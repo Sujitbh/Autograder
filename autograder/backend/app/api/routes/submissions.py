@@ -1,3 +1,44 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from typing import List
+
+from app.api.deps import get_db, get_current_user
+from app.models.submission import Submission
+from app.schemas.submission import SubmissionCreate, SubmissionOut
+
+router = APIRouter(prefix="/submissions", tags=["submissions"])
+
+
+@router.get("/", response_model=List[SubmissionOut])
+def list_submissions(db: Session = Depends(get_db)):
+    return db.query(Submission).all()
+
+
+@router.post("/", response_model=SubmissionOut)
+def create_submission(payload: SubmissionCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    s = Submission(assignment_id=payload.assignment_id, student_id=payload.student_id)
+    db.add(s)
+    db.commit()
+    db.refresh(s)
+    return s
+
+
+@router.get("/{s_id}", response_model=SubmissionOut)
+def get_submission(s_id: int, db: Session = Depends(get_db)):
+    s = db.query(Submission).filter(Submission.id == s_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    return s
+
+
+@router.delete("/{s_id}")
+def delete_submission(s_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    s = db.query(Submission).filter(Submission.id == s_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    db.delete(s)
+    db.commit()
+    return {"ok": True}
 import os
 from pathlib import Path
 from typing import List
