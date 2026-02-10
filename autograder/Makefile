@@ -1,18 +1,20 @@
 SHELL := /bin/bash
 
-.PHONY: up down backend frontend db
+.PHONY: up down backend frontend db seed
 
-up: db
+up: db frontend backend seed
 
 db:
 	@docker-compose up -d db
-	@echo "Postgres started."
+
+frontend:
+	@docker-compose up -d frontend
+
+backend:
+	@docker-compose up -d backend
+
+seed:
+	@docker-compose exec db bash -c "your-seed-command-here"
 
 down:
 	@docker-compose down
-
-backend:
-	@cd backend && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-
-frontend:
-	@cd frontend && npm run dev
