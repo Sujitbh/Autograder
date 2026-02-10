@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { GraduationCap, Users, ShieldCheck, User, Lock } from 'lucide-react'
-import { setToken as storeToken, setRole as storeRole } from '../lib/auth'
+import { setToken as storeToken, setRole as storeRole, setUsername as storeUsername } from '../lib/auth'
 import { apiFetch } from '../lib/api'
 
 export default function Login({ onLogin, navigate }) {
@@ -53,6 +53,7 @@ export default function Login({ onLogin, navigate }) {
       }
       storeToken(token)
       storeRole(role)
+      storeUsername(username)
       onLogin && onLogin(token, role)
       navigate && navigate(role === 'faculty' ? 'faculty_dashboard' : 'student_dashboard')
     } catch (err) {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import './App.css'
 import Layout from './components/Layout'
 import StudentDashboard from './components/StudentDashboard'
@@ -8,7 +8,8 @@ import AISubmissionAnalyzer from './components/AISubmissionAnalyzer'
 import AssignmentCreator from './components/AssignmentCreator'
 import AdminPanel from './components/AdminPanel'
 import Login from './components/Login'
-import { getToken, getRole, clearAuth } from './lib/auth'
+import { ToastProvider, useToast, setToastHandler } from './components/Toast'
+import { getToken, getRole, getUsername, clearAuth } from './lib/auth'
 import { Plus } from 'lucide-react'
 
 const MOCK_ASSIGNMENT = {
@@ -32,33 +33,55 @@ const MOCK_ASSIGNMENT = {
   ]
 }
 
-function App() {
+function AppContent() {
   const token = getToken()
   const storedRole = getRole()
-  const [user, setUser] = useState(token ? { id: 'u1', name: 'Sarah Drasner', email: 'sarah@university.edu', role: storedRole || 'faculty' } : null)
+  const storedUsername = getUsername()
+  const toast = useToast()
+  
+  const [user, setUser] = useState(token ? { 
+    id: 'u1', 
+    name: storedUsername || 'User', 
+    email: storedUsername || 'user@university.edu', 
+    role: storedRole || 'faculty' 
+  } : null)
   const [view, setView] = useState(user ? 'dashboard' : 'login')
   const [isCreatorOpen, setIsCreatorOpen] = useState(false)
+  const [currentAssignment, setCurrentAssignment] = useState(null)
+
+  // Register toast handler for global access
+  useEffect(() => {
+    setToastHandler(toast)
+  }, [toast])
 
   const handleRoleChange = (role) => {
     setUser({ ...user, role })
     setView('dashboard')
+    toast.info(`Switched to ${role} view`)
   }
 
   const handleLogout = () => {
     clearAuth()
     setUser(null)
     setView('login')
+    toast.success('Logged out successfully')
+  }
+
+  const handleOpenWorkspace = (assignment) => {
+    setCurrentAssignment(assignment || MOCK_ASSIGNMENT)
+    setView('workspace')
   }
 
   const renderContent = () => {
     if (!user) {
       return <Login onLogin={(token, role) => {
-        setUser({ id: 'u1', name: 'Sarah Drasner', email: 'sarah@university.edu', role })
-        setView(role === 'faculty' ? 'dashboard' : 'dashboard')
+        setUser({ id: 'u1', name: storedUsername || 'User', email: storedUsername || 'user@university.edu', role })
+        setView('dashboard')
+        toast.success('Welcome back!')
       }} navigate={(target) => setView(target === 'faculty_dashboard' ? 'dashboard' : 'dashboard')} />
     }
     if (view === 'workspace') {
-      return <CodeWorkspace assignment={MOCK_ASSIGNMENT} onBack={() => setView('dashboard')} />
+      return <CodeWorkspace assignment={currentAssignment || MOCK_ASSIGNMENT} onBack={() => setView('dashboard')} />
     }
 
     switch (user.role) {
@@ -71,13 +94,13 @@ function App() {
                 <p className="opacity-80">You have 3 days remaining to submit this assignment.</p>
               </div>
               <button 
-                onClick={() => setView('workspace')}
+                onClick={() => handleOpenWorkspace(MOCK_ASSIGNMENT)}
                 className="bg-white text-indigo-600 px-8 py-3 rounded-xl font-bold hover:bg-slate-100 transition-all shadow-lg"
               >
                 Resume Coding
               </button>
             </div>
-            <StudentDashboard />
+            <StudentDashboard onOpenWorkspace={handleOpenWorkspace} navigate={setView} />
           </div>
         )
       case 'faculty':
@@ -96,9 +119,9 @@ function App() {
                 <span>Create Assignment</span>
               </button>
             </div>
-            <FacultyDashboard />
+            <FacultyDashboard navigate={setView} onSelectSubmission={(sub) => toast.info(`Selected submission #${sub.id}`)} />
             <AISubmissionAnalyzer />
-            {isCreatorOpen && <AssignmentCreator onClose={() => setIsCreatorOpen(false)} onSave={() => setIsCreatorOpen(false)} />}
+            {isCreatorOpen && <AssignmentCreator onClose={() => setIsCreatorOpen(false)} onSave={() => { setIsCreatorOpen(false); toast.success('Assignment created!') }} />}
           </div>
         )
       case 'admin':
@@ -114,6 +137,14 @@ function App() {
         {renderContent()}
       </div>
     </Layout>
+  )
+}
+
+function App() {
+  return (
+    <ToastProvider>
+      <AppContent />
+    </ToastProvider>
   )
 }
 

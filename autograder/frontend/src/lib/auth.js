@@ -16,7 +16,17 @@ export function getRole() {
   return localStorage.getItem('role')
 }
 
+export function setUsername(username) {
+  if (username) localStorage.setItem('username', username)
+  else localStorage.removeItem('username')
+}
+
+export function getUsername() {
+  return localStorage.getItem('username')
+}
+
 export function clearAuth() {
   localStorage.removeItem('token')
   localStorage.removeItem('role')
+  localStorage.removeItem('username')
 }
