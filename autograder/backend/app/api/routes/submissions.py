@@ -1,12 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+import os
+from pathlib import Path
 from typing import List
 
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from sqlalchemy.orm import Session
+
 from app.api.deps import get_db, get_current_user
+from app.core.permissions import require_role
+from app.models.assignment import Assignment
 from app.models.submission import Submission
+from app.models.submission_file import SubmissionFile
+from app.models.user import User
 from app.schemas.submission import SubmissionCreate, SubmissionOut
+from app.settings import settings
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
+
+
+def safe_folder_name(s: str) -> str:
+    """Keep it simple + safe for folders."""
+    return "".join(ch if ch.isalnum() or ch in ("@", ".", "_", "-") else "_" for ch in s)
 
 
 @router.get("/", response_model=List[SubmissionOut])
@@ -15,7 +28,11 @@ def list_submissions(db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=SubmissionOut)
-def create_submission(payload: SubmissionCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def create_submission(
+    payload: SubmissionCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     s = Submission(assignment_id=payload.assignment_id, student_id=payload.student_id)
     db.add(s)
     db.commit()
@@ -32,33 +49,18 @@ def get_submission(s_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/{s_id}")
-def delete_submission(s_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def delete_submission(
+    s_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     s = db.query(Submission).filter(Submission.id == s_id).first()
     if not s:
         raise HTTPException(status_code=404, detail="Submission not found")
     db.delete(s)
     db.commit()
     return {"ok": True}
-import os
-from pathlib import Path
-from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy.orm import Session
-
-from app.api.deps import get_db, get_current_user
-from app.core.permissions import require_role
-from app.models.assignment import Assignment
-from app.models.submission import Submission
-from app.models.submission_file import SubmissionFile
-from app.models.user import User
-from app.settings import settings
-
-router = APIRouter(prefix="/submissions", tags=["submissions"])
-
-def safe_folder_name(s: str) -> str:
-    # keep it simple + safe for folders
-    return "".join(ch if ch.isalnum() or ch in ("@", ".", "_", "-") else "_" for ch in s)
 
 @router.post("/assignments/{assignment_id}/upload")
 async def upload_submission_files(
