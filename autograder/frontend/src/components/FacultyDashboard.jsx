@@ -18,10 +18,12 @@ import {
   Play
 } from 'lucide-react'
 import { coursesApi, assignmentsApi, submissionsApi, gradingApi } from '../lib/api'
+import { useNavigate } from 'react-router-dom'
 
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6']
 
 export default function FacultyDashboard({ navigate, onSelectSubmission }) {
+  const routerNavigate = useNavigate()
   const [courses, setCourses] = useState([])
   const [assignments, setAssignments] = useState([])
   const [submissions, setSubmissions] = useState([])
@@ -162,7 +164,11 @@ export default function FacultyDashboard({ navigate, onSelectSubmission }) {
           </div>
           <select
             value={selectedCourse?.id || ''}
-            onChange={(e) => setSelectedCourse(courses.find(c => c.id === parseInt(e.target.value)) || null)}
+            onChange={(e) => {
+              const val = e.target.value
+              setSelectedCourse(courses.find(c => c.id === parseInt(val)) || null)
+              if (val) routerNavigate(`/faculty/assignments?course_id=${val}`)
+            }}
             className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-200 outline-none"
           >
             <option value="">All Courses</option>
@@ -371,9 +377,10 @@ export default function FacultyDashboard({ navigate, onSelectSubmission }) {
             ) : (
               courses.map(course => (
                 <div 
-                  key={course.id}
-                  className="flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:border-indigo-300 transition-all cursor-pointer group"
-                >
+                    key={course.id}
+                    onClick={() => routerNavigate(`/faculty/assignments?course_id=${course.id}`)}
+                    className="flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:border-indigo-300 transition-all cursor-pointer group"
+                  >
                   <div className="flex items-center space-x-4">
                     <div className="p-3 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl">
                       <BookOpen className="w-5 h-5 text-white" />

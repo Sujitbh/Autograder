@@ -1,5 +1,6 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, X, PlusCircle } from 'lucide-react'
+import { coursesApi } from '../lib/api'
 
 export default function AssignmentCreator({ onClose, onSave }) {
   const [title, setTitle] = useState('')
@@ -10,6 +11,24 @@ export default function AssignmentCreator({ onClose, onSave }) {
   const [testCases, setTestCases] = useState([
     { id: '1', input: '5', expectedOutput: '120', isPublic: true }
   ])
+  const [courses, setCourses] = useState([])
+  const [selectedCourse, setSelectedCourse] = useState(null)
+
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      try {
+        const data = await coursesApi.list().catch(() => [])
+        if (!mounted) return
+        setCourses(data)
+        if (data && data.length > 0) setSelectedCourse(data[0].id)
+      } catch (err) {
+        console.error('Failed to load courses', err)
+      }
+    }
+    load()
+    return () => { mounted = false }
+  }, [])
 
   const addRubricRow = () => {
     setRubric([...rubric, { id: Date.now().toString(), criterion: '', points: 0, description: '' }])
@@ -44,7 +63,7 @@ export default function AssignmentCreator({ onClose, onSave }) {
               <span className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center mr-3 text-sm">1</span>
               Basic Information
             </h3>
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-3 gap-6">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slate-400 uppercase">Assignment Title</label>
                 <input 
@@ -66,6 +85,22 @@ export default function AssignmentCreator({ onClose, onSave }) {
                   <option value="java">Java</option>
                   <option value="javascript">JavaScript</option>
                 </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-400 uppercase">Course</label>
+                {courses.length === 0 ? (
+                  <div className="px-4 py-2 text-sm text-slate-400">No courses available</div>
+                ) : (
+                  <select
+                    value={selectedCourse || ''}
+                    onChange={e => setSelectedCourse(e.target.value)}
+                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  >
+                    {courses.map(c => (
+                      <option key={c.id} value={c.id}>{c.code}: {c.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
           </section>

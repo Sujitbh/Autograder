@@ -23,7 +23,7 @@ const menuItems = {
   ],
   faculty: [
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard, path: '/faculty/dashboard' },
-    { id: 'classes', label: 'Classes', icon: Users, path: '/faculty/classes' },
+    { id: 'courses', label: 'Courses', icon: BookOpen, path: '/faculty/courses' },
     { id: 'assignments', label: 'Assignments', icon: Code2, path: '/faculty/assignments' },
     { id: 'reports', label: 'Reports', icon: BarChart3, path: '/faculty/grading' },
   ],
