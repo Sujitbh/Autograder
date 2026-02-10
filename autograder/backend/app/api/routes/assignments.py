@@ -24,7 +24,15 @@ def create_assignment(
 ):
     require_role(user.role, {"faculty", "admin"})
 
-    assignment = Assignment(title=payload.title, description=payload.description)
+    assignment = Assignment(
+        title=payload.title,
+        description=payload.description,
+        course_id=payload.course_id,
+        created_by=user.id,
+        due_date=payload.due_date,
+        max_submissions=payload.max_submissions,
+        allowed_languages=payload.allowed_languages,
+    )
     db.add(assignment)
     db.commit()
     db.refresh(assignment)

@@ -10,7 +10,6 @@ from pydantic import BaseModel
 class SubmissionBase(BaseModel):
     """Base submission schema."""
     assignment_id: int
-    student_id: int
 
 
 class SubmissionCreate(SubmissionBase):
@@ -28,9 +27,11 @@ class SubmissionFileOut(BaseModel):
         from_attributes = True
 
 
-class SubmissionOut(SubmissionBase):
+class SubmissionOut(BaseModel):
     """Schema for submission output."""
     id: int
+    assignment_id: int
+    student_id: int
     status: Optional[str] = "pending"
     score: Optional[int] = None
     max_score: Optional[int] = None

@@ -44,11 +44,14 @@ class UserService:
                 detail="Email already registered",
             )
 
+        # Auto-assign faculty role for @ulm.edu domain
+        role = "faculty" if payload.email.lower().endswith("@ulm.edu") else "student"
+
         user = User(
             name=payload.name,
             email=payload.email,
             password_hash=hash_password(payload.password),
-            role="student",  # Default role
+            role=role,
         )
         db.add(user)
         db.commit()

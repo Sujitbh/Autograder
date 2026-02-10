@@ -31,10 +31,12 @@ export default function FacultyAssignments() {
     description: '',
     course_id: '',
     due_date: '',
-    max_score: 100,
-    language: 'python',
+    allowed_languages: 'python',
   })
   const [creating, setCreating] = useState(false)
+  const [editingAssignment, setEditingAssignment] = useState(null)
+  const [editForm, setEditForm] = useState({})
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -67,13 +69,15 @@ export default function FacultyAssignments() {
     setCreating(true)
     try {
       const data = {
-        ...newAssignment,
+        title: newAssignment.title,
+        description: newAssignment.description || null,
         course_id: newAssignment.course_id ? parseInt(newAssignment.course_id) : null,
-        max_score: parseInt(newAssignment.max_score) || 100,
+        due_date: newAssignment.due_date || null,
+        allowed_languages: newAssignment.allowed_languages || 'python',
       }
       await assignmentsAPI.create(data)
       setShowNewModal(false)
-      setNewAssignment({ title: '', description: '', course_id: '', due_date: '', max_score: 100, language: 'python' })
+      setNewAssignment({ title: '', description: '', course_id: '', due_date: '', allowed_languages: 'python' })
       loadData()
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to create assignment')
@@ -89,6 +93,44 @@ export default function FacultyAssignments() {
       loadData()
     } catch (err) {
       setError('Failed to delete assignment')
+    }
+  }
+
+  const openEditModal = (assignment) => {
+    setEditForm({
+      title: assignment.title || '',
+      description: assignment.description || '',
+      course_id: assignment.course_id || '',
+      due_date: assignment.due_date ? assignment.due_date.slice(0, 16) : '',
+      allowed_languages: assignment.allowed_languages || 'python',
+      is_active: assignment.is_active !== false,
+    })
+    setEditingAssignment(assignment)
+  }
+
+  const handleUpdate = async (e) => {
+    e.preventDefault()
+    if (!editForm.title.trim()) {
+      setError('Title is required')
+      return
+    }
+    setSaving(true)
+    try {
+      const data = {
+        title: editForm.title,
+        description: editForm.description || null,
+        course_id: editForm.course_id ? parseInt(editForm.course_id) : null,
+        due_date: editForm.due_date || null,
+        allowed_languages: editForm.allowed_languages || 'python',
+        is_active: editForm.is_active,
+      }
+      await assignmentsAPI.update(editingAssignment.id, data)
+      setEditingAssignment(null)
+      loadData()
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to update assignment')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -177,12 +219,12 @@ export default function FacultyAssignments() {
                         <MoreVertical className="w-4 h-4 text-slate-400" />
                       </button>
                       <div className="absolute right-0 top-8 bg-white border border-slate-200 rounded-xl shadow-lg py-1 w-36 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-10">
-                        <Link
-                          to={`/faculty/assignments/${assignment.id}/edit`}
-                          className="flex items-center px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"
+                        <button
+                          onClick={() => openEditModal(assignment)}
+                          className="flex items-center px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 w-full"
                         >
                           <Edit className="w-4 h-4 mr-2" /> Edit
-                        </Link>
+                        </button>
                         <button
                           onClick={() => handleDelete(assignment.id)}
                           className="flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full"
@@ -278,8 +320,8 @@ export default function FacultyAssignments() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Language</label>
                   <select
-                    value={newAssignment.language}
-                    onChange={(e) => setNewAssignment(p => ({ ...p, language: e.target.value }))}
+                    value={newAssignment.allowed_languages}
+                    onChange={(e) => setNewAssignment(p => ({ ...p, allowed_languages: e.target.value }))}
                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-200 outline-none"
                   >
                     <option value="python">Python</option>
@@ -300,16 +342,6 @@ export default function FacultyAssignments() {
                     className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-200 outline-none"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Max Score</label>
-                  <input
-                    type="number"
-                    value={newAssignment.max_score}
-                    onChange={(e) => setNewAssignment(p => ({ ...p, max_score: e.target.value }))}
-                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-200 outline-none"
-                    min={1}
-                  />
-                </div>
               </div>
               <div className="flex justify-end space-x-3 pt-4">
                 <button
@@ -326,6 +358,107 @@ export default function FacultyAssignments() {
                 >
                   {creating && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>Create</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingAssignment && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
+            <div className="p-6 border-b border-slate-100">
+              <h2 className="text-xl font-bold text-slate-800">Edit Assignment</h2>
+            </div>
+            <form onSubmit={handleUpdate} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Title *</label>
+                <input
+                  type="text"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm(p => ({ ...p, title: e.target.value }))}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-200 outline-none"
+                  placeholder="Assignment title"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                <textarea
+                  value={editForm.description}
+                  onChange={(e) => setEditForm(p => ({ ...p, description: e.target.value }))}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-200 outline-none"
+                  rows={3}
+                  placeholder="Assignment description..."
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Course</label>
+                  <select
+                    value={editForm.course_id}
+                    onChange={(e) => setEditForm(p => ({ ...p, course_id: e.target.value }))}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-200 outline-none"
+                  >
+                    <option value="">Select course</option>
+                    {courses.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Language</label>
+                  <select
+                    value={editForm.allowed_languages}
+                    onChange={(e) => setEditForm(p => ({ ...p, allowed_languages: e.target.value }))}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-200 outline-none"
+                  >
+                    <option value="python">Python</option>
+                    <option value="java">Java</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="cpp">C++</option>
+                    <option value="c">C</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Due Date</label>
+                  <input
+                    type="datetime-local"
+                    value={editForm.due_date}
+                    onChange={(e) => setEditForm(p => ({ ...p, due_date: e.target.value }))}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-200 outline-none"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editForm.is_active}
+                      onChange={(e) => setEditForm(p => ({ ...p, is_active: e.target.checked }))}
+                      className="w-4 h-4 text-indigo-600 rounded"
+                    />
+                    <span className="text-sm font-medium text-slate-700">Active</span>
+                  </label>
+                </div>
+              </div>
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setEditingAssignment(null)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center space-x-2"
+                >
+                  {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>Save Changes</span>
                 </button>
               </div>
             </form>
