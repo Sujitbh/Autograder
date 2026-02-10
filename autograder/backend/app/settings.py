@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = [
         "http://localhost:5174",
         "http://localhost:5173",
-        "https://crispy-winner-6qqgqq66wpxf4jrp-5173.app.github.dev",
-        "https://crispy-winner-6qqgqq66wpxf4jrp-5175.app.github.dev",
+        "https://orange-waddle-qjjqjjrrg5w3j65-5173.app.github.dev",
+        "https://orange-waddle-qjjqjjrrg5w3j65-8000.app.github.dev",
     ]
 
 
