@@ -80,11 +80,14 @@ export default function CodeWorkspace({ assignment, onBack }) {
     
     try {
       // Create a file from the code
-      const file = new File([code], `solution.${getFileExtension(assignment?.language)}`, {
+      const ext = getFileExtension(assignment?.language)
+      const file = new File([code], `solution.${ext}`, {
         type: 'text/plain'
       })
       
-      await submissionsAPI.submit(assignment.id, [file])
+      console.log('[CodeWorkspace] Submitting file:', file.name, 'size:', file.size, 'for assignment:', assignment.id)
+      const response = await submissionsAPI.upload(assignment.id, [file])
+      console.log('[CodeWorkspace] Submission response:', response.data)
       
       // Navigate back or show success
       if (onBack) {
@@ -93,7 +96,9 @@ export default function CodeWorkspace({ assignment, onBack }) {
         navigate('/student/submissions')
       }
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to submit assignment')
+      const detail = err.response?.data?.detail || err.message || 'Failed to submit assignment'
+      console.error('[CodeWorkspace] Submission failed:', detail, err)
+      setError(detail)
     } finally {
       setIsSubmitting(false)
     }

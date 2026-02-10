@@ -89,14 +89,14 @@ def get_submission_files(
     return [{"id": f.id, "filename": f.filename, "file_size": f.file_size} for f in files]
 
 
-@router.post("/assignments/{assignment_id}/upload")
+@router.post("/assignments/{assignment_id}/upload", response_model=SubmissionOut)
 async def upload_submission_files(
     assignment_id: int,
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    require_role(user.role, {"student"})
+    require_role(user.role, {"student", "faculty", "admin"})
 
     assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
     if not assignment:
@@ -130,16 +130,12 @@ async def upload_submission_files(
             submission_id=submission.id,
             filename=filename,
             path=str(dest_path),
+            file_size=len(content),
         )
         db.add(rec)
         saved += 1
 
     db.commit()
+    db.refresh(submission)
 
-    return {
-        "submission_id": submission.id,
-        "assignment_id": assignment_id,
-        "student": user.email,
-        "files_saved": saved,
-        "folder": str(dest_dir),
-    }
+    return submission
