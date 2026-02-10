@@ -17,7 +17,6 @@ class User(Base):
 
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
     submissions = relationship("Submission", back_populates="student", foreign_keys="Submission.student_id")
