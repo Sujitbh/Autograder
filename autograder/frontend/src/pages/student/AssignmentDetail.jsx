@@ -94,14 +94,17 @@ export default function AssignmentDetail() {
     setUploading(true)
     setError(null)
     try {
+      console.log('[AssignmentDetail] Uploading', files.length, 'file(s) for assignment:', id)
       const response = await submissionsAPI.upload(id, files)
-      setSubmission(response.data)
+      console.log('[AssignmentDetail] Upload response:', response.data)
       setFiles([])
       setActiveTab('submission')
       alert('Submission uploaded successfully!')
-      loadData() // Refresh to get latest data
+      await loadData() // Refresh to get latest submission from server
     } catch (err) {
-      setError(err.response?.data?.detail || 'Upload failed')
+      const detail = err.response?.data?.detail || err.message || 'Upload failed'
+      console.error('[AssignmentDetail] Upload failed:', detail, err)
+      setError(detail)
     } finally {
       setUploading(false)
     }
