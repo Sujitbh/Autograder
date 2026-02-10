@@ -22,6 +22,7 @@ import {
   FacultyAssignments,
   FacultyAssignmentDetail,
   FacultyGrading,
+  FacultyCourses,
 } from '../pages/faculty'
 
 // Admin Pages
@@ -103,6 +104,10 @@ export const router = createBrowserRouter([
       {
         path: 'assignments',
         element: <FacultyAssignments />,
+      },
+      {
+        path: 'courses',
+        element: <FacultyCourses />,
       },
       {
         path: 'assignments/:id',

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import { assignmentsAPI, submissionsAPI, coursesAPI, gradingAPI } from '../../api/endpoints'
 import {
@@ -21,6 +21,7 @@ import {
 const COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444']
 
 export default function FacultyDashboard() {
+  const navigate = useNavigate()
   const [assignments, setAssignments] = useState([])
   const [submissions, setSubmissions] = useState([])
   const [courses, setCourses] = useState([])
@@ -186,6 +187,22 @@ export default function FacultyDashboard() {
               <BarChart3 className="w-6 h-6 text-violet-600" />
             </div>
           </div>
+          {courses.length > 0 && (
+            <div className="mt-3 space-y-2">
+              {courses.slice(0,3).map(c => (
+                <button
+                  key={c.id}
+                  onClick={() => navigate(`/faculty/assignments?course_id=${c.id}`)}
+                  className="text-left w-full text-sm text-slate-600 hover:text-indigo-600"
+                >
+                  {c.code ? `${c.code} — ${c.name}` : c.name}
+                </button>
+              ))}
+              {courses.length > 3 && (
+                <button onClick={() => navigate('/faculty/courses')} className="text-sm text-indigo-600">View all courses</button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
