@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///Users/reeyadangol/Desktop/Autograder/Untitled/autograder/frontend/src/app/page.tsx"],"sourcesContent":["'use client';\n\nimport { useEffect } from 'react';\nimport { useRouter } from 'next/navigation';\nimport { useAuth } from '@/utils/AuthContext';\n\nexport default function Home() {\n    const { isAuthenticated } = useAuth();\n    const router = useRouter();\n\n    useEffect(() => {\n        router.replace(isAuthenticated ? '/courses' : '/login');\n    }, [isAuthenticated, router]);\n\n    return null;\n}\n"],"names":[],"mappings":";;;;AAEA;AACA;AACA;;AAJA;;;;AAMe,SAAS;;IACpB,MAAM,EAAE,eAAe,EAAE,GAAG,IAAA,yMAAO;IACnC,MAAM,SAAS,IAAA,iNAAS;IAExB,IAAA,yOAAS;0BAAC;YACN,OAAO,OAAO,CAAC,kBAAkB,aAAa;QAClD;yBAAG;QAAC;QAAiB;KAAO;IAE5B,OAAO;AACX;GATwB;;QACQ,yMAAO;QACpB,iNAAS;;;KAFJ"}},
+    {"offset": {"line": 45, "column": 0}, "map": {"version":3,"sources":["file:///Users/reeyadangol/Desktop/Autograder/Untitled/autograder/frontend/node_modules/next/navigation.js"],"sourcesContent":["module.exports = require('./dist/client/components/navigation')\n"],"names":[],"mappings":"AAAA,OAAO,OAAO","ignoreList":[0]}}]
+}

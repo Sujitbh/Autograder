@@ -1,0 +1,3 @@
+{
+  "/courses/[courseId]/grading/page": "app/courses/[courseId]/grading/page.js"
+}
