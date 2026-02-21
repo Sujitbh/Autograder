@@ -1,0 +1,55 @@
+/* [project]/Desktop/Autograder/Untitled/autograder/frontend/src/styles/index.css [app-client] (css) */
+.ql-toolbar {
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+  background-color: #f5eded !important;
+  border-color: #d9d9d9 !important;
+}
+
+.ql-container {
+  border-bottom-right-radius: 8px;
+  border-bottom-left-radius: 8px;
+  border-color: #d9d9d9 !important;
+  font-family: Inter, system-ui, -apple-system, sans-serif !important;
+  font-size: 14px !important;
+}
+
+.ql-editor {
+  min-height: 200px;
+  font-family: Inter, system-ui, -apple-system, sans-serif !important;
+}
+
+.ql-editor.ql-blank:before {
+  color: #8a8a8a;
+  font-style: normal;
+}
+
+.ql-snow .ql-stroke {
+  stroke: #6b0000 !important;
+}
+
+.ql-snow .ql-fill {
+  fill: #6b0000 !important;
+}
+
+.ql-snow .ql-picker-label {
+  color: #2d2d2d !important;
+}
+
+.ql-toolbar button:hover, .ql-toolbar button:focus, .ql-toolbar button.ql-active {
+  color: #6b0000 !important;
+}
+
+.ql-toolbar button:hover .ql-stroke, .ql-toolbar button:focus .ql-stroke, .ql-toolbar button.ql-active .ql-stroke {
+  stroke: #6b0000 !important;
+}
+
+.ql-toolbar button:hover .ql-fill, .ql-toolbar button:focus .ql-fill, .ql-toolbar button.ql-active .ql-fill {
+  fill: #6b0000 !important;
+}
+
+.ql-snow.ql-toolbar button:hover, .ql-snow.ql-toolbar button:focus {
+  background-color: #6b00001a !important;
+}
+
+/*# sourceMappingURL=Desktop_Autograder_Untitled_autograder_frontend_src_styles_index_css_bad6b30c._.single.css.map*/
