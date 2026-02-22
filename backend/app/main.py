@@ -1,6 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from app.core.database import Base, engine
+from app.api.deps import get_db
 import app.models  # ensure all models are imported so metadata is complete
 from app.api.routes import (
     auth,
@@ -13,6 +16,10 @@ from app.api.routes import (
     grading,
 )
 from app.settings import settings
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Autograder API",
@@ -20,7 +27,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
-Base.metadata.create_all(bind=engine)
+# Create all tables on startup
+try:
+    Base.metadata.create_all(bind=engine)
+    logger.info("Database tables created/verified successfully")
+    # Quick connectivity check
+    with engine.connect() as conn:
+        conn.execute(text("SELECT 1"))
+    logger.info(f"Database connection OK: {settings.DATABASE_URL.split('@')[1]}")
+except Exception as e:
+    logger.error(f"Database connection FAILED: {e}")
 
 
 @app.get("/")
@@ -50,4 +66,30 @@ app.add_middleware(
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/api/health/db")
+def health_db(db: Session = Depends(get_db)):
+    """Database connectivity check — returns success/fail with diagnostics."""
+    try:
+        result = db.execute(text("SELECT 1")).scalar()
+        table_count = db.execute(
+            text("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'")
+        ).scalar()
+        user_count = db.execute(text("SELECT count(*) FROM users")).scalar()
+        course_count = db.execute(text("SELECT count(*) FROM courses")).scalar()
+        assignment_count = db.execute(text("SELECT count(*) FROM assignments")).scalar()
+        return {
+            "status": "connected",
+            "db_host": settings.DATABASE_URL.split("@")[1].split("/")[0],
+            "db_name": settings.DATABASE_URL.split("/")[-1],
+            "tables": table_count,
+            "rows": {
+                "users": user_count,
+                "courses": course_count,
+                "assignments": assignment_count,
+            },
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
