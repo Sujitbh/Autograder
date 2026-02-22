@@ -1,0 +1,296 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* ============================================
+     AutoGrade ULM Design System
+     Section 1 - Color Palette & Design Tokens
+     All values from Figma design spec
+     ============================================ */
+
+  /* 1.1 Color Palette */
+  /* Primary Colors */
+  --color-primary: #6B0000;
+  /* Primary CTAs, active states, headers, logo accents */
+  --color-primary-hover: #8B1A1A;
+  /* Button hover, active navigation items */
+  --color-primary-bg: #F5EDED;
+  /* Page backgrounds, sidebar fill, inactive card states */
+  --color-primary-light: #FCEAEA;
+  /* Notification badges, alert backgrounds, hover fills */
+
+  /* Gold Accent */
+  --color-gold-accent: #C9A84C;
+  /* Notification badges, callout borders, award icons */
+
+  /* Text Colors */
+  --color-text-dark: #2D2D2D;
+  /* Primary body text, headings (non-maroon) */
+  --color-text-mid: #595959;
+  /* Secondary labels, captions, metadata */
+  --color-text-light: #8A8A8A;
+  /* Placeholder text, disabled states, helper text */
+
+  /* Border & Backgrounds */
+  --color-border: #D9D9D9;
+  /* Card borders, table borders, input outlines (default) */
+  --color-white: #FFFFFF;
+  /* Card backgrounds, modal backgrounds, input fills */
+
+  /* Surface colors for dark mode support */
+  --color-surface: #FFFFFF;
+  --color-surface-elevated: #FAF5F5;
+  --color-nav-bg: #6B0000;
+
+  /* Status Colors */
+  --color-success: #2D6A2D;
+  --color-warning: #8A5700;
+  --color-error: #8B0000;
+  --color-info: #1A4D7A;
+
+  /* Status Backgrounds */
+  --color-success-bg: #E8F5E9;
+  --color-warning-bg: #FFF3CD;
+  --color-error-bg: #FFE6E6;
+  --color-info-bg: #E3F2FD;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-dropdown: 0 4px 12px rgba(107, 0, 0, 0.10);
+  --shadow-modal: 0 8px 24px rgba(107, 0, 0, 0.15);
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Spacing (8px base grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Typography Scale */
+  --font-size-11: 11px;
+  /* Micro labels, table headers */
+  --font-size-12: 12px;
+  /* Helper text, metadata */
+  --font-size-13: 13px;
+  /* Form labels, secondary UI */
+  --font-size-14: 14px;
+  /* Body text (base), buttons */
+  --font-size-16: 16px;
+  /* Section headers, emphasized text */
+  --font-size-18: 18px;
+  /* Panel titles, modal headers */
+  --font-size-22: 22px;
+  /* Page subheadings */
+  --font-size-28: 28px;
+  /* Page titles (H1) */
+
+  /* Font Weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Line Heights */
+  --line-height-tight: 1.2;
+  /* Headers */
+  --line-height-normal: 1.5;
+  /* Body text */
+  --line-height-relaxed: 1.7;
+  /* Long-form content */
+
+  /* Legacy aliases for backward compatibility */
+  --ulm-maroon: var(--color-primary);
+  --ulm-maroon-hover: var(--color-primary-hover);
+  --ulm-maroon-dark: #3A0000;
+  --ulm-gold: var(--color-gold-accent);
+  --ulm-background: var(--color-primary-bg);
+  --ulm-white: var(--color-white);
+  --ulm-text-dark: var(--color-text-dark);
+  --ulm-text-mid: var(--color-text-mid);
+  --ulm-text-light: var(--color-text-light);
+  --ulm-border: var(--color-border);
+  --ulm-success: var(--color-success);
+  --ulm-error: var(--color-error);
+  --ulm-warning: var(--color-warning);
+  --ulm-info: var(--color-info);
+
+  /* Standard theme variables for Radix UI components */
+  --background: var(--color-primary-bg);
+  --foreground: var(--color-text-dark);
+  --card: var(--color-white);
+  --card-foreground: var(--color-text-dark);
+  --popover: var(--color-white);
+  --popover-foreground: var(--color-text-dark);
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-white);
+  --secondary: var(--color-primary-bg);
+  --secondary-foreground: var(--color-text-dark);
+  --muted: var(--color-primary-bg);
+  --muted-foreground: var(--color-text-mid);
+  --accent: var(--color-gold-accent);
+  --accent-foreground: var(--color-text-dark);
+  --destructive: var(--color-error);
+  --destructive-foreground: var(--color-white);
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --input-background: var(--color-white);
+  --ring: var(--color-primary);
+  --radius: var(--radius-md);
+
+  --chart-1: var(--color-primary);
+  --chart-2: var(--color-gold-accent);
+  --chart-3: var(--color-success);
+  --chart-4: var(--color-info);
+  --chart-5: var(--color-warning);
+}
+
+/* ============================================
+   Dark Mode Overrides
+   Applied when .dark class is on <html>
+   ============================================ */
+.dark {
+  --color-primary: #D4544C;
+  --color-primary-hover: #C44840;
+  --color-primary-bg: #181818;
+  --color-primary-light: #2D2020;
+
+  --color-gold-accent: #E8CC6E;
+
+  --color-text-dark: #F5F5F5;
+  --color-text-mid: #BDBDBD;
+  --color-text-light: #858585;
+
+  --color-border: #333333;
+  --color-white: #212121;
+
+  --color-surface: #212121;
+  --color-surface-elevated: #2A2A2A;
+  --color-nav-bg: #1C1C1C;
+
+  --color-success: #81C784;
+  --color-warning: #FFD54F;
+  --color-error: #EF9A9A;
+  --color-info: #90CAF9;
+
+  --color-success-bg: #1B2E1B;
+  --color-warning-bg: #2E2A1A;
+  --color-error-bg: #2E1B1B;
+  --color-info-bg: #1A2230;
+
+  --shadow-card: 0 1px 4px rgba(0, 0, 0, 0.35);
+  --shadow-dropdown: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-modal: 0 8px 24px rgba(0, 0, 0, 0.55);
+
+  --background: var(--color-primary-bg);
+  --foreground: var(--color-text-dark);
+  --card: var(--color-white);
+  --card-foreground: var(--color-text-dark);
+  --popover: var(--color-white);
+  --popover-foreground: var(--color-text-dark);
+  --primary: var(--color-primary);
+  --primary-foreground: #FFFFFF;
+  --secondary: #2A2A2A;
+  --secondary-foreground: var(--color-text-dark);
+  --muted: #2A2A2A;
+  --muted-foreground: var(--color-text-mid);
+  --accent: var(--color-gold-accent);
+  --accent-foreground: var(--color-text-dark);
+  --destructive: var(--color-error);
+  --destructive-foreground: #1A1A1A;
+  --border: var(--color-border);
+  --input: var(--color-border);
+  --input-background: #1E1E1E;
+  --ring: var(--color-primary);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    font-size: 14px;
+    line-height: 22px;
+  }
+
+  html {
+    font-size: var(--font-size);
+  }
+
+  h1 {
+    font-family: 'Inter', sans-serif;
+  }
+
+  h2 {
+    font-family: 'Inter', sans-serif;
+  }
+
+  h3 {
+    font-family: 'Inter', sans-serif;
+  }
+
+  h4 {
+    font-family: 'Inter', sans-serif;
+  }
+
+  label {
+    font-family: 'Inter', sans-serif;
+  }
+
+  button {
+    font-family: 'Inter', sans-serif;
+  }
+
+  input,
+  textarea {
+    font-family: 'Inter', sans-serif;
+  }
+
+  code,
+  pre {
+    font-family: 'JetBrains Mono', 'Courier New', monospace;
+  }
+}
