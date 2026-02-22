@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     # CORS origins for frontend development
     CORS_ORIGINS: List[str] = [
+        "http://localhost:3000",
         "http://localhost:5174",
         "http://localhost:5173",
         "https://orange-waddle-qjjqjjrrg5w3j65-5173.app.github.dev",

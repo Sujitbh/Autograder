@@ -1,5 +1,0 @@
-export { default as FacultyDashboard } from './Dashboard'
-export { default as FacultyAssignments } from './Assignments'
-export { default as FacultyAssignmentDetail } from './AssignmentDetail'
-export { default as FacultyGrading } from './Grading'
-export { default as FacultyCourses } from './Courses'

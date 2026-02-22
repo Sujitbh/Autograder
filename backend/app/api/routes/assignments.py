@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.api.deps import get_db, get_current_user
 from app.core.permissions import require_role
@@ -12,8 +12,14 @@ router = APIRouter(prefix="/assignments", tags=["assignments"])
 
 
 @router.get("/", response_model=List[AssignmentOut])
-def list_assignments(db: Session = Depends(get_db)):
-    return db.query(Assignment).all()
+def list_assignments(
+    course_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+):
+    q = db.query(Assignment)
+    if course_id is not None:
+        q = q.filter(Assignment.course_id == course_id)
+    return q.all()
 
 
 @router.post("/", response_model=AssignmentOut)
