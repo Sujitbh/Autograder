@@ -1,0 +1,16 @@
+# Start coding here...The "Submit Assignment" button is failing with the error "Failed to submit assignment."
+Please debug and fix the frontend submission logic.
+
+Ensure that:
+
+The correct API endpoint for assignment submission is being called.
+
+The request method, headers, and authentication token are included properly.
+
+The assignment ID and submission data (code, files, or text) are correctly passed in the request body.
+
+Proper error handling is implemented to display backend error messages.
+
+Add console logs to help trace submission failures.
+
+Ensure the UI updates correctly after successful submission. 
