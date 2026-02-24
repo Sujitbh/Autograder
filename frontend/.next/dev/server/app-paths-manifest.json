@@ -1,4 +1,5 @@
 {
+  "/_not-found/page": "app/_not-found/page.js",
   "/courses/[courseId]/assignment/new/page": "app/courses/[courseId]/assignment/new/page.js",
   "/courses/[courseId]/assignments/[assignmentId]/grading/page": "app/courses/[courseId]/assignments/[assignmentId]/grading/page.js",
   "/courses/[courseId]/grading/page": "app/courses/[courseId]/grading/page.js",
@@ -10,5 +11,6 @@
   "/courses/page": "app/courses/page.js",
   "/login/page": "app/login/page.js",
   "/page": "app/page.js",
-  "/signup/page": "app/signup/page.js"
+  "/signup/page": "app/signup/page.js",
+  "/student/page": "app/student/page.js"
 }
