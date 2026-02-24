@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { useRouter } from 'next/navigation';
+import { authService } from '@/services/api/authService';
 
 interface SignupPageProps {
   onSignup: () => void;
@@ -28,8 +29,9 @@ export function SignupPage({ onSignup }: SignupPageProps) {
 
   const validateULMEmail = (email: string) => {
     const emailLower = email.toLowerCase().trim();
-    if (!emailLower.endsWith('@ulm.edu')) {
-      return 'Email address must be a valid @ulm.edu address';
+    // Student signup must use @warhawks.ulm.edu
+    if (!emailLower.endsWith('@warhawks.ulm.edu')) {
+      return 'Email address must be a valid @warhawks.ulm.edu address';
     }
     return null;
   };
@@ -89,33 +91,23 @@ export function SignupPage({ onSignup }: SignupPageProps) {
       return;
     }
 
-    // Check if email is already registered
-    const existingUsers = localStorage.getItem('autograde_users');
-    const users = existingUsers ? JSON.parse(existingUsers) : [
-      { email: 'sjohnson@ulm.edu', password: 'password123', firstName: 'Sarah', lastName: 'Johnson' },
-      { email: 'professor@ulm.edu', password: 'demo123', firstName: 'Demo', lastName: 'Professor' },
-      { email: 'faculty@ulm.edu', password: 'faculty123', firstName: 'Faculty', lastName: 'Member' },
-    ];
-
-    const emailExists = users.find((u: any) => u.email.toLowerCase() === formData.email.toLowerCase());
-    if (emailExists) {
-      setEmailError('This email is already registered. Please sign in instead.');
-      return;
-    }
-
-    // Save new user to localStorage
-    const newUser = {
+    // Register user in backend
+    const registerPayload = {
+      name: `${formData.firstName} ${formData.lastName}`,
       email: formData.email.toLowerCase(),
       password: formData.password,
-      firstName: formData.firstName,
-      lastName: formData.lastName,
     };
-
-    users.push(newUser);
-    localStorage.setItem('autograde_users', JSON.stringify(users));
-
-    // All validation passed - redirect to login page with success message
-    router.push('/login?signup=success');
+    authService.register(registerPayload)
+      .then((user) => {
+        localStorage.setItem('autograde_current_user', JSON.stringify(user));
+        if (typeof onSignup === 'function') {
+          onSignup();
+        }
+        router.push('/student');
+      })
+      .catch((err) => {
+        setFormError(err?.response?.data?.detail || 'Registration failed.');
+      });
   };
 
   const getPasswordStrengthColor = () => {
@@ -191,10 +183,10 @@ export function SignupPage({ onSignup }: SignupPageProps) {
 
           <div className="mb-8">
             <h2 className="mb-2" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px', color: 'var(--color-text-dark)' }}>
-              Create Faculty Account
+              Create Student Account
             </h2>
             <p style={{ fontSize: '14px', lineHeight: '22px', color: 'var(--color-text-mid)' }}>
-              Join the Autograder system and streamline your grading workflow
+              Join the Autograder system and start submitting assignments
             </p>
           </div>
 
