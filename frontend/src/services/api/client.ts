@@ -78,7 +78,12 @@ api.interceptors.response.use(
             throw new ValidationError(data.message ?? 'Validation error');
         }
 
-        throw new Error(data?.message ?? `Request failed (${status})`);
+        // Surface FastAPI's detail field (used for 400/401/404 etc)
+        const detail = (data as any)?.detail;
+        throw new Error(
+            typeof detail === 'string' ? detail
+            : data?.message ?? `Request failed (${status})`
+        );
     }
 );
 

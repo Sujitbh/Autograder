@@ -14,6 +14,7 @@ from app.api.routes import (
     submissions,
     faculty_downloads,
     grading,
+    student_dashboard,
 )
 from app.settings import settings
 import logging
@@ -53,6 +54,7 @@ app.include_router(rubrics.router, prefix="/api")
 app.include_router(submissions.router, prefix="/api")
 app.include_router(grading.router, prefix="/api")
 app.include_router(faculty_downloads.router, prefix="/api")
+app.include_router(student_dashboard.router, prefix="/api")
 
 # Enable CORS for development frontend
 app.add_middleware(

@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.api.deps import get_db, get_current_user
 from app.models.rubric import Rubric
@@ -10,8 +10,14 @@ router = APIRouter(prefix="/rubrics", tags=["rubrics"])
 
 
 @router.get("/", response_model=List[RubricOut])
-def list_rubrics(db: Session = Depends(get_db)):
-    return db.query(Rubric).all()
+def list_rubrics(
+    assignment_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+):
+    q = db.query(Rubric)
+    if assignment_id is not None:
+        q = q.filter(Rubric.assignment_id == assignment_id)
+    return q.all()
 
 
 @router.post("/", response_model=RubricOut)

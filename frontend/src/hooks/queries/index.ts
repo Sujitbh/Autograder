@@ -22,6 +22,8 @@ export {
     useSubmissions,
     useSubmission,
     useSubmitCode,
+    useUploadFiles,
+    useManualScore,
     useGradeSubmission,
 } from './useSubmissions';
 

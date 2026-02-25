@@ -19,6 +19,14 @@ interface BackendCourse {
     description: string | null;
 }
 
+/** Shape returned by /courses/{id}/members */
+export interface CourseMember {
+    user_id: number;
+    name: string;
+    email: string;
+    role: string;
+}
+
 /** Map a backend course to the frontend Course type */
 function mapCourse(c: BackendCourse): Course {
     return {
@@ -58,7 +66,11 @@ export const courseService = {
 
     /** Create a new course. */
     async createCourse(dto: CreateCourseDto): Promise<Course> {
-        const { data } = await api.post<BackendCourse>('/courses/', dto);
+        const { data } = await api.post<BackendCourse>('/courses/', {
+            name: dto.name,
+            code: dto.code,
+            description: dto.description,
+        });
         return mapCourse(data);
     },
 
@@ -76,7 +88,26 @@ export const courseService = {
         await api.delete(`/courses/${courseId}`);
     },
 
-    /** Get enrolled students for a course. */
+    /** List members (students, TAs, instructors) enrolled in a course. */
+    async getMembers(courseId: string): Promise<CourseMember[]> {
+        const { data } = await api.get<CourseMember[]>(`/courses/${courseId}/members`);
+        return data;
+    },
+
+    /**
+     * Add a user to a course by email.
+     * @param role - 'student' | 'ta' | 'instructor'
+     */
+    async addMember(courseId: string, email: string, role: 'student' | 'ta' | 'instructor'): Promise<void> {
+        await api.post(`/courses/${courseId}/members`, { email, role });
+    },
+
+    /** Remove a user from a course. */
+    async removeMember(courseId: string, userId: number): Promise<void> {
+        await api.delete(`/courses/${courseId}/members/${userId}`);
+    },
+
+    /** Get enrolled students for a course (legacy — kept for compatibility). */
     async getEnrollments(
         courseId: string,
         page = 1,

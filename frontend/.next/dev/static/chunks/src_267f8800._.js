@@ -178,7 +178,7 @@ function envBool(value, fallback) {
     return value === 'true';
 }
 const config = {
-    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:3001/api',
+    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:8000/api',
     wsUrl: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002',
     pistonApiUrl: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_PISTON_API_URL || 'https://emkc.org/api/v2/piston',
     s3Bucket: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_S3_BUCKET || 'autograde-uploads-dev',
@@ -283,7 +283,9 @@ api.interceptors.response.use((res)=>res, async (error)=>{
     if (status === 422 && data?.error) {
         throw new ValidationError(data.message ?? 'Validation error');
     }
-    throw new Error(data?.message ?? `Request failed (${status})`);
+    // Surface FastAPI's detail field (used for 400/401/404 etc)
+    const detail = data?.detail;
+    throw new Error(typeof detail === 'string' ? detail : data?.message ?? `Request failed (${status})`);
 });
 async function withRetry(fn, retries = 3) {
     for(let attempt = 0; attempt <= retries; attempt++){
@@ -422,7 +424,11 @@ const courseService = {
         return mapCourse(data);
     },
     /** Create a new course. */ async createCourse (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/courses/', dto);
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/courses/', {
+            name: dto.name,
+            code: dto.code,
+            description: dto.description
+        });
         return mapCourse(data);
     },
     /** Update an existing course. */ async updateCourse (courseId, dto) {
@@ -432,7 +438,23 @@ const courseService = {
     /** Delete a course. */ async deleteCourse (courseId) {
         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].delete(`/courses/${courseId}`);
     },
-    /** Get enrolled students for a course. */ async getEnrollments (courseId, page = 1, pageSize = 50) {
+    /** List members (students, TAs, instructors) enrolled in a course. */ async getMembers (courseId) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/members`);
+        return data;
+    },
+    /**
+     * Add a user to a course by email.
+     * @param role - 'student' | 'ta' | 'instructor'
+     */ async addMember (courseId, email, role) {
+        await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/courses/${courseId}/members`, {
+            email,
+            role
+        });
+    },
+    /** Remove a user from a course. */ async removeMember (courseId, userId) {
+        await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].delete(`/courses/${courseId}/members/${userId}`);
+    },
+    /** Get enrolled students for a course (legacy — kept for compatibility). */ async getEnrollments (courseId, page = 1, pageSize = 50) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/enrollments`, {
                 params: {
                     page,
@@ -535,34 +557,52 @@ __turbopack_context__.s([
    ═══════════════════════════════════════════════════════════════════ */ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/client.ts [app-client] (ecmascript)");
 ;
 const submissionService = {
-    /** Submit code for grading. */ async submitCode (dto) {
+    /** Upload files for an assignment (student). */ async uploadFiles (assignmentId, files) {
+        const form = new FormData();
+        files.forEach((f)=>form.append('files', f));
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/submissions/assignments/${assignmentId}/upload`, form, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        return data;
+    },
+    /** Submit code for grading (legacy). */ async submitCode (dto) {
         const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/assignments/${dto.assignmentId}/submissions`, dto);
         return data.data;
     },
     /** Get a specific submission. */ async getSubmission (submissionId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/${submissionId}`));
-        return data.data;
+        return data;
     },
-    /** List all submissions for an assignment (faculty view). */ async getSubmissions (assignmentId, page = 1, pageSize = 50) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/assignments/${assignmentId}/submissions`, {
-                params: {
-                    page,
-                    pageSize
-                }
-            }));
-        return data.data;
+    /**
+     * List all submissions for an assignment.
+     * Faculty/admin: all submissions. Student: own only.
+     * Returns enriched records with student name/email and files.
+     */ async getSubmissions (assignmentId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/assignments/${assignmentId}`));
+        return data;
     },
-    /** Faculty: grade a submission. */ async gradeSubmission (dto) {
+    /** Get student's own submissions for an assignment. */ async getMySubmissions (assignmentId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/assignments/${assignmentId}`));
+        return data;
+    },
+    /** Read the text content of a submitted file (faculty/TA/admin only). */ async getFileContent (fileId) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/files/${fileId}/content`);
+        return data;
+    },
+    /**
+     * Manually score a submission (instructor / TA / admin).
+     */ async manualScore (submissionId, dto) {
+        await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/grading/submissions/${submissionId}/manual-score`, dto);
+    },
+    /** Faculty: automated grade a submission. */ async gradeSubmission (dto) {
         const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/submissions/${dto.submissionId}/grade`, dto);
         return data.data;
     },
-    /** Get submission history for a student on an assignment. */ async getStudentSubmissions (assignmentId, studentId) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/assignments/${assignmentId}/submissions`, {
-                params: {
-                    studentId
-                }
-            }));
-        return data.data;
+    /** Get grading results for a submission. */ async getGradingResults (submissionId) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/grading/submissions/${submissionId}/results`);
+        return data;
     }
 };
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {

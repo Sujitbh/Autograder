@@ -106,7 +106,12 @@ export function SignupPage({ onSignup }: SignupPageProps) {
         router.push('/student');
       })
       .catch((err) => {
-        setFormError(err?.response?.data?.detail || 'Registration failed.');
+        const msg: string = err?.message || 'Registration failed.';
+        if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already exists')) {
+          setFormError('This email is already registered. Please sign in instead.');
+        } else {
+          setFormError(msg);
+        }
       });
   };
 

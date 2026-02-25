@@ -1,16 +1,19 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/courses/[courseId]/assignment/new/page": "app/courses/[courseId]/assignment/new/page.js",
-  "/courses/[courseId]/assignments/[assignmentId]/grading/page": "app/courses/[courseId]/assignments/[assignmentId]/grading/page.js",
+  "/calendar/page": "app/calendar/page.js",
   "/courses/[courseId]/grading/page": "app/courses/[courseId]/grading/page.js",
   "/courses/[courseId]/groups/page": "app/courses/[courseId]/groups/page.js",
   "/courses/[courseId]/page": "app/courses/[courseId]/page.js",
   "/courses/[courseId]/reports/page": "app/courses/[courseId]/reports/page.js",
   "/courses/[courseId]/settings/page": "app/courses/[courseId]/settings/page.js",
   "/courses/[courseId]/students/page": "app/courses/[courseId]/students/page.js",
+  "/courses/new/page": "app/courses/new/page.js",
   "/courses/page": "app/courses/page.js",
+  "/faculty/calendar/page": "app/faculty/calendar/page.js",
   "/login/page": "app/login/page.js",
   "/page": "app/page.js",
   "/signup/page": "app/signup/page.js",
+  "/student/courses/[courseId]/assignments/page": "app/student/courses/[courseId]/assignments/page.js",
+  "/student/courses/[courseId]/page": "app/student/courses/[courseId]/page.js",
   "/student/page": "app/student/page.js"
 }

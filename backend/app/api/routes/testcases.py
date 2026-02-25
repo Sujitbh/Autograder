@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.api.deps import get_db, get_current_user
 from app.models.testcase import TestCase
@@ -10,8 +10,14 @@ router = APIRouter(prefix="/testcases", tags=["testcases"])
 
 
 @router.get("/", response_model=List[TestCaseOut])
-def list_testcases(db: Session = Depends(get_db)):
-    return db.query(TestCase).all()
+def list_testcases(
+    assignment_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+):
+    q = db.query(TestCase)
+    if assignment_id is not None:
+        q = q.filter(TestCase.assignment_id == assignment_id)
+    return q.all()
 
 
 @router.post("/", response_model=TestCaseOut)

@@ -203,6 +203,56 @@ def get_submission_results(
     }
 
 
+
+# ==================== Manual Score Entry ====================
+
+
+class ManualScoreRequest(BaseModel):
+    """Request body for instructor/TA manual scoring."""
+    score: float
+    max_score: float = 100
+    feedback: Optional[str] = None
+
+
+@router.post("/submissions/{submission_id}/manual-score")
+def manual_score_submission(
+    submission_id: int,
+    payload: ManualScoreRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Manually score a submission.
+    Restricted to faculty, ta, and admin roles.
+    """
+    require_role(user.role, {"faculty", "ta", "admin"})
+
+    submission = db.query(Submission).filter(Submission.id == submission_id).first()
+    if not submission:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Submission not found",
+        )
+
+    from datetime import datetime
+    submission.score = payload.score
+    submission.max_score = payload.max_score
+    submission.feedback = payload.feedback
+    submission.status = "graded"
+    submission.graded_at = datetime.utcnow()
+    db.commit()
+    db.refresh(submission)
+
+    return {
+        "submission_id": submission.id,
+        "score": submission.score,
+        "max_score": submission.max_score,
+        "feedback": submission.feedback,
+        "status": submission.status,
+        "graded_at": submission.graded_at,
+    }
+
+
 # ==================== Assignment Statistics ====================
 
 @router.get("/assignments/{assignment_id}/stats")
@@ -219,8 +269,7 @@ def get_assignment_stats(
 
 
 @router.post("/assignments/{assignment_id}/grade-all")
-def grade_all_submissions(
-    assignment_id: int,
+def grade_all_submissions(    assignment_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
