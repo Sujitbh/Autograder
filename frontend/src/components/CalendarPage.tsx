@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import {
     ChevronLeft, ChevronRight, CalendarDays, Clock,
-    ExternalLink, BookOpen,
+    ExternalLink, BookOpen, Loader2,
 } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
 import { Button } from './ui/button';
+import { assignmentService } from '@/services/api/assignmentService';
+import { courseService } from '@/services/api/courseService';
 
 /* ═══════════════════════════════════════════
    Types
@@ -39,36 +42,13 @@ function getCourseColor(courseCode: string): string {
 }
 
 /* ═══════════════════════════════════════════
-   Assignment data
+   Local-storage fallback loader
    ═══════════════════════════════════════════ */
 
-function loadAllAssignments(): CalendarAssignment[] {
-    const mockAssignments: CalendarAssignment[] = [
-        { id: 'a1', name: 'Hello World Program', dueDate: '2026-02-24', courseName: 'Introduction to Computer Science', courseCode: 'CS-1001', courseId: 'cs-1001', language: 'Python' },
-        { id: 'a2', name: 'Variables and Data Types', dueDate: '2026-03-03', courseName: 'Introduction to Computer Science', courseCode: 'CS-1001', courseId: 'cs-1001', language: 'Python' },
-        { id: 'a3', name: 'Control Flow: Loops', dueDate: '2026-03-10', courseName: 'Introduction to Computer Science', courseCode: 'CS-1001', courseId: 'cs-1001', language: 'Python' },
-        { id: 'a4', name: 'Functions and Modules', dueDate: '2026-03-17', courseName: 'Introduction to Computer Science', courseCode: 'CS-1001', courseId: 'cs-1001', language: 'Python' },
-        { id: 'a5', name: 'Object-Oriented Programming', dueDate: '2026-03-24', courseName: 'Introduction to Computer Science', courseCode: 'CS-1001', courseId: 'cs-1001', language: 'Python' },
-        { id: 'ds1', name: 'Linked List Implementation', dueDate: '2026-02-26', courseName: 'Data Structures and Algorithms', courseCode: 'CS-2050', courseId: 'cs-2050', language: 'Java' },
-        { id: 'ds2', name: 'Binary Search Trees', dueDate: '2026-03-05', courseName: 'Data Structures and Algorithms', courseCode: 'CS-2050', courseId: 'cs-2050', language: 'Java' },
-        { id: 'ds3', name: 'Graph Algorithms', dueDate: '2026-03-19', courseName: 'Data Structures and Algorithms', courseCode: 'CS-2050', courseId: 'cs-2050', language: 'Java' },
-        { id: 'se1', name: 'Requirements Document', dueDate: '2026-02-28', courseName: 'Software Engineering Principles', courseCode: 'CS-3100', courseId: 'cs-3100' },
-        { id: 'se2', name: 'System Design Diagram', dueDate: '2026-03-12', courseName: 'Software Engineering Principles', courseCode: 'CS-3100', courseId: 'cs-3100' },
-        { id: 'se3', name: 'Sprint Review Presentation', dueDate: '2026-03-26', courseName: 'Software Engineering Principles', courseCode: 'CS-3100', courseId: 'cs-3100' },
-        { id: 'wd1', name: 'React Portfolio App', dueDate: '2026-03-07', courseName: 'Advanced Web Development', courseCode: 'CS-4200', courseId: 'cs-4200', language: 'TypeScript' },
-        { id: 'wd2', name: 'REST API Project', dueDate: '2026-03-21', courseName: 'Advanced Web Development', courseCode: 'CS-4200', courseId: 'cs-4200', language: 'TypeScript' },
-    ];
-
-    // Load course info from localStorage to map courseId to name/code
-    let courseMap: Record<string, { code: string; title: string }> = {};
-    try {
-        const storedCourses = JSON.parse(localStorage.getItem('autograde_courses') || '[]');
-        storedCourses.forEach((c: any) => {
-            courseMap[c.id] = { code: c.code || '', title: c.title || 'Unknown Course' };
-        });
-    } catch { /* ignore */ }
-
-    // Load user-created assignments
+function loadLocalAssignments(
+    courseMap: Record<string, { code: string; title: string }>
+): CalendarAssignment[] {
+    // Load user-created assignments from localStorage (fallback / offline)
     try {
         const stored = JSON.parse(localStorage.getItem('createdAssignments') || '[]');
         const created: CalendarAssignment[] = stored.map((a: any) => {
@@ -79,13 +59,13 @@ function loadAllAssignments(): CalendarAssignment[] {
                 dueDate: a.dueDate,
                 courseName: course?.title || a.courseName || 'My Course',
                 courseCode: course?.code || a.courseCode || '',
-                courseId: a.courseId || 'cs-1001',
+                courseId: a.courseId || '',
                 language: a.language,
             };
         });
-        return [...mockAssignments, ...created];
+        return created;
     } catch {
-        return mockAssignments;
+        return [];
     }
 }
 
@@ -93,13 +73,56 @@ function loadAllAssignments(): CalendarAssignment[] {
    Component
    ═══════════════════════════════════════════ */
 
-const TODAY = new Date(2026, 1, 20); // Feb 20, 2026
+const TODAY = new Date();
+TODAY.setHours(0, 0, 0, 0);
 
 export function CalendarPage() {
     const router = useRouter();
     const [calendarDate, setCalendarDate] = useState(() => new Date(TODAY.getFullYear(), TODAY.getMonth(), 1));
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
-    const [allAssignments] = useState<CalendarAssignment[]>(loadAllAssignments);
+
+    // ── Real API data ──────────────────────────────────────────────
+    const { data: apiCourses = [] } = useQuery({
+        queryKey: ['courses'],
+        queryFn: () => courseService.getCourses(),
+        staleTime: 60_000,
+    });
+
+    const { data: apiAssignments = [], isLoading: assignmentsLoading } = useQuery({
+        queryKey: ['assignments-all'],
+        queryFn: () => assignmentService.getAssignments(),
+        staleTime: 30_000,
+    });
+
+    // Build courseId → {code, title} map from API courses
+    const apiCourseMap = useMemo(() => {
+        const map: Record<string, { code: string; title: string }> = {};
+        apiCourses.forEach(c => { map[c.id] = { code: c.code || 'CS', title: c.name }; });
+        return map;
+    }, [apiCourses]);
+
+    // Map API assignments to CalendarAssignment shape
+    const apiCalendarAssignments = useMemo<CalendarAssignment[]>(() => {
+        return apiAssignments
+            .filter(a => !!a.dueDate)
+            .map(a => ({
+                id: a.id,
+                name: a.name,
+                dueDate: a.dueDate.slice(0, 10),
+                courseName: apiCourseMap[a.courseId]?.title || 'My Course',
+                courseCode: apiCourseMap[a.courseId]?.code || 'CS',
+                courseId: a.courseId,
+                language: a.language,
+            }));
+    }, [apiAssignments, apiCourseMap]);
+
+    // Merge with localStorage (deduplicate by id)
+    const allAssignments = useMemo<CalendarAssignment[]>(() => {
+        const localAssignments = loadLocalAssignments(apiCourseMap);
+        const apiIds = new Set(apiCalendarAssignments.map(a => a.id));
+        const localOnly = localAssignments.filter(la => !apiIds.has(la.id));
+        return [...apiCalendarAssignments, ...localOnly];
+    }, [apiCalendarAssignments, apiCourseMap]);
 
     const year = calendarDate.getFullYear();
     const month = calendarDate.getMonth();
@@ -180,6 +203,13 @@ export function CalendarPage() {
                             View all assignment due dates across your courses
                         </p>
                     </div>
+                    <div className="flex items-center gap-3">
+                        {assignmentsLoading && (
+                            <span className="flex items-center gap-1.5" style={{ fontSize: '13px', color: 'var(--color-text-light)' }}>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                Loading…
+                            </span>
+                        )}
                     <Button
                         onClick={goToday}
                         variant="outline"
@@ -189,6 +219,7 @@ export function CalendarPage() {
                         <CalendarDays className="w-4 h-4" />
                         Today
                     </Button>
+                    </div>
                 </div>
 
                 <div className="flex gap-6" style={{ alignItems: 'flex-start' }}>

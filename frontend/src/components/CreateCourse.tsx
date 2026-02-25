@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import {
     ChevronLeft, ChevronRight, Check, Copy, Mail, Printer,
     BookOpen, Users, ClipboardList, Info, AlertTriangle, Sparkles,
-    GraduationCap, Calendar, Hash, FileText,
+    GraduationCap, Calendar, Hash, FileText, Plus, X,
 } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
@@ -17,6 +17,7 @@ import {
     SelectValue,
 } from './ui/select';
 import { useRouter } from 'next/navigation';
+import { courseService } from '@/services/api/courseService';
 
 /* ═══════════════════════════════════════════
    Types
@@ -135,6 +136,13 @@ export function CreateCourse() {
     const [createdCourse, setCreatedCourse] = useState<Course | null>(null);
     const [codeCopied, setCodeCopied] = useState(false);
 
+    /* ── Member emails (add during course creation) ── */
+    const [studentEmails, setStudentEmails] = useState<string[]>([]);
+    const [taEmails, setTaEmails] = useState<string[]>([]);
+    const [newStudentEmail, setNewStudentEmail] = useState('');
+    const [newTaEmail, setNewTaEmail] = useState('');
+    const [createError, setCreateError] = useState<string | null>(null);
+
     /* ── Validate per step ── */
     const validateStep = (step: number): boolean => {
         const errors: FormErrors = {};
@@ -174,20 +182,37 @@ export function CreateCourse() {
     };
 
     /* ── Create course ── */
-    const handleCreate = () => {
+    const handleCreate = async () => {
         setIsCreating(true);
+        setCreateError(null);
+        try {
+            // 1. Create course via backend API
+            const created = await courseService.createCourse({
+                code: courseCode.trim().toUpperCase(),
+                name: courseName.trim(),
+                description: description.trim() || undefined,
+            });
 
-        setTimeout(() => {
+            // 2. Enroll students by email (ignore per-email failures)
+            for (const email of studentEmails) {
+                try { await courseService.addMember(created.id, email, 'student'); } catch { /* ignore */ }
+            }
+
+            // 3. Enroll TAs by email
+            for (const email of taEmails) {
+                try { await courseService.addMember(created.id, email, 'ta'); } catch { /* ignore */ }
+            }
+
+            // 4. Build local display object
             const enrollCode = enrollmentMethod === 'code' ? generateCourseCode() : undefined;
-            const courseId = `course-${Date.now()}`;
             const newCourse: Course = {
-                id: courseId,
+                id: created.id,
                 code: courseCode.trim().toUpperCase(),
                 title: courseName.trim(),
                 semester,
                 section: section.trim() || undefined,
                 description: description.trim() || undefined,
-                students: 0,
+                students: studentEmails.length,
                 assignments: 0,
                 pendingGrades: 0,
                 status: 'active',
@@ -195,12 +220,16 @@ export function CreateCourse() {
                 enrollmentCodeActive: enrollmentMethod === 'code',
             };
 
+            // Also save to localStorage for legacy lookupCourse calls
             const existing = loadCourses();
             saveCourses([newCourse, ...existing]);
             setCreatedCourse(newCourse);
-            setIsCreating(false);
             setCurrentStep(4); // success step
-        }, 1000);
+        } catch (err: any) {
+            setCreateError(err.message ?? 'Failed to create course. Please try again.');
+        } finally {
+            setIsCreating(false);
+        }
     };
 
     const copyCode = (code: string) => {
@@ -549,6 +578,116 @@ export function CreateCourse() {
                     </div>
                 </div>
             )}
+
+            {/* ── Add Students by Email ── */}
+            <div>
+                <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
+                    <GraduationCap className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
+                    Add Students by Email
+                    <span style={{ fontSize: '11px', color: '#8A8A8A', fontWeight: 400 }}>(optional — you can add more later)</span>
+                </label>
+                <div className="flex gap-2">
+                    <Input
+                        value={newStudentEmail}
+                        onChange={e => setNewStudentEmail(e.target.value)}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const em = newStudentEmail.trim().toLowerCase();
+                                if (em && !studentEmails.includes(em)) {
+                                    setStudentEmails(prev => [...prev, em]);
+                                }
+                                setNewStudentEmail('');
+                            }
+                        }}
+                        placeholder="student@warhawks.ulm.edu"
+                        className="border-[var(--color-border)] h-10 flex-1"
+                        style={{ fontSize: '14px' }}
+                    />
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                            const em = newStudentEmail.trim().toLowerCase();
+                            if (em && !studentEmails.includes(em)) {
+                                setStudentEmails(prev => [...prev, em]);
+                            }
+                            setNewStudentEmail('');
+                        }}
+                        className="h-10 px-3"
+                        style={{ borderColor: '#6B0000', color: '#6B0000' }}
+                    >
+                        <Plus className="w-4 h-4" />
+                    </Button>
+                </div>
+                {studentEmails.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        {studentEmails.map(em => (
+                            <span key={em} className="flex items-center gap-1 px-2 py-1 rounded-full text-sm" style={{ backgroundColor: '#F5EDED', color: '#6B0000', fontSize: '12px' }}>
+                                {em}
+                                <button onClick={() => setStudentEmails(prev => prev.filter(e => e !== em))} className="ml-1 hover:opacity-70">
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* ── Add Grading Assistants by Email ── */}
+            <div>
+                <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
+                    <Users className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
+                    Add Grading Assistants (TA) by Email
+                    <span style={{ fontSize: '11px', color: '#8A8A8A', fontWeight: 400 }}>(optional)</span>
+                </label>
+                <div className="flex gap-2">
+                    <Input
+                        value={newTaEmail}
+                        onChange={e => setNewTaEmail(e.target.value)}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const em = newTaEmail.trim().toLowerCase();
+                                if (em && !taEmails.includes(em)) {
+                                    setTaEmails(prev => [...prev, em]);
+                                }
+                                setNewTaEmail('');
+                            }
+                        }}
+                        placeholder="ta@ulm.edu"
+                        className="border-[var(--color-border)] h-10 flex-1"
+                        style={{ fontSize: '14px' }}
+                    />
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                            const em = newTaEmail.trim().toLowerCase();
+                            if (em && !taEmails.includes(em)) {
+                                setTaEmails(prev => [...prev, em]);
+                            }
+                            setNewTaEmail('');
+                        }}
+                        className="h-10 px-3"
+                        style={{ borderColor: '#6B0000', color: '#6B0000' }}
+                    >
+                        <Plus className="w-4 h-4" />
+                    </Button>
+                </div>
+                {taEmails.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        {taEmails.map(em => (
+                            <span key={em} className="flex items-center gap-1 px-2 py-1 rounded-full text-sm" style={{ backgroundColor: '#E8F0FF', color: '#1A4D7A', fontSize: '12px' }}>
+                                {em}
+                                <button onClick={() => setTaEmails(prev => prev.filter(e => e !== em))} className="ml-1 hover:opacity-70">
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 
@@ -861,24 +1000,31 @@ export function CreateCourse() {
                                         <ChevronRight className="w-4 h-4 ml-2" />
                                     </Button>
                                 ) : (
-                                    <Button
-                                        onClick={handleCreate}
-                                        disabled={isCreating}
-                                        className="text-white"
-                                        style={{ backgroundColor: '#6B0000', height: '44px', padding: '0 28px' }}
-                                    >
-                                        {isCreating ? (
-                                            <>
-                                                <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
-                                                Creating Course…
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Check className="w-4 h-4 mr-2" />
-                                                Create Course
-                                            </>
+                                    <div className="flex flex-col items-end gap-2">
+                                        {createError && (
+                                            <p style={{ fontSize: '13px', color: '#B91C1C', maxWidth: '300px', textAlign: 'right' }}>
+                                                {createError}
+                                            </p>
                                         )}
-                                    </Button>
+                                        <Button
+                                            onClick={handleCreate}
+                                            disabled={isCreating}
+                                            className="text-white"
+                                            style={{ backgroundColor: '#6B0000', height: '44px', padding: '0 28px' }}
+                                        >
+                                            {isCreating ? (
+                                                <>
+                                                    <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                                                    Creating Course…
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Check className="w-4 h-4 mr-2" />
+                                                    Create Course
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
                                 )}
                             </div>
                         </div>

@@ -1713,7 +1713,7 @@ function envBool(value, fallback) {
     return value === 'true';
 }
 const config = {
-    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:3001/api',
+    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:8000/api',
     wsUrl: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002',
     pistonApiUrl: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_PISTON_API_URL || 'https://emkc.org/api/v2/piston',
     s3Bucket: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_S3_BUCKET || 'autograde-uploads-dev',
@@ -1818,7 +1818,9 @@ api.interceptors.response.use((res)=>res, async (error)=>{
     if (status === 422 && data?.error) {
         throw new ValidationError(data.message ?? 'Validation error');
     }
-    throw new Error(data?.message ?? `Request failed (${status})`);
+    // Surface FastAPI's detail field (used for 400/401/404 etc)
+    const detail = data?.detail;
+    throw new Error(typeof detail === 'string' ? detail : data?.message ?? `Request failed (${status})`);
 });
 async function withRetry(fn, retries = 3) {
     for(let attempt = 0; attempt <= retries; attempt++){

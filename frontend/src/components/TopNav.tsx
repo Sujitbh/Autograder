@@ -114,9 +114,9 @@ export function TopNav({
       {/* Left Zone: Logo + App Name */}
       <div
         className="flex items-center cursor-pointer"
-        onClick={() => router.push('/courses')}
+        onClick={() => router.push(currentUser?.role === 'student' ? '/student' : '/courses')}
         role="button"
-        aria-label="Go to courses"
+        aria-label="Go home"
       >
         <GraduationCap
           className="text-white"

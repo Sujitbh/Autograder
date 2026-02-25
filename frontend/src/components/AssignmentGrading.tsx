@@ -23,6 +23,7 @@ import {
 } from './ui/dialog';
 import { getStudentsForCourse, hashStr, COURSE_STUDENT_COUNTS } from '../utils/studentData';
 import { useAssignment } from '@/hooks/queries';
+import { useQuery } from '@tanstack/react-query';
 
 /* ─── Rubric criterion ─── */
 interface RubricCriterion {
@@ -325,6 +326,7 @@ interface StudentSubmission {
     status: 'not-submitted' | 'submitted' | 'graded' | 'needs-review';
     late: boolean;
     flagged: boolean;
+    files?: { id: number; filename: string; file_size: number | null }[];
 }
 
 function makeMockSubmissions(assignmentId: string, courseId: string): StudentSubmission[] {
@@ -497,8 +499,82 @@ export function AssignmentGrading() {
     useEffect(() => { setSubmissions(initialSubmissions); }, [initialSubmissions]);
     const mockGroups = useMemo(() => buildMockGroups(courseId ?? 'cs-1001'), [courseId]);
 
+    // ── Load real submissions from API (for numeric assignment IDs) ──
+    const isNumericId = assignmentId && /^\d+$/.test(assignmentId);
+    const { data: apiSubmittions, refetch: refetchApiSubs } = useQuery({
+        queryKey: ['grading-submissions', assignmentId],
+        queryFn: () => import('@/services/api/submissionService').then(m => m.submissionService.getSubmissions(assignmentId!)),
+        enabled: !!isNumericId,
+    });
+
+    // Merge API submissions into display list
+    useEffect(() => {
+        if (!apiSubmittions || !isNumericId) return;
+        const mapped: StudentSubmission[] = apiSubmittions.map((s: any) => {
+            const initials = (s.student_name ?? 'U')
+                .split(' ')
+                .map((w: string) => w[0])
+                .join('')
+                .toUpperCase()
+                .slice(0, 2);
+            return {
+                id: String(s.id),
+                studentName: s.student_name ?? 'Unknown',
+                studentId: s.student_email ?? String(s.student_id),
+                submittedAt: s.created_at ?? null,
+                code: '[Files submitted — see file viewer]',
+                language: 'python',
+                status: s.status === 'graded' ? 'graded' as const
+                    : s.status === 'pending' || s.status === 'grading' ? 'submitted' as const
+                    : 'submitted' as const,
+                autoScore: s.score ?? null,
+                maxPoints: s.max_score ?? meta?.totalPoints ?? 100,
+                finalGrade: s.status === 'graded' ? (s.score ?? null) : null,
+                late: false,
+                flagged: false,
+                avatarInitials: initials,
+                files: s.files ?? [],
+            } as any;
+        });
+        if (mapped.length > 0) {
+            setSubmissions(mapped);
+        }
+    }, [apiSubmittions, isNumericId]);
+
+    // ── File content state (for viewing uploaded files in grading modal) ──
+    const [viewingFile, setViewingFile] = useState<{ filename: string; content: string } | null>(null);
+    const [loadingFile, setLoadingFile] = useState(false);
+
+    const loadFileContent = async (fileId: number) => {
+        setLoadingFile(true);
+        try {
+            const result = await import('@/services/api/submissionService').then(m =>
+                m.submissionService.getFileContent(fileId)
+            );
+            setViewingFile({ filename: result.filename, content: result.content });
+        } catch {
+            setViewingFile({ filename: 'Error', content: 'Could not load file content.' });
+        } finally {
+            setLoadingFile(false);
+        }
+    };
+
     /* ─── Grade submission handler ─── */
-    const handleSubmitGrade = (studentId: string, grade: number, _feedback: string) => {
+    const handleSubmitGrade = async (studentId: string, grade: number, feedback: string) => {
+        // For real (numeric) submission IDs, call the manual-score API
+        const numId = parseInt(studentId, 10);
+        if (!isNaN(numId) && isNumericId) {
+            try {
+                await import('@/services/api/submissionService').then(m =>
+                    m.submissionService.manualScore(numId, {
+                        score: grade,
+                        max_score: meta?.totalPoints ?? 100,
+                        feedback: feedback || undefined,
+                    })
+                );
+                refetchApiSubs();
+            } catch { /* ignore — still update UI */ }
+        }
         setSubmissions(prev => prev.map(s =>
             s.id === studentId
                 ? { ...s, finalGrade: grade, status: 'graded' as const }
@@ -1099,13 +1175,24 @@ export function AssignmentGrading() {
                                                             )}
                                                         </td>
                                                         <td className="px-5 py-4" onClick={e => e.stopPropagation()} style={{ cursor: 'default' }}>
-                                                            {sub.status === 'not-submitted' ? (
-                                                                <button disabled style={{ fontSize: '13px', color: '#8A8A8A', padding: '6px 16px', height: '32px' }}>—</button>
-                                                            ) : sub.status === 'graded' ? (
-                                                                <Button variant="outline" className="border-[var(--color-border)] h-8 px-4 text-xs" onClick={() => { const idx = gradableStudents.findIndex(g => g.id === sub.id); if (idx >= 0) setGradingStudentIdx(idx); }}>View</Button>
-                                                            ) : (
-                                                                <Button className="text-white h-8 px-4 text-xs" style={{ backgroundColor: '#6B0000' }} onClick={() => { const idx = gradableStudents.findIndex(g => g.id === sub.id); if (idx >= 0) setGradingStudentIdx(idx); }}>Grade</Button>
-                                                            )}
+                                                            <div className="flex items-center gap-1 flex-wrap">
+                                                                {sub.files && sub.files.length > 0 && sub.files.map((f) => (
+                                                                    <Button key={f.id} variant="outline" className="h-8 px-2 text-xs border-[var(--color-border)]"
+                                                                        onClick={() => loadFileContent(f.id)}
+                                                                        title={f.filename}
+                                                                    >
+                                                                        <FileText className="w-3.5 h-3.5 mr-1" />
+                                                                        {f.filename.length > 12 ? f.filename.slice(0, 12) + '…' : f.filename}
+                                                                    </Button>
+                                                                ))}
+                                                                {sub.status === 'not-submitted' ? (
+                                                                    <button disabled style={{ fontSize: '13px', color: '#8A8A8A', padding: '6px 16px', height: '32px' }}>—</button>
+                                                                ) : sub.status === 'graded' ? (
+                                                                    <Button variant="outline" className="border-[var(--color-border)] h-8 px-4 text-xs" onClick={() => { const idx = gradableStudents.findIndex(g => g.id === sub.id); if (idx >= 0) setGradingStudentIdx(idx); }}>View</Button>
+                                                                ) : (
+                                                                    <Button className="text-white h-8 px-4 text-xs" style={{ backgroundColor: '#6B0000' }} onClick={() => { const idx = gradableStudents.findIndex(g => g.id === sub.id); if (idx >= 0) setGradingStudentIdx(idx); }}>Grade</Button>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );
@@ -1225,6 +1312,25 @@ export function AssignmentGrading() {
                         <Button onClick={() => setShowEditDialog(false)} className="text-white" style={{ backgroundColor: 'var(--color-primary)' }}>
                             <CheckCircle2 className="w-4 h-4 mr-2" /> Save Changes
                         </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* File Viewer Dialog */}
+            <Dialog open={!!viewingFile} onOpenChange={() => setViewingFile(null)}>
+                <DialogContent className="max-w-3xl max-h-[80vh]" style={{ boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
+                    <DialogHeader>
+                        <DialogTitle style={{ fontSize: '16px', fontWeight: 600 }}>
+                            {viewingFile?.filename ?? 'File'}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="overflow-auto rounded-lg" style={{ backgroundColor: '#1E1E1E', padding: '16px', maxHeight: '60vh' }}>
+                        <pre style={{ color: '#D4D4D4', fontSize: '13px', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                            {viewingFile?.content ?? ''}
+                        </pre>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setViewingFile(null)}>Close</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
