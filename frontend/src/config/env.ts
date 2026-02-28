@@ -26,7 +26,7 @@ function envBool(value: string | undefined, fallback: boolean): boolean {
 }
 
 export const config: EnvironmentConfig = {
-    apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
+    apiUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
     wsUrl: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002',
     pistonApiUrl: process.env.NEXT_PUBLIC_PISTON_API_URL || 'https://emkc.org/api/v2/piston',
     s3Bucket: process.env.NEXT_PUBLIC_S3_BUCKET || 'autograde-uploads-dev',

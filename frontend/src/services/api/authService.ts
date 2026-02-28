@@ -23,13 +23,29 @@ interface BackendUser {
 }
 
 function mapUser(u: BackendUser): User {
+    const [firstName = '', ...rest] = (u.name ?? '').trim().split(' ');
+    const lastName = rest.join(' ');
+    if (u.role === 'student') {
+        return {
+            id: String(u.id),
+            firstName: firstName || 'Student',
+            lastName,
+            email: u.email,
+            sisUserId: '',
+            sisLoginId: '',
+            enrolledCourses: [],
+            role: 'student',
+        };
+    }
     return {
         id: String(u.id),
-        name: u.name,
+        firstName: firstName || 'User',
+        lastName,
         email: u.email,
-        role: u.role as 'faculty' | 'student',
-        avatarUrl: '',
-    } as User;
+        title: '',
+        department: '',
+        role: 'faculty',
+    };
 }
 
 export const authService = {
