@@ -1,69 +1,146 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Submission Service — Submit code, fetch submissions
+   Submission Service — upload/fetch/grade submissions
+   Backed by FastAPI routes under /submissions, /grading, /faculty
    ═══════════════════════════════════════════════════════════════════ */
 
 import api, { withRetry } from './client';
-import type {
-    Submission,
-    SubmitCodeDto,
-    GradeSubmissionDto,
-    ApiResponse,
-    PaginatedResponse,
-} from '@/types';
+import type { Submission, SubmitCodeDto, GradeSubmissionDto } from '@/types';
+
+interface BackendSubmission {
+  id: number;
+  assignment_id: number;
+  student_id: number;
+  status: 'pending' | 'grading' | 'graded' | 'error';
+  score?: number | null;
+  max_score?: number | null;
+  feedback?: string | null;
+  graded_at?: string | null;
+  created_at?: string | null;
+}
+
+interface BackendUploadResponse {
+  submission_id: number;
+  assignment_id: number;
+  student: string;
+  files_saved: number;
+  folder: string;
+}
+
+interface BackendGradingResults {
+  submission_id: number;
+  status: string;
+  score?: number | null;
+  max_score?: number | null;
+  feedback?: string | null;
+  graded_at?: string | null;
+}
+
+function mapSubmission(s: BackendSubmission): Submission {
+  return {
+    id: String(s.id),
+    assignmentId: String(s.assignment_id),
+    studentId: String(s.student_id),
+    code: '',
+    language: 'python',
+    submittedAt: s.created_at ?? '',
+    isLate: false,
+    status: s.status === 'graded' ? 'graded' : 'pending',
+    grade:
+      s.score != null
+        ? {
+            id: `grade-${s.id}`,
+            submissionId: String(s.id),
+            rubricScores: [],
+            totalScore: s.score,
+            maxScore: s.max_score ?? 100,
+            percentage:
+              s.max_score && s.max_score > 0
+                ? Number(((s.score / s.max_score) * 100).toFixed(2))
+                : 0,
+            letterGrade: '',
+            feedback: s.feedback ?? '',
+            gradedAt: s.graded_at ?? '',
+            gradedBy: '',
+          }
+        : undefined,
+  };
+}
 
 export const submissionService = {
-    /** Submit code for grading. */
-    async submitCode(dto: SubmitCodeDto): Promise<Submission> {
-        const { data } = await api.post<ApiResponse<Submission>>(
-            `/assignments/${dto.assignmentId}/submissions`,
-            dto
-        );
-        return data.data;
-    },
+  /** Legacy fallback: create submission row without files. */
+  async submitCode(dto: SubmitCodeDto): Promise<Submission> {
+    const payload = { assignment_id: Number(dto.assignmentId) };
+    const { data } = await api.post<BackendSubmission>('/submissions/', payload);
+    return mapSubmission(data);
+  },
 
-    /** Get a specific submission. */
-    async getSubmission(submissionId: string): Promise<Submission> {
-        const { data } = await withRetry(() =>
-            api.get<ApiResponse<Submission>>(`/submissions/${submissionId}`)
-        );
-        return data.data;
-    },
+  /** Student file upload (multipart/form-data with field name `files`). */
+  async uploadFiles(assignmentId: string, files: File[]): Promise<BackendUploadResponse> {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
 
-    /** List all submissions for an assignment (faculty view). */
-    async getSubmissions(
-        assignmentId: string,
-        page = 1,
-        pageSize = 50
-    ): Promise<PaginatedResponse<Submission>> {
-        const { data } = await withRetry(() =>
-            api.get<ApiResponse<PaginatedResponse<Submission>>>(
-                `/assignments/${assignmentId}/submissions`,
-                { params: { page, pageSize } }
-            )
-        );
-        return data.data;
-    },
+    const { data } = await api.post<BackendUploadResponse>(
+      `/submissions/assignments/${assignmentId}/upload`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return data;
+  },
 
-    /** Faculty: grade a submission. */
-    async gradeSubmission(dto: GradeSubmissionDto): Promise<Submission> {
-        const { data } = await api.post<ApiResponse<Submission>>(
-            `/submissions/${dto.submissionId}/grade`,
-            dto
-        );
-        return data.data;
-    },
+  /** Get a specific submission. */
+  async getSubmission(submissionId: string): Promise<Submission> {
+    const { data } = await withRetry(() =>
+      api.get<BackendSubmission>(`/submissions/${submissionId}`)
+    );
+    return mapSubmission(data);
+  },
 
-    /** Get submission history for a student on an assignment. */
-    async getStudentSubmissions(
-        assignmentId: string,
-        studentId: string
-    ): Promise<Submission[]> {
-        const { data } = await withRetry(() =>
-            api.get<ApiResponse<Submission[]>>(
-                `/assignments/${assignmentId}/submissions`,
-                { params: { studentId } }
-            )
-        );
-        return data.data;
-    },
+  /** List submissions for an assignment. */
+  async getSubmissions(assignmentId: string): Promise<Submission[]> {
+    const { data } = await withRetry(() =>
+      api.get<BackendSubmission[]>(`/submissions/assignments/${assignmentId}`)
+    );
+    return data.map(mapSubmission);
+  },
+
+  /** Run grading for a submission. */
+  async gradeSubmission(dto: GradeSubmissionDto): Promise<BackendGradingResults> {
+    const { data } = await api.post<BackendGradingResults>(
+      `/grading/submissions/${dto.submissionId}/grade`
+    );
+    return data;
+  },
+
+  /** Manual score entry/override by instructor/TA. */
+  async overrideSubmissionScore(
+    submissionId: string,
+    payload: { score: number; max_score?: number; feedback?: string }
+  ): Promise<BackendGradingResults> {
+    const { data } = await api.patch<BackendGradingResults>(
+      `/grading/submissions/${submissionId}/score`,
+      payload
+    );
+    return data;
+  },
+
+  /** Fetch grading results/details for one submission. */
+  async getSubmissionResults(submissionId: string): Promise<BackendGradingResults> {
+    const { data } = await withRetry(() =>
+      api.get<BackendGradingResults>(`/grading/submissions/${submissionId}/results`)
+    );
+    return data;
+  },
+
+  /** Instructor/TA ZIP download of all submissions for assignment. */
+  async downloadAssignmentZip(assignmentId: string): Promise<Blob> {
+    const { data } = await api.get(`/faculty/assignments/${assignmentId}/download-zip`, {
+      responseType: 'blob',
+    });
+    return data;
+  },
+
+  /** Student history helper; backend already filters by auth user role. */
+  async getStudentSubmissions(assignmentId: string, _studentId: string): Promise<Submission[]> {
+    return this.getSubmissions(assignmentId);
+  },
 };

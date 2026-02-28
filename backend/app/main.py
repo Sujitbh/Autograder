@@ -14,6 +14,7 @@ from app.api.routes import (
     submissions,
     faculty_downloads,
     grading,
+    student_dashboard,
 )
 from app.settings import settings
 import logging
@@ -21,10 +22,20 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 app = FastAPI(
     title="Autograder API",
     description="API for automated code grading system",
     version="1.0.0",
+)
+
+# Enable CORS for development frontend (must be before routers)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Create all tables on startup
@@ -53,15 +64,7 @@ app.include_router(rubrics.router, prefix="/api")
 app.include_router(submissions.router, prefix="/api")
 app.include_router(grading.router, prefix="/api")
 app.include_router(faculty_downloads.router, prefix="/api")
-
-# Enable CORS for development frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.include_router(student_dashboard.router, prefix="/api")
 
 @app.get("/health")
 def health():
@@ -92,4 +95,3 @@ def health_db(db: Session = Depends(get_db)):
         }
     except Exception as e:
         return {"status": "error", "error": str(e)}
-

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user
-from app.core.permissions import require_role
+from app.core.permissions import require_role, require_course_role
 from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
@@ -33,6 +33,11 @@ def create_submission(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    assignment = db.query(Assignment).filter(Assignment.id == payload.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    require_course_role(db=db, user=user, course_id=assignment.course_id, allowed_roles=["student"])
+
     s = Submission(assignment_id=payload.assignment_id, student_id=user.id)
     db.add(s)
     db.commit()
@@ -41,10 +46,25 @@ def create_submission(
 
 
 @router.get("/{s_id}", response_model=SubmissionOut)
-def get_submission(s_id: int, db: Session = Depends(get_db)):
+def get_submission(
+    s_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     s = db.query(Submission).filter(Submission.id == s_id).first()
     if not s:
         raise HTTPException(status_code=404, detail="Submission not found")
+    assignment = db.query(Assignment).filter(Assignment.id == s.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    if user.role != "admin" and s.student_id != user.id:
+        require_course_role(
+            db=db,
+            user=user,
+            course_id=assignment.course_id,
+            allowed_roles=["instructor", "ta"],
+        )
     return s
 
 
@@ -57,6 +77,17 @@ def delete_submission(
     s = db.query(Submission).filter(Submission.id == s_id).first()
     if not s:
         raise HTTPException(status_code=404, detail="Submission not found")
+    assignment = db.query(Assignment).filter(Assignment.id == s.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    if user.role != "admin" and s.student_id != user.id:
+        require_course_role(
+            db=db,
+            user=user,
+            course_id=assignment.course_id,
+            allowed_roles=["instructor"],
+        )
     db.delete(s)
     db.commit()
     return {"ok": True}
@@ -69,9 +100,20 @@ def get_submissions_by_assignment(
     user: User = Depends(get_current_user),
 ):
     """Get all submissions for a specific assignment."""
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
     query = db.query(Submission).filter(Submission.assignment_id == assignment_id)
     if user.role == "student":
         query = query.filter(Submission.student_id == user.id)
+    elif user.role != "admin":
+        require_course_role(
+            db=db,
+            user=user,
+            course_id=assignment.course_id,
+            allowed_roles=["instructor", "ta"],
+        )
     return query.all()
 
 
@@ -85,6 +127,18 @@ def get_submission_files(
     s = db.query(Submission).filter(Submission.id == s_id).first()
     if not s:
         raise HTTPException(status_code=404, detail="Submission not found")
+    assignment = db.query(Assignment).filter(Assignment.id == s.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    if user.role != "admin" and s.student_id != user.id:
+        require_course_role(
+            db=db,
+            user=user,
+            course_id=assignment.course_id,
+            allowed_roles=["instructor", "ta"],
+        )
+
     files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == s_id).all()
     return [{"id": f.id, "filename": f.filename, "file_size": f.file_size} for f in files]
 
@@ -101,6 +155,7 @@ async def upload_submission_files(
     assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    require_course_role(db=db, user=user, course_id=assignment.course_id, allowed_roles=["student"])
 
     submission = Submission(assignment_id=assignment_id, student_id=user.id)
     db.add(submission)

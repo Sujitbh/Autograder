@@ -17,6 +17,8 @@ import {
     SelectValue,
 } from './ui/select';
 import { useRouter } from 'next/navigation';
+import { useCreateCourse } from '@/hooks/queries';
+import { courseService } from '@/services/api';
 
 /* ═══════════════════════════════════════════
    Types
@@ -85,18 +87,6 @@ function getDefaultSemester(): string {
     return `Fall ${year}`;
 }
 
-function loadCourses(): Course[] {
-    try {
-        const stored = localStorage.getItem('autograde_courses');
-        if (stored) return JSON.parse(stored);
-    } catch { /* ignore */ }
-    return [];
-}
-
-function saveCourses(courses: Course[]) {
-    localStorage.setItem('autograde_courses', JSON.stringify(courses));
-}
-
 /* ═══════════════════════════════════════════
    Steps
    ═══════════════════════════════════════════ */
@@ -114,6 +104,7 @@ const STEPS = [
 export function CreateCourse() {
     const router = useRouter();
     const semesters = useMemo(() => generateSemesters(), []);
+    const createCourse = useCreateCourse();
 
     /* ── Step ── */
     const [currentStep, setCurrentStep] = useState(1);
@@ -126,6 +117,8 @@ export function CreateCourse() {
     const [description, setDescription] = useState('');
     const [enrollmentMethod, setEnrollmentMethod] = useState<'code' | 'manual'>('code');
     const [maxStudents, setMaxStudents] = useState('');
+    const [initialStudentEmails, setInitialStudentEmails] = useState('');
+    const [initialTaEmails, setInitialTaEmails] = useState('');
 
     /* ── Validation ── */
     const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -145,16 +138,6 @@ export function CreateCourse() {
                 errors.courseCode = 'Use letters, numbers, spaces, or hyphens (e.g., CS-1001)';
             if (!courseName.trim()) errors.courseName = 'Course name is required';
             if (!semester) errors.semester = 'Semester is required';
-
-            // Check duplicate
-            const existing = loadCourses();
-            const dup = existing.find(c =>
-                c.code.toLowerCase() === courseCode.trim().toLowerCase() &&
-                c.semester === semester &&
-                (c.section || '') === section.trim()
-            );
-            if (dup)
-                errors.courseCode = 'A course with this code, semester, and section already exists.';
         }
 
         setFormErrors(errors);
@@ -174,33 +157,70 @@ export function CreateCourse() {
     };
 
     /* ── Create course ── */
-    const handleCreate = () => {
+    const handleCreate = async () => {
         setIsCreating(true);
+        setFormErrors({});
 
-        setTimeout(() => {
-            const enrollCode = enrollmentMethod === 'code' ? generateCourseCode() : undefined;
-            const courseId = `course-${Date.now()}`;
-            const newCourse: Course = {
-                id: courseId,
+        try {
+            const created = await createCourse.mutateAsync({
                 code: courseCode.trim().toUpperCase(),
-                title: courseName.trim(),
+                name: courseName.trim(),
                 semester,
                 section: section.trim() || undefined,
                 description: description.trim() || undefined,
+                enrollmentCodeActive: enrollmentMethod === 'code',
+            });
+            const persisted = await courseService.getCourse(created.id);
+
+            const enrollCode = enrollmentMethod === 'code' ? (persisted.enrollmentCode || generateCourseCode()) : undefined;
+            const newCourse: Course = {
+                id: persisted.id,
+                code: persisted.code || courseCode.trim().toUpperCase(),
+                title: persisted.name || courseName.trim(),
+                semester,
+                section: section.trim() || undefined,
+                description: persisted.description || description.trim() || undefined,
                 students: 0,
                 assignments: 0,
                 pendingGrades: 0,
-                status: 'active',
+                status: persisted.status === 'archived' ? 'archived' : 'active',
                 enrollmentCode: enrollCode,
-                enrollmentCodeActive: enrollmentMethod === 'code',
+                enrollmentCodeActive: persisted.enrollmentCodeActive,
             };
 
-            const existing = loadCourses();
-            saveCourses([newCourse, ...existing]);
+            const studentEmails = initialStudentEmails
+                .split(',')
+                .map((e) => e.trim().toLowerCase())
+                .filter(Boolean);
+            const taEmails = initialTaEmails
+                .split(',')
+                .map((e) => e.trim().toLowerCase())
+                .filter(Boolean);
+
+            const enrollmentTasks = [
+                ...studentEmails.map((email) =>
+                    courseService.addEnrollment(persisted.id, { email, role: 'student' })
+                ),
+                ...taEmails.map((email) =>
+                    courseService.addEnrollment(persisted.id, { email, role: 'ta' })
+                ),
+            ];
+            if (enrollmentTasks.length > 0) {
+                try {
+                    await Promise.all(enrollmentTasks);
+                } catch {
+                    // Course creation already succeeded; keep success flow and let roster edits happen later.
+                }
+            }
+
             setCreatedCourse(newCourse);
-            setIsCreating(false);
             setCurrentStep(4); // success step
-        }, 1000);
+        } catch (e) {
+            const message = e instanceof Error ? e.message : 'Failed to create course';
+            setFormErrors({ courseName: message });
+        } finally {
+            setIsCreating(false);
+        }
     };
 
     const copyCode = (code: string) => {
@@ -549,6 +569,38 @@ export function CreateCourse() {
                     </div>
                 </div>
             )}
+
+            <div>
+                <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
+                    Initial Student Emails (optional)
+                </label>
+                <Textarea
+                    value={initialStudentEmails}
+                    onChange={e => setInitialStudentEmails(e.target.value)}
+                    placeholder="student1@warhawks.ulm.edu, student2@warhawks.ulm.edu"
+                    rows={2}
+                    className="border-[var(--color-border)]"
+                />
+                <p style={{ fontSize: '11px', color: '#8A8A8A', marginTop: '6px' }}>
+                    Comma-separated. Existing users will be enrolled as students after course creation.
+                </p>
+            </div>
+
+            <div>
+                <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
+                    Initial Grading Assistant Emails (optional)
+                </label>
+                <Textarea
+                    value={initialTaEmails}
+                    onChange={e => setInitialTaEmails(e.target.value)}
+                    placeholder="ta1@ulm.edu, ta2@ulm.edu"
+                    rows={2}
+                    className="border-[var(--color-border)]"
+                />
+                <p style={{ fontSize: '11px', color: '#8A8A8A', marginTop: '6px' }}>
+                    Comma-separated. Existing faculty/admin users will be enrolled as course TAs.
+                </p>
+            </div>
         </div>
     );
 

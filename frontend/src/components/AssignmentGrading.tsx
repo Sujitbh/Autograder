@@ -23,6 +23,7 @@ import {
 } from './ui/dialog';
 import { getStudentsForCourse, hashStr, COURSE_STUDENT_COUNTS } from '../utils/studentData';
 import { useAssignment } from '@/hooks/queries';
+import { submissionService } from '@/services/api';
 
 /* ─── Rubric criterion ─── */
 interface RubricCriterion {
@@ -427,6 +428,7 @@ function scoreColor(score: number, max: number): string {
 export function AssignmentGrading() {
     const router = useRouter();
     const { courseId, assignmentId } = useParams() as { courseId: string; assignmentId: string };
+    const [isDownloadingZip, setIsDownloadingZip] = useState(false);
 
     // Fetch from API
     const { data: apiAssignment, isLoading: isLoadingAssignment } = useAssignment(courseId, assignmentId);
@@ -564,6 +566,25 @@ export function AssignmentGrading() {
             </PageLayout>
         );
     }
+
+    const handleDownloadZip = async () => {
+        if (!assignmentId) return;
+        setIsDownloadingZip(true);
+        try {
+            const blob = await submissionService.downloadAssignmentZip(assignmentId);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `assignment_${assignmentId}_submissions.zip`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to download submissions ZIP';
+            window.alert(message);
+        } finally {
+            setIsDownloadingZip(false);
+        }
+    };
 
     /* ─── Tab counts ─── */
     const counts = useMemo(() => {
@@ -704,9 +725,14 @@ export function AssignmentGrading() {
                                 <Trash2 className="w-4 h-4 mr-2" />
                                 Delete
                             </Button>
-                            <Button variant="outline" className="border-[var(--color-border)] h-9">
+                            <Button
+                                variant="outline"
+                                className="border-[var(--color-border)] h-9"
+                                onClick={handleDownloadZip}
+                                disabled={isDownloadingZip}
+                            >
                                 <Download className="w-4 h-4 mr-2" />
-                                Export
+                                {isDownloadingZip ? 'Downloading...' : 'Download submissions (ZIP)'}
                             </Button>
                         </div>
                     </div>
