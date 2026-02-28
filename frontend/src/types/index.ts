@@ -213,6 +213,7 @@ export interface CreateCourseDto {
     semester: string;
     section?: string;
     description?: string;
+    enrollmentCodeActive?: boolean;
 }
 
 export interface UpdateCourseDto extends Partial<CreateCourseDto> {
@@ -256,13 +257,9 @@ export interface GradeSubmissionDto {
 }
 
 export interface RegisterData {
-    firstName: string;
-    lastName: string;
+    name: string;
     email: string;
     password: string;
-    role: UserRole;
-    department?: string;
-    title?: string;
 }
 
 // ── Analytics / Report Types ────────────────────────────────────────

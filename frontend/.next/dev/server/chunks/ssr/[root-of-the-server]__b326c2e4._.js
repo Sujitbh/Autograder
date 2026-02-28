@@ -7753,12 +7753,28 @@ __turbopack_context__.s([
    ═══════════════════════════════════════════════════════════════════ */ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/client.ts [app-ssr] (ecmascript)");
 ;
 function mapUser(u) {
+    const [firstName = '', ...rest] = (u.name ?? '').trim().split(' ');
+    const lastName = rest.join(' ');
+    if (u.role === 'student') {
+        return {
+            id: String(u.id),
+            firstName: firstName || 'Student',
+            lastName,
+            email: u.email,
+            sisUserId: '',
+            sisLoginId: '',
+            enrolledCourses: [],
+            role: 'student'
+        };
+    }
     return {
         id: String(u.id),
-        name: u.name,
+        firstName: firstName || 'User',
+        lastName,
         email: u.email,
-        role: u.role,
-        avatarUrl: ''
+        title: '',
+        department: '',
+        role: 'faculty'
     };
 }
 const authService = {
@@ -7823,14 +7839,14 @@ __turbopack_context__.s([
         semester: 'Spring 2026',
         description: c.description ?? '',
         facultyId: '',
-        enrollmentCode: '',
-        enrollmentCodeActive: true,
-        status: 'active',
+        enrollmentCode: c.enrollment_code ?? '',
+        enrollmentCodeActive: c.enrollment_code_active,
+        status: c.is_active ? 'active' : 'archived',
         studentCount: 0,
         assignmentCount: 0,
         pendingGrades: 0,
-        createdAt: '',
-        updatedAt: ''
+        createdAt: c.created_at ?? '',
+        updatedAt: c.updated_at ?? ''
     };
 }
 const courseService = {
@@ -7843,7 +7859,13 @@ const courseService = {
         return mapCourse(data);
     },
     /** Create a new course. */ async createCourse (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post('/courses/', dto);
+        const payload = {
+            name: dto.name,
+            code: dto.code,
+            description: dto.description ?? '',
+            enrollment_code_active: dto.enrollmentCodeActive ?? true
+        };
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post('/courses/', payload);
         return mapCourse(data);
     },
     /** Update an existing course. */ async updateCourse (courseId, dto) {
@@ -7853,14 +7875,22 @@ const courseService = {
     /** Delete a course. */ async deleteCourse (courseId) {
         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].delete(`/courses/${courseId}`);
     },
-    /** Get enrolled students for a course. */ async getEnrollments (courseId, page = 1, pageSize = 50) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/enrollments`, {
-                params: {
-                    page,
-                    pageSize
-                }
-            }));
+    /** Get roster entries for a course. */ async getEnrollments (courseId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/enrollments`));
         return data;
+    },
+    /** Add one member to a course roster (student/ta/instructor). */ async addEnrollment (courseId, payload) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`/courses/${courseId}/enrollments`, payload);
+        return data;
+    },
+    /** Update roster role for an existing enrollment. */ async updateEnrollmentRole (courseId, enrollmentId, role) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].put(`/courses/${courseId}/enrollments/${enrollmentId}`, {
+            role
+        });
+        return data;
+    },
+    /** Remove a member from the course roster. */ async removeEnrollment (courseId, enrollmentId) {
+        await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].delete(`/courses/${courseId}/enrollments/${enrollmentId}`);
     },
     /** Enroll a student via enrollment code. */ async enrollStudent (enrollmentCode) {
         const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post('/courses/enroll', {

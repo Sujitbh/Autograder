@@ -63,6 +63,10 @@ api.interceptors.response.use(
         }
 
         const { status, data } = error.response;
+        const backendDetail = (data as any)?.detail;
+        const backendMessage = (typeof backendDetail === 'string' ? backendDetail : undefined)
+            ?? data?.message
+            ?? data?.error;
 
         if (status === 401) {
             // Token expired — clear local auth and redirect
@@ -71,14 +75,14 @@ api.interceptors.response.use(
                 localStorage.removeItem('autograde_auth');
                 // Let the AuthContext handle the redirect
             }
-            throw new AuthError(data?.message ?? 'Unauthorized');
+            throw new AuthError(backendMessage ?? 'Unauthorized');
         }
 
         if (status === 422 && data?.error) {
-            throw new ValidationError(data.message ?? 'Validation error');
+            throw new ValidationError(backendMessage ?? 'Validation error');
         }
 
-        throw new Error(data?.message ?? `Request failed (${status})`);
+        throw new Error(backendMessage ?? `Request failed (${status})`);
     }
 );
 

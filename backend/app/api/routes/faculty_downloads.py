@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user
-from app.core.permissions import require_role
+from app.core.permissions import require_course_role
 from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
@@ -21,11 +21,15 @@ def download_assignment_zip(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    require_role(user.role, {"faculty", "admin"})
-
     assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    require_course_role(
+        db=db,
+        user=user,
+        course_id=assignment.course_id,
+        allowed_roles=["instructor", "ta"],
+    )
 
     # join: submissions -> files; and map student_id -> email
     submissions = db.query(Submission).filter(Submission.assignment_id == assignment_id).all()

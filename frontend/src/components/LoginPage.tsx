@@ -58,8 +58,11 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     try {
       // Call the real backend
       const { user, token } = await authService.login(email.trim(), password);
+      const displayName =
+        `${(user as any).firstName ?? ''} ${(user as any).lastName ?? ''}`.trim() ||
+        user.email.split('@')[0];
       onLogin(
-        { id: user.id, name: user.name, email: user.email, role: user.role as string },
+        { id: user.id, name: displayName, email: user.email, role: user.role as string },
         token,
       );
     } catch (err: any) {

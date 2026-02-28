@@ -12,7 +12,9 @@ export function useCourses() {
     return useQuery({
         queryKey: ['courses'],
         queryFn: () => courseService.getCourses(),
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,
+        refetchOnMount: 'always',
+        refetchOnWindowFocus: true,
     });
 }
 
@@ -31,7 +33,12 @@ export function useCreateCourse() {
 
     return useMutation({
         mutationFn: (dto: CreateCourseDto) => courseService.createCourse(dto),
-        onSuccess: () => {
+        onSuccess: (newCourse) => {
+            qc.setQueryData<Course[] | undefined>(['courses'], (prev) => {
+                if (!prev) return [newCourse];
+                const exists = prev.some((c) => c.id === newCourse.id);
+                return exists ? prev : [newCourse, ...prev];
+            });
             qc.invalidateQueries({ queryKey: ['courses'] });
         },
     });

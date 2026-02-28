@@ -10,6 +10,8 @@ class Course(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     code = Column(String, nullable=True, index=True)
+    enrollment_code = Column(String, nullable=True, unique=True, index=True)
+    enrollment_code_active = Column(Boolean, nullable=False, default=True)
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
 

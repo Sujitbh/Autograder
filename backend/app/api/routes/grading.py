@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.api.deps import get_db, get_current_user
-from app.core.permissions import require_role
+from app.core.permissions import require_course_role
 from app.models.user import User
+from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.services.grading_service import GradingService
 from app.services.execution_service import ExecutionService, ExecutionStatus
@@ -39,6 +40,12 @@ class GradeSubmissionRequest(BaseModel):
     submission_id: int
     run_tests: bool = True
     apply_rubric: bool = True
+
+
+class ManualScoreUpdateRequest(BaseModel):
+    score: int
+    max_score: Optional[int] = None
+    feedback: Optional[str] = None
 
 
 # ==================== Code Execution ====================
@@ -113,13 +120,17 @@ def grade_submission(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Submission not found",
         )
+    assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
 
-    # Permission check
-    if user.role == "student" and submission.student_id != user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Can only grade your own submissions",
-        )
+    # Instructors/TAs for the course (or admin) can grade.
+    require_course_role(
+        db=db,
+        user=user,
+        course_id=assignment.course_id,
+        allowed_roles=["instructor", "ta"],
+    )
 
     # Update submission status
     submission.status = "grading"
@@ -172,12 +183,23 @@ def get_submission_results(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Submission not found",
         )
+    assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
 
-    # Permission check
-    if user.role == "student" and submission.student_id != user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Can only view your own results",
+    # Students can only view their own results; instructors/TAs can view course submissions.
+    if user.role == "student":
+        if submission.student_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Can only view your own results",
+            )
+    else:
+        require_course_role(
+            db=db,
+            user=user,
+            course_id=assignment.course_id,
+            allowed_roles=["instructor", "ta"],
         )
 
     results = GradingService.get_results(db, submission_id)
@@ -214,7 +236,15 @@ def get_assignment_stats(
     """
     Get grading statistics for an assignment (faculty/admin).
     """
-    require_role(user.role, {"faculty", "admin"})
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    require_course_role(
+        db=db,
+        user=user,
+        course_id=assignment.course_id,
+        allowed_roles=["instructor", "ta"],
+    )
     return GradingService.get_assignment_stats(db, assignment_id)
 
 
@@ -227,7 +257,15 @@ def grade_all_submissions(
     """
     Grade all pending submissions for an assignment (faculty/admin).
     """
-    require_role(user.role, {"faculty", "admin"})
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    require_course_role(
+        db=db,
+        user=user,
+        course_id=assignment.course_id,
+        allowed_roles=["instructor", "ta"],
+    )
 
     submissions = db.query(Submission).filter(
         Submission.assignment_id == assignment_id,
@@ -253,4 +291,56 @@ def grade_all_submissions(
         "total_graded": len([r for r in results if r["status"] == "graded"]),
         "total_errors": len([r for r in results if r["status"] == "error"]),
         "results": results,
+    }
+
+
+@router.patch("/submissions/{submission_id}/score")
+def manual_score_submission(
+    submission_id: int,
+    payload: ManualScoreUpdateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    submission = db.query(Submission).filter(Submission.id == submission_id).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    require_course_role(
+        db=db,
+        user=user,
+        course_id=assignment.course_id,
+        allowed_roles=["instructor", "ta"],
+    )
+
+    if payload.score < 0:
+        raise HTTPException(status_code=400, detail="score must be >= 0")
+
+    resolved_max = payload.max_score if payload.max_score is not None else submission.max_score
+    if resolved_max is not None and payload.score > resolved_max:
+        raise HTTPException(status_code=400, detail="score cannot exceed max_score")
+
+    submission.score = payload.score
+    if payload.max_score is not None:
+        submission.max_score = payload.max_score
+    if payload.feedback is not None:
+        submission.feedback = payload.feedback
+    submission.status = "graded"
+
+    from datetime import datetime
+    submission.graded_at = datetime.utcnow()
+
+    db.add(submission)
+    db.commit()
+    db.refresh(submission)
+
+    return {
+        "submission_id": submission.id,
+        "status": submission.status,
+        "score": submission.score,
+        "max_score": submission.max_score,
+        "feedback": submission.feedback,
+        "graded_at": submission.graded_at,
     }
