@@ -45,12 +45,10 @@ export function useGradeSubmission() {
     return useMutation({
         mutationFn: (dto: GradeSubmissionDto) =>
             submissionService.gradeSubmission(dto),
-        onSuccess: (updated) => {
+        onSuccess: (_updated, dto) => {
             // Optimistically update the individual submission cache
-            qc.setQueryData(['submission', updated.id], updated);
-            qc.invalidateQueries({
-                queryKey: ['submissions', updated.assignmentId],
-            });
+            qc.invalidateQueries({ queryKey: ['submission', dto.submissionId] });
+            qc.invalidateQueries({ queryKey: ['submissions'] });
             // Also refresh grades
             qc.invalidateQueries({ queryKey: ['grades'] });
         },

@@ -178,7 +178,7 @@ function envBool(value, fallback) {
     return value === 'true';
 }
 const config = {
-    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:3001/api',
+    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:8000/api',
     wsUrl: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002',
     pistonApiUrl: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_PISTON_API_URL || 'https://emkc.org/api/v2/piston',
     s3Bucket: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_S3_BUCKET || 'autograde-uploads-dev',
@@ -271,6 +271,8 @@ api.interceptors.response.use((res)=>res, async (error)=>{
         throw new NetworkError('Unable to connect to the server');
     }
     const { status, data } = error.response;
+    const backendDetail = data?.detail;
+    const backendMessage = (typeof backendDetail === 'string' ? backendDetail : undefined) ?? data?.message ?? data?.error;
     if (status === 401) {
         // Token expired — clear local auth and redirect
         if ("TURBOPACK compile-time truthy", 1) {
@@ -278,12 +280,12 @@ api.interceptors.response.use((res)=>res, async (error)=>{
             localStorage.removeItem('autograde_auth');
         // Let the AuthContext handle the redirect
         }
-        throw new AuthError(data?.message ?? 'Unauthorized');
+        throw new AuthError(backendMessage ?? 'Unauthorized');
     }
     if (status === 422 && data?.error) {
-        throw new ValidationError(data.message ?? 'Validation error');
+        throw new ValidationError(backendMessage ?? 'Validation error');
     }
-    throw new Error(data?.message ?? `Request failed (${status})`);
+    throw new Error(backendMessage ?? `Request failed (${status})`);
 });
 async function withRetry(fn, retries = 3) {
     for(let attempt = 0; attempt <= retries; attempt++){
@@ -317,12 +319,28 @@ __turbopack_context__.s([
    ═══════════════════════════════════════════════════════════════════ */ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/client.ts [app-client] (ecmascript)");
 ;
 function mapUser(u) {
+    const [firstName = '', ...rest] = (u.name ?? '').trim().split(' ');
+    const lastName = rest.join(' ');
+    if (u.role === 'student') {
+        return {
+            id: String(u.id),
+            firstName: firstName || 'Student',
+            lastName,
+            email: u.email,
+            sisUserId: '',
+            sisLoginId: '',
+            enrolledCourses: [],
+            role: 'student'
+        };
+    }
     return {
         id: String(u.id),
-        name: u.name,
+        firstName: firstName || 'User',
+        lastName,
         email: u.email,
-        role: u.role,
-        avatarUrl: ''
+        title: '',
+        department: '',
+        role: 'faculty'
     };
 }
 const authService = {
@@ -402,14 +420,14 @@ __turbopack_context__.s([
         semester: 'Spring 2026',
         description: c.description ?? '',
         facultyId: '',
-        enrollmentCode: '',
-        enrollmentCodeActive: true,
-        status: 'active',
+        enrollmentCode: c.enrollment_code ?? '',
+        enrollmentCodeActive: c.enrollment_code_active,
+        status: c.is_active ? 'active' : 'archived',
         studentCount: 0,
         assignmentCount: 0,
         pendingGrades: 0,
-        createdAt: '',
-        updatedAt: ''
+        createdAt: c.created_at ?? '',
+        updatedAt: c.updated_at ?? ''
     };
 }
 const courseService = {
@@ -422,7 +440,13 @@ const courseService = {
         return mapCourse(data);
     },
     /** Create a new course. */ async createCourse (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/courses/', dto);
+        const payload = {
+            name: dto.name,
+            code: dto.code,
+            description: dto.description ?? '',
+            enrollment_code_active: dto.enrollmentCodeActive ?? true
+        };
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/courses/', payload);
         return mapCourse(data);
     },
     /** Update an existing course. */ async updateCourse (courseId, dto) {
@@ -432,14 +456,22 @@ const courseService = {
     /** Delete a course. */ async deleteCourse (courseId) {
         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].delete(`/courses/${courseId}`);
     },
-    /** Get enrolled students for a course. */ async getEnrollments (courseId, page = 1, pageSize = 50) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/enrollments`, {
-                params: {
-                    page,
-                    pageSize
-                }
-            }));
+    /** Get roster entries for a course. */ async getEnrollments (courseId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/enrollments`));
         return data;
+    },
+    /** Add one member to a course roster (student/ta/instructor). */ async addEnrollment (courseId, payload) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/courses/${courseId}/enrollments`, payload);
+        return data;
+    },
+    /** Update roster role for an existing enrollment. */ async updateEnrollmentRole (courseId, enrollmentId, role) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].patch(`/courses/${courseId}/enrollments/${enrollmentId}`, {
+            role
+        });
+        return data;
+    },
+    /** Remove a member from the course roster. */ async removeEnrollment (courseId, enrollmentId) {
+        await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].delete(`/courses/${courseId}/enrollments/${enrollmentId}`);
     },
     /** Enroll a student via enrollment code. */ async enrollStudent (enrollmentCode) {
         const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/courses/enroll', {
@@ -531,38 +563,80 @@ __turbopack_context__.s([
     ()=>submissionService
 ]);
 /* ═══════════════════════════════════════════════════════════════════
-   Submission Service — Submit code, fetch submissions
+   Submission Service — upload/fetch/grade submissions
+   Backed by FastAPI routes under /submissions, /grading, /faculty
    ═══════════════════════════════════════════════════════════════════ */ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/client.ts [app-client] (ecmascript)");
 ;
+function mapSubmission(s) {
+    return {
+        id: String(s.id),
+        assignmentId: String(s.assignment_id),
+        studentId: String(s.student_id),
+        code: '',
+        language: 'python',
+        submittedAt: s.created_at ?? '',
+        isLate: false,
+        status: s.status === 'graded' ? 'graded' : 'pending',
+        grade: s.score != null ? {
+            id: `grade-${s.id}`,
+            submissionId: String(s.id),
+            rubricScores: [],
+            totalScore: s.score,
+            maxScore: s.max_score ?? 100,
+            percentage: s.max_score && s.max_score > 0 ? Number((s.score / s.max_score * 100).toFixed(2)) : 0,
+            letterGrade: '',
+            feedback: s.feedback ?? '',
+            gradedAt: s.graded_at ?? '',
+            gradedBy: ''
+        } : undefined
+    };
+}
 const submissionService = {
-    /** Submit code for grading. */ async submitCode (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/assignments/${dto.assignmentId}/submissions`, dto);
-        return data.data;
+    /** Legacy fallback: create submission row without files. */ async submitCode (dto) {
+        const payload = {
+            assignment_id: Number(dto.assignmentId)
+        };
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/submissions/', payload);
+        return mapSubmission(data);
+    },
+    /** Student file upload (multipart/form-data with field name `files`). */ async uploadFiles (assignmentId, files) {
+        const formData = new FormData();
+        files.forEach((file)=>formData.append('files', file));
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/submissions/assignments/${assignmentId}/upload`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        return data;
     },
     /** Get a specific submission. */ async getSubmission (submissionId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/${submissionId}`));
-        return data.data;
+        return mapSubmission(data);
     },
-    /** List all submissions for an assignment (faculty view). */ async getSubmissions (assignmentId, page = 1, pageSize = 50) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/assignments/${assignmentId}/submissions`, {
-                params: {
-                    page,
-                    pageSize
-                }
-            }));
-        return data.data;
+    /** List submissions for an assignment. */ async getSubmissions (assignmentId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/assignments/${assignmentId}`));
+        return data.map(mapSubmission);
     },
-    /** Faculty: grade a submission. */ async gradeSubmission (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/submissions/${dto.submissionId}/grade`, dto);
-        return data.data;
+    /** Run grading for a submission. */ async gradeSubmission (dto) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/grading/submissions/${dto.submissionId}/grade`);
+        return data;
     },
-    /** Get submission history for a student on an assignment. */ async getStudentSubmissions (assignmentId, studentId) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/assignments/${assignmentId}/submissions`, {
-                params: {
-                    studentId
-                }
-            }));
-        return data.data;
+    /** Manual score entry/override by instructor/TA. */ async overrideSubmissionScore (submissionId, payload) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].patch(`/grading/submissions/${submissionId}/score`, payload);
+        return data;
+    },
+    /** Fetch grading results/details for one submission. */ async getSubmissionResults (submissionId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/grading/submissions/${submissionId}/results`));
+        return data;
+    },
+    /** Instructor/TA ZIP download of all submissions for assignment. */ async downloadAssignmentZip (assignmentId) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/faculty/assignments/${assignmentId}/download-zip`, {
+            responseType: 'blob'
+        });
+        return data;
+    },
+    /** Student history helper; backend already filters by auth user role. */ async getStudentSubmissions (assignmentId, _studentId) {
+        return this.getSubmissions(assignmentId);
     }
 };
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
@@ -715,9 +789,10 @@ function LoginPage({ onLogin }) {
         try {
             // Call the real backend
             const { user, token } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$authService$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["authService"].login(email.trim(), password);
+            const displayName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email.split('@')[0];
             onLogin({
                 id: user.id,
-                name: user.name,
+                name: displayName,
                 email: user.email,
                 role: user.role
             }, token);
@@ -742,7 +817,7 @@ function LoginPage({ onLogin }) {
                 className: "w-8 h-8"
             }, void 0, false, {
                 fileName: "[project]/src/components/LoginPage.tsx",
-                lineNumber: 82,
+                lineNumber: 85,
                 columnNumber: 30
             }, this),
             label: 'Student',
@@ -754,7 +829,7 @@ function LoginPage({ onLogin }) {
                 className: "w-8 h-8"
             }, void 0, false, {
                 fileName: "[project]/src/components/LoginPage.tsx",
-                lineNumber: 83,
+                lineNumber: 86,
                 columnNumber: 30
             }, this),
             label: 'Faculty',
@@ -766,7 +841,7 @@ function LoginPage({ onLogin }) {
                 className: "w-8 h-8"
             }, void 0, false, {
                 fileName: "[project]/src/components/LoginPage.tsx",
-                lineNumber: 84,
+                lineNumber: 87,
                 columnNumber: 28
             }, this),
             label: 'Admin',
@@ -793,17 +868,17 @@ function LoginPage({ onLogin }) {
                                     className: "w-20 h-20 text-white"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                    lineNumber: 101,
+                                    lineNumber: 104,
                                     columnNumber: 15
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/LoginPage.tsx",
-                                lineNumber: 100,
+                                lineNumber: 103,
                                 columnNumber: 13
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/components/LoginPage.tsx",
-                            lineNumber: 99,
+                            lineNumber: 102,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h1", {
@@ -816,7 +891,7 @@ function LoginPage({ onLogin }) {
                             children: "AutoGrade"
                         }, void 0, false, {
                             fileName: "[project]/src/components/LoginPage.tsx",
-                            lineNumber: 104,
+                            lineNumber: 107,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -828,7 +903,7 @@ function LoginPage({ onLogin }) {
                             children: "University of Louisiana Monroe"
                         }, void 0, false, {
                             fileName: "[project]/src/components/LoginPage.tsx",
-                            lineNumber: 107,
+                            lineNumber: 110,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -840,18 +915,18 @@ function LoginPage({ onLogin }) {
                             children: "Automated Grading System"
                         }, void 0, false, {
                             fileName: "[project]/src/components/LoginPage.tsx",
-                            lineNumber: 110,
+                            lineNumber: 113,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/LoginPage.tsx",
-                    lineNumber: 98,
+                    lineNumber: 101,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/LoginPage.tsx",
-                lineNumber: 92,
+                lineNumber: 95,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -871,12 +946,12 @@ function LoginPage({ onLogin }) {
                                         className: "w-10 h-10 text-white"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/LoginPage.tsx",
-                                        lineNumber: 122,
+                                        lineNumber: 125,
                                         columnNumber: 15
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                    lineNumber: 121,
+                                    lineNumber: 124,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
@@ -889,13 +964,13 @@ function LoginPage({ onLogin }) {
                                     children: "AutoGrade"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                    lineNumber: 124,
+                                    lineNumber: 127,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/LoginPage.tsx",
-                            lineNumber: 120,
+                            lineNumber: 123,
                             columnNumber: 11
                         }, this),
                         !selectedRole && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -914,7 +989,7 @@ function LoginPage({ onLogin }) {
                                             children: "Welcome"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 133,
+                                            lineNumber: 136,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -926,13 +1001,13 @@ function LoginPage({ onLogin }) {
                                             children: "Choose how you'd like to sign in"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 136,
+                                            lineNumber: 139,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                    lineNumber: 132,
+                                    lineNumber: 135,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -957,7 +1032,7 @@ function LoginPage({ onLogin }) {
                                                     children: icon
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 149,
+                                                    lineNumber: 152,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -972,7 +1047,7 @@ function LoginPage({ onLogin }) {
                                                             children: label
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                                            lineNumber: 156,
+                                                            lineNumber: 159,
                                                             columnNumber: 23
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -984,13 +1059,13 @@ function LoginPage({ onLogin }) {
                                                             children: description
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                                            lineNumber: 157,
+                                                            lineNumber: 160,
                                                             columnNumber: 23
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 155,
+                                                    lineNumber: 158,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$arrow$2d$left$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ArrowLeft$3e$__["ArrowLeft"], {
@@ -1000,24 +1075,24 @@ function LoginPage({ onLogin }) {
                                                     }
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 159,
+                                                    lineNumber: 162,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
                                         }, role, true, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 143,
+                                            lineNumber: 146,
                                             columnNumber: 19
                                         }, this))
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                    lineNumber: 141,
+                                    lineNumber: 144,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/LoginPage.tsx",
-                            lineNumber: 131,
+                            lineNumber: 134,
                             columnNumber: 13
                         }, this),
                         selectedRole && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1040,14 +1115,14 @@ function LoginPage({ onLogin }) {
                                             className: "w-4 h-4"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 175,
+                                            lineNumber: 178,
                                             columnNumber: 17
                                         }, this),
                                         " Back to role selection"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                    lineNumber: 169,
+                                    lineNumber: 172,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1064,7 +1139,7 @@ function LoginPage({ onLogin }) {
                                             children: selectedRole === 'student' ? 'Student Sign In' : selectedRole === 'faculty' ? 'Faculty Sign In' : 'Admin Sign In'
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 179,
+                                            lineNumber: 182,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1080,13 +1155,13 @@ function LoginPage({ onLogin }) {
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 182,
+                                            lineNumber: 185,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                    lineNumber: 178,
+                                    lineNumber: 181,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("form", {
@@ -1107,7 +1182,7 @@ function LoginPage({ onLogin }) {
                                                     }
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 194,
+                                                    lineNumber: 197,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1119,13 +1194,13 @@ function LoginPage({ onLogin }) {
                                                     children: "Account created successfully! Please sign in with your credentials."
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 195,
+                                                    lineNumber: 198,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 190,
+                                            lineNumber: 193,
                                             columnNumber: 19
                                         }, this),
                                         error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1142,7 +1217,7 @@ function LoginPage({ onLogin }) {
                                                     }
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 210,
+                                                    lineNumber: 213,
                                                     columnNumber: 21
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1158,7 +1233,7 @@ function LoginPage({ onLogin }) {
                                                             children: error
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                                            lineNumber: 215,
+                                                            lineNumber: 218,
                                                             columnNumber: 23
                                                         }, this),
                                                         showNotRegisteredPrompt && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -1172,19 +1247,19 @@ function LoginPage({ onLogin }) {
                                                             children: "Create an Account"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                                            lineNumber: 224,
+                                                            lineNumber: 227,
                                                             columnNumber: 25
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 214,
+                                                    lineNumber: 217,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 203,
+                                            lineNumber: 206,
                                             columnNumber: 19
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1201,7 +1276,7 @@ function LoginPage({ onLogin }) {
                                                     children: "Institutional Email"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 239,
+                                                    lineNumber: 242,
                                                     columnNumber: 19
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -1232,7 +1307,7 @@ function LoginPage({ onLogin }) {
                                                     required: true
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 246,
+                                                    lineNumber: 249,
                                                     columnNumber: 19
                                                 }, this),
                                                 emailError ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1246,14 +1321,14 @@ function LoginPage({ onLogin }) {
                                                             className: "w-3.5 h-3.5 flex-shrink-0 mt-0.5"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                                            lineNumber: 269,
+                                                            lineNumber: 272,
                                                             columnNumber: 23
                                                         }, this),
                                                         emailError
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 268,
+                                                    lineNumber: 271,
                                                     columnNumber: 21
                                                 }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                                     className: "mt-2",
@@ -1264,13 +1339,13 @@ function LoginPage({ onLogin }) {
                                                     children: selectedRole === 'student' ? 'Must be a valid @warhawks.ulm.edu email' : 'Must be a valid @ulm.edu email'
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 273,
+                                                    lineNumber: 276,
                                                     columnNumber: 21
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 238,
+                                            lineNumber: 241,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1287,7 +1362,7 @@ function LoginPage({ onLogin }) {
                                                     children: "Password"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 281,
+                                                    lineNumber: 284,
                                                     columnNumber: 19
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1307,7 +1382,7 @@ function LoginPage({ onLogin }) {
                                                             required: true
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                                            lineNumber: 289,
+                                                            lineNumber: 292,
                                                             columnNumber: 21
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -1319,30 +1394,30 @@ function LoginPage({ onLogin }) {
                                                                 className: "w-5 h-5"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/LoginPage.tsx",
-                                                                lineNumber: 308,
+                                                                lineNumber: 311,
                                                                 columnNumber: 39
                                                             }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$eye$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Eye$3e$__["Eye"], {
                                                                 className: "w-5 h-5"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/LoginPage.tsx",
-                                                                lineNumber: 308,
+                                                                lineNumber: 311,
                                                                 columnNumber: 72
                                                             }, this)
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                                            lineNumber: 302,
+                                                            lineNumber: 305,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 288,
+                                                    lineNumber: 291,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 280,
+                                            lineNumber: 283,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -1357,7 +1432,7 @@ function LoginPage({ onLogin }) {
                                                             onCheckedChange: (checked)=>setRememberMe(checked)
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                                            lineNumber: 316,
+                                                            lineNumber: 319,
                                                             columnNumber: 21
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
@@ -1371,13 +1446,13 @@ function LoginPage({ onLogin }) {
                                                             children: "Remember me"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                                            lineNumber: 321,
+                                                            lineNumber: 324,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 315,
+                                                    lineNumber: 318,
                                                     columnNumber: 19
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("a", {
@@ -1391,13 +1466,13 @@ function LoginPage({ onLogin }) {
                                                     children: "Forgot password?"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 325,
+                                                    lineNumber: 328,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 314,
+                                            lineNumber: 317,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -1415,7 +1490,7 @@ function LoginPage({ onLogin }) {
                                                         className: "w-4 h-4 mr-2 animate-spin"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/LoginPage.tsx",
-                                                        lineNumber: 337,
+                                                        lineNumber: 340,
                                                         columnNumber: 37
                                                     }, this),
                                                     " Signing in…"
@@ -1423,7 +1498,7 @@ function LoginPage({ onLogin }) {
                                             }, void 0, true) : 'Sign In'
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 331,
+                                            lineNumber: 334,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1447,13 +1522,13 @@ function LoginPage({ onLogin }) {
                                                     children: "Create Account"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 343,
+                                                    lineNumber: 346,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 341,
+                                            lineNumber: 344,
                                             columnNumber: 17
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -1475,42 +1550,42 @@ function LoginPage({ onLogin }) {
                                                     children: "support@ulm.edu"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                                    lineNumber: 351,
+                                                    lineNumber: 354,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/LoginPage.tsx",
-                                            lineNumber: 349,
+                                            lineNumber: 352,
                                             columnNumber: 17
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/LoginPage.tsx",
-                                    lineNumber: 187,
+                                    lineNumber: 190,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/LoginPage.tsx",
-                            lineNumber: 168,
+                            lineNumber: 171,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/LoginPage.tsx",
-                    lineNumber: 118,
+                    lineNumber: 121,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/LoginPage.tsx",
-                lineNumber: 117,
+                lineNumber: 120,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/LoginPage.tsx",
-        lineNumber: 90,
+        lineNumber: 93,
         columnNumber: 5
     }, this);
 }

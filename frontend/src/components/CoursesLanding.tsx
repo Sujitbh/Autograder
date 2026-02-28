@@ -27,6 +27,7 @@ import {
 } from './ui/dialog';
 import { useRouter } from 'next/navigation';
 import { useCourses, useDeleteCourse } from '@/hooks/queries';
+import { config } from '@/config/env';
 
 /* ═══════════════════════════════════════════
    Types (local UI shape — mapped from API)
@@ -236,7 +237,7 @@ export function CoursesLanding() {
         {error && !isLoading && (
           <div className="flex flex-col items-center justify-center py-20 gap-2" style={{ color: 'var(--color-danger, #ef4444)' }}>
             <AlertTriangle className="w-6 h-6" />
-            <span>Failed to load courses. Is the backend running?</span>
+            <span>Failed to load courses. Is the backend running at {config.apiUrl}?</span>
             <span style={{ fontSize: '12px', opacity: 0.7 }}>{(error as Error).message}</span>
           </div>
         )}
@@ -436,4 +437,3 @@ export function CoursesLanding() {
     </PageLayout>
   );
 }
-

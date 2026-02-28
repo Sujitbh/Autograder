@@ -18,16 +18,30 @@ var _s = __turbopack_context__.k.signature();
 ;
 function AuthGuard({ children }) {
     _s();
-    const { isAuthenticated } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { isAuthenticated, role } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
+    const pathname = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["usePathname"])();
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "AuthGuard.useEffect": ()=>{
             if (!isAuthenticated) {
                 router.replace('/login');
+                return;
+            }
+            // Minimum UI-level role routing split:
+            // - students stay in /student space
+            // - faculty/admin stay in /courses or /faculty space
+            if (role === 'student' && pathname?.startsWith('/courses')) {
+                router.replace('/student');
+                return;
+            }
+            if ((role === 'faculty' || role === 'admin') && pathname?.startsWith('/student')) {
+                router.replace('/courses');
             }
         }
     }["AuthGuard.useEffect"], [
         isAuthenticated,
+        role,
+        pathname,
         router
     ]);
     if (!isAuthenticated) return null;
@@ -35,10 +49,11 @@ function AuthGuard({ children }) {
         children: children
     }, void 0, false);
 }
-_s(AuthGuard, "Z8qV8gahpegazQReeCvErAUIJG4=", false, function() {
+_s(AuthGuard, "F7uN0EBS69urbfSnRFZixdY5kXw=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"],
-        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"]
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["usePathname"]
     ];
 });
 _c = AuthGuard;
@@ -1713,7 +1728,7 @@ function envBool(value, fallback) {
     return value === 'true';
 }
 const config = {
-    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:3001/api',
+    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:8000/api',
     wsUrl: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002',
     pistonApiUrl: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_PISTON_API_URL || 'https://emkc.org/api/v2/piston',
     s3Bucket: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_S3_BUCKET || 'autograde-uploads-dev',
@@ -1806,6 +1821,8 @@ api.interceptors.response.use((res)=>res, async (error)=>{
         throw new NetworkError('Unable to connect to the server');
     }
     const { status, data } = error.response;
+    const backendDetail = data?.detail;
+    const backendMessage = (typeof backendDetail === 'string' ? backendDetail : undefined) ?? data?.message ?? data?.error;
     if (status === 401) {
         // Token expired — clear local auth and redirect
         if ("TURBOPACK compile-time truthy", 1) {
@@ -1813,12 +1830,12 @@ api.interceptors.response.use((res)=>res, async (error)=>{
             localStorage.removeItem('autograde_auth');
         // Let the AuthContext handle the redirect
         }
-        throw new AuthError(data?.message ?? 'Unauthorized');
+        throw new AuthError(backendMessage ?? 'Unauthorized');
     }
     if (status === 422 && data?.error) {
-        throw new ValidationError(data.message ?? 'Validation error');
+        throw new ValidationError(backendMessage ?? 'Validation error');
     }
-    throw new Error(data?.message ?? `Request failed (${status})`);
+    throw new Error(backendMessage ?? `Request failed (${status})`);
 });
 async function withRetry(fn, retries = 3) {
     for(let attempt = 0; attempt <= retries; attempt++){
@@ -2009,19 +2026,38 @@ function StudentDashboard() {
                             lineNumber: 65,
                             columnNumber: 11
                         }, this),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
-                            variant: "outline",
-                            onClick: handleLogout,
-                            className: "gap-2",
+                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                            className: "flex items-center gap-2",
                             children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$log$2d$out$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__LogOut$3e$__["LogOut"], {
-                                    className: "w-4 h-4"
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
+                                    variant: "outline",
+                                    onClick: ()=>router.push('/student/results'),
+                                    className: "gap-2",
+                                    children: "View Results"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/StudentDashboard.tsx",
                                     lineNumber: 74,
                                     columnNumber: 13
                                 }, this),
-                                "Sign Out"
+                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
+                                    variant: "outline",
+                                    onClick: handleLogout,
+                                    className: "gap-2",
+                                    children: [
+                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$log$2d$out$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__LogOut$3e$__["LogOut"], {
+                                            className: "w-4 h-4"
+                                        }, void 0, false, {
+                                            fileName: "[project]/src/components/StudentDashboard.tsx",
+                                            lineNumber: 78,
+                                            columnNumber: 15
+                                        }, this),
+                                        "Sign Out"
+                                    ]
+                                }, void 0, true, {
+                                    fileName: "[project]/src/components/StudentDashboard.tsx",
+                                    lineNumber: 77,
+                                    columnNumber: 13
+                                }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/StudentDashboard.tsx",
@@ -2042,7 +2078,7 @@ function StudentDashboard() {
                                 className: "w-6 h-6"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/StudentDashboard.tsx",
-                                lineNumber: 80,
+                                lineNumber: 85,
                                 columnNumber: 27
                             }, void 0),
                             label: "Enrolled Courses",
@@ -2050,7 +2086,7 @@ function StudentDashboard() {
                             color: "#6B0000"
                         }, void 0, false, {
                             fileName: "[project]/src/components/StudentDashboard.tsx",
-                            lineNumber: 80,
+                            lineNumber: 85,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(StatCard, {
@@ -2058,7 +2094,7 @@ function StudentDashboard() {
                                 className: "w-6 h-6"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/StudentDashboard.tsx",
-                                lineNumber: 81,
+                                lineNumber: 86,
                                 columnNumber: 27
                             }, void 0),
                             label: "Total Assignments",
@@ -2066,7 +2102,7 @@ function StudentDashboard() {
                             color: "#2563EB"
                         }, void 0, false, {
                             fileName: "[project]/src/components/StudentDashboard.tsx",
-                            lineNumber: 81,
+                            lineNumber: 86,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(StatCard, {
@@ -2074,7 +2110,7 @@ function StudentDashboard() {
                                 className: "w-6 h-6"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/StudentDashboard.tsx",
-                                lineNumber: 82,
+                                lineNumber: 87,
                                 columnNumber: 27
                             }, void 0),
                             label: "Pending",
@@ -2082,7 +2118,7 @@ function StudentDashboard() {
                             color: "#D97706"
                         }, void 0, false, {
                             fileName: "[project]/src/components/StudentDashboard.tsx",
-                            lineNumber: 82,
+                            lineNumber: 87,
                             columnNumber: 11
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(StatCard, {
@@ -2090,7 +2126,7 @@ function StudentDashboard() {
                                 className: "w-6 h-6"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/StudentDashboard.tsx",
-                                lineNumber: 83,
+                                lineNumber: 88,
                                 columnNumber: 27
                             }, void 0),
                             label: "Completed",
@@ -2098,13 +2134,13 @@ function StudentDashboard() {
                             color: "#16A34A"
                         }, void 0, false, {
                             fileName: "[project]/src/components/StudentDashboard.tsx",
-                            lineNumber: 83,
+                            lineNumber: 88,
                             columnNumber: 11
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/StudentDashboard.tsx",
-                    lineNumber: 79,
+                    lineNumber: 84,
                     columnNumber: 9
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2117,7 +2153,7 @@ function StudentDashboard() {
                             children: "Your Courses"
                         }, void 0, false, {
                             fileName: "[project]/src/components/StudentDashboard.tsx",
-                            lineNumber: 87,
+                            lineNumber: 92,
                             columnNumber: 11
                         }, this),
                         isLoading ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2128,7 +2164,7 @@ function StudentDashboard() {
                             children: "Loading courses…"
                         }, void 0, false, {
                             fileName: "[project]/src/components/StudentDashboard.tsx",
-                            lineNumber: 91,
+                            lineNumber: 96,
                             columnNumber: 13
                         }, this) : stats?.courses?.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "text-center py-16 border rounded-xl bg-white",
@@ -2143,7 +2179,7 @@ function StudentDashboard() {
                                     }
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/StudentDashboard.tsx",
-                                    lineNumber: 96,
+                                    lineNumber: 101,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -2154,7 +2190,7 @@ function StudentDashboard() {
                                     children: "No courses yet"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/StudentDashboard.tsx",
-                                    lineNumber: 97,
+                                    lineNumber: 102,
                                     columnNumber: 15
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -2165,13 +2201,13 @@ function StudentDashboard() {
                                     children: "You haven't been enrolled in any courses."
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/StudentDashboard.tsx",
-                                    lineNumber: 100,
+                                    lineNumber: 105,
                                     columnNumber: 15
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/StudentDashboard.tsx",
-                            lineNumber: 95,
+                            lineNumber: 100,
                             columnNumber: 13
                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                             className: "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4",
@@ -2192,7 +2228,7 @@ function StudentDashboard() {
                                                         children: course.name
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/StudentDashboard.tsx",
-                                                        lineNumber: 115,
+                                                        lineNumber: 120,
                                                         columnNumber: 27
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -2203,13 +2239,13 @@ function StudentDashboard() {
                                                         children: course.code
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/StudentDashboard.tsx",
-                                                        lineNumber: 118,
+                                                        lineNumber: 123,
                                                         columnNumber: 27
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/StudentDashboard.tsx",
-                                                lineNumber: 114,
+                                                lineNumber: 119,
                                                 columnNumber: 25
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$right$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronRight$3e$__["ChevronRight"], {
@@ -2219,29 +2255,29 @@ function StudentDashboard() {
                                                 }
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/StudentDashboard.tsx",
-                                                lineNumber: 122,
+                                                lineNumber: 127,
                                                 columnNumber: 25
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/StudentDashboard.tsx",
-                                        lineNumber: 113,
+                                        lineNumber: 118,
                                         columnNumber: 23
                                     }, this)
                                 }, course.id, false, {
                                     fileName: "[project]/src/components/StudentDashboard.tsx",
-                                    lineNumber: 108,
+                                    lineNumber: 113,
                                     columnNumber: 21
                                 }, this)) : null
                         }, void 0, false, {
                             fileName: "[project]/src/components/StudentDashboard.tsx",
-                            lineNumber: 105,
+                            lineNumber: 110,
                             columnNumber: 13
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/StudentDashboard.tsx",
-                    lineNumber: 86,
+                    lineNumber: 91,
                     columnNumber: 9
                 }, this)
             ]

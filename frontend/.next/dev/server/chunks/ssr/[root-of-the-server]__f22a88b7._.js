@@ -34,14 +34,28 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$
 ;
 ;
 function AuthGuard({ children }) {
-    const { isAuthenticated } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { isAuthenticated, role } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRouter"])();
+    const pathname = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["usePathname"])();
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         if (!isAuthenticated) {
             router.replace('/login');
+            return;
+        }
+        // Minimum UI-level role routing split:
+        // - students stay in /student space
+        // - faculty/admin stay in /courses or /faculty space
+        if (role === 'student' && pathname?.startsWith('/courses')) {
+            router.replace('/student');
+            return;
+        }
+        if ((role === 'faculty' || role === 'admin') && pathname?.startsWith('/student')) {
+            router.replace('/courses');
         }
     }, [
         isAuthenticated,
+        role,
+        pathname,
         router
     ]);
     if (!isAuthenticated) return null;
@@ -2994,7 +3008,7 @@ function envBool(value, fallback) {
     return value === 'true';
 }
 const config = {
-    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:3001/api',
+    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:8000/api',
     wsUrl: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002',
     pistonApiUrl: process.env.NEXT_PUBLIC_PISTON_API_URL || 'https://emkc.org/api/v2/piston',
     s3Bucket: process.env.NEXT_PUBLIC_S3_BUCKET || 'autograde-uploads-dev',
@@ -3080,16 +3094,18 @@ api.interceptors.response.use((res)=>res, async (error)=>{
         throw new NetworkError('Unable to connect to the server');
     }
     const { status, data } = error.response;
+    const backendDetail = data?.detail;
+    const backendMessage = (typeof backendDetail === 'string' ? backendDetail : undefined) ?? data?.message ?? data?.error;
     if (status === 401) {
         // Token expired — clear local auth and redirect
         if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
         ;
-        throw new AuthError(data?.message ?? 'Unauthorized');
+        throw new AuthError(backendMessage ?? 'Unauthorized');
     }
     if (status === 422 && data?.error) {
-        throw new ValidationError(data.message ?? 'Validation error');
+        throw new ValidationError(backendMessage ?? 'Validation error');
     }
-    throw new Error(data?.message ?? `Request failed (${status})`);
+    throw new Error(backendMessage ?? `Request failed (${status})`);
 });
 async function withRetry(fn, retries = 3) {
     for(let attempt = 0; attempt <= retries; attempt++){
@@ -3120,12 +3136,28 @@ __turbopack_context__.s([
    ═══════════════════════════════════════════════════════════════════ */ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/client.ts [app-ssr] (ecmascript)");
 ;
 function mapUser(u) {
+    const [firstName = '', ...rest] = (u.name ?? '').trim().split(' ');
+    const lastName = rest.join(' ');
+    if (u.role === 'student') {
+        return {
+            id: String(u.id),
+            firstName: firstName || 'Student',
+            lastName,
+            email: u.email,
+            sisUserId: '',
+            sisLoginId: '',
+            enrolledCourses: [],
+            role: 'student'
+        };
+    }
     return {
         id: String(u.id),
-        name: u.name,
+        firstName: firstName || 'User',
+        lastName,
         email: u.email,
-        role: u.role,
-        avatarUrl: ''
+        title: '',
+        department: '',
+        role: 'faculty'
     };
 }
 const authService = {
@@ -3190,14 +3222,14 @@ __turbopack_context__.s([
         semester: 'Spring 2026',
         description: c.description ?? '',
         facultyId: '',
-        enrollmentCode: '',
-        enrollmentCodeActive: true,
-        status: 'active',
+        enrollmentCode: c.enrollment_code ?? '',
+        enrollmentCodeActive: c.enrollment_code_active,
+        status: c.is_active ? 'active' : 'archived',
         studentCount: 0,
         assignmentCount: 0,
         pendingGrades: 0,
-        createdAt: '',
-        updatedAt: ''
+        createdAt: c.created_at ?? '',
+        updatedAt: c.updated_at ?? ''
     };
 }
 const courseService = {
@@ -3210,7 +3242,13 @@ const courseService = {
         return mapCourse(data);
     },
     /** Create a new course. */ async createCourse (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post('/courses/', dto);
+        const payload = {
+            name: dto.name,
+            code: dto.code,
+            description: dto.description ?? '',
+            enrollment_code_active: dto.enrollmentCodeActive ?? true
+        };
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post('/courses/', payload);
         return mapCourse(data);
     },
     /** Update an existing course. */ async updateCourse (courseId, dto) {
@@ -3220,14 +3258,22 @@ const courseService = {
     /** Delete a course. */ async deleteCourse (courseId) {
         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].delete(`/courses/${courseId}`);
     },
-    /** Get enrolled students for a course. */ async getEnrollments (courseId, page = 1, pageSize = 50) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/enrollments`, {
-                params: {
-                    page,
-                    pageSize
-                }
-            }));
+    /** Get roster entries for a course. */ async getEnrollments (courseId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/enrollments`));
         return data;
+    },
+    /** Add one member to a course roster (student/ta/instructor). */ async addEnrollment (courseId, payload) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`/courses/${courseId}/enrollments`, payload);
+        return data;
+    },
+    /** Update roster role for an existing enrollment. */ async updateEnrollmentRole (courseId, enrollmentId, role) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].patch(`/courses/${courseId}/enrollments/${enrollmentId}`, {
+            role
+        });
+        return data;
+    },
+    /** Remove a member from the course roster. */ async removeEnrollment (courseId, enrollmentId) {
+        await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].delete(`/courses/${courseId}/enrollments/${enrollmentId}`);
     },
     /** Enroll a student via enrollment code. */ async enrollStudent (enrollmentCode) {
         const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post('/courses/enroll', {
@@ -3313,38 +3359,80 @@ __turbopack_context__.s([
     ()=>submissionService
 ]);
 /* ═══════════════════════════════════════════════════════════════════
-   Submission Service — Submit code, fetch submissions
+   Submission Service — upload/fetch/grade submissions
+   Backed by FastAPI routes under /submissions, /grading, /faculty
    ═══════════════════════════════════════════════════════════════════ */ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/client.ts [app-ssr] (ecmascript)");
 ;
+function mapSubmission(s) {
+    return {
+        id: String(s.id),
+        assignmentId: String(s.assignment_id),
+        studentId: String(s.student_id),
+        code: '',
+        language: 'python',
+        submittedAt: s.created_at ?? '',
+        isLate: false,
+        status: s.status === 'graded' ? 'graded' : 'pending',
+        grade: s.score != null ? {
+            id: `grade-${s.id}`,
+            submissionId: String(s.id),
+            rubricScores: [],
+            totalScore: s.score,
+            maxScore: s.max_score ?? 100,
+            percentage: s.max_score && s.max_score > 0 ? Number((s.score / s.max_score * 100).toFixed(2)) : 0,
+            letterGrade: '',
+            feedback: s.feedback ?? '',
+            gradedAt: s.graded_at ?? '',
+            gradedBy: ''
+        } : undefined
+    };
+}
 const submissionService = {
-    /** Submit code for grading. */ async submitCode (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`/assignments/${dto.assignmentId}/submissions`, dto);
-        return data.data;
+    /** Legacy fallback: create submission row without files. */ async submitCode (dto) {
+        const payload = {
+            assignment_id: Number(dto.assignmentId)
+        };
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post('/submissions/', payload);
+        return mapSubmission(data);
+    },
+    /** Student file upload (multipart/form-data with field name `files`). */ async uploadFiles (assignmentId, files) {
+        const formData = new FormData();
+        files.forEach((file)=>formData.append('files', file));
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`/submissions/assignments/${assignmentId}/upload`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        return data;
     },
     /** Get a specific submission. */ async getSubmission (submissionId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/${submissionId}`));
-        return data.data;
+        return mapSubmission(data);
     },
-    /** List all submissions for an assignment (faculty view). */ async getSubmissions (assignmentId, page = 1, pageSize = 50) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/assignments/${assignmentId}/submissions`, {
-                params: {
-                    page,
-                    pageSize
-                }
-            }));
-        return data.data;
+    /** List submissions for an assignment. */ async getSubmissions (assignmentId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/assignments/${assignmentId}`));
+        return data.map(mapSubmission);
     },
-    /** Faculty: grade a submission. */ async gradeSubmission (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`/submissions/${dto.submissionId}/grade`, dto);
-        return data.data;
+    /** Run grading for a submission. */ async gradeSubmission (dto) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`/grading/submissions/${dto.submissionId}/grade`);
+        return data;
     },
-    /** Get submission history for a student on an assignment. */ async getStudentSubmissions (assignmentId, studentId) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/assignments/${assignmentId}/submissions`, {
-                params: {
-                    studentId
-                }
-            }));
-        return data.data;
+    /** Manual score entry/override by instructor/TA. */ async overrideSubmissionScore (submissionId, payload) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].patch(`/grading/submissions/${submissionId}/score`, payload);
+        return data;
+    },
+    /** Fetch grading results/details for one submission. */ async getSubmissionResults (submissionId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/grading/submissions/${submissionId}/results`));
+        return data;
+    },
+    /** Instructor/TA ZIP download of all submissions for assignment. */ async downloadAssignmentZip (assignmentId) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/faculty/assignments/${assignmentId}/download-zip`, {
+            responseType: 'blob'
+        });
+        return data;
+    },
+    /** Student history helper; backend already filters by auth user role. */ async getStudentSubmissions (assignmentId, _studentId) {
+        return this.getSubmissions(assignmentId);
     }
 };
 }),
@@ -3441,7 +3529,9 @@ function useCourses() {
             'courses'
         ],
         queryFn: ()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["courseService"].getCourses(),
-        staleTime: 5 * 60 * 1000
+        staleTime: 0,
+        refetchOnMount: 'always',
+        refetchOnWindowFocus: true
     });
 }
 function useCourse(courseId) {
@@ -3458,7 +3548,19 @@ function useCreateCourse() {
     const qc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useQueryClient"])();
     return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMutation"])({
         mutationFn: (dto)=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["courseService"].createCourse(dto),
-        onSuccess: ()=>{
+        onSuccess: (newCourse)=>{
+            qc.setQueryData([
+                'courses'
+            ], (prev)=>{
+                if (!prev) return [
+                    newCourse
+                ];
+                const exists = prev.some((c)=>c.id === newCourse.id);
+                return exists ? prev : [
+                    newCourse,
+                    ...prev
+                ];
+            });
             qc.invalidateQueries({
                 queryKey: [
                     'courses'
@@ -3648,16 +3750,17 @@ function useGradeSubmission() {
     const qc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useQueryClient"])();
     return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMutation"])({
         mutationFn: (dto)=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$submissionService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["submissionService"].gradeSubmission(dto),
-        onSuccess: (updated)=>{
+        onSuccess: (_updated, dto)=>{
             // Optimistically update the individual submission cache
-            qc.setQueryData([
-                'submission',
-                updated.id
-            ], updated);
             qc.invalidateQueries({
                 queryKey: [
-                    'submissions',
-                    updated.assignmentId
+                    'submission',
+                    dto.submissionId
+                ]
+            });
+            qc.invalidateQueries({
+                queryKey: [
+                    'submissions'
                 ]
             });
             // Also refresh grades
@@ -3797,6 +3900,8 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$d
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/navigation.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$queries$2f$index$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/src/hooks/queries/index.ts [app-ssr] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$queries$2f$useCourses$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/hooks/queries/useCourses.ts [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$config$2f$env$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/config/env.ts [app-ssr] (ecmascript)");
+;
 ;
 ;
 ;
@@ -3879,7 +3984,7 @@ function CoursesLanding() {
             children: status
         }, void 0, false, {
             fileName: "[project]/src/components/CoursesLanding.tsx",
-            lineNumber: 114,
+            lineNumber: 115,
             columnNumber: 7
         }, this);
     };
@@ -3893,7 +3998,7 @@ function CoursesLanding() {
                 ]
             }, void 0, false, {
                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                lineNumber: 132,
+                lineNumber: 133,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
@@ -3915,7 +4020,7 @@ function CoursesLanding() {
                                         children: "My Courses"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                        lineNumber: 138,
+                                        lineNumber: 139,
                                         columnNumber: 13
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -3929,13 +4034,13 @@ function CoursesLanding() {
                                         children: "Spring 2026 — University of Louisiana Monroe"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                        lineNumber: 141,
+                                        lineNumber: 142,
                                         columnNumber: 13
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                lineNumber: 137,
+                                lineNumber: 138,
                                 columnNumber: 11
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
@@ -3951,20 +4056,20 @@ function CoursesLanding() {
                                         className: "w-5 h-5 mr-2"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                        lineNumber: 150,
+                                        lineNumber: 151,
                                         columnNumber: 13
                                     }, this),
                                     "Create New Course"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                lineNumber: 145,
+                                lineNumber: 146,
                                 columnNumber: 11
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                        lineNumber: 136,
+                        lineNumber: 137,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -3990,7 +4095,7 @@ function CoursesLanding() {
                                                 className: "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-light)]"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                lineNumber: 161,
+                                                lineNumber: 162,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Input"], {
@@ -4000,18 +4105,18 @@ function CoursesLanding() {
                                                 className: "pl-10 border-[var(--color-border)]"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                lineNumber: 162,
+                                                lineNumber: 163,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                        lineNumber: 160,
+                                        lineNumber: 161,
                                         columnNumber: 15
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                    lineNumber: 159,
+                                    lineNumber: 160,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Select"], {
@@ -4026,12 +4131,12 @@ function CoursesLanding() {
                                                 placeholder: "All Semesters"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                lineNumber: 174,
+                                                lineNumber: 175,
                                                 columnNumber: 17
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                            lineNumber: 173,
+                                            lineNumber: 174,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SelectContent"], {
@@ -4041,7 +4146,7 @@ function CoursesLanding() {
                                                     children: "All Semesters"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                    lineNumber: 177,
+                                                    lineNumber: 178,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -4049,7 +4154,7 @@ function CoursesLanding() {
                                                     children: "Spring 2026"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                    lineNumber: 178,
+                                                    lineNumber: 179,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -4057,7 +4162,7 @@ function CoursesLanding() {
                                                     children: "Fall 2025"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                    lineNumber: 179,
+                                                    lineNumber: 180,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -4065,19 +4170,19 @@ function CoursesLanding() {
                                                     children: "Summer 2025"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                    lineNumber: 180,
+                                                    lineNumber: 181,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                            lineNumber: 176,
+                                            lineNumber: 177,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                    lineNumber: 172,
+                                    lineNumber: 173,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Select"], {
@@ -4092,12 +4197,12 @@ function CoursesLanding() {
                                                 placeholder: "All"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                lineNumber: 187,
+                                                lineNumber: 188,
                                                 columnNumber: 17
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                            lineNumber: 186,
+                                            lineNumber: 187,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SelectContent"], {
@@ -4107,7 +4212,7 @@ function CoursesLanding() {
                                                     children: "All"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                    lineNumber: 190,
+                                                    lineNumber: 191,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -4115,7 +4220,7 @@ function CoursesLanding() {
                                                     children: "Active"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                    lineNumber: 191,
+                                                    lineNumber: 192,
                                                     columnNumber: 17
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -4123,19 +4228,19 @@ function CoursesLanding() {
                                                     children: "Archived"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                    lineNumber: 192,
+                                                    lineNumber: 193,
                                                     columnNumber: 17
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                            lineNumber: 189,
+                                            lineNumber: 190,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                    lineNumber: 185,
+                                    lineNumber: 186,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4160,12 +4265,12 @@ function CoursesLanding() {
                                                 className: "w-4 h-4"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                lineNumber: 209,
+                                                lineNumber: 210,
                                                 columnNumber: 17
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                            lineNumber: 198,
+                                            lineNumber: 199,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -4182,29 +4287,29 @@ function CoursesLanding() {
                                                 className: "w-4 h-4"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                lineNumber: 222,
+                                                lineNumber: 223,
                                                 columnNumber: 17
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                            lineNumber: 211,
+                                            lineNumber: 212,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                    lineNumber: 197,
+                                    lineNumber: 198,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                            lineNumber: 157,
+                            lineNumber: 158,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                        lineNumber: 156,
+                        lineNumber: 157,
                         columnNumber: 9
                     }, this),
                     isLoading && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4217,20 +4322,20 @@ function CoursesLanding() {
                                 className: "w-5 h-5 animate-spin"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                lineNumber: 231,
+                                lineNumber: 232,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                 children: "Loading courses…"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                lineNumber: 232,
+                                lineNumber: 233,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                        lineNumber: 230,
+                        lineNumber: 231,
                         columnNumber: 11
                     }, this),
                     error && !isLoading && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4243,14 +4348,18 @@ function CoursesLanding() {
                                 className: "w-6 h-6"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                lineNumber: 238,
+                                lineNumber: 239,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                children: "Failed to load courses. Is the backend running?"
-                            }, void 0, false, {
+                                children: [
+                                    "Failed to load courses. Is the backend running at ",
+                                    __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$config$2f$env$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["config"].apiUrl,
+                                    "?"
+                                ]
+                            }, void 0, true, {
                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                lineNumber: 239,
+                                lineNumber: 240,
                                 columnNumber: 13
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4261,13 +4370,13 @@ function CoursesLanding() {
                                 children: error.message
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                lineNumber: 240,
+                                lineNumber: 241,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                        lineNumber: 237,
+                        lineNumber: 238,
                         columnNumber: 11
                     }, this),
                     !isLoading && !error && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4295,7 +4404,7 @@ function CoursesLanding() {
                                         }
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                        lineNumber: 266,
+                                        lineNumber: 267,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4324,7 +4433,7 @@ function CoursesLanding() {
                                                         children: course.code
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                        lineNumber: 271,
+                                                        lineNumber: 272,
                                                         columnNumber: 19
                                                     }, this),
                                                     course.enrollmentCode && course.enrollmentCodeActive && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4339,13 +4448,13 @@ function CoursesLanding() {
                                                         children: course.enrollmentCode
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                        lineNumber: 286,
+                                                        lineNumber: 287,
                                                         columnNumber: 21
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                lineNumber: 270,
+                                                lineNumber: 271,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
@@ -4364,7 +4473,7 @@ function CoursesLanding() {
                                                 children: course.title
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                lineNumber: 302,
+                                                lineNumber: 303,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4383,7 +4492,7 @@ function CoursesLanding() {
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                lineNumber: 320,
+                                                lineNumber: 321,
                                                 columnNumber: 17
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4406,7 +4515,7 @@ function CoursesLanding() {
                                                                 className: "w-4 h-4 shrink-0"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                                lineNumber: 328,
+                                                                lineNumber: 329,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4415,20 +4524,20 @@ function CoursesLanding() {
                                                                         children: course.pendingGrades
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                                        lineNumber: 329,
+                                                                        lineNumber: 330,
                                                                         columnNumber: 29
                                                                     }, this),
                                                                     " submissions need grading"
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                                lineNumber: 329,
+                                                                lineNumber: 330,
                                                                 columnNumber: 23
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                        lineNumber: 327,
+                                                        lineNumber: 328,
                                                         columnNumber: 21
                                                     }, this),
                                                     course.nextDueDays != null && course.nextDueDays > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4443,7 +4552,7 @@ function CoursesLanding() {
                                                                 className: "w-4 h-4 shrink-0"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                                lineNumber: 334,
+                                                                lineNumber: 335,
                                                                 columnNumber: 23
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4455,13 +4564,13 @@ function CoursesLanding() {
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                                lineNumber: 335,
+                                                                lineNumber: 336,
                                                                 columnNumber: 23
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                        lineNumber: 333,
+                                                        lineNumber: 334,
                                                         columnNumber: 21
                                                     }, this),
                                                     course.pendingGrades === 0 && (course.nextDueDays == null || course.nextDueDays <= 0) && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4475,24 +4584,24 @@ function CoursesLanding() {
                                                             children: "✓ All caught up"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                            lineNumber: 340,
+                                                            lineNumber: 341,
                                                             columnNumber: 23
                                                         }, this)
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                        lineNumber: 339,
+                                                        lineNumber: 340,
                                                         columnNumber: 21
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                lineNumber: 325,
+                                                lineNumber: 326,
                                                 columnNumber: 17
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                        lineNumber: 268,
+                                        lineNumber: 269,
                                         columnNumber: 15
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4528,7 +4637,7 @@ function CoursesLanding() {
                                                             children: "Open Course →"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                            lineNumber: 358,
+                                                            lineNumber: 359,
                                                             columnNumber: 21
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dropdown$2d$menu$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["DropdownMenu"], {
@@ -4554,17 +4663,17 @@ function CoursesLanding() {
                                                                             }
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                                            lineNumber: 378,
+                                                                            lineNumber: 379,
                                                                             columnNumber: 27
                                                                         }, this)
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                                        lineNumber: 371,
+                                                                        lineNumber: 372,
                                                                         columnNumber: 25
                                                                     }, this)
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                                    lineNumber: 370,
+                                                                    lineNumber: 371,
                                                                     columnNumber: 23
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dropdown$2d$menu$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["DropdownMenuContent"], {
@@ -4578,53 +4687,53 @@ function CoursesLanding() {
                                                                                 className: "w-4 h-4 mr-2"
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                                                lineNumber: 386,
+                                                                                lineNumber: 387,
                                                                                 columnNumber: 27
                                                                             }, this),
                                                                             "Delete Course"
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                                        lineNumber: 382,
+                                                                        lineNumber: 383,
                                                                         columnNumber: 25
                                                                     }, this)
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                                    lineNumber: 381,
+                                                                    lineNumber: 382,
                                                                     columnNumber: 23
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                            lineNumber: 369,
+                                                            lineNumber: 370,
                                                             columnNumber: 21
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                    lineNumber: 357,
+                                                    lineNumber: 358,
                                                     columnNumber: 19
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                            lineNumber: 355,
+                                            lineNumber: 356,
                                             columnNumber: 17
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                                        lineNumber: 347,
+                                        lineNumber: 348,
                                         columnNumber: 15
                                     }, this)
                                 ]
                             }, course.id, true, {
                                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                                lineNumber: 253,
+                                lineNumber: 254,
                                 columnNumber: 13
                             }, this))
                     }, void 0, false, {
                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                        lineNumber: 245,
+                        lineNumber: 246,
                         columnNumber: 34
                     }, this),
                     !isLoading && !error && filteredCourses.length === 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4637,12 +4746,12 @@ function CoursesLanding() {
                             children: "No courses found matching your filters."
                         }, void 0, false, {
                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                            lineNumber: 400,
+                            lineNumber: 401,
                             columnNumber: 13
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                        lineNumber: 399,
+                        lineNumber: 400,
                         columnNumber: 11
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Dialog"], {
@@ -4664,7 +4773,7 @@ function CoursesLanding() {
                                             children: "Delete Course"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                            lineNumber: 410,
+                                            lineNumber: 411,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["DialogDescription"], {
@@ -4686,20 +4795,20 @@ function CoursesLanding() {
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                    lineNumber: 414,
+                                                    lineNumber: 415,
                                                     columnNumber: 49
                                                 }, this),
                                                 "? This action cannot be undone and all associated data will be permanently removed."
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                            lineNumber: 413,
+                                            lineNumber: 414,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                    lineNumber: 409,
+                                    lineNumber: 410,
                                     columnNumber: 13
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["DialogFooter"], {
@@ -4711,7 +4820,7 @@ function CoursesLanding() {
                                             children: "Cancel"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                            lineNumber: 418,
+                                            lineNumber: 419,
                                             columnNumber: 15
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2d$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["Button"], {
@@ -4725,43 +4834,43 @@ function CoursesLanding() {
                                                     className: "w-4 h-4 mr-2"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                                    lineNumber: 429,
+                                                    lineNumber: 430,
                                                     columnNumber: 17
                                                 }, this),
                                                 "Delete Course"
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                                            lineNumber: 424,
+                                            lineNumber: 425,
                                             columnNumber: 15
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CoursesLanding.tsx",
-                                    lineNumber: 417,
+                                    lineNumber: 418,
                                     columnNumber: 13
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CoursesLanding.tsx",
-                            lineNumber: 408,
+                            lineNumber: 409,
                             columnNumber: 11
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/CoursesLanding.tsx",
-                        lineNumber: 407,
+                        lineNumber: 408,
                         columnNumber: 9
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/CoursesLanding.tsx",
-                lineNumber: 134,
+                lineNumber: 135,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/CoursesLanding.tsx",
-        lineNumber: 131,
+        lineNumber: 132,
         columnNumber: 5
     }, this);
 }
