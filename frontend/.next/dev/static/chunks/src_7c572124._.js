@@ -8227,6 +8227,16 @@ const submissionService = {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/${submissionId}`));
         return mapSubmission(data);
     },
+    /** Get files for a submission. */ async getSubmissionFiles (submissionId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/${submissionId}/files`));
+        return data;
+    },
+    /** Download a single file. */ async downloadFile (fileId) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/files/${fileId}/download`, {
+            responseType: 'blob'
+        });
+        return data;
+    },
     /** List submissions for an assignment. */ async getSubmissions (assignmentId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/assignments/${assignmentId}`));
         return data.map(mapSubmission);
