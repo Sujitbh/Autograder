@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user
@@ -11,7 +12,7 @@ from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
 from app.models.user import User
-from app.schemas.submission import SubmissionCreate, SubmissionOut
+from app.schemas.submission import SubmissionCreate, SubmissionOut, SubmissionWithStudent
 from app.settings import settings
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
@@ -93,7 +94,7 @@ def delete_submission(
     return {"ok": True}
 
 
-@router.get("/assignments/{assignment_id}", response_model=List[SubmissionOut])
+@router.get("/assignments/{assignment_id}")
 def get_submissions_by_assignment(
     assignment_id: int,
     db: Session = Depends(get_db),
@@ -107,6 +108,7 @@ def get_submissions_by_assignment(
     query = db.query(Submission).filter(Submission.assignment_id == assignment_id)
     if user.role == "student":
         query = query.filter(Submission.student_id == user.id)
+        return query.all()
     elif user.role != "admin":
         require_course_role(
             db=db,
@@ -114,7 +116,34 @@ def get_submissions_by_assignment(
             course_id=assignment.course_id,
             allowed_roles=["instructor", "ta"],
         )
-    return query.all()
+    
+    # For faculty/admin, return submissions with student details and files
+    submissions = query.all()
+    result = []
+    for sub in submissions:
+        student = db.query(User).filter(User.id == sub.student_id).first()
+        files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == sub.id).all()
+        
+        result.append({
+            "id": sub.id,
+            "assignment_id": sub.assignment_id,
+            "student_id": sub.student_id,
+            "status": sub.status,
+            "score": sub.score,
+            "max_score": sub.max_score,
+            "feedback": sub.feedback,
+            "graded_at": sub.graded_at,
+            "created_at": sub.created_at,
+            "student": {
+                "id": student.id,
+                "name": student.name,
+                "email": student.email,
+                "student_id": getattr(student, "student_id", None),
+            } if student else None,
+            "files": [{"id": f.id, "filename": f.filename, "file_size": f.file_size} for f in files]
+        })
+    
+    return result
 
 
 @router.get("/{s_id}/files")
@@ -141,6 +170,45 @@ def get_submission_files(
 
     files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == s_id).all()
     return [{"id": f.id, "filename": f.filename, "file_size": f.file_size} for f in files]
+
+
+@router.get("/files/{file_id}/download")
+def download_submission_file(
+    file_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Download a single submission file."""
+    file_record = db.query(SubmissionFile).filter(SubmissionFile.id == file_id).first()
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    submission = db.query(Submission).filter(Submission.id == file_record.submission_id).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    
+    # Check permissions
+    if user.role != "admin" and submission.student_id != user.id:
+        require_course_role(
+            db=db,
+            user=user,
+            course_id=assignment.course_id,
+            allowed_roles=["instructor", "ta"],
+        )
+    
+    # Check if file exists on disk
+    if not os.path.exists(file_record.path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    
+    return FileResponse(
+        path=file_record.path,
+        filename=file_record.filename,
+        media_type="application/octet-stream"
+    )
 
 
 @router.post("/assignments/{assignment_id}/upload")

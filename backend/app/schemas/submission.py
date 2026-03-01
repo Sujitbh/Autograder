@@ -48,6 +48,23 @@ class SubmissionWithFiles(SubmissionOut):
     files: List[SubmissionFileOut] = []
 
 
+class StudentInfo(BaseModel):
+    """Student information for faculty view."""
+    id: int
+    name: str
+    email: str
+    student_id: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SubmissionWithStudent(SubmissionOut):
+    """Submission with student details for faculty grading view."""
+    student: StudentInfo
+    files: List[SubmissionFileOut] = []
+
+
 class SubmissionResultOut(BaseModel):
     """Schema for individual test result."""
     id: int

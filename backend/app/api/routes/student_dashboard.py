@@ -29,15 +29,33 @@ def student_dashboard_stats(db: Session = Depends(get_db), user: User = Depends(
     completed = sum(1 for s in submissions if s.status == "graded")
     pending = sum(1 for s in submissions if s.status in ["pending", "grading"])
 
+    # Calculate per-course progress
+    course_data = []
+    for c in courses:
+        course_assignments = [a for a in assignments if a.course_id == c.id]
+        course_assignment_ids = [a.id for a in course_assignments]
+        course_submissions = [s for s in submissions if s.assignment_id in course_assignment_ids]
+        
+        completed_for_course = sum(1 for s in course_submissions if s.status == "graded")
+        graded_submissions_with_score = [s for s in course_submissions if s.status == "graded" and s.score is not None and s.max_score is not None and s.max_score > 0]
+        
+        average_score = None
+        if graded_submissions_with_score:
+            total_percentage = sum((s.score / s.max_score * 100) for s in graded_submissions_with_score)
+            average_score = total_percentage / len(graded_submissions_with_score)
+        
+        course_data.append({
+            "id": c.id,
+            "name": c.name,
+            "code": c.code,
+            "description": c.description,
+            "assignments_count": len(course_assignments),
+            "completed_count": completed_for_course,
+            "average_score": round(average_score, 1) if average_score is not None else None,
+        })
+
     return {
-        "courses": [
-            {
-                "id": c.id,
-                "name": c.name,
-                "code": c.code,
-                "description": c.description,
-            } for c in courses
-        ],
+        "courses": course_data,
         "total_assignments": total_assignments,
         "completed_assignments": completed,
         "pending_assignments": pending,
