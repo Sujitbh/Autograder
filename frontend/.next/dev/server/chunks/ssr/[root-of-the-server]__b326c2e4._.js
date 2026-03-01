@@ -34,14 +34,28 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$
 ;
 ;
 function AuthGuard({ children }) {
-    const { isAuthenticated } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { isAuthenticated, role } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRouter"])();
+    const pathname = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["usePathname"])();
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         if (!isAuthenticated) {
             router.replace('/login');
+            return;
+        }
+        // Minimum UI-level role routing split:
+        // - students stay in /student space
+        // - faculty/admin stay in /courses or /faculty space
+        if (role === 'student' && pathname?.startsWith('/courses')) {
+            router.replace('/student');
+            return;
+        }
+        if ((role === 'faculty' || role === 'admin') && pathname?.startsWith('/student')) {
+            router.replace('/courses');
         }
     }, [
         isAuthenticated,
+        role,
+        pathname,
         router
     ]);
     if (!isAuthenticated) return null;
@@ -7627,16 +7641,16 @@ function envBool(value, fallback) {
     return value === 'true';
 }
 const config = {
-    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:3001/api',
-    wsUrl: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002',
-    pistonApiUrl: process.env.NEXT_PUBLIC_PISTON_API_URL || 'https://emkc.org/api/v2/piston',
-    s3Bucket: process.env.NEXT_PUBLIC_S3_BUCKET || 'autograde-uploads-dev',
-    cloudFrontUrl: process.env.NEXT_PUBLIC_CLOUDFRONT_URL || '',
-    awsRegion: process.env.NEXT_PUBLIC_AWS_REGION || 'us-east-1',
+    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:8000/api',
+    wsUrl: ("TURBOPACK compile-time value", "ws://localhost:3002") || 'ws://localhost:3002',
+    pistonApiUrl: ("TURBOPACK compile-time value", "https://emkc.org/api/v2/piston") || 'https://emkc.org/api/v2/piston',
+    s3Bucket: ("TURBOPACK compile-time value", "autograde-uploads-dev") || 'autograde-uploads-dev',
+    cloudFrontUrl: ("TURBOPACK compile-time value", "") || '',
+    awsRegion: ("TURBOPACK compile-time value", "us-east-1") || 'us-east-1',
     features: {
-        darkMode: envBool(process.env.NEXT_PUBLIC_ENABLE_DARK_MODE, true),
-        aiDetection: envBool(process.env.NEXT_PUBLIC_ENABLE_AI_DETECTION, false),
-        canvasIntegration: envBool(process.env.NEXT_PUBLIC_ENABLE_CANVAS_INTEGRATION, false)
+        darkMode: envBool(("TURBOPACK compile-time value", "true"), true),
+        aiDetection: envBool(("TURBOPACK compile-time value", "false"), false),
+        canvasIntegration: envBool(("TURBOPACK compile-time value", "false"), false)
     },
     monitoring: {
         sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN || null,
@@ -7713,16 +7727,18 @@ api.interceptors.response.use((res)=>res, async (error)=>{
         throw new NetworkError('Unable to connect to the server');
     }
     const { status, data } = error.response;
+    const backendDetail = data?.detail;
+    const backendMessage = (typeof backendDetail === 'string' ? backendDetail : undefined) ?? data?.message ?? data?.error;
     if (status === 401) {
         // Token expired — clear local auth and redirect
         if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
         ;
-        throw new AuthError(data?.message ?? 'Unauthorized');
+        throw new AuthError(backendMessage ?? 'Unauthorized');
     }
     if (status === 422 && data?.error) {
-        throw new ValidationError(data.message ?? 'Validation error');
+        throw new ValidationError(backendMessage ?? 'Validation error');
     }
-    throw new Error(data?.message ?? `Request failed (${status})`);
+    throw new Error(backendMessage ?? `Request failed (${status})`);
 });
 async function withRetry(fn, retries = 3) {
     for(let attempt = 0; attempt <= retries; attempt++){
@@ -7884,7 +7900,7 @@ const courseService = {
         return data;
     },
     /** Update roster role for an existing enrollment. */ async updateEnrollmentRole (courseId, enrollmentId, role) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].put(`/courses/${courseId}/enrollments/${enrollmentId}`, {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].patch(`/courses/${courseId}/enrollments/${enrollmentId}`, {
             role
         });
         return data;
@@ -7976,38 +7992,80 @@ __turbopack_context__.s([
     ()=>submissionService
 ]);
 /* ═══════════════════════════════════════════════════════════════════
-   Submission Service — Submit code, fetch submissions
+   Submission Service — upload/fetch/grade submissions
+   Backed by FastAPI routes under /submissions, /grading, /faculty
    ═══════════════════════════════════════════════════════════════════ */ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/client.ts [app-ssr] (ecmascript)");
 ;
+function mapSubmission(s) {
+    return {
+        id: String(s.id),
+        assignmentId: String(s.assignment_id),
+        studentId: String(s.student_id),
+        code: '',
+        language: 'python',
+        submittedAt: s.created_at ?? '',
+        isLate: false,
+        status: s.status === 'graded' ? 'graded' : 'pending',
+        grade: s.score != null ? {
+            id: `grade-${s.id}`,
+            submissionId: String(s.id),
+            rubricScores: [],
+            totalScore: s.score,
+            maxScore: s.max_score ?? 100,
+            percentage: s.max_score && s.max_score > 0 ? Number((s.score / s.max_score * 100).toFixed(2)) : 0,
+            letterGrade: '',
+            feedback: s.feedback ?? '',
+            gradedAt: s.graded_at ?? '',
+            gradedBy: ''
+        } : undefined
+    };
+}
 const submissionService = {
-    /** Submit code for grading. */ async submitCode (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`/assignments/${dto.assignmentId}/submissions`, dto);
-        return data.data;
+    /** Legacy fallback: create submission row without files. */ async submitCode (dto) {
+        const payload = {
+            assignment_id: Number(dto.assignmentId)
+        };
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post('/submissions/', payload);
+        return mapSubmission(data);
+    },
+    /** Student file upload (multipart/form-data with field name `files`). */ async uploadFiles (assignmentId, files) {
+        const formData = new FormData();
+        files.forEach((file)=>formData.append('files', file));
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`/submissions/assignments/${assignmentId}/upload`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        return data;
     },
     /** Get a specific submission. */ async getSubmission (submissionId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/${submissionId}`));
-        return data.data;
+        return mapSubmission(data);
     },
-    /** List all submissions for an assignment (faculty view). */ async getSubmissions (assignmentId, page = 1, pageSize = 50) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/assignments/${assignmentId}/submissions`, {
-                params: {
-                    page,
-                    pageSize
-                }
-            }));
-        return data.data;
+    /** List submissions for an assignment. */ async getSubmissions (assignmentId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/assignments/${assignmentId}`));
+        return data.map(mapSubmission);
     },
-    /** Faculty: grade a submission. */ async gradeSubmission (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`/submissions/${dto.submissionId}/grade`, dto);
-        return data.data;
+    /** Run grading for a submission. */ async gradeSubmission (dto) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post(`/grading/submissions/${dto.submissionId}/grade`);
+        return data;
     },
-    /** Get submission history for a student on an assignment. */ async getStudentSubmissions (assignmentId, studentId) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/assignments/${assignmentId}/submissions`, {
-                params: {
-                    studentId
-                }
-            }));
-        return data.data;
+    /** Manual score entry/override by instructor/TA. */ async overrideSubmissionScore (submissionId, payload) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].patch(`/grading/submissions/${submissionId}/score`, payload);
+        return data;
+    },
+    /** Fetch grading results/details for one submission. */ async getSubmissionResults (submissionId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/grading/submissions/${submissionId}/results`));
+        return data;
+    },
+    /** Instructor/TA ZIP download of all submissions for assignment. */ async downloadAssignmentZip (assignmentId) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/faculty/assignments/${assignmentId}/download-zip`, {
+            responseType: 'blob'
+        });
+        return data;
+    },
+    /** Student history helper; backend already filters by auth user role. */ async getStudentSubmissions (assignmentId, _studentId) {
+        return this.getSubmissions(assignmentId);
     }
 };
 }),
@@ -8104,7 +8162,9 @@ function useCourses() {
             'courses'
         ],
         queryFn: ()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["courseService"].getCourses(),
-        staleTime: 5 * 60 * 1000
+        staleTime: 0,
+        refetchOnMount: 'always',
+        refetchOnWindowFocus: true
     });
 }
 function useCourse(courseId) {
@@ -8121,7 +8181,19 @@ function useCreateCourse() {
     const qc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useQueryClient"])();
     return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMutation"])({
         mutationFn: (dto)=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["courseService"].createCourse(dto),
-        onSuccess: ()=>{
+        onSuccess: (newCourse)=>{
+            qc.setQueryData([
+                'courses'
+            ], (prev)=>{
+                if (!prev) return [
+                    newCourse
+                ];
+                const exists = prev.some((c)=>c.id === newCourse.id);
+                return exists ? prev : [
+                    newCourse,
+                    ...prev
+                ];
+            });
             qc.invalidateQueries({
                 queryKey: [
                     'courses'
@@ -8311,16 +8383,17 @@ function useGradeSubmission() {
     const qc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useQueryClient"])();
     return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMutation"])({
         mutationFn: (dto)=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$submissionService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["submissionService"].gradeSubmission(dto),
-        onSuccess: (updated)=>{
+        onSuccess: (_updated, dto)=>{
             // Optimistically update the individual submission cache
-            qc.setQueryData([
-                'submission',
-                updated.id
-            ], updated);
             qc.invalidateQueries({
                 queryKey: [
-                    'submissions',
-                    updated.assignmentId
+                    'submission',
+                    dto.submissionId
+                ]
+            });
+            qc.invalidateQueries({
+                queryKey: [
+                    'submissions'
                 ]
             });
             // Also refresh grades

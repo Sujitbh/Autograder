@@ -18,16 +18,30 @@ var _s = __turbopack_context__.k.signature();
 ;
 function AuthGuard({ children }) {
     _s();
-    const { isAuthenticated } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { isAuthenticated, role } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
+    const pathname = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["usePathname"])();
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "AuthGuard.useEffect": ()=>{
             if (!isAuthenticated) {
                 router.replace('/login');
+                return;
+            }
+            // Minimum UI-level role routing split:
+            // - students stay in /student space
+            // - faculty/admin stay in /courses or /faculty space
+            if (role === 'student' && pathname?.startsWith('/courses')) {
+                router.replace('/student');
+                return;
+            }
+            if ((role === 'faculty' || role === 'admin') && pathname?.startsWith('/student')) {
+                router.replace('/courses');
             }
         }
     }["AuthGuard.useEffect"], [
         isAuthenticated,
+        role,
+        pathname,
         router
     ]);
     if (!isAuthenticated) return null;
@@ -35,10 +49,11 @@ function AuthGuard({ children }) {
         children: children
     }, void 0, false);
 }
-_s(AuthGuard, "Z8qV8gahpegazQReeCvErAUIJG4=", false, function() {
+_s(AuthGuard, "F7uN0EBS69urbfSnRFZixdY5kXw=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"],
-        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"]
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["usePathname"]
     ];
 });
 _c = AuthGuard;
