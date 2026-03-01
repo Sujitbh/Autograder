@@ -34,14 +34,28 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$
 ;
 ;
 function AuthGuard({ children }) {
-    const { isAuthenticated } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { isAuthenticated, role } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useRouter"])();
+    const pathname = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["usePathname"])();
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$server$2f$route$2d$modules$2f$app$2d$page$2f$vendored$2f$ssr$2f$react$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useEffect"])(()=>{
         if (!isAuthenticated) {
             router.replace('/login');
+            return;
+        }
+        // Minimum UI-level role routing split:
+        // - students stay in /student space
+        // - faculty/admin stay in /courses or /faculty space
+        if (role === 'student' && pathname?.startsWith('/courses')) {
+            router.replace('/student');
+            return;
+        }
+        if ((role === 'faculty' || role === 'admin') && pathname?.startsWith('/student')) {
+            router.replace('/courses');
         }
     }, [
         isAuthenticated,
+        role,
+        pathname,
         router
     ]);
     if (!isAuthenticated) return null;

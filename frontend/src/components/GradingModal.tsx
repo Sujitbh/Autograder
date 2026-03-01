@@ -1,8 +1,9 @@
-import { X, CheckCircle, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Send, AlertTriangle, Shield, Copy, Users } from 'lucide-react';
+import { X, CheckCircle, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Send, AlertTriangle, Shield, Copy, Users, Download, FileText } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
+import { submissionService } from '@/services/api';
 
 interface RubricItem {
   name: string;
@@ -31,6 +32,8 @@ interface GradingModalProps {
   groupName?: string;
   groupMemberNames?: string[];
   onApplyToGroup?: (grade: number) => void;
+  /* Submission details for backend integration */
+  submissionId?: string;
 }
 
 export function GradingModal({
@@ -49,8 +52,7 @@ export function GradingModal({
   onSaveDraft,
   isGroupAssignment = false,
   groupName,
-  groupMemberNames = [],
-  onApplyToGroup,
+  submissionId,
 }: GradingModalProps) {
   const [expandedTests, setExpandedTests] = useState<Record<string, boolean>>({
     public: true,
@@ -58,6 +60,9 @@ export function GradingModal({
   });
 
   const [expandedAIAlerts, setExpandedAIAlerts] = useState(true);
+  const [files, setFiles] = useState<Array<{id: number; filename: string; file_size: number | null}>>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Mock AI detection results
   const aiDetectionResults = {
@@ -122,14 +127,71 @@ export function GradingModal({
     });
   };
 
+  /* ─── Load submitted files ─── */
+  useEffect(() => {
+    if (submissionId) {
+      setIsLoadingFiles(true);
+      submissionService.getSubmissionFiles(submissionId)
+        .then(setFiles)
+        .catch(err => console.error('Failed to load files:', err))
+        .finally(() => setIsLoadingFiles(false));
+    }
+  }, [submissionId]);
+
+  /* ─── Handle file download ─── */
+  const handleDownloadFile = async (fileId: number, filename: string) => {
+    try {
+      const blob = await submissionService.downloadFile(fileId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download file:', err);
+      alert('Failed to download file');
+    }
+  };
+
+  /* ─── Save grade to backend ─── */
+  const handleSaveGradeToBackend = async () => {
+    if (!submissionId) {
+      // Fallback to callback if no submission ID
+      onSubmitGrade?.(getTotalScore(), feedback);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await submissionService.overrideSubmissionScore(submissionId, {
+        score: getTotalScore(),
+        max_score: getTotalMaxPoints(),
+        feedback: feedback || undefined,
+      });
+      setSubmitted(true);
+      setTimeout(() => {
+        setSubmitted(false);
+        onClose();
+        // Call the callback to refresh data
+        onSubmitGrade?.(getTotalScore(), feedback);
+      }, 1200);
+    } catch (err) {
+      console.error('Failed to save grade:', err);
+      alert('Failed to save grade: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   /* ─── Keyboard shortcuts ─── */
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') { onClose(); return; }
     if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); onSaveDraft?.(getTotalScore(), feedback); setSavedDraft(true); setTimeout(() => setSavedDraft(false), 1500); return; }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); onSubmitGrade?.(getTotalScore(), feedback); setSubmitted(true); setTimeout(() => { setSubmitted(false); onClose(); }, 1200); return; }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); handleSaveGradeToBackend(); return; }
     if (e.key === 'ArrowLeft' && hasPrev && onPrev) { onPrev(); return; }
     if (e.key === 'ArrowRight' && hasNext && onNext) { onNext(); return; }
-  }, [onClose, hasPrev, hasNext, onPrev, onNext]);
+  }, [onClose, hasPrev, hasNext, onPrev, onNext, submissionId, feedback]);
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
@@ -199,6 +261,52 @@ export function GradingModal({
         <div className="flex flex-1 overflow-hidden">
           {/* Left Panel: Code & Test Results (60%) */}
           <div className="w-[60%] border-r overflow-auto" style={{ borderColor: 'var(--color-border)' }}>
+            {/* Submitted Files Section */}
+            {submissionId && (
+              <div className="p-6 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                <h3 className="flex items-center gap-2 mb-3" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                  <FileText className="w-5 h-5" />
+                  Submitted Files
+                </h3>
+                {isLoadingFiles ? (
+                  <p className="text-sm text-gray-500">Loading files...</p>
+                ) : files.length === 0 ? (
+                  <p className="text-sm text-gray-500">No files submitted</p>
+                ) : (
+                  <div className="space-y-2">
+                    {files.map((file) => (
+                      <div
+                        key={file.id}
+                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50"
+                        style={{ borderColor: 'var(--color-border)' }}
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <FileText className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
+                          <span className="text-sm font-medium truncate" style={{ color: 'var(--color-text-dark)' }}>
+                            {file.filename}
+                          </span>
+                          {file.file_size && (
+                            <span className="text-xs text-gray-400 flex-shrink-0">
+                              ({Math.round(file.file_size / 1024)}KB)
+                            </span>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDownloadFile(file.id, file.filename)}
+                          className="flex-shrink-0 ml-2"
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* AI Detection Alerts */}
             {(aiDetectionResults.plagiarismDetected || aiDetectionResults.aiCodeDetected) && (
               <div className="p-6 border-b" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-warning-bg)' }}>
@@ -553,17 +661,15 @@ print(square(5))`}
                   type="submit"
                   className="flex-1 text-white"
                   style={{ backgroundColor: submitted ? '#2D6A2D' : 'var(--color-primary)' }}
+                  disabled={isSaving}
                   onClick={() => {
-                    onSubmitGrade?.(getTotalScore(), feedback);
-                    setSubmitted(true);
-                    setTimeout(() => {
-                      setSubmitted(false);
-                      onClose();
-                    }, 1200);
+                    handleSaveGradeToBackend();
                   }}
                 >
                   {submitted ? (
                     <><CheckCircle className="w-4 h-4 mr-2" /> Submitted!</>
+                  ) : isSaving ? (
+                    <>Saving...</>
                   ) : (
                     <><Send className="w-4 h-4 mr-2" /> Submit Grade</>
                   )}

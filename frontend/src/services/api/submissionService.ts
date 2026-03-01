@@ -95,6 +95,22 @@ export const submissionService = {
     return mapSubmission(data);
   },
 
+  /** Get files for a submission. */
+  async getSubmissionFiles(submissionId: string): Promise<Array<{id: number; filename: string; file_size: number | null}>> {
+    const { data } = await withRetry(() =>
+      api.get<Array<{id: number; filename: string; file_size: number | null}>>(`/submissions/${submissionId}/files`)
+    );
+    return data;
+  },
+
+  /** Download a single file. */
+  async downloadFile(fileId: number): Promise<Blob> {
+    const { data } = await api.get(`/submissions/files/${fileId}/download`, {
+      responseType: 'blob',
+    });
+    return data;
+  },
+
   /** List submissions for an assignment. */
   async getSubmissions(assignmentId: string): Promise<Submission[]> {
     const { data } = await withRetry(() =>

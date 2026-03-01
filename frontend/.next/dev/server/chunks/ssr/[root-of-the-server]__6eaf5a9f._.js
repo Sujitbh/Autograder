@@ -2987,16 +2987,16 @@ function envBool(value, fallback) {
     return value === 'true';
 }
 const config = {
-    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:3001/api',
-    wsUrl: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002',
-    pistonApiUrl: process.env.NEXT_PUBLIC_PISTON_API_URL || 'https://emkc.org/api/v2/piston',
-    s3Bucket: process.env.NEXT_PUBLIC_S3_BUCKET || 'autograde-uploads-dev',
-    cloudFrontUrl: process.env.NEXT_PUBLIC_CLOUDFRONT_URL || '',
-    awsRegion: process.env.NEXT_PUBLIC_AWS_REGION || 'us-east-1',
+    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:8000/api',
+    wsUrl: ("TURBOPACK compile-time value", "ws://localhost:3002") || 'ws://localhost:3002',
+    pistonApiUrl: ("TURBOPACK compile-time value", "https://emkc.org/api/v2/piston") || 'https://emkc.org/api/v2/piston',
+    s3Bucket: ("TURBOPACK compile-time value", "autograde-uploads-dev") || 'autograde-uploads-dev',
+    cloudFrontUrl: ("TURBOPACK compile-time value", "") || '',
+    awsRegion: ("TURBOPACK compile-time value", "us-east-1") || 'us-east-1',
     features: {
-        darkMode: envBool(process.env.NEXT_PUBLIC_ENABLE_DARK_MODE, true),
-        aiDetection: envBool(process.env.NEXT_PUBLIC_ENABLE_AI_DETECTION, false),
-        canvasIntegration: envBool(process.env.NEXT_PUBLIC_ENABLE_CANVAS_INTEGRATION, false)
+        darkMode: envBool(("TURBOPACK compile-time value", "true"), true),
+        aiDetection: envBool(("TURBOPACK compile-time value", "false"), false),
+        canvasIntegration: envBool(("TURBOPACK compile-time value", "false"), false)
     },
     monitoring: {
         sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN || null,
@@ -3073,16 +3073,18 @@ api.interceptors.response.use((res)=>res, async (error)=>{
         throw new NetworkError('Unable to connect to the server');
     }
     const { status, data } = error.response;
+    const backendDetail = data?.detail;
+    const backendMessage = (typeof backendDetail === 'string' ? backendDetail : undefined) ?? data?.message ?? data?.error;
     if (status === 401) {
         // Token expired — clear local auth and redirect
         if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
         ;
-        throw new AuthError(data?.message ?? 'Unauthorized');
+        throw new AuthError(backendMessage ?? 'Unauthorized');
     }
     if (status === 422 && data?.error) {
-        throw new ValidationError(data.message ?? 'Validation error');
+        throw new ValidationError(backendMessage ?? 'Validation error');
     }
-    throw new Error(data?.message ?? `Request failed (${status})`);
+    throw new Error(backendMessage ?? `Request failed (${status})`);
 });
 async function withRetry(fn, retries = 3) {
     for(let attempt = 0; attempt <= retries; attempt++){
@@ -3386,6 +3388,16 @@ const submissionService = {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/${submissionId}`));
         return mapSubmission(data);
     },
+    /** Get files for a submission. */ async getSubmissionFiles (submissionId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/${submissionId}/files`));
+        return data;
+    },
+    /** Download a single file. */ async downloadFile (fileId) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/files/${fileId}/download`, {
+            responseType: 'blob'
+        });
+        return data;
+    },
     /** List submissions for an assignment. */ async getSubmissions (assignmentId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/assignments/${assignmentId}`));
         return data.map(mapSubmission);
@@ -3506,7 +3518,9 @@ function useCourses() {
             'courses'
         ],
         queryFn: ()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["courseService"].getCourses(),
-        staleTime: 5 * 60 * 1000
+        staleTime: 0,
+        refetchOnMount: 'always',
+        refetchOnWindowFocus: true
     });
 }
 function useCourse(courseId) {
@@ -3523,7 +3537,19 @@ function useCreateCourse() {
     const qc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useQueryClient"])();
     return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMutation"])({
         mutationFn: (dto)=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["courseService"].createCourse(dto),
-        onSuccess: ()=>{
+        onSuccess: (newCourse)=>{
+            qc.setQueryData([
+                'courses'
+            ], (prev)=>{
+                if (!prev) return [
+                    newCourse
+                ];
+                const exists = prev.some((c)=>c.id === newCourse.id);
+                return exists ? prev : [
+                    newCourse,
+                    ...prev
+                ];
+            });
             qc.invalidateQueries({
                 queryKey: [
                     'courses'

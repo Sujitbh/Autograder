@@ -253,15 +253,15 @@ function envBool(value, fallback) {
 }
 const config = {
     apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:8000/api',
-    wsUrl: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002',
-    pistonApiUrl: process.env.NEXT_PUBLIC_PISTON_API_URL || 'https://emkc.org/api/v2/piston',
-    s3Bucket: process.env.NEXT_PUBLIC_S3_BUCKET || 'autograde-uploads-dev',
-    cloudFrontUrl: process.env.NEXT_PUBLIC_CLOUDFRONT_URL || '',
-    awsRegion: process.env.NEXT_PUBLIC_AWS_REGION || 'us-east-1',
+    wsUrl: ("TURBOPACK compile-time value", "ws://localhost:3002") || 'ws://localhost:3002',
+    pistonApiUrl: ("TURBOPACK compile-time value", "https://emkc.org/api/v2/piston") || 'https://emkc.org/api/v2/piston',
+    s3Bucket: ("TURBOPACK compile-time value", "autograde-uploads-dev") || 'autograde-uploads-dev',
+    cloudFrontUrl: ("TURBOPACK compile-time value", "") || '',
+    awsRegion: ("TURBOPACK compile-time value", "us-east-1") || 'us-east-1',
     features: {
-        darkMode: envBool(process.env.NEXT_PUBLIC_ENABLE_DARK_MODE, true),
-        aiDetection: envBool(process.env.NEXT_PUBLIC_ENABLE_AI_DETECTION, false),
-        canvasIntegration: envBool(process.env.NEXT_PUBLIC_ENABLE_CANVAS_INTEGRATION, false)
+        darkMode: envBool(("TURBOPACK compile-time value", "true"), true),
+        aiDetection: envBool(("TURBOPACK compile-time value", "false"), false),
+        canvasIntegration: envBool(("TURBOPACK compile-time value", "false"), false)
     },
     monitoring: {
         sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN || null,
@@ -652,6 +652,16 @@ const submissionService = {
     /** Get a specific submission. */ async getSubmission (submissionId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/${submissionId}`));
         return mapSubmission(data);
+    },
+    /** Get files for a submission. */ async getSubmissionFiles (submissionId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/${submissionId}/files`));
+        return data;
+    },
+    /** Download a single file. */ async downloadFile (fileId) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/files/${fileId}/download`, {
+            responseType: 'blob'
+        });
+        return data;
     },
     /** List submissions for an assignment. */ async getSubmissions (assignmentId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/assignments/${assignmentId}`));

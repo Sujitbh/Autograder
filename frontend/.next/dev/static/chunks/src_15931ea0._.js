@@ -18,16 +18,30 @@ var _s = __turbopack_context__.k.signature();
 ;
 function AuthGuard({ children }) {
     _s();
-    const { isAuthenticated } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    const { isAuthenticated, role } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
+    const pathname = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["usePathname"])();
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "AuthGuard.useEffect": ()=>{
             if (!isAuthenticated) {
                 router.replace('/login');
+                return;
+            }
+            // Minimum UI-level role routing split:
+            // - students stay in /student space
+            // - faculty/admin stay in /courses or /faculty space
+            if (role === 'student' && pathname?.startsWith('/courses')) {
+                router.replace('/student');
+                return;
+            }
+            if ((role === 'faculty' || role === 'admin') && pathname?.startsWith('/student')) {
+                router.replace('/courses');
             }
         }
     }["AuthGuard.useEffect"], [
         isAuthenticated,
+        role,
+        pathname,
         router
     ]);
     if (!isAuthenticated) return null;
@@ -35,10 +49,11 @@ function AuthGuard({ children }) {
         children: children
     }, void 0, false);
 }
-_s(AuthGuard, "Z8qV8gahpegazQReeCvErAUIJG4=", false, function() {
+_s(AuthGuard, "F7uN0EBS69urbfSnRFZixdY5kXw=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"],
-        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"]
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["usePathname"]
     ];
 });
 _c = AuthGuard;
@@ -5320,16 +5335,16 @@ function envBool(value, fallback) {
     return value === 'true';
 }
 const config = {
-    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:3001/api',
-    wsUrl: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002',
-    pistonApiUrl: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_PISTON_API_URL || 'https://emkc.org/api/v2/piston',
-    s3Bucket: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_S3_BUCKET || 'autograde-uploads-dev',
-    cloudFrontUrl: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_CLOUDFRONT_URL || '',
-    awsRegion: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_AWS_REGION || 'us-east-1',
+    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:8000/api',
+    wsUrl: ("TURBOPACK compile-time value", "ws://localhost:3002") || 'ws://localhost:3002',
+    pistonApiUrl: ("TURBOPACK compile-time value", "https://emkc.org/api/v2/piston") || 'https://emkc.org/api/v2/piston',
+    s3Bucket: ("TURBOPACK compile-time value", "autograde-uploads-dev") || 'autograde-uploads-dev',
+    cloudFrontUrl: ("TURBOPACK compile-time value", "") || '',
+    awsRegion: ("TURBOPACK compile-time value", "us-east-1") || 'us-east-1',
     features: {
-        darkMode: envBool(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_ENABLE_DARK_MODE, true),
-        aiDetection: envBool(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_ENABLE_AI_DETECTION, false),
-        canvasIntegration: envBool(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_ENABLE_CANVAS_INTEGRATION, false)
+        darkMode: envBool(("TURBOPACK compile-time value", "true"), true),
+        aiDetection: envBool(("TURBOPACK compile-time value", "false"), false),
+        canvasIntegration: envBool(("TURBOPACK compile-time value", "false"), false)
     },
     monitoring: {
         sentryDsn: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$build$2f$polyfills$2f$process$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].env.NEXT_PUBLIC_SENTRY_DSN || null,
@@ -5413,6 +5428,8 @@ api.interceptors.response.use((res)=>res, async (error)=>{
         throw new NetworkError('Unable to connect to the server');
     }
     const { status, data } = error.response;
+    const backendDetail = data?.detail;
+    const backendMessage = (typeof backendDetail === 'string' ? backendDetail : undefined) ?? data?.message ?? data?.error;
     if (status === 401) {
         // Token expired — clear local auth and redirect
         if ("TURBOPACK compile-time truthy", 1) {
@@ -5420,12 +5437,12 @@ api.interceptors.response.use((res)=>res, async (error)=>{
             localStorage.removeItem('autograde_auth');
         // Let the AuthContext handle the redirect
         }
-        throw new AuthError(data?.message ?? 'Unauthorized');
+        throw new AuthError(backendMessage ?? 'Unauthorized');
     }
     if (status === 422 && data?.error) {
-        throw new ValidationError(data.message ?? 'Validation error');
+        throw new ValidationError(backendMessage ?? 'Validation error');
     }
-    throw new Error(data?.message ?? `Request failed (${status})`);
+    throw new Error(backendMessage ?? `Request failed (${status})`);
 });
 async function withRetry(fn, retries = 3) {
     for(let attempt = 0; attempt <= retries; attempt++){
@@ -5459,12 +5476,28 @@ __turbopack_context__.s([
    ═══════════════════════════════════════════════════════════════════ */ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/client.ts [app-client] (ecmascript)");
 ;
 function mapUser(u) {
+    const [firstName = '', ...rest] = (u.name ?? '').trim().split(' ');
+    const lastName = rest.join(' ');
+    if (u.role === 'student') {
+        return {
+            id: String(u.id),
+            firstName: firstName || 'Student',
+            lastName,
+            email: u.email,
+            sisUserId: '',
+            sisLoginId: '',
+            enrolledCourses: [],
+            role: 'student'
+        };
+    }
     return {
         id: String(u.id),
-        name: u.name,
+        firstName: firstName || 'User',
+        lastName,
         email: u.email,
-        role: u.role,
-        avatarUrl: ''
+        title: '',
+        department: '',
+        role: 'faculty'
     };
 }
 const authService = {
@@ -5544,14 +5577,14 @@ __turbopack_context__.s([
         semester: 'Spring 2026',
         description: c.description ?? '',
         facultyId: '',
-        enrollmentCode: '',
-        enrollmentCodeActive: true,
-        status: 'active',
+        enrollmentCode: c.enrollment_code ?? '',
+        enrollmentCodeActive: c.enrollment_code_active,
+        status: c.is_active ? 'active' : 'archived',
         studentCount: 0,
         assignmentCount: 0,
         pendingGrades: 0,
-        createdAt: '',
-        updatedAt: ''
+        createdAt: c.created_at ?? '',
+        updatedAt: c.updated_at ?? ''
     };
 }
 const courseService = {
@@ -5564,7 +5597,13 @@ const courseService = {
         return mapCourse(data);
     },
     /** Create a new course. */ async createCourse (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/courses/', dto);
+        const payload = {
+            name: dto.name,
+            code: dto.code,
+            description: dto.description ?? '',
+            enrollment_code_active: dto.enrollmentCodeActive ?? true
+        };
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/courses/', payload);
         return mapCourse(data);
     },
     /** Update an existing course. */ async updateCourse (courseId, dto) {
@@ -5574,14 +5613,22 @@ const courseService = {
     /** Delete a course. */ async deleteCourse (courseId) {
         await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].delete(`/courses/${courseId}`);
     },
-    /** Get enrolled students for a course. */ async getEnrollments (courseId, page = 1, pageSize = 50) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/enrollments`, {
-                params: {
-                    page,
-                    pageSize
-                }
-            }));
+    /** Get roster entries for a course. */ async getEnrollments (courseId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/enrollments`));
         return data;
+    },
+    /** Add one member to a course roster (student/ta/instructor). */ async addEnrollment (courseId, payload) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/courses/${courseId}/enrollments`, payload);
+        return data;
+    },
+    /** Update roster role for an existing enrollment. */ async updateEnrollmentRole (courseId, enrollmentId, role) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].patch(`/courses/${courseId}/enrollments/${enrollmentId}`, {
+            role
+        });
+        return data;
+    },
+    /** Remove a member from the course roster. */ async removeEnrollment (courseId, enrollmentId) {
+        await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].delete(`/courses/${courseId}/enrollments/${enrollmentId}`);
     },
     /** Enroll a student via enrollment code. */ async enrollStudent (enrollmentCode) {
         const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/courses/enroll', {
@@ -5673,38 +5720,80 @@ __turbopack_context__.s([
     ()=>submissionService
 ]);
 /* ═══════════════════════════════════════════════════════════════════
-   Submission Service — Submit code, fetch submissions
+   Submission Service — upload/fetch/grade submissions
+   Backed by FastAPI routes under /submissions, /grading, /faculty
    ═══════════════════════════════════════════════════════════════════ */ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/client.ts [app-client] (ecmascript)");
 ;
+function mapSubmission(s) {
+    return {
+        id: String(s.id),
+        assignmentId: String(s.assignment_id),
+        studentId: String(s.student_id),
+        code: '',
+        language: 'python',
+        submittedAt: s.created_at ?? '',
+        isLate: false,
+        status: s.status === 'graded' ? 'graded' : 'pending',
+        grade: s.score != null ? {
+            id: `grade-${s.id}`,
+            submissionId: String(s.id),
+            rubricScores: [],
+            totalScore: s.score,
+            maxScore: s.max_score ?? 100,
+            percentage: s.max_score && s.max_score > 0 ? Number((s.score / s.max_score * 100).toFixed(2)) : 0,
+            letterGrade: '',
+            feedback: s.feedback ?? '',
+            gradedAt: s.graded_at ?? '',
+            gradedBy: ''
+        } : undefined
+    };
+}
 const submissionService = {
-    /** Submit code for grading. */ async submitCode (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/assignments/${dto.assignmentId}/submissions`, dto);
-        return data.data;
+    /** Legacy fallback: create submission row without files. */ async submitCode (dto) {
+        const payload = {
+            assignment_id: Number(dto.assignmentId)
+        };
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/submissions/', payload);
+        return mapSubmission(data);
+    },
+    /** Student file upload (multipart/form-data with field name `files`). */ async uploadFiles (assignmentId, files) {
+        const formData = new FormData();
+        files.forEach((file)=>formData.append('files', file));
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/submissions/assignments/${assignmentId}/upload`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        return data;
     },
     /** Get a specific submission. */ async getSubmission (submissionId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/${submissionId}`));
-        return data.data;
+        return mapSubmission(data);
     },
-    /** List all submissions for an assignment (faculty view). */ async getSubmissions (assignmentId, page = 1, pageSize = 50) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/assignments/${assignmentId}/submissions`, {
-                params: {
-                    page,
-                    pageSize
-                }
-            }));
-        return data.data;
+    /** List submissions for an assignment. */ async getSubmissions (assignmentId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/assignments/${assignmentId}`));
+        return data.map(mapSubmission);
     },
-    /** Faculty: grade a submission. */ async gradeSubmission (dto) {
-        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/submissions/${dto.submissionId}/grade`, dto);
-        return data.data;
+    /** Run grading for a submission. */ async gradeSubmission (dto) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post(`/grading/submissions/${dto.submissionId}/grade`);
+        return data;
     },
-    /** Get submission history for a student on an assignment. */ async getStudentSubmissions (assignmentId, studentId) {
-        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/assignments/${assignmentId}/submissions`, {
-                params: {
-                    studentId
-                }
-            }));
-        return data.data;
+    /** Manual score entry/override by instructor/TA. */ async overrideSubmissionScore (submissionId, payload) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].patch(`/grading/submissions/${submissionId}/score`, payload);
+        return data;
+    },
+    /** Fetch grading results/details for one submission. */ async getSubmissionResults (submissionId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/grading/submissions/${submissionId}/results`));
+        return data;
+    },
+    /** Instructor/TA ZIP download of all submissions for assignment. */ async downloadAssignmentZip (assignmentId) {
+        const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/faculty/assignments/${assignmentId}/download-zip`, {
+            responseType: 'blob'
+        });
+        return data;
+    },
+    /** Student history helper; backend already filters by auth user role. */ async getStudentSubmissions (assignmentId, _studentId) {
+        return this.getSubmissions(assignmentId);
     }
 };
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
@@ -5814,7 +5903,9 @@ function useCourses() {
         queryFn: {
             "useCourses.useQuery": ()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["courseService"].getCourses()
         }["useCourses.useQuery"],
-        staleTime: 5 * 60 * 1000
+        staleTime: 0,
+        refetchOnMount: 'always',
+        refetchOnWindowFocus: true
     });
 }
 _s(useCourses, "4ZpngI1uv+Uo3WQHEZmTQ5FNM+k=", false, function() {
@@ -5848,7 +5939,23 @@ function useCreateCourse() {
             "useCreateCourse.useMutation": (dto)=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["courseService"].createCourse(dto)
         }["useCreateCourse.useMutation"],
         onSuccess: {
-            "useCreateCourse.useMutation": ()=>{
+            "useCreateCourse.useMutation": (newCourse)=>{
+                qc.setQueryData([
+                    'courses'
+                ], {
+                    "useCreateCourse.useMutation": (prev)=>{
+                        if (!prev) return [
+                            newCourse
+                        ];
+                        const exists = prev.some({
+                            "useCreateCourse.useMutation.exists": (c)=>c.id === newCourse.id
+                        }["useCreateCourse.useMutation.exists"]);
+                        return exists ? prev : [
+                            newCourse,
+                            ...prev
+                        ];
+                    }
+                }["useCreateCourse.useMutation"]);
                 qc.invalidateQueries({
                     queryKey: [
                         'courses'
@@ -6155,16 +6262,17 @@ function useGradeSubmission() {
             "useGradeSubmission.useMutation": (dto)=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$submissionService$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["submissionService"].gradeSubmission(dto)
         }["useGradeSubmission.useMutation"],
         onSuccess: {
-            "useGradeSubmission.useMutation": (updated)=>{
+            "useGradeSubmission.useMutation": (_updated, dto)=>{
                 // Optimistically update the individual submission cache
-                qc.setQueryData([
-                    'submission',
-                    updated.id
-                ], updated);
                 qc.invalidateQueries({
                     queryKey: [
-                        'submissions',
-                        updated.assignmentId
+                        'submission',
+                        dto.submissionId
+                    ]
+                });
+                qc.invalidateQueries({
+                    queryKey: [
+                        'submissions'
                     ]
                 });
                 // Also refresh grades
@@ -6381,8 +6489,13 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$d
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$studentData$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/utils/studentData.ts [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$queries$2f$index$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/src/hooks/queries/index.ts [app-client] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$queries$2f$useAssignments$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/hooks/queries/useAssignments.ts [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$queries$2f$useSubmissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/hooks/queries/useSubmissions.ts [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$index$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/src/services/api/index.ts [app-client] (ecmascript) <locals>");
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$submissionService$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/submissionService.ts [app-client] (ecmascript)");
 ;
 var _s = __turbopack_context__.k.signature();
+;
+;
 ;
 ;
 ;
@@ -6950,10 +7063,10 @@ function buildMockGroups(courseId) {
 function getGroupForStudent(studentId, groups) {
     return groups.find((g)=>g.memberIds.includes(studentId));
 }
-function getGroupMembers(studentId, submissions, groups) {
+function getGroupMembers(studentId, submissionsState, groups) {
     const group = getGroupForStudent(studentId, groups);
     if (!group) return [];
-    return submissions.filter((s)=>group.memberIds.includes(s.studentId) && s.studentId !== studentId);
+    return submissionsState.filter((s)=>group.memberIds.includes(s.studentId) && s.studentId !== studentId);
 }
 function scoreColor(score, max) {
     const pct = score / max * 100;
@@ -6965,8 +7078,10 @@ function AssignmentGrading() {
     _s();
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
     const { courseId, assignmentId } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useParams"])();
+    const [isDownloadingZip, setIsDownloadingZip] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     // Fetch from API
     const { data: apiAssignment, isLoading: isLoadingAssignment } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$queries$2f$useAssignments$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAssignment"])(courseId, assignmentId);
+    const { data: apiSubmissions, isLoading: isLoadingSubmissions, refetch: refetchSubmissions } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$queries$2f$useSubmissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSubmissions"])(assignmentId);
     // Try hardcoded meta first; then API data; then localStorage fallback
     const meta = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "AssignmentGrading.useMemo[meta]": ()=>{
@@ -7043,20 +7158,81 @@ function AssignmentGrading() {
         assignmentId,
         apiAssignment
     ]);
-    const initialSubmissions = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
-        "AssignmentGrading.useMemo[initialSubmissions]": ()=>makeMockSubmissions(assignmentId ?? '', courseId ?? 'cs-1001')
-    }["AssignmentGrading.useMemo[initialSubmissions]"], [
+    // Map API submissions to StudentSubmission format
+    const submissions = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
+        "AssignmentGrading.useMemo[submissions]": ()=>{
+            if (!apiSubmissions || isLoadingSubmissions) {
+                // Fallback to mock data while loading or if no API data
+                return makeMockSubmissions(assignmentId ?? '', courseId ?? 'cs-1001');
+            }
+            // Get all students in course to show who hasn't submitted
+            const allStudents = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$studentData$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["getStudentsForCourse"])(courseId ?? 'cs-1001');
+            const submissionMap = new Map();
+            // Build map of student_id -> submission
+            apiSubmissions.forEach({
+                "AssignmentGrading.useMemo[submissions]": (sub)=>{
+                    submissionMap.set(sub.student_id, sub);
+                }
+            }["AssignmentGrading.useMemo[submissions]"]);
+            // Create StudentSubmission for each enrolled student
+            return allStudents.map({
+                "AssignmentGrading.useMemo[submissions]": (student)=>{
+                    const submission = submissionMap.get(Number(student.id));
+                    if (submission) {
+                        const getInitials = {
+                            "AssignmentGrading.useMemo[submissions].getInitials": (name)=>{
+                                return name.split(' ').map({
+                                    "AssignmentGrading.useMemo[submissions].getInitials": (n)=>n[0]
+                                }["AssignmentGrading.useMemo[submissions].getInitials"]).join('').toUpperCase().slice(0, 2);
+                            }
+                        }["AssignmentGrading.useMemo[submissions].getInitials"];
+                        return {
+                            id: String(submission.id),
+                            studentName: submission.student?.name || student.name,
+                            studentId: submission.student?.student_id || student.studentId,
+                            avatarInitials: getInitials(submission.student?.name || student.name),
+                            submittedAt: submission.created_at,
+                            autoScore: submission.score,
+                            finalGrade: submission.score,
+                            maxPoints: submission.max_score || meta?.totalPoints || 100,
+                            status: submission.status === 'graded' ? 'graded' : 'submitted',
+                            late: false,
+                            flagged: false
+                        };
+                    } else {
+                        // Not submitted
+                        return {
+                            id: `nosub-${student.id}`,
+                            studentName: student.name,
+                            studentId: student.studentId,
+                            avatarInitials: student.avatarInitials,
+                            submittedAt: null,
+                            autoScore: null,
+                            finalGrade: null,
+                            maxPoints: meta?.totalPoints || 100,
+                            status: 'not-submitted',
+                            late: false,
+                            flagged: false
+                        };
+                    }
+                }
+            }["AssignmentGrading.useMemo[submissions]"]);
+        }
+    }["AssignmentGrading.useMemo[submissions]"], [
+        apiSubmissions,
+        isLoadingSubmissions,
         assignmentId,
-        courseId
+        courseId,
+        meta
     ]);
-    const [submissions, setSubmissions] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(initialSubmissions);
-    // Reset when assignment/course changes
+    const [submissionsState, setSubmissionsState] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(submissions);
+    // Update local state when API data changes
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "AssignmentGrading.useEffect": ()=>{
-            setSubmissions(initialSubmissions);
+            setSubmissionsState(submissions);
         }
     }["AssignmentGrading.useEffect"], [
-        initialSubmissions
+        submissions
     ]);
     const mockGroups = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "AssignmentGrading.useMemo[mockGroups]": ()=>buildMockGroups(courseId ?? 'cs-1001')
@@ -7064,16 +7240,16 @@ function AssignmentGrading() {
         courseId
     ]);
     /* ─── Grade submission handler ─── */ const handleSubmitGrade = (studentId, grade, _feedback)=>{
-        setSubmissions((prev)=>prev.map((s)=>s.id === studentId ? {
+        setSubmissionsState((prev)=>prev.map((s)=>s.id === studentId ? {
                     ...s,
                     finalGrade: grade,
                     status: 'graded'
                 } : s));
     };
     /* ─── Apply grade to all group members ─── */ const handleApplyGroupGrade = (sourceStudentId, grade)=>{
-        const group = getGroupForStudent(submissions.find((s)=>s.id === sourceStudentId)?.studentId ?? '', mockGroups);
+        const group = getGroupForStudent(submissionsState.find((s)=>s.id === sourceStudentId)?.studentId ?? '', mockGroups);
         if (!group) return;
-        setSubmissions((prev)=>prev.map((s)=>group.memberIds.includes(s.studentId) ? {
+        setSubmissionsState((prev)=>prev.map((s)=>group.memberIds.includes(s.studentId) ? {
                     ...s,
                     finalGrade: grade,
                     status: 'graded'
@@ -7108,7 +7284,7 @@ function AssignmentGrading() {
                     ]
                 }, void 0, false, {
                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                    lineNumber: 545,
+                    lineNumber: 605,
                     columnNumber: 17
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7129,7 +7305,7 @@ function AssignmentGrading() {
                                 children: "Assignment Not Found"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                lineNumber: 548,
+                                lineNumber: 608,
                                 columnNumber: 25
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -7141,24 +7317,24 @@ function AssignmentGrading() {
                                 children: "Go Back"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                lineNumber: 549,
+                                lineNumber: 609,
                                 columnNumber: 25
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                        lineNumber: 547,
+                        lineNumber: 607,
                         columnNumber: 21
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                    lineNumber: 546,
+                    lineNumber: 606,
                     columnNumber: 17
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/components/AssignmentGrading.tsx",
-            lineNumber: 544,
+            lineNumber: 604,
             columnNumber: 13
         }, this);
     }
@@ -7174,7 +7350,7 @@ function AssignmentGrading() {
                     ]
                 }, void 0, false, {
                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                    lineNumber: 559,
+                    lineNumber: 619,
                     columnNumber: 17
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7188,42 +7364,60 @@ function AssignmentGrading() {
                             className: "w-5 h-5 animate-spin"
                         }, void 0, false, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 561,
+                            lineNumber: 621,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                             children: "Loading assignment…"
                         }, void 0, false, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 562,
+                            lineNumber: 622,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                    lineNumber: 560,
+                    lineNumber: 620,
                     columnNumber: 17
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/components/AssignmentGrading.tsx",
-            lineNumber: 558,
+            lineNumber: 618,
             columnNumber: 13
         }, this);
     }
+    const handleDownloadZip = async ()=>{
+        if (!assignmentId) return;
+        setIsDownloadingZip(true);
+        try {
+            const blob = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$submissionService$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["submissionService"].downloadAssignmentZip(assignmentId);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `assignment_${assignmentId}_submissions.zip`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to download submissions ZIP';
+            window.alert(message);
+        } finally{
+            setIsDownloadingZip(false);
+        }
+    };
     /* ─── Tab counts ─── */ const counts = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "AssignmentGrading.useMemo[counts]": ()=>{
-            const all = submissions.length;
-            const notSubmitted = submissions.filter({
+            const all = submissionsState.length;
+            const notSubmitted = submissionsState.filter({
                 "AssignmentGrading.useMemo[counts]": (s)=>s.status === 'not-submitted'
             }["AssignmentGrading.useMemo[counts]"]).length;
-            const submitted = submissions.filter({
+            const submitted = submissionsState.filter({
                 "AssignmentGrading.useMemo[counts]": (s)=>s.status === 'submitted'
             }["AssignmentGrading.useMemo[counts]"]).length;
-            const graded = submissions.filter({
+            const graded = submissionsState.filter({
                 "AssignmentGrading.useMemo[counts]": (s)=>s.status === 'graded'
             }["AssignmentGrading.useMemo[counts]"]).length;
-            const needsReview = submissions.filter({
+            const needsReview = submissionsState.filter({
                 "AssignmentGrading.useMemo[counts]": (s)=>s.status === 'needs-review'
             }["AssignmentGrading.useMemo[counts]"]).length;
             return {
@@ -7235,7 +7429,7 @@ function AssignmentGrading() {
             };
         }
     }["AssignmentGrading.useMemo[counts]"], [
-        submissions
+        submissionsState
     ]);
     const tabs = [
         {
@@ -7266,7 +7460,7 @@ function AssignmentGrading() {
     ];
     /* ─── Filter ─── */ const filtered = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMemo"])({
         "AssignmentGrading.useMemo[filtered]": ()=>{
-            return submissions.filter({
+            return submissionsState.filter({
                 "AssignmentGrading.useMemo[filtered]": (s)=>{
                     if (activeTab !== 'all' && s.status !== activeTab) return false;
                     if (searchQuery) {
@@ -7278,7 +7472,7 @@ function AssignmentGrading() {
             }["AssignmentGrading.useMemo[filtered]"]);
         }
     }["AssignmentGrading.useMemo[filtered]"], [
-        submissions,
+        submissionsState,
         activeTab,
         searchQuery
     ]);
@@ -7324,7 +7518,7 @@ function AssignmentGrading() {
             className: "w-3.5 h-3.5 opacity-30"
         }, void 0, false, {
             fileName: "[project]/src/components/AssignmentGrading.tsx",
-            lineNumber: 620,
+            lineNumber: 699,
             columnNumber: 41
         }, this);
         return sortOrder === 'asc' ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$up$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronUp$3e$__["ChevronUp"], {
@@ -7334,7 +7528,7 @@ function AssignmentGrading() {
             }
         }, void 0, false, {
             fileName: "[project]/src/components/AssignmentGrading.tsx",
-            lineNumber: 622,
+            lineNumber: 701,
             columnNumber: 15
         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$chevron$2d$down$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ChevronDown$3e$__["ChevronDown"], {
             className: "w-3.5 h-3.5",
@@ -7343,7 +7537,7 @@ function AssignmentGrading() {
             }
         }, void 0, false, {
             fileName: "[project]/src/components/AssignmentGrading.tsx",
-            lineNumber: 623,
+            lineNumber: 702,
             columnNumber: 15
         }, this);
     };
@@ -7370,7 +7564,7 @@ function AssignmentGrading() {
                 ]
             }, void 0, false, {
                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                lineNumber: 632,
+                lineNumber: 711,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7380,7 +7574,7 @@ function AssignmentGrading() {
                         activeItem: "assignments"
                     }, void 0, false, {
                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                        lineNumber: 640,
+                        lineNumber: 719,
                         columnNumber: 17
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
@@ -7398,14 +7592,14 @@ function AssignmentGrading() {
                                         className: "w-5 h-5"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 649,
+                                        lineNumber: 728,
                                         columnNumber: 25
                                     }, this),
                                     "Back to Assignments"
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                lineNumber: 644,
+                                lineNumber: 723,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7423,7 +7617,7 @@ function AssignmentGrading() {
                                                 children: meta.name
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 656,
+                                                lineNumber: 735,
                                                 columnNumber: 29
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7444,7 +7638,7 @@ function AssignmentGrading() {
                                                                 className: "w-4 h-4"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 661,
+                                                                lineNumber: 740,
                                                                 columnNumber: 37
                                                             }, this),
                                                             "Due: ",
@@ -7456,7 +7650,7 @@ function AssignmentGrading() {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 660,
+                                                        lineNumber: 739,
                                                         columnNumber: 33
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -7474,14 +7668,14 @@ function AssignmentGrading() {
                                                                 className: "w-4 h-4"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 665,
+                                                                lineNumber: 744,
                                                                 columnNumber: 37
                                                             }, this),
                                                             meta.language
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 664,
+                                                        lineNumber: 743,
                                                         columnNumber: 33
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -7499,15 +7693,15 @@ function AssignmentGrading() {
                                                                 className: "w-4 h-4"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 669,
+                                                                lineNumber: 748,
                                                                 columnNumber: 37
                                                             }, this),
-                                                            submissions.length,
+                                                            submissionsState.length,
                                                             " Students"
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 668,
+                                                        lineNumber: 747,
                                                         columnNumber: 33
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -7525,7 +7719,7 @@ function AssignmentGrading() {
                                                                 className: "w-4 h-4"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 673,
+                                                                lineNumber: 752,
                                                                 columnNumber: 37
                                                             }, this),
                                                             meta.totalPoints,
@@ -7533,7 +7727,7 @@ function AssignmentGrading() {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 672,
+                                                        lineNumber: 751,
                                                         columnNumber: 33
                                                     }, this),
                                                     meta.isGroupAssignment && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -7551,26 +7745,26 @@ function AssignmentGrading() {
                                                                 className: "w-4 h-4"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 678,
+                                                                lineNumber: 757,
                                                                 columnNumber: 41
                                                             }, this),
                                                             "Group Assignment"
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 677,
+                                                        lineNumber: 756,
                                                         columnNumber: 37
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 659,
+                                                lineNumber: 738,
                                                 columnNumber: 29
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 655,
+                                        lineNumber: 734,
                                         columnNumber: 25
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7591,14 +7785,14 @@ function AssignmentGrading() {
                                                         className: "w-4 h-4 mr-2"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 696,
+                                                        lineNumber: 775,
                                                         columnNumber: 33
                                                     }, this),
                                                     "Edit"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 685,
+                                                lineNumber: 764,
                                                 columnNumber: 29
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -7610,44 +7804,46 @@ function AssignmentGrading() {
                                                         className: "w-4 h-4 mr-2"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 704,
+                                                        lineNumber: 783,
                                                         columnNumber: 33
                                                     }, this),
                                                     "Delete"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 699,
+                                                lineNumber: 778,
                                                 columnNumber: 29
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
                                                 variant: "outline",
                                                 className: "border-[var(--color-border)] h-9",
+                                                onClick: handleDownloadZip,
+                                                disabled: isDownloadingZip,
                                                 children: [
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$download$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Download$3e$__["Download"], {
                                                         className: "w-4 h-4 mr-2"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 708,
+                                                        lineNumber: 792,
                                                         columnNumber: 33
                                                     }, this),
-                                                    "Export"
+                                                    isDownloadingZip ? 'Downloading...' : 'Download submissions (ZIP)'
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 707,
+                                                lineNumber: 786,
                                                 columnNumber: 29
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 684,
+                                        lineNumber: 763,
                                         columnNumber: 25
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                lineNumber: 654,
+                                lineNumber: 733,
                                 columnNumber: 21
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7694,7 +7890,7 @@ function AssignmentGrading() {
                                                 className: "w-4 h-4"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 737,
+                                                lineNumber: 821,
                                                 columnNumber: 37
                                             }, this),
                                             sec.label,
@@ -7710,7 +7906,7 @@ function AssignmentGrading() {
                                                 children: counts.all
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 740,
+                                                lineNumber: 824,
                                                 columnNumber: 41
                                             }, this),
                                             sec.id === 'rubric' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -7725,19 +7921,19 @@ function AssignmentGrading() {
                                                 children: meta.rubric.length
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 745,
+                                                lineNumber: 829,
                                                 columnNumber: 41
                                             }, this)
                                         ]
                                     }, sec.id, true, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 723,
+                                        lineNumber: 807,
                                         columnNumber: 33
                                     }, this);
                                 })
                             }, void 0, false, {
                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                lineNumber: 715,
+                                lineNumber: 799,
                                 columnNumber: 21
                             }, this),
                             pageSection === 'overview' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7765,14 +7961,14 @@ function AssignmentGrading() {
                                                         }
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 760,
+                                                        lineNumber: 844,
                                                         columnNumber: 37
                                                     }, this),
                                                     "Description"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 759,
+                                                lineNumber: 843,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -7784,13 +7980,13 @@ function AssignmentGrading() {
                                                 children: meta.description
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 763,
+                                                lineNumber: 847,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 758,
+                                        lineNumber: 842,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7815,14 +8011,14 @@ function AssignmentGrading() {
                                                         }
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 769,
+                                                        lineNumber: 853,
                                                         columnNumber: 37
                                                     }, this),
                                                     "Instructions"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 768,
+                                                lineNumber: 852,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7836,18 +8032,18 @@ function AssignmentGrading() {
                                                         children: line
                                                     }, i, false, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 774,
+                                                        lineNumber: 858,
                                                         columnNumber: 41
                                                     }, this))
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 772,
+                                                lineNumber: 856,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 767,
+                                        lineNumber: 851,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7875,14 +8071,14 @@ function AssignmentGrading() {
                                                                 }
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 784,
+                                                                lineNumber: 868,
                                                                 columnNumber: 41
                                                             }, this),
                                                             "Points Breakdown"
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 783,
+                                                        lineNumber: 867,
                                                         columnNumber: 37
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7902,7 +8098,7 @@ function AssignmentGrading() {
                                                                             children: c.name
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                            lineNumber: 790,
+                                                                            lineNumber: 874,
                                                                             columnNumber: 49
                                                                         }, this),
                                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -7918,13 +8114,13 @@ function AssignmentGrading() {
                                                                             ]
                                                                         }, void 0, true, {
                                                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                            lineNumber: 791,
+                                                                            lineNumber: 875,
                                                                             columnNumber: 49
                                                                         }, this)
                                                                     ]
                                                                 }, i, true, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 789,
+                                                                    lineNumber: 873,
                                                                     columnNumber: 45
                                                                 }, this)),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7942,7 +8138,7 @@ function AssignmentGrading() {
                                                                         children: "Total"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 797,
+                                                                        lineNumber: 881,
                                                                         columnNumber: 45
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -7957,25 +8153,25 @@ function AssignmentGrading() {
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 798,
+                                                                        lineNumber: 882,
                                                                         columnNumber: 45
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 796,
+                                                                lineNumber: 880,
                                                                 columnNumber: 41
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 787,
+                                                        lineNumber: 871,
                                                         columnNumber: 37
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 782,
+                                                lineNumber: 866,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8000,14 +8196,14 @@ function AssignmentGrading() {
                                                                 }
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 806,
+                                                                lineNumber: 890,
                                                                 columnNumber: 41
                                                             }, this),
                                                             "Settings"
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 805,
+                                                        lineNumber: 889,
                                                         columnNumber: 37
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8067,7 +8263,7 @@ function AssignmentGrading() {
                                                                         }
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 820,
+                                                                        lineNumber: 904,
                                                                         columnNumber: 49
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8082,7 +8278,7 @@ function AssignmentGrading() {
                                                                                 children: item.label
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                                lineNumber: 822,
+                                                                                lineNumber: 906,
                                                                                 columnNumber: 53
                                                                             }, this),
                                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -8093,42 +8289,42 @@ function AssignmentGrading() {
                                                                                 children: item.value
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                                lineNumber: 823,
+                                                                                lineNumber: 907,
                                                                                 columnNumber: 53
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 821,
+                                                                        lineNumber: 905,
                                                                         columnNumber: 49
                                                                     }, this)
                                                                 ]
                                                             }, i, true, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 819,
+                                                                lineNumber: 903,
                                                                 columnNumber: 45
                                                             }, this))
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 809,
+                                                        lineNumber: 893,
                                                         columnNumber: 37
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 804,
+                                                lineNumber: 888,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 780,
+                                        lineNumber: 864,
                                         columnNumber: 29
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                lineNumber: 756,
+                                lineNumber: 840,
                                 columnNumber: 25
                             }, this),
                             pageSection === 'rubric' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8147,7 +8343,7 @@ function AssignmentGrading() {
                                                     children: "Grading Rubric"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 839,
+                                                    lineNumber: 923,
                                                     columnNumber: 37
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -8164,18 +8360,18 @@ function AssignmentGrading() {
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 840,
+                                                    lineNumber: 924,
                                                     columnNumber: 37
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 838,
+                                            lineNumber: 922,
                                             columnNumber: 33
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 837,
+                                        lineNumber: 921,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8209,7 +8405,7 @@ function AssignmentGrading() {
                                                                         children: i + 1
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 854,
+                                                                        lineNumber: 938,
                                                                         columnNumber: 53
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
@@ -8221,13 +8417,13 @@ function AssignmentGrading() {
                                                                         children: criterion.name
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 860,
+                                                                        lineNumber: 944,
                                                                         columnNumber: 53
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 853,
+                                                                lineNumber: 937,
                                                                 columnNumber: 49
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8244,7 +8440,7 @@ function AssignmentGrading() {
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 863,
+                                                                        lineNumber: 947,
                                                                         columnNumber: 53
                                                                     }, this),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -8263,19 +8459,19 @@ function AssignmentGrading() {
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 864,
+                                                                        lineNumber: 948,
                                                                         columnNumber: 53
                                                                     }, this)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 862,
+                                                                lineNumber: 946,
                                                                 columnNumber: 49
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 852,
+                                                        lineNumber: 936,
                                                         columnNumber: 45
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8290,7 +8486,7 @@ function AssignmentGrading() {
                                                                 children: criterion.description
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 870,
+                                                                lineNumber: 954,
                                                                 columnNumber: 49
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8307,30 +8503,30 @@ function AssignmentGrading() {
                                                                     }
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 873,
+                                                                    lineNumber: 957,
                                                                     columnNumber: 53
                                                                 }, this)
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 872,
+                                                                lineNumber: 956,
                                                                 columnNumber: 49
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 869,
+                                                        lineNumber: 953,
                                                         columnNumber: 45
                                                     }, this)
                                                 ]
                                             }, i, true, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 851,
+                                                lineNumber: 935,
                                                 columnNumber: 41
                                             }, this);
                                         })
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 847,
+                                        lineNumber: 931,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8353,7 +8549,7 @@ function AssignmentGrading() {
                                                                 }
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 888,
+                                                                lineNumber: 972,
                                                                 columnNumber: 41
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -8365,13 +8561,13 @@ function AssignmentGrading() {
                                                                 children: "Total Points"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 889,
+                                                                lineNumber: 973,
                                                                 columnNumber: 41
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 887,
+                                                        lineNumber: 971,
                                                         columnNumber: 37
                                                     }, this),
                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -8383,13 +8579,13 @@ function AssignmentGrading() {
                                                         children: meta.totalPoints
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 891,
+                                                        lineNumber: 975,
                                                         columnNumber: 37
                                                     }, this)
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 886,
+                                                lineNumber: 970,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8409,30 +8605,30 @@ function AssignmentGrading() {
                                                                 children: c.maxPoints
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 896,
+                                                                lineNumber: 980,
                                                                 columnNumber: 55
                                                             }, this)
                                                         ]
                                                     }, i, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 895,
+                                                        lineNumber: 979,
                                                         columnNumber: 41
                                                     }, this))
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 893,
+                                                lineNumber: 977,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 885,
+                                        lineNumber: 969,
                                         columnNumber: 29
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                lineNumber: 835,
+                                lineNumber: 919,
                                 columnNumber: 25
                             }, this),
                             pageSection === 'submissions' && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
@@ -8476,19 +8672,19 @@ function AssignmentGrading() {
                                                                 children: tab.count
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 930,
+                                                                lineNumber: 1014,
                                                                 columnNumber: 53
                                                             }, this)
                                                         ]
                                                     }, tab.id, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 913,
+                                                        lineNumber: 997,
                                                         columnNumber: 45
                                                     }, this);
                                                 })
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 909,
+                                                lineNumber: 993,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -8502,20 +8698,20 @@ function AssignmentGrading() {
                                                         className: "w-4 h-4 mr-2"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 953,
+                                                        lineNumber: 1037,
                                                         columnNumber: 37
                                                     }, this),
                                                     "Grade All"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 948,
+                                                lineNumber: 1032,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 908,
+                                        lineNumber: 992,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8527,7 +8723,7 @@ function AssignmentGrading() {
                                                     className: "absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-light)]"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 961,
+                                                    lineNumber: 1045,
                                                     columnNumber: 37
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -8537,18 +8733,18 @@ function AssignmentGrading() {
                                                     className: "pl-10 border-[var(--color-border)]"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 962,
+                                                    lineNumber: 1046,
                                                     columnNumber: 37
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 960,
+                                            lineNumber: 1044,
                                             columnNumber: 33
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 959,
+                                        lineNumber: 1043,
                                         columnNumber: 29
                                     }, this),
                                     sorted.length === 0 && counts.all === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8561,7 +8757,7 @@ function AssignmentGrading() {
                                                 }
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 974,
+                                                lineNumber: 1058,
                                                 columnNumber: 37
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -8574,7 +8770,7 @@ function AssignmentGrading() {
                                                 children: "No Submissions Yet"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 975,
+                                                lineNumber: 1059,
                                                 columnNumber: 37
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -8588,13 +8784,13 @@ function AssignmentGrading() {
                                                 children: "Students haven't submitted their work yet. Check back after the due date or send a reminder."
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 976,
+                                                lineNumber: 1060,
                                                 columnNumber: 37
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 973,
+                                        lineNumber: 1057,
                                         columnNumber: 33
                                     }, this) : counts.graded === counts.all && activeTab === 'graded' ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                         className: "text-center py-20",
@@ -8606,7 +8802,7 @@ function AssignmentGrading() {
                                                 }
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 982,
+                                                lineNumber: 1066,
                                                 columnNumber: 37
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -8619,7 +8815,7 @@ function AssignmentGrading() {
                                                 children: "All Submissions Graded!"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 983,
+                                                lineNumber: 1067,
                                                 columnNumber: 37
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -8631,7 +8827,7 @@ function AssignmentGrading() {
                                                 children: "Great work! All submissions for this assignment have been graded."
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 984,
+                                                lineNumber: 1068,
                                                 columnNumber: 37
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -8643,20 +8839,20 @@ function AssignmentGrading() {
                                                         className: "w-4 h-4 mr-2"
                                                     }, void 0, false, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 988,
+                                                        lineNumber: 1072,
                                                         columnNumber: 41
                                                     }, this),
                                                     " View Reports"
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 987,
+                                                lineNumber: 1071,
                                                 columnNumber: 37
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 981,
+                                        lineNumber: 1065,
                                         columnNumber: 33
                                     }, this) : sorted.length === 0 ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                         className: "text-center py-16",
@@ -8671,7 +8867,7 @@ function AssignmentGrading() {
                                                 children: "No students match this filter."
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 993,
+                                                lineNumber: 1077,
                                                 columnNumber: 37
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -8687,13 +8883,13 @@ function AssignmentGrading() {
                                                 children: "Clear filters"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                lineNumber: 994,
+                                                lineNumber: 1078,
                                                 columnNumber: 37
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 992,
+                                        lineNumber: 1076,
                                         columnNumber: 33
                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                         className: "rounded-lg overflow-hidden",
@@ -8727,18 +8923,18 @@ function AssignmentGrading() {
                                                                             field: "studentName"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                            lineNumber: 1003,
+                                                                            lineNumber: 1087,
                                                                             columnNumber: 70
                                                                         }, this)
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 1002,
+                                                                    lineNumber: 1086,
                                                                     columnNumber: 53
                                                                 }, this)
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 1001,
+                                                                lineNumber: 1085,
                                                                 columnNumber: 49
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
@@ -8751,7 +8947,7 @@ function AssignmentGrading() {
                                                                 children: "Student ID"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 1006,
+                                                                lineNumber: 1090,
                                                                 columnNumber: 49
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
@@ -8770,18 +8966,18 @@ function AssignmentGrading() {
                                                                             field: "submittedAt"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                            lineNumber: 1009,
+                                                                            lineNumber: 1093,
                                                                             columnNumber: 67
                                                                         }, this)
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 1008,
+                                                                    lineNumber: 1092,
                                                                     columnNumber: 53
                                                                 }, this)
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 1007,
+                                                                lineNumber: 1091,
                                                                 columnNumber: 49
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
@@ -8800,18 +8996,18 @@ function AssignmentGrading() {
                                                                             field: "autoScore"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                            lineNumber: 1014,
+                                                                            lineNumber: 1098,
                                                                             columnNumber: 68
                                                                         }, this)
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 1013,
+                                                                    lineNumber: 1097,
                                                                     columnNumber: 53
                                                                 }, this)
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 1012,
+                                                                lineNumber: 1096,
                                                                 columnNumber: 49
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
@@ -8830,18 +9026,18 @@ function AssignmentGrading() {
                                                                             field: "finalGrade"
                                                                         }, void 0, false, {
                                                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                            lineNumber: 1019,
+                                                                            lineNumber: 1103,
                                                                             columnNumber: 63
                                                                         }, this)
                                                                     ]
                                                                 }, void 0, true, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 1018,
+                                                                    lineNumber: 1102,
                                                                     columnNumber: 53
                                                                 }, this)
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 1017,
+                                                                lineNumber: 1101,
                                                                 columnNumber: 49
                                                             }, this),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("th", {
@@ -8854,18 +9050,18 @@ function AssignmentGrading() {
                                                                 children: "Action"
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 1022,
+                                                                lineNumber: 1106,
                                                                 columnNumber: 49
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 1000,
+                                                        lineNumber: 1084,
                                                         columnNumber: 45
                                                     }, this)
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 999,
+                                                    lineNumber: 1083,
                                                     columnNumber: 41
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("tbody", {
@@ -8908,7 +9104,7 @@ function AssignmentGrading() {
                                                                                 children: sub.avatarInitials
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                                lineNumber: 1049,
+                                                                                lineNumber: 1133,
                                                                                 columnNumber: 65
                                                                             }, this),
                                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -8923,7 +9119,7 @@ function AssignmentGrading() {
                                                                                                 }
                                                                                             }, void 0, false, {
                                                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                                                lineNumber: 1054,
+                                                                                                lineNumber: 1138,
                                                                                                 columnNumber: 88
                                                                                             }, this),
                                                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -8935,13 +9131,13 @@ function AssignmentGrading() {
                                                                                                 children: sub.studentName
                                                                                             }, void 0, false, {
                                                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                                                lineNumber: 1055,
+                                                                                                lineNumber: 1139,
                                                                                                 columnNumber: 73
                                                                                             }, this)
                                                                                         ]
                                                                                     }, void 0, true, {
                                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                                        lineNumber: 1053,
+                                                                                        lineNumber: 1137,
                                                                                         columnNumber: 69
                                                                                     }, this),
                                                                                     meta.isGroupAssignment && (()=>{
@@ -8955,25 +9151,25 @@ function AssignmentGrading() {
                                                                                             children: grp.name
                                                                                         }, void 0, false, {
                                                                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                                            lineNumber: 1060,
+                                                                                            lineNumber: 1144,
                                                                                             columnNumber: 77
                                                                                         }, this) : null;
                                                                                     })()
                                                                                 ]
                                                                             }, void 0, true, {
                                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                                lineNumber: 1052,
+                                                                                lineNumber: 1136,
                                                                                 columnNumber: 65
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 1048,
+                                                                        lineNumber: 1132,
                                                                         columnNumber: 61
                                                                     }, this)
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 1047,
+                                                                    lineNumber: 1131,
                                                                     columnNumber: 57
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
@@ -8985,7 +9181,7 @@ function AssignmentGrading() {
                                                                     children: sub.studentId
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 1068,
+                                                                    lineNumber: 1152,
                                                                     columnNumber: 57
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
@@ -9012,7 +9208,7 @@ function AssignmentGrading() {
                                                                                 ]
                                                                             }, void 0, true, {
                                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                                lineNumber: 1072,
+                                                                                lineNumber: 1156,
                                                                                 columnNumber: 69
                                                                             }, this),
                                                                             sub.late && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -9028,13 +9224,13 @@ function AssignmentGrading() {
                                                                                 children: "Late"
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                                lineNumber: 1077,
+                                                                                lineNumber: 1161,
                                                                                 columnNumber: 73
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 1071,
+                                                                        lineNumber: 1155,
                                                                         columnNumber: 65
                                                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                         style: {
@@ -9044,12 +9240,12 @@ function AssignmentGrading() {
                                                                         children: "Not Yet"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 1081,
+                                                                        lineNumber: 1165,
                                                                         columnNumber: 65
                                                                     }, this)
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 1069,
+                                                                    lineNumber: 1153,
                                                                     columnNumber: 57
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
@@ -9067,7 +9263,7 @@ function AssignmentGrading() {
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 1086,
+                                                                        lineNumber: 1170,
                                                                         columnNumber: 65
                                                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                         style: {
@@ -9077,12 +9273,12 @@ function AssignmentGrading() {
                                                                         children: "—"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 1088,
+                                                                        lineNumber: 1172,
                                                                         columnNumber: 65
                                                                     }, this)
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 1084,
+                                                                    lineNumber: 1168,
                                                                     columnNumber: 57
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
@@ -9097,7 +9293,7 @@ function AssignmentGrading() {
                                                                                 }
                                                                             }, void 0, false, {
                                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                                lineNumber: 1094,
+                                                                                lineNumber: 1178,
                                                                                 columnNumber: 69
                                                                             }, this),
                                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -9113,13 +9309,13 @@ function AssignmentGrading() {
                                                                                 ]
                                                                             }, void 0, true, {
                                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                                lineNumber: 1095,
+                                                                                lineNumber: 1179,
                                                                                 columnNumber: 69
                                                                             }, this)
                                                                         ]
                                                                     }, void 0, true, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 1093,
+                                                                        lineNumber: 1177,
                                                                         columnNumber: 65
                                                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                                         style: {
@@ -9129,12 +9325,12 @@ function AssignmentGrading() {
                                                                         children: "—"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 1098,
+                                                                        lineNumber: 1182,
                                                                         columnNumber: 65
                                                                     }, this)
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 1091,
+                                                                    lineNumber: 1175,
                                                                     columnNumber: 57
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("td", {
@@ -9154,7 +9350,7 @@ function AssignmentGrading() {
                                                                         children: "—"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 1103,
+                                                                        lineNumber: 1187,
                                                                         columnNumber: 65
                                                                     }, this) : sub.status === 'graded' ? /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
                                                                         variant: "outline",
@@ -9166,7 +9362,7 @@ function AssignmentGrading() {
                                                                         children: "View"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 1105,
+                                                                        lineNumber: 1189,
                                                                         columnNumber: 65
                                                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
                                                                         className: "text-white h-8 px-4 text-xs",
@@ -9180,35 +9376,35 @@ function AssignmentGrading() {
                                                                         children: "Grade"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                        lineNumber: 1107,
+                                                                        lineNumber: 1191,
                                                                         columnNumber: 65
                                                                     }, this)
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 1101,
+                                                                    lineNumber: 1185,
                                                                     columnNumber: 57
                                                                 }, this)
                                                             ]
                                                         }, sub.id, true, {
                                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                            lineNumber: 1029,
+                                                            lineNumber: 1113,
                                                             columnNumber: 53
                                                         }, this);
                                                     })
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 1025,
+                                                    lineNumber: 1109,
                                                     columnNumber: 41
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 998,
+                                            lineNumber: 1082,
                                             columnNumber: 37
                                         }, this)
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 997,
+                                        lineNumber: 1081,
                                         columnNumber: 33
                                     }, this)
                                 ]
@@ -9216,13 +9412,13 @@ function AssignmentGrading() {
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                        lineNumber: 642,
+                        lineNumber: 721,
                         columnNumber: 17
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                lineNumber: 639,
+                lineNumber: 718,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Dialog"], {
@@ -9245,7 +9441,7 @@ function AssignmentGrading() {
                                     children: "Apply Auto-Scores as Final Grades"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1126,
+                                    lineNumber: 1210,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DialogDescription"], {
@@ -9257,13 +9453,13 @@ function AssignmentGrading() {
                                     children: "This will use automated test scores as final grades for all ungraded submissions. Manual review is recommended for accuracy."
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1129,
+                                    lineNumber: 1213,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1125,
+                            lineNumber: 1209,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -9279,7 +9475,7 @@ function AssignmentGrading() {
                                     }
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1134,
+                                    lineNumber: 1218,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -9293,13 +9489,13 @@ function AssignmentGrading() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1135,
+                                    lineNumber: 1219,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1133,
+                            lineNumber: 1217,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DialogFooter"], {
@@ -9312,7 +9508,7 @@ function AssignmentGrading() {
                                     children: "Cancel"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1140,
+                                    lineNumber: 1224,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -9326,31 +9522,31 @@ function AssignmentGrading() {
                                             className: "w-4 h-4 mr-2"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1142,
+                                            lineNumber: 1226,
                                             columnNumber: 29
                                         }, this),
                                         " Apply Grades"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1141,
+                                    lineNumber: 1225,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1139,
+                            lineNumber: 1223,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                    lineNumber: 1124,
+                    lineNumber: 1208,
                     columnNumber: 17
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                lineNumber: 1123,
+                lineNumber: 1207,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Dialog"], {
@@ -9373,7 +9569,7 @@ function AssignmentGrading() {
                                     children: "Delete Assignment"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1152,
+                                    lineNumber: 1236,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DialogDescription"], {
@@ -9391,7 +9587,7 @@ function AssignmentGrading() {
                                             children: meta.name
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1156,
+                                            lineNumber: 1240,
                                             columnNumber: 61
                                         }, this),
                                         "? This will permanently remove the assignment and all ",
@@ -9400,13 +9596,13 @@ function AssignmentGrading() {
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1155,
+                                    lineNumber: 1239,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1151,
+                            lineNumber: 1235,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -9422,7 +9618,7 @@ function AssignmentGrading() {
                                     }
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1160,
+                                    lineNumber: 1244,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -9433,13 +9629,13 @@ function AssignmentGrading() {
                                     children: "This action cannot be undone. All grades, submissions, and feedback will be lost."
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1161,
+                                    lineNumber: 1245,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1159,
+                            lineNumber: 1243,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DialogFooter"], {
@@ -9452,7 +9648,7 @@ function AssignmentGrading() {
                                     children: "Cancel"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1166,
+                                    lineNumber: 1250,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -9469,31 +9665,31 @@ function AssignmentGrading() {
                                             className: "w-4 h-4 mr-2"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1172,
+                                            lineNumber: 1256,
                                             columnNumber: 29
                                         }, this),
                                         " Delete Assignment"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1167,
+                                    lineNumber: 1251,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1165,
+                            lineNumber: 1249,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                    lineNumber: 1150,
+                    lineNumber: 1234,
                     columnNumber: 17
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                lineNumber: 1149,
+                lineNumber: 1233,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Dialog"], {
@@ -9516,7 +9712,7 @@ function AssignmentGrading() {
                                     children: "Edit Assignment"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1182,
+                                    lineNumber: 1266,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DialogDescription"], {
@@ -9528,13 +9724,13 @@ function AssignmentGrading() {
                                     children: "Update the assignment details below. Changes will be reflected for all students."
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1185,
+                                    lineNumber: 1269,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1181,
+                            lineNumber: 1265,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -9553,7 +9749,7 @@ function AssignmentGrading() {
                                             children: "Assignment Name"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1191,
+                                            lineNumber: 1275,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -9562,13 +9758,13 @@ function AssignmentGrading() {
                                             className: "border-[var(--color-border)]"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1192,
+                                            lineNumber: 1276,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1190,
+                                    lineNumber: 1274,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -9584,7 +9780,7 @@ function AssignmentGrading() {
                                             children: "Description"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1195,
+                                            lineNumber: 1279,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$textarea$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Textarea"], {
@@ -9593,13 +9789,13 @@ function AssignmentGrading() {
                                             className: "border-[var(--color-border)] min-h-[100px]"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1196,
+                                            lineNumber: 1280,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1194,
+                                    lineNumber: 1278,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -9618,7 +9814,7 @@ function AssignmentGrading() {
                                                     children: "Due Date"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 1200,
+                                                    lineNumber: 1284,
                                                     columnNumber: 33
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -9628,13 +9824,13 @@ function AssignmentGrading() {
                                                     className: "border-[var(--color-border)]"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 1201,
+                                                    lineNumber: 1285,
                                                     columnNumber: 33
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1199,
+                                            lineNumber: 1283,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -9650,7 +9846,7 @@ function AssignmentGrading() {
                                                     children: "Total Points"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 1204,
+                                                    lineNumber: 1288,
                                                     columnNumber: 33
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -9660,19 +9856,19 @@ function AssignmentGrading() {
                                                     className: "border-[var(--color-border)] bg-gray-50"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 1205,
+                                                    lineNumber: 1289,
                                                     columnNumber: 33
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1203,
+                                            lineNumber: 1287,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1198,
+                                    lineNumber: 1282,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -9688,7 +9884,7 @@ function AssignmentGrading() {
                                             children: "Instructions"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1209,
+                                            lineNumber: 1293,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$textarea$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Textarea"], {
@@ -9697,13 +9893,13 @@ function AssignmentGrading() {
                                             className: "border-[var(--color-border)] min-h-[120px]"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1210,
+                                            lineNumber: 1294,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1208,
+                                    lineNumber: 1292,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -9722,7 +9918,7 @@ function AssignmentGrading() {
                                                     children: "Allowed Attempts"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 1214,
+                                                    lineNumber: 1298,
                                                     columnNumber: 33
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -9732,13 +9928,13 @@ function AssignmentGrading() {
                                                     className: "border-[var(--color-border)] bg-gray-50"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 1215,
+                                                    lineNumber: 1299,
                                                     columnNumber: 33
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1213,
+                                            lineNumber: 1297,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -9754,7 +9950,7 @@ function AssignmentGrading() {
                                                     children: "Language"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 1218,
+                                                    lineNumber: 1302,
                                                     columnNumber: 33
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -9763,25 +9959,25 @@ function AssignmentGrading() {
                                                     className: "border-[var(--color-border)] bg-gray-50"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 1219,
+                                                    lineNumber: 1303,
                                                     columnNumber: 33
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1217,
+                                            lineNumber: 1301,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1212,
+                                    lineNumber: 1296,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1189,
+                            lineNumber: 1273,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DialogFooter"], {
@@ -9794,7 +9990,7 @@ function AssignmentGrading() {
                                     children: "Cancel"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1224,
+                                    lineNumber: 1308,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -9808,36 +10004,36 @@ function AssignmentGrading() {
                                             className: "w-4 h-4 mr-2"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1226,
+                                            lineNumber: 1310,
                                             columnNumber: 29
                                         }, this),
                                         " Save Changes"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1225,
+                                    lineNumber: 1309,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1223,
+                            lineNumber: 1307,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                    lineNumber: 1180,
+                    lineNumber: 1264,
                     columnNumber: 17
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                lineNumber: 1179,
+                lineNumber: 1263,
                 columnNumber: 13
             }, this),
             currentGradingStudent && gradingStudentIdx !== null && (()=>{
                 const studentGroup = meta.isGroupAssignment ? getGroupForStudent(currentGradingStudent.studentId, mockGroups) : undefined;
-                const groupMembers = meta.isGroupAssignment ? getGroupMembers(currentGradingStudent.studentId, submissions, mockGroups) : [];
+                const groupMembers = meta.isGroupAssignment ? getGroupMembers(currentGradingStudent.studentId, submissionsState, mockGroups) : [];
                 return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$GradingModal$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["GradingModal"], {
                     studentName: currentGradingStudent.studentName,
                     assignmentName: meta.name,
@@ -9862,7 +10058,7 @@ function AssignmentGrading() {
                     } : undefined
                 }, void 0, false, {
                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                    lineNumber: 1237,
+                    lineNumber: 1321,
                     columnNumber: 21
                 }, this);
             })(),
@@ -9892,14 +10088,14 @@ function AssignmentGrading() {
                                             }
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1268,
+                                            lineNumber: 1352,
                                             columnNumber: 29
                                         }, this),
                                         "Apply Grade to Group Members"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1267,
+                                    lineNumber: 1351,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DialogDescription"], {
@@ -9917,7 +10113,7 @@ function AssignmentGrading() {
                                             children: applyGroupStudent?.studentName
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1272,
+                                            lineNumber: 1356,
                                             columnNumber: 55
                                         }, this),
                                         " to all other members of",
@@ -9929,20 +10125,20 @@ function AssignmentGrading() {
                                             children: applyGroupStudent ? getGroupForStudent(applyGroupStudent.studentId, mockGroups)?.name : ''
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1273,
+                                            lineNumber: 1357,
                                             columnNumber: 29
                                         }, this),
                                         "."
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1271,
+                                    lineNumber: 1355,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1266,
+                            lineNumber: 1350,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -9962,7 +10158,7 @@ function AssignmentGrading() {
                                         children: "Grade to Apply"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 1280,
+                                        lineNumber: 1364,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -9978,18 +10174,18 @@ function AssignmentGrading() {
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                        lineNumber: 1281,
+                                        lineNumber: 1365,
                                         columnNumber: 29
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                lineNumber: 1279,
+                                lineNumber: 1363,
                                 columnNumber: 25
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1278,
+                            lineNumber: 1362,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -10005,12 +10201,12 @@ function AssignmentGrading() {
                                     children: "Group members who will receive this grade:"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1289,
+                                    lineNumber: 1373,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                     className: "space-y-2",
-                                    children: applyGroupStudent && getGroupMembers(applyGroupStudent.studentId, submissions, mockGroups).map((member)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                    children: applyGroupStudent && getGroupMembers(applyGroupStudent.studentId, submissionsState, mockGroups).map((member)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "flex items-center justify-between p-3 rounded-lg border",
                                             style: {
                                                 borderColor: 'var(--color-border)'
@@ -10030,7 +10226,7 @@ function AssignmentGrading() {
                                                             children: member.avatarInitials
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                            lineNumber: 1296,
+                                                            lineNumber: 1380,
                                                             columnNumber: 41
                                                         }, this),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -10044,7 +10240,7 @@ function AssignmentGrading() {
                                                                     children: member.studentName
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 1300,
+                                                                    lineNumber: 1384,
                                                                     columnNumber: 45
                                                                 }, this),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -10056,19 +10252,19 @@ function AssignmentGrading() {
                                                                     children: member.studentId
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                    lineNumber: 1301,
+                                                                    lineNumber: 1385,
                                                                     columnNumber: 45
                                                                 }, this)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                            lineNumber: 1299,
+                                                            lineNumber: 1383,
                                                             columnNumber: 41
                                                         }, this)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 1295,
+                                                    lineNumber: 1379,
                                                     columnNumber: 37
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -10090,13 +10286,13 @@ function AssignmentGrading() {
                                                                 children: applyGroupGrade
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                                lineNumber: 1307,
+                                                                lineNumber: 1391,
                                                                 columnNumber: 99
                                                             }, this)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 1306,
+                                                        lineNumber: 1390,
                                                         columnNumber: 45
                                                     }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
                                                         style: {
@@ -10112,29 +10308,29 @@ function AssignmentGrading() {
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                        lineNumber: 1310,
+                                                        lineNumber: 1394,
                                                         columnNumber: 45
                                                     }, this)
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                                    lineNumber: 1304,
+                                                    lineNumber: 1388,
                                                     columnNumber: 37
                                                 }, this)
                                             ]
                                         }, member.id, true, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1294,
+                                            lineNumber: 1378,
                                             columnNumber: 33
                                         }, this))
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1292,
+                                    lineNumber: 1376,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1288,
+                            lineNumber: 1372,
                             columnNumber: 21
                         }, this),
                         groupGradeApplied && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -10150,7 +10346,7 @@ function AssignmentGrading() {
                                     }
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1322,
+                                    lineNumber: 1406,
                                     columnNumber: 29
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -10162,13 +10358,13 @@ function AssignmentGrading() {
                                     children: "Grade applied to all group members!"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1323,
+                                    lineNumber: 1407,
                                     columnNumber: 29
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1321,
+                            lineNumber: 1405,
                             columnNumber: 25
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DialogFooter"], {
@@ -10184,7 +10380,7 @@ function AssignmentGrading() {
                                     children: "Cancel"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1328,
+                                    lineNumber: 1412,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -10209,45 +10405,46 @@ function AssignmentGrading() {
                                             className: "w-4 h-4 mr-2"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                            lineNumber: 1347,
+                                            lineNumber: 1431,
                                             columnNumber: 29
                                         }, this),
                                         groupGradeApplied ? 'Applied!' : 'Apply to All Members'
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                                    lineNumber: 1331,
+                                    lineNumber: 1415,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/AssignmentGrading.tsx",
-                            lineNumber: 1327,
+                            lineNumber: 1411,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/AssignmentGrading.tsx",
-                    lineNumber: 1265,
+                    lineNumber: 1349,
                     columnNumber: 17
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/AssignmentGrading.tsx",
-                lineNumber: 1264,
+                lineNumber: 1348,
                 columnNumber: 13
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/AssignmentGrading.tsx",
-        lineNumber: 631,
+        lineNumber: 710,
         columnNumber: 9
     }, this);
 }
-_s(AssignmentGrading, "BAU2+OJveQd2QSnIDwGK4mcp7YI=", false, function() {
+_s(AssignmentGrading, "F8F4HvaGP9kuCzv/zgS2EtOaTV8=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"],
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useParams"],
-        __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$queries$2f$useAssignments$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAssignment"]
+        __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$queries$2f$useAssignments$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAssignment"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$hooks$2f$queries$2f$useSubmissions$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useSubmissions"]
     ];
 });
 _c = AssignmentGrading;
