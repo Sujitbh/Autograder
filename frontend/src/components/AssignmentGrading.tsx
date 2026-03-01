@@ -23,6 +23,7 @@ import {
 } from './ui/dialog';
 import { getStudentsForCourse, hashStr, COURSE_STUDENT_COUNTS } from '../utils/studentData';
 import { useAssignment } from '@/hooks/queries';
+import { useSubmissions } from '@/hooks/queries/useSubmissions';
 import { submissionService } from '@/services/api';
 
 /* ─── Rubric criterion ─── */
@@ -409,10 +410,10 @@ function getGroupForStudent(studentId: string, groups: MockGroup[]): MockGroup |
     return groups.find(g => g.memberIds.includes(studentId));
 }
 
-function getGroupMembers(studentId: string, submissions: StudentSubmission[], groups: MockGroup[]): StudentSubmission[] {
+function getGroupMembers(studentId: string, submissionsState: StudentSubmission[], groups: MockGroup[]): StudentSubmission[] {
     const group = getGroupForStudent(studentId, groups);
     if (!group) return [];
-    return submissions.filter(s => group.memberIds.includes(s.studentId) && s.studentId !== studentId);
+    return submissionsState.filter(s => group.memberIds.includes(s.studentId) && s.studentId !== studentId);
 }
 
 type SortField = 'studentName' | 'submittedAt' | 'autoScore' | 'finalGrade';
@@ -432,6 +433,7 @@ export function AssignmentGrading() {
 
     // Fetch from API
     const { data: apiAssignment, isLoading: isLoadingAssignment } = useAssignment(courseId, assignmentId);
+    const { data: apiSubmissions, isLoading: isLoadingSubmissions, refetch: refetchSubmissions } = useSubmissions(assignmentId);
 
     // Try hardcoded meta first; then API data; then localStorage fallback
     const meta: AssignmentMeta | undefined = useMemo(() => {
@@ -493,15 +495,108 @@ export function AssignmentGrading() {
         return undefined;
     }, [assignmentId, apiAssignment]);
 
-    const initialSubmissions = useMemo(() => makeMockSubmissions(assignmentId ?? '', courseId ?? 'cs-1001'), [assignmentId, courseId]);
-    const [submissions, setSubmissions] = useState<StudentSubmission[]>(initialSubmissions);
-    // Reset when assignment/course changes
-    useEffect(() => { setSubmissions(initialSubmissions); }, [initialSubmissions]);
+    // Map API submissions to StudentSubmission format
+    const submissions = useMemo(() => {
+        if (!apiSubmissions || isLoadingSubmissions) {
+            return makeMockSubmissions(assignmentId ?? '', courseId ?? 'cs-1001');
+        }
+
+        const getInitials = (name: string) =>
+            name
+                .split(' ')
+                .map(n => n[0])
+                .join('')
+                .toUpperCase()
+                .slice(0, 2);
+
+        const normalizedApiSubs = (apiSubmissions as any[]).map((sub: any) => {
+            const studentPk = Number(sub.student_id ?? sub.studentId ?? sub.student?.id ?? -1);
+            const studentName = sub.student?.name ?? 'Student';
+            const studentIdentifier = sub.student?.student_id ?? String(sub.studentId ?? studentPk);
+            const submittedAt = sub.created_at ?? sub.submittedAt ?? null;
+            const score = sub.score ?? sub.grade?.totalScore ?? null;
+            const maxScore = sub.max_score ?? sub.grade?.maxScore ?? meta?.totalPoints ?? 100;
+            const status = sub.status === 'graded' || score != null ? 'graded' : 'submitted';
+
+            return {
+                id: String(sub.id),
+                studentPk,
+                studentName,
+                studentIdentifier,
+                submittedAt,
+                score,
+                maxScore,
+                status,
+            };
+        });
+
+        const allStudents = getStudentsForCourse(courseId ?? 'cs-1001');
+
+        // Real courses may not exist in local mock roster. In that case, show API submissions directly.
+        if (!allStudents || allStudents.length === 0) {
+            return normalizedApiSubs.map((submission) => ({
+                id: submission.id,
+                studentName: submission.studentName,
+                studentId: submission.studentIdentifier,
+                avatarInitials: getInitials(submission.studentName),
+                submittedAt: submission.submittedAt,
+                autoScore: submission.score,
+                finalGrade: submission.score,
+                maxPoints: submission.maxScore,
+                status: submission.status,
+                late: false,
+                flagged: false,
+            } as StudentSubmission));
+        }
+
+        const submissionMap = new Map<number, (typeof normalizedApiSubs)[number]>();
+        normalizedApiSubs.forEach((sub) => {
+            if (sub.studentPk >= 0) submissionMap.set(sub.studentPk, sub);
+        });
+
+        return allStudents.map((student) => {
+            const submission = submissionMap.get(Number(student.id));
+
+            if (submission) {
+                return {
+                    id: submission.id,
+                    studentName: submission.studentName || student.name,
+                    studentId: submission.studentIdentifier || student.studentId,
+                    avatarInitials: getInitials(submission.studentName || student.name),
+                    submittedAt: submission.submittedAt,
+                    autoScore: submission.score,
+                    finalGrade: submission.score,
+                    maxPoints: submission.maxScore,
+                    status: submission.status,
+                    late: false,
+                    flagged: false,
+                } as StudentSubmission;
+            }
+
+            return {
+                id: `nosub-${student.id}`,
+                studentName: student.name,
+                studentId: student.studentId,
+                avatarInitials: student.avatarInitials,
+                submittedAt: null,
+                autoScore: null,
+                finalGrade: null,
+                maxPoints: meta?.totalPoints || 100,
+                status: 'not-submitted' as const,
+                late: false,
+                flagged: false,
+            } as StudentSubmission;
+        });
+    }, [apiSubmissions, isLoadingSubmissions, assignmentId, courseId, meta]);
+
+    const [submissionsState, setSubmissionsState] = useState<StudentSubmission[]>(submissions);
+    // Update local state when API data changes
+    useEffect(() => { setSubmissionsState(submissions); }, [submissions]);
     const mockGroups = useMemo(() => buildMockGroups(courseId ?? 'cs-1001'), [courseId]);
 
     /* ─── Grade submission handler ─── */
     const handleSubmitGrade = (studentId: string, grade: number, _feedback: string) => {
-        setSubmissions(prev => prev.map(s =>
+        setSubmissionsState(prev => prev.map(s =>
             s.id === studentId
                 ? { ...s, finalGrade: grade, status: 'graded' as const }
                 : s
@@ -511,10 +606,10 @@ export function AssignmentGrading() {
     /* ─── Apply grade to all group members ─── */
     const handleApplyGroupGrade = (sourceStudentId: string, grade: number) => {
         const group = getGroupForStudent(
-            submissions.find(s => s.id === sourceStudentId)?.studentId ?? '', mockGroups
+            submissionsState.find(s => s.id === sourceStudentId)?.studentId ?? '', mockGroups
         );
         if (!group) return;
-        setSubmissions(prev => prev.map(s =>
+        setSubmissionsState(prev => prev.map(s =>
             group.memberIds.includes(s.studentId)
                 ? { ...s, finalGrade: grade, status: 'graded' as const }
                 : s
@@ -541,32 +636,6 @@ export function AssignmentGrading() {
     const [applyGroupGrade, setApplyGroupGrade] = useState<number | null>(null);
     const [groupGradeApplied, setGroupGradeApplied] = useState(false);
 
-    if (!courseId || !assignmentId || (!meta && !isLoadingAssignment)) {
-        return (
-            <PageLayout>
-                <TopNav breadcrumbs={[{ label: 'Courses', href: '/courses' }]} />
-                <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
-                    <div className="text-center">
-                        <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '16px' }}>Assignment Not Found</h2>
-                        <Button onClick={() => router.back()} className="text-white" style={{ backgroundColor: 'var(--color-primary)' }}>Go Back</Button>
-                    </div>
-                </div>
-            </PageLayout>
-        );
-    }
-
-    if (isLoadingAssignment && !meta) {
-        return (
-            <PageLayout>
-                <TopNav breadcrumbs={[{ label: 'Courses', href: '/courses' }]} />
-                <div className="flex items-center justify-center gap-3" style={{ minHeight: 'calc(100vh - 64px)', color: 'var(--color-text-mid)' }}>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Loading assignment…</span>
-                </div>
-            </PageLayout>
-        );
-    }
-
     const handleDownloadZip = async () => {
         if (!assignmentId) return;
         setIsDownloadingZip(true);
@@ -588,13 +657,13 @@ export function AssignmentGrading() {
 
     /* ─── Tab counts ─── */
     const counts = useMemo(() => {
-        const all = submissions.length;
-        const notSubmitted = submissions.filter(s => s.status === 'not-submitted').length;
-        const submitted = submissions.filter(s => s.status === 'submitted').length;
-        const graded = submissions.filter(s => s.status === 'graded').length;
-        const needsReview = submissions.filter(s => s.status === 'needs-review').length;
+        const all = submissionsState.length;
+        const notSubmitted = submissionsState.filter(s => s.status === 'not-submitted').length;
+        const submitted = submissionsState.filter(s => s.status === 'submitted').length;
+        const graded = submissionsState.filter(s => s.status === 'graded').length;
+        const needsReview = submissionsState.filter(s => s.status === 'needs-review').length;
         return { all, notSubmitted, submitted, graded, needsReview };
-    }, [submissions]);
+    }, [submissionsState]);
 
     const tabs = [
         { id: 'all', label: 'All', count: counts.all },
@@ -606,7 +675,7 @@ export function AssignmentGrading() {
 
     /* ─── Filter ─── */
     const filtered = useMemo(() => {
-        return submissions.filter(s => {
+        return submissionsState.filter(s => {
             if (activeTab !== 'all' && s.status !== activeTab) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
@@ -614,7 +683,7 @@ export function AssignmentGrading() {
             }
             return true;
         });
-    }, [submissions, activeTab, searchQuery]);
+    }, [submissionsState, activeTab, searchQuery]);
 
     /* ─── Sort ─── */
     const sorted = useMemo(() => {
@@ -647,6 +716,32 @@ export function AssignmentGrading() {
     /* ─── Grading modal student list (for prev/next navigation) ─── */
     const gradableStudents = sorted.filter(s => s.status !== 'not-submitted');
     const currentGradingStudent = gradingStudentIdx !== null ? gradableStudents[gradingStudentIdx] : null;
+
+    if (!courseId || !assignmentId || (!meta && !isLoadingAssignment)) {
+        return (
+            <PageLayout>
+                <TopNav breadcrumbs={[{ label: 'Courses', href: '/courses' }]} />
+                <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
+                    <div className="text-center">
+                        <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '16px' }}>Assignment Not Found</h2>
+                        <Button onClick={() => router.back()} className="text-white" style={{ backgroundColor: 'var(--color-primary)' }}>Go Back</Button>
+                    </div>
+                </div>
+            </PageLayout>
+        );
+    }
+
+    if (isLoadingAssignment && !meta) {
+        return (
+            <PageLayout>
+                <TopNav breadcrumbs={[{ label: 'Courses', href: '/courses' }]} />
+                <div className="flex items-center justify-center gap-3" style={{ minHeight: 'calc(100vh - 64px)', color: 'var(--color-text-mid)' }}>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Loading assignment…</span>
+                </div>
+            </PageLayout>
+        );
+    }
 
     return (
         <PageLayout>
@@ -688,7 +783,7 @@ export function AssignmentGrading() {
                                 </span>
                                 <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#595959', backgroundColor: '#F5F5F5', padding: '6px 12px', borderRadius: '8px' }}>
                                     <Users className="w-4 h-4" />
-                                    {submissions.length} Students
+                                    {submissionsState.length} Students
                                 </span>
                                 <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#595959', backgroundColor: '#F5F5F5', padding: '6px 12px', borderRadius: '8px' }}>
                                     <Star className="w-4 h-4" />
@@ -1258,7 +1353,7 @@ export function AssignmentGrading() {
             {/* Grading Modal */}
             {currentGradingStudent && gradingStudentIdx !== null && (() => {
                 const studentGroup = meta.isGroupAssignment ? getGroupForStudent(currentGradingStudent.studentId, mockGroups) : undefined;
-                const groupMembers = meta.isGroupAssignment ? getGroupMembers(currentGradingStudent.studentId, submissions, mockGroups) : [];
+                const groupMembers = meta.isGroupAssignment ? getGroupMembers(currentGradingStudent.studentId, submissionsState, mockGroups) : [];
                 return (
                     <GradingModal
                         studentName={currentGradingStudent.studentName}
@@ -1272,11 +1367,15 @@ export function AssignmentGrading() {
                         onPrev={() => setGradingStudentIdx(prev => (prev !== null && prev > 0 ? prev - 1 : prev))}
                         onNext={() => setGradingStudentIdx(prev => (prev !== null && prev < gradableStudents.length - 1 ? prev + 1 : prev))}
                         onClose={() => setGradingStudentIdx(null)}
-                        onSubmitGrade={(grade, fb) => handleSubmitGrade(currentGradingStudent.id, grade, fb)}
+                        onSubmitGrade={(grade, fb) => {
+                            handleSubmitGrade(currentGradingStudent.id, grade, fb);
+                            refetchSubmissions();
+                        }}
                         onSaveDraft={(grade, fb) => handleSubmitGrade(currentGradingStudent.id, grade, fb)}
                         isGroupAssignment={meta.isGroupAssignment}
                         groupName={studentGroup?.name}
                         groupMemberNames={groupMembers.map(m => m.studentName)}
+                        submissionId={currentGradingStudent.id}
                         onApplyToGroup={meta.isGroupAssignment && studentGroup ? (grade: number) => {
                             setApplyGroupStudent(currentGradingStudent);
                             setApplyGroupGrade(grade);
@@ -1316,7 +1415,7 @@ export function AssignmentGrading() {
                             Group members who will receive this grade:
                         </p>
                         <div className="space-y-2">
-                            {applyGroupStudent && getGroupMembers(applyGroupStudent.studentId, submissions, mockGroups).map(member => (
+                            {applyGroupStudent && getGroupMembers(applyGroupStudent.studentId, submissionsState, mockGroups).map(member => (
                                 <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border" style={{ borderColor: 'var(--color-border)' }}>
                                     <div className="flex items-center gap-3">
                                         <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--color-primary-bg)', color: '#6B0000', fontSize: '10px', fontWeight: 700 }}>

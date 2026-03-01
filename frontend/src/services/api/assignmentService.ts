@@ -54,6 +54,7 @@ export const assignmentService = {
         const url = courseId
             ? `/assignments/?course_id=${courseId}`
             : '/assignments/';
+        
         const { data } = await withRetry(() =>
             api.get<BackendAssignment[]>(url)
         );

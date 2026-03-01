@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from app.api.deps import get_db, get_current_user
+from app.api.deps import get_db, get_current_user, get_current_user_optional
 from app.core.permissions import require_role
 from app.models.assignment import Assignment
 from app.models.user import User
@@ -15,10 +15,16 @@ router = APIRouter(prefix="/assignments", tags=["assignments"])
 def list_assignments(
     course_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
+    user: Optional[User] = Depends(get_current_user_optional),
 ):
     q = db.query(Assignment)
     if course_id is not None:
         q = q.filter(Assignment.course_id == course_id)
+    
+    # Students should only see active assignments
+    if user and user.role == "student":
+        q = q.filter(Assignment.is_active == True)
+    
     return q.all()
 
 
