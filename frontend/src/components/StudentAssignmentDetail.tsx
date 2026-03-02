@@ -122,40 +122,49 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     <PageLayout>
       <main className="max-w-5xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-8">
           <Button
             variant="ghost"
             onClick={() => router.push(`/student/courses/${courseId}`)}
-            className="mb-4 gap-2"
+            className="mb-6 gap-2 hover:bg-gray-100 rounded-lg px-3"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to {course?.name ?? 'Course'}
           </Button>
 
-          <div>
-            <h1 className="text-3xl font-bold" style={{ color: 'var(--color-text-dark)' }}>
-              {assignment.name}
-            </h1>
-            
-            <div className="flex items-center gap-4 mt-3 text-sm">
-              {dueDate && (
-                <div 
-                  className="flex items-center gap-1.5" 
-                  style={{ color: isOverdue ? '#DC2626' : 'var(--color-text-mid)' }}
-                >
-                  <Calendar className="w-4 h-4" />
-                  <span>
-                    Due: {dueDate.toLocaleDateString()} at {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                  {isOverdue && <span className="font-medium">(Overdue)</span>}
-                </div>
-              )}
-              {assignment.maxPoints && (
-                <div className="flex items-center gap-1.5" style={{ color: 'var(--color-text-mid)' }}>
-                  <FileText className="w-4 h-4" />
-                  <span>{assignment.maxPoints} points</span>
-                </div>
-              )}
+          <div className="relative bg-gradient-to-br from-[#6B0000] to-[#8B0000] rounded-3xl p-8 text-white shadow-lg overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-32 -mt-32"></div>
+            <div className="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-24 -mb-24"></div>
+            <div className="relative z-10">
+              <h1 className="text-4xl font-bold mb-4">
+                {assignment.name}
+              </h1>
+              
+              <div className="flex items-center gap-6 flex-wrap">
+                {dueDate && (
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/20">
+                    <Calendar className="w-5 h-5" />
+                    <div>
+                      <p className="text-xs opacity-80">Due Date</p>
+                      <p className="font-semibold">
+                        {dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    {isOverdue && (
+                      <span className="ml-2 px-2 py-1 rounded-full text-xs font-bold bg-red-500 text-white">Overdue</span>
+                    )}
+                  </div>
+                )}
+                {assignment.maxPoints && (
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/20">
+                    <FileText className="w-5 h-5" />
+                    <div>
+                      <p className="text-xs opacity-80">Total Points</p>
+                      <p className="font-semibold text-xl">{assignment.maxPoints}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -164,13 +173,13 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Description */}
-            <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-              <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--color-text-dark)' }}>
-                Description
+            <div className="bg-white rounded-2xl border-2 border-[var(--color-border)] p-6 shadow-sm">
+              <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--color-text-dark)' }}>
+                📝 Assignment Description
               </h2>
               <div className="prose prose-sm max-w-none" style={{ color: 'var(--color-text-mid)' }}>
                 {assignment.description ? (
-                  <p className="whitespace-pre-wrap">{assignment.description}</p>
+                  <p className="whitespace-pre-wrap leading-relaxed text-base">{assignment.description}</p>
                 ) : (
                   <p className="text-sm italic">No description provided.</p>
                 )}
@@ -178,22 +187,22 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
             </div>
 
             {/* File Upload */}
-            <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-              <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--color-text-dark)' }}>
-                Submit Your Work
+            <div className="bg-white rounded-2xl border-2 border-[var(--color-border)] p-6 shadow-sm">
+              <h2 className="text-xl font-bold mb-4" style={{ color: 'var(--color-text-dark)' }}>
+                📤 Submit Your Work
               </h2>
 
               {uploadSuccess && (
-                <div className="mb-4 p-3 rounded-lg bg-green-50 border border-green-200 flex items-center gap-2 text-sm text-green-800">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Files uploaded successfully!</span>
+                <div className="mb-4 p-4 rounded-xl bg-green-50 border-2 border-green-200 flex items-center gap-3 text-sm text-green-800 shadow-sm">
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span className="font-medium">Files uploaded successfully!</span>
                 </div>
               )}
 
               {uploadError && (
-                <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-center gap-2 text-sm text-red-800">
-                  <AlertCircle className="w-4 h-4" />
-                  <span>{uploadError}</span>
+                <div className="mb-4 p-4 rounded-xl bg-red-50 border-2 border-red-200 flex items-center gap-3 text-sm text-red-800 shadow-sm">
+                  <AlertCircle className="w-5 h-5" />
+                  <span className="font-medium">{uploadError}</span>
                 </div>
               )}
 
@@ -201,18 +210,20 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
               <div
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
-                className="border-2 border-dashed rounded-lg p-8 text-center transition-colors hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-bg)]"
+                className="border-2 border-dashed rounded-2xl p-10 text-center transition-all duration-200 hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-bg)] hover:shadow-md"
                 style={{ borderColor: 'var(--color-border)' }}
               >
-                <Upload className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--color-text-light)' }} />
-                <p className="font-medium mb-1" style={{ color: 'var(--color-text-dark)' }}>
+                <div className="bg-gray-50 rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+                  <Upload className="w-10 h-10" style={{ color: 'var(--color-primary)' }} />
+                </div>
+                <p className="font-bold text-lg mb-2" style={{ color: 'var(--color-text-dark)' }}>
                   Drag & drop files here
                 </p>
-                <p className="text-sm mb-4" style={{ color: 'var(--color-text-mid)' }}>
-                  or click the button below to browse
+                <p className="text-sm mb-5" style={{ color: 'var(--color-text-mid)' }}>
+                  or click the button below to browse from your computer
                 </p>
                 <label htmlFor="file-input">
-                  <Button variant="outline" className="cursor-pointer" onClick={() => document.getElementById('file-input')?.click()}>
+                  <Button size="lg" className="cursor-pointer px-8" onClick={() => document.getElementById('file-input')?.click()}>
                     Browse Files
                   </Button>
                 </label>
@@ -227,31 +238,36 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
               {/* Selected Files List */}
               {selectedFiles.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="text-sm font-medium" style={{ color: 'var(--color-text-dark)' }}>
+                <div className="mt-6 space-y-3">
+                  <p className="text-sm font-bold flex items-center gap-2" style={{ color: 'var(--color-text-dark)' }}>
+                    <FileText className="w-4 h-4" />
                     Selected Files ({selectedFiles.length})
                   </p>
                   {selectedFiles.map((file, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-3 rounded-lg border"
+                      className="flex items-center justify-between p-4 rounded-xl border-2 shadow-sm hover:shadow-md transition-shadow"
                       style={{ borderColor: 'var(--color-border)', backgroundColor: '#F9FAFB' }}
                     >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <FileText className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-text-mid)' }} />
-                        <span className="text-sm truncate" style={{ color: 'var(--color-text-dark)' }}>
-                          {file.name}
-                        </span>
-                        <span className="text-xs flex-shrink-0" style={{ color: 'var(--color-text-light)' }}>
-                          ({(file.size / 1024).toFixed(1)} KB)
-                        </span>
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="bg-white rounded-lg p-2">
+                          <FileText className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm font-medium block truncate" style={{ color: 'var(--color-text-dark)' }}>
+                            {file.name}
+                          </span>
+                          <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>
+                            {(file.size / 1024).toFixed(1)} KB
+                          </span>
+                        </div>
                       </div>
                       <button
                         onClick={() => removeFile(index)}
-                        className="p-1 rounded hover:bg-red-50 transition-colors"
+                        className="p-2 rounded-lg hover:bg-red-50 transition-colors"
                         title="Remove file"
                       >
-                        <X className="w-4 h-4" style={{ color: '#DC2626' }} />
+                        <X className="w-5 h-5" style={{ color: '#DC2626' }} />
                       </button>
                     </div>
                   ))}
@@ -263,16 +279,17 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                 <Button
                   onClick={handleSubmit}
                   disabled={isUploading || selectedFiles.length === 0}
-                  className="flex-1 gap-2"
+                  className="flex-1 gap-2 h-12 text-base font-semibold shadow-md hover:shadow-lg transition-shadow"
+                  size="lg"
                 >
                   {isUploading ? (
                     <>
-                      <Clock className="w-4 h-4 animate-spin" />
+                      <Clock className="w-5 h-5 animate-spin" />
                       Uploading...
                     </>
                   ) : (
                     <>
-                      <Upload className="w-4 h-4" />
+                      <Upload className="w-5 h-5" />
                       Submit Assignment
                     </>
                   )}

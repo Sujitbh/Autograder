@@ -9,6 +9,8 @@ from app.core.permissions import require_role, require_course_role
 from app.models.course import Course
 from app.models.enrollment import Enrollment
 from app.models.user import User
+from app.models.assignment import Assignment
+from app.models.submission import Submission
 from app.schemas.course import (
     CourseCreate,
     CourseOut,
@@ -250,3 +252,121 @@ def enroll_student_by_course_code(
     db.commit()
     db.refresh(enrollment)
     return enrollment
+
+
+@router.get("/{course_id}/classmates", response_model=List[dict])
+def get_course_classmates(
+    course_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get list of classmates (students) in a course. Only accessible to enrolled students."""
+    require_role(user.role, {"student"})
+    
+    # Check if user is enrolled in the course
+    user_enrollment = db.query(Enrollment).filter(
+        Enrollment.course_id == course_id,
+        Enrollment.user_id == user.id,
+        Enrollment.role == "student"
+    ).first()
+    
+    if not user_enrollment:
+        raise HTTPException(status_code=403, detail="Not enrolled in this course")
+    
+    # Get all students enrolled in the course
+    enrollments = db.query(Enrollment).options(joinedload(Enrollment.user)).filter(
+        Enrollment.course_id == course_id,
+        Enrollment.role == "student"
+    ).all()
+    
+    classmates = []
+    for enrollment in enrollments:
+        classmates.append({
+            "id": enrollment.user.id,
+            "name": enrollment.user.name,
+            "email": enrollment.user.email,
+        })
+    
+    return classmates
+
+
+@router.get("/{course_id}/grades", response_model=dict)
+def get_course_grades(
+    course_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get student's grades and assignment performance in a course."""
+    require_role(user.role, {"student"})
+    
+    # Check if user is enrolled in the course
+    user_enrollment = db.query(Enrollment).filter(
+        Enrollment.course_id == course_id,
+        Enrollment.user_id == user.id,
+        Enrollment.role == "student"
+    ).first()
+    
+    if not user_enrollment:
+        raise HTTPException(status_code=403, detail="Not enrolled in this course")
+    
+    # Get all assignments for the course
+    assignments = db.query(Assignment).filter(Assignment.course_id == course_id).all()
+    assignment_ids = [a.id for a in assignments]
+    
+    if not assignment_ids:
+        return {
+            "assignments": [],
+            "averageScore": None,
+            "graded_count": 0,
+            "total_count": 0
+        }
+    
+    # Get student's submissions for these assignments
+    submissions = db.query(Submission).filter(
+        Submission.student_id == user.id,
+        Submission.assignment_id.in_(assignment_ids)
+    ).all()
+    
+    # Build submission map by assignment_id
+    latest_submissions = {}
+    for sub in submissions:
+        if sub.assignment_id not in latest_submissions:
+            latest_submissions[sub.assignment_id] = sub
+    
+    # Collect grades
+    assignment_grades = []
+    graded_scores = []
+    
+    for assignment in assignments:
+        sub = latest_submissions.get(assignment.id)
+        if sub and sub.status == "graded" and sub.score is not None and sub.max_score is not None and sub.max_score > 0:
+            percentage = (sub.score / sub.max_score) * 100
+            graded_scores.append(percentage)
+            assignment_grades.append({
+                "assignment_id": assignment.id,
+                "assignment_name": assignment.name,
+                "score": sub.score,
+                "max_score": sub.max_score,
+                "percentage": round(percentage, 1),
+                "submitted": True
+            })
+        else:
+            assignment_grades.append({
+                "assignment_id": assignment.id,
+                "assignment_name": assignment.name,
+                "score": None,
+                "max_score": assignment.maxPoints,
+                "percentage": None,
+                "submitted": sub is not None
+            })
+    
+    average_score = None
+    if graded_scores:
+        average_score = round(sum(graded_scores) / len(graded_scores), 1)
+    
+    return {
+        "assignments": assignment_grades,
+        "averageScore": average_score,
+        "graded_count": len(graded_scores),
+        "total_count": len(assignments)
+    }

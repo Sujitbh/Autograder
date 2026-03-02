@@ -57,18 +57,6 @@ class UserService:
         db.commit()
         db.refresh(user)
 
-        # Enroll new student in default course if student
-        if role == "student":
-            from app.models.course import Course
-            from app.models.enrollment import Enrollment
-
-            default_course = db.query(Course).first()
-            if default_course:
-                enrollment = Enrollment(course_id=default_course.id, user_id=user.id, role="student")
-                db.add(enrollment)
-                db.commit()
-                db.refresh(enrollment)
-
         return user
 
     @staticmethod

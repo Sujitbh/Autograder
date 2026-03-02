@@ -12,6 +12,7 @@
   "/courses/page": "app/courses/page.js",
   "/login/page": "app/login/page.js",
   "/page": "app/page.js",
+  "/signup/page": "app/signup/page.js",
   "/student/courses/[id]/assignments/[assignmentId]/page": "app/student/courses/[id]/assignments/[assignmentId]/page.js",
   "/student/courses/[id]/page": "app/student/courses/[id]/page.js",
   "/student/page": "app/student/page.js",
