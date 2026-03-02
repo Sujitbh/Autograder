@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Save, Shield, Bell, Clock, Globe, Palette, Users, FileText, AlertTriangle, Check, Eye, EyeOff, Upload, Edit, Plus, Copy, RefreshCw, Info, Link2 } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
 import { Sidebar } from './Sidebar';
+import { TAManagement } from './TAManagement';
 import { useParams } from 'next/navigation';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
+import { courseService, CourseEnrollment } from '@/services/api/courseService';
 import {
     Select,
     SelectContent,
@@ -68,6 +70,32 @@ export function SettingsPage() {
     const [codeCopied, setCodeCopied] = useState(false);
     const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
     const [isRegenerating, setIsRegenerating] = useState(false);
+
+    /* ── Enrolled students state for TA management ── */
+    const [enrolledStudents, setEnrolledStudents] = useState<Array<{ student_id: number; student_name: string; email: string }>>([]);
+
+    /* ── Fetch enrolled students on mount ── */
+    useEffect(() => {
+        const fetchEnrolledStudents = async () => {
+            try {
+                const enrollments = await courseService.getEnrollments(courseId);
+                const students = enrollments
+                    .filter((e: CourseEnrollment) => e.role === 'student' && e.user)
+                    .map((e: CourseEnrollment) => ({
+                        student_id: e.user_id,
+                        student_name: e.user?.name ?? 'Student',
+                        email: e.user?.email ?? '',
+                    }));
+                setEnrolledStudents(students);
+            } catch (error) {
+                console.error('Failed to fetch enrolled students:', error);
+            }
+        };
+
+        if (courseId) {
+            fetchEnrolledStudents();
+        }
+    }, [courseId]);
 
     const sections = [
         { id: 'general', icon: FileText, label: 'General' },
@@ -877,61 +905,24 @@ export function SettingsPage() {
                                     </div>
 
                                     <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                                        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '24px' }}>
-                                            Teaching Assistants
-                                        </h2>
-
-                                        <div className="space-y-3 mb-4">
-                                            {[
-                                                { name: 'Alice Johnson', email: 'ajohnson@ulm.edu', role: 'Full Access' },
-                                                { name: 'Bob Martinez', email: 'bmartinez@ulm.edu', role: 'Grading Only' },
-                                            ].map((ta, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="flex items-center justify-between p-4 rounded-lg"
-                                                    style={{ backgroundColor: 'var(--color-primary-bg)' }}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <div
-                                                            className="w-10 h-10 rounded-full flex items-center justify-center text-white"
-                                                            style={{ backgroundColor: 'var(--color-primary)', fontSize: '13px', fontWeight: 600 }}
-                                                        >
-                                                            {ta.name.split(' ').map(n => n[0]).join('')}
-                                                        </div>
-                                                        <div>
-                                                            <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                                {ta.name}
-                                                            </p>
-                                                            <p style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>
-                                                                {ta.email}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <span
-                                                            className="px-2 py-1 rounded"
-                                                            style={{
-                                                                backgroundColor: ta.role === 'Full Access' ? 'var(--color-success)' : 'var(--color-info)',
-                                                                color: 'white',
-                                                                fontSize: '11px',
-                                                                fontWeight: 600,
-                                                                textTransform: 'uppercase',
-                                                            }}
-                                                        >
-                                                            {ta.role}
-                                                        </span>
-                                                        <button className="p-1.5 hover:bg-white rounded transition-colors" aria-label="Edit TA">
-                                                            <Edit className="w-4 h-4 text-[var(--color-text-mid)]" />
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        <Button variant="outline" className="border-dashed border-[var(--color-border)] text-[var(--color-text-mid)]">
-                                            <Plus className="w-4 h-4 mr-2" />
-                                            Add Teaching Assistant
-                                        </Button>
+                                        <TAManagement 
+                                            courseId={Number(courseId)} 
+                                            enrolledStudents={enrolledStudents}
+                                            onInvitationSent={() => {
+                                                if (courseId) {
+                                                    courseService.getEnrollments(courseId).then(enrollments => {
+                                                        const students = enrollments
+                                                            .filter((e: CourseEnrollment) => e.role === 'student' && e.user)
+                                                            .map((e: CourseEnrollment) => ({
+                                                                student_id: e.user_id,
+                                                                student_name: e.user?.name ?? 'Student',
+                                                                email: e.user?.email ?? '',
+                                                            }));
+                                                        setEnrolledStudents(students);
+                                                    });
+                                                }
+                                            }}
+                                        />
                                     </div>
 
                                     <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid var(--color-error)' }}>
