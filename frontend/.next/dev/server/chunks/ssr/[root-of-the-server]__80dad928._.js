@@ -252,16 +252,16 @@ function envBool(value, fallback) {
     return value === 'true';
 }
 const config = {
-    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:3001/api',
-    wsUrl: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002',
-    pistonApiUrl: process.env.NEXT_PUBLIC_PISTON_API_URL || 'https://emkc.org/api/v2/piston',
-    s3Bucket: process.env.NEXT_PUBLIC_S3_BUCKET || 'autograde-uploads-dev',
-    cloudFrontUrl: process.env.NEXT_PUBLIC_CLOUDFRONT_URL || '',
-    awsRegion: process.env.NEXT_PUBLIC_AWS_REGION || 'us-east-1',
+    apiUrl: ("TURBOPACK compile-time value", "http://localhost:8000/api") || 'http://localhost:8000/api',
+    wsUrl: ("TURBOPACK compile-time value", "ws://localhost:3002") || 'ws://localhost:3002',
+    pistonApiUrl: ("TURBOPACK compile-time value", "https://emkc.org/api/v2/piston") || 'https://emkc.org/api/v2/piston',
+    s3Bucket: ("TURBOPACK compile-time value", "autograde-uploads-dev") || 'autograde-uploads-dev',
+    cloudFrontUrl: ("TURBOPACK compile-time value", "") || '',
+    awsRegion: ("TURBOPACK compile-time value", "us-east-1") || 'us-east-1',
     features: {
-        darkMode: envBool(process.env.NEXT_PUBLIC_ENABLE_DARK_MODE, true),
-        aiDetection: envBool(process.env.NEXT_PUBLIC_ENABLE_AI_DETECTION, false),
-        canvasIntegration: envBool(process.env.NEXT_PUBLIC_ENABLE_CANVAS_INTEGRATION, false)
+        darkMode: envBool(("TURBOPACK compile-time value", "true"), true),
+        aiDetection: envBool(("TURBOPACK compile-time value", "false"), false),
+        canvasIntegration: envBool(("TURBOPACK compile-time value", "false"), false)
     },
     monitoring: {
         sentryDsn: process.env.NEXT_PUBLIC_SENTRY_DSN || null,
@@ -338,16 +338,18 @@ api.interceptors.response.use((res)=>res, async (error)=>{
         throw new NetworkError('Unable to connect to the server');
     }
     const { status, data } = error.response;
+    const backendDetail = data?.detail;
+    const backendMessage = (typeof backendDetail === 'string' ? backendDetail : undefined) ?? data?.message ?? data?.error;
     if (status === 401) {
         // Token expired — clear local auth and redirect
         if ("TURBOPACK compile-time falsy", 0) //TURBOPACK unreachable
         ;
-        throw new AuthError(data?.message ?? 'Unauthorized');
+        throw new AuthError(backendMessage ?? 'Unauthorized');
     }
     if (status === 422 && data?.error) {
-        throw new ValidationError(data.message ?? 'Validation error');
+        throw new ValidationError(backendMessage ?? 'Validation error');
     }
-    throw new Error(data?.message ?? `Request failed (${status})`);
+    throw new Error(backendMessage ?? `Request failed (${status})`);
 });
 async function withRetry(fn, retries = 3) {
     for(let attempt = 0; attempt <= retries; attempt++){
@@ -378,12 +380,28 @@ __turbopack_context__.s([
    ═══════════════════════════════════════════════════════════════════ */ var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/client.ts [app-ssr] (ecmascript)");
 ;
 function mapUser(u) {
+    const [firstName = '', ...rest] = (u.name ?? '').trim().split(' ');
+    const lastName = rest.join(' ');
+    if (u.role === 'student') {
+        return {
+            id: String(u.id),
+            firstName: firstName || 'Student',
+            lastName,
+            email: u.email,
+            sisUserId: '',
+            sisLoginId: '',
+            enrolledCourses: [],
+            role: 'student'
+        };
+    }
     return {
         id: String(u.id),
-        name: u.name,
+        firstName: firstName || 'User',
+        lastName,
         email: u.email,
-        role: u.role,
-        avatarUrl: ''
+        title: '',
+        department: '',
+        role: 'faculty'
     };
 }
 const authService = {

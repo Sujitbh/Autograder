@@ -2,17 +2,14 @@
 
 import { useMemo } from "react";
 import {
-  BookOpen,
   ClipboardList,
   Clock,
   CheckCircle2,
   GraduationCap,
   LogOut,
-  ChevronRight,
-  Calendar,
   AlertCircle,
   TrendingUp,
-  FileText,
+  ArrowRight,
 } from "lucide-react";
 import { PageLayout } from "./PageLayout";
 import { Button } from "./ui/button";
@@ -22,32 +19,117 @@ import { useStudentDashboardStats } from "@/hooks/queries/useStudentDashboardSta
 import { useQuery } from "@tanstack/react-query";
 import api from "@/services/api/client";
 
-function StatCard({
-  icon,
-  label,
-  value,
-  color,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string | number;
-  color: string;
-}) {
+// ─────── COURSE CARD ────────────
+interface StudentCourse {
+  id: number | string;
+  name: string;
+  code: string;
+  description?: string;
+  assignments_count?: number;
+  completed_count?: number;
+  average_score?: number | null;
+}
+
+function StudentCourseCard({ course, onClick }: { course: StudentCourse; onClick: () => void }) {
+  const progress = course.assignments_count && course.assignments_count > 0
+    ? Math.round(((course.completed_count || 0) / course.assignments_count) * 100)
+    : 0;
+
+  const getScoreColor = (score: number | null | undefined) => {
+    if (score === null || score === undefined) return '#9CA3AF';
+    if (score >= 75) return '#16A34A';
+    if (score >= 60) return '#D97706';
+    return '#DC2626';
+  };
+
   return (
-    <div className="bg-white rounded-xl border border-[var(--color-border)] p-5 flex items-center gap-4">
-      <div
-        className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: color, color: "white" }}
-      >
-        {icon}
+    <div
+      role="button"
+      onClick={onClick}
+      className="group relative flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg cursor-pointer"
+    >
+      {/* Top maroon bar */}
+      <div className="h-2 w-full bg-[#6B0000]" />
+
+      {/* Header with code badge */}
+      <div className="flex items-start justify-between gap-2 px-5 pt-4 pb-3">
+        <span className="inline-flex items-center rounded-full bg-[#6B0000] px-3 py-0.5 text-xs font-semibold text-white">
+          {course.code}
+        </span>
       </div>
-      <div>
-        <p className="text-2xl font-bold" style={{ color: "var(--color-text-dark)" }}>
-          {value}
-        </p>
-        <p className="text-sm" style={{ color: "var(--color-text-mid)" }}>
-          {label}
-        </p>
+
+      {/* Course name + description */}
+      <div className="flex-1 px-5 pb-4">
+        <h3 className="text-lg font-semibold leading-snug text-gray-900">
+          {course.name}
+        </h3>
+        {course.description && (
+          <p className="mt-2 text-xs text-gray-500 line-clamp-2">
+            {course.description}
+          </p>
+        )}
+      </div>
+
+      {/* Metrics grid */}
+      <div className="grid grid-cols-3 gap-px border-t border-gray-100 bg-gray-100">
+        {/* Assignments */}
+        <div className="flex flex-col items-center gap-1 bg-white py-3">
+          <ClipboardList className="h-4 w-4 text-gray-400" />
+          <span className="text-sm font-semibold text-gray-900">
+            {course.assignments_count ?? 0}
+          </span>
+          <span className="text-[10px] uppercase tracking-wide text-gray-400">
+            Assignments
+          </span>
+        </div>
+
+        {/* Completed */}
+        <div className="flex flex-col items-center gap-1 bg-white py-3">
+          <CheckCircle2 className="h-4 w-4 text-gray-400" />
+          <span className="text-sm font-semibold text-gray-900">
+            {course.completed_count ?? 0}
+          </span>
+          <span className="text-[10px] uppercase tracking-wide text-gray-400">
+            Completed
+          </span>
+        </div>
+
+        {/* Average Score */}
+        <div className="flex flex-col items-center gap-1 bg-white py-3">
+          <TrendingUp className="h-4 w-4" style={{ color: getScoreColor(course.average_score) }} />
+          <span className="text-sm font-semibold" style={{ color: getScoreColor(course.average_score) }}>
+            {course.average_score !== null && course.average_score !== undefined
+              ? `${Math.round(course.average_score)}%`
+              : '—'}
+          </span>
+          <span className="text-[10px] uppercase tracking-wide text-gray-400">
+            Avg Score
+          </span>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3">
+        <div className="flex-1">
+          {course.assignments_count && course.assignments_count > 0 ? (
+            <div className="text-xs text-gray-500">
+              {progress}% complete
+            </div>
+          ) : (
+            <div className="text-xs text-gray-400">
+              No assignments
+            </div>
+          )}
+        </div>
+        <Button
+          size="sm"
+          className="gap-1 bg-[#6B0000] text-white hover:bg-[#8B1A1A]"
+          onClick={() => onClick()}
+          aria-label={`Open ${course.name}`}
+        >
+          Open Course
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
       </div>
     </div>
   );
@@ -76,128 +158,24 @@ function parseSafeDate(dateValue: string | null | undefined) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function UpcomingAssignmentsWidget({
-  results,
-  isLoading,
-}: {
-  results: AssignmentResult[];
-  isLoading: boolean;
-}) {
+function StudentDashboard() {
+  const { user, logout } = useAuth();
   const router = useRouter();
+  const { data: stats, isLoading } = useStudentDashboardStats();
+  const { data: resultsData, isLoading: isLoadingResults } = useQuery({
+    queryKey: ['student-dashboard-results'],
+    queryFn: async () => {
+      const { data } = await api.get<DashboardResultsResponse>('/student-dashboard/results');
+      return data;
+    },
+    staleTime: 60 * 1000,
+  });
 
-  // Filter and sort upcoming assignments
-  const upcomingAssignments = results
-    ?.filter((a) => {
-      const dueDate = parseSafeDate(a.due_date);
-      return !!dueDate && dueDate > new Date() && a.status !== 'graded';
-    })
-    .sort((a, b) => {
-      const dateA = new Date(a.due_date!).getTime();
-      const dateB = new Date(b.due_date!).getTime();
-      return dateA - dateB;
-    })
-    .slice(0, 5) || [];
+  const results = resultsData?.results || [];
 
-  const getTimeUntilDue = (dueDate: string) => {
+  const { overdue, dueSoon, waitingForGrade } = useMemo(() => {
     const now = new Date();
-    const due = new Date(dueDate);
-    const diffMs = due.getTime() - now.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffDays > 7) {
-      return { text: `${diffDays} days`, color: 'var(--color-text-mid)', urgent: false };
-    } else if (diffDays > 2) {
-      return { text: `${diffDays} days`, color: '#D97706', urgent: false };
-    } else if (diffDays >= 1) {
-      return { text: `${diffDays} day${diffDays > 1 ? 's' : ''}`, color: '#DC2626', urgent: true };
-    } else if (diffHours > 0) {
-      return { text: `${diffHours} hours`, color: '#DC2626', urgent: true };
-    } else {
-      return { text: 'Due soon!', color: '#DC2626', urgent: true };
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-        <h2 className="text-lg font-semibold mb-4" style={{ color: "var(--color-text-dark)" }}>
-          Upcoming Assignments
-        </h2>
-        <p className="text-sm" style={{ color: "var(--color-text-mid)" }}>Loading...</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--color-text-dark)" }}>
-          Upcoming Assignments
-        </h2>
-        <Calendar className="w-5 h-5" style={{ color: "var(--color-text-mid)" }} />
-      </div>
-
-      {upcomingAssignments.length === 0 ? (
-        <div className="text-center py-8">
-          <CheckCircle2 className="w-10 h-10 mx-auto mb-2" style={{ color: "var(--color-text-light)" }} />
-          <p className="text-sm" style={{ color: "var(--color-text-mid)" }}>
-            No upcoming assignments
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {upcomingAssignments.map((assignment) => {
-            const timeInfo = getTimeUntilDue(assignment.due_date!);
-            return (
-              <button
-                key={assignment.assignment_id}
-                onClick={() => router.push(`/student/courses/${assignment.course_id}/assignments/${assignment.assignment_id}`)}
-                className="w-full text-left p-4 rounded-lg border border-[var(--color-border)] hover:border-[var(--color-primary)] transition-colors group"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium mb-1 truncate" style={{ color: "var(--color-text-dark)" }}>
-                      {assignment.assignment_title}
-                    </p>
-                    <p className="text-xs mb-2" style={{ color: "var(--color-text-mid)" }}>
-                      {assignment.course_name}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-3 h-3" style={{ color: timeInfo.color }} />
-                      <span className="text-xs font-medium" style={{ color: timeInfo.color }}>
-                        Due in {timeInfo.text}
-                      </span>
-                      {timeInfo.urgent && (
-                        <AlertCircle className="w-3 h-3" style={{ color: '#DC2626' }} />
-                      )}
-                    </div>
-                  </div>
-                  <ChevronRight className="w-4 h-4 flex-shrink-0 mt-1 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "var(--color-primary)" }} />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ActionCenterWidget({
-  results,
-  isLoading,
-  onOpenAssignment,
-  onViewResults,
-}: {
-  results: AssignmentResult[];
-  isLoading: boolean;
-  onOpenAssignment: (assignment: AssignmentResult) => void;
-  onViewResults: () => void;
-}) {
-  const now = new Date();
-
-  const { overdue, dueSoon, waitingForGrade, focusAssignment } = useMemo(() => {
+    
     const overdueItems = results
       .filter((r) => r.status === 'not_submitted')
       .filter((r) => {
@@ -217,235 +195,11 @@ function ActionCenterWidget({
       .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime());
 
     const waitingItems = results.filter((r) => r.status === 'pending' || r.status === 'grading');
-    const focus = overdueItems[0] || dueSoonItems[0] || null;
 
     return {
       overdue: overdueItems,
       dueSoon: dueSoonItems,
       waitingForGrade: waitingItems,
-      focusAssignment: focus,
-    };
-  }, [results]);
-
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-        <h2 className="text-lg font-semibold mb-2" style={{ color: 'var(--color-text-dark)' }}>
-          Action Center
-        </h2>
-        <p className="text-sm" style={{ color: 'var(--color-text-mid)' }}>Loading priorities…</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-xl border border-[var(--color-border)] p-6">
-      <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-dark)' }}>
-        Action Center
-      </h2>
-
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="rounded-lg border border-[var(--color-border)] p-3">
-          <p className="text-xs" style={{ color: 'var(--color-text-mid)' }}>Overdue</p>
-          <p className="text-xl font-bold" style={{ color: 'var(--color-primary)' }}>{overdue.length}</p>
-        </div>
-        <div className="rounded-lg border border-[var(--color-border)] p-3">
-          <p className="text-xs" style={{ color: 'var(--color-text-mid)' }}>Due ≤ 48h</p>
-          <p className="text-xl font-bold" style={{ color: 'var(--color-primary)' }}>{dueSoon.length}</p>
-        </div>
-        <div className="rounded-lg border border-[var(--color-border)] p-3">
-          <p className="text-xs" style={{ color: 'var(--color-text-mid)' }}>Awaiting Grade</p>
-          <p className="text-xl font-bold" style={{ color: 'var(--color-primary)' }}>{waitingForGrade.length}</p>
-        </div>
-      </div>
-
-      {focusAssignment ? (
-        <div className="rounded-lg border border-[var(--color-border)] p-4 mb-4">
-          <p className="text-xs mb-1" style={{ color: 'var(--color-text-mid)' }}>Recommended next action</p>
-          <p className="font-semibold" style={{ color: 'var(--color-text-dark)' }}>{focusAssignment.assignment_title}</p>
-          <p className="text-xs" style={{ color: 'var(--color-text-mid)' }}>{focusAssignment.course_name}</p>
-          <div className="mt-3">
-            <Button size="sm" className="w-full" onClick={() => onOpenAssignment(focusAssignment)}>
-              Open Assignment
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-lg border border-[var(--color-border)] p-4 mb-4 text-sm" style={{ color: 'var(--color-text-mid)' }}>
-          You’re all caught up.
-        </div>
-      )}
-
-      <Button variant="outline" className="w-full" onClick={onViewResults}>
-        View Full Results
-      </Button>
-    </div>
-  );
-}
-
-function RecentGradesWidget({
-  results,
-  isLoading,
-  onViewAll,
-}: {
-  results: AssignmentResult[];
-  isLoading: boolean;
-  onViewAll: () => void;
-}) {
-  const recentGraded = useMemo(() => {
-    return results
-      .filter((r) => r.status === 'graded' && r.score !== null && r.max_score !== null)
-      .sort((a, b) => {
-        const dateA = parseSafeDate(a.graded_at) ?? parseSafeDate(a.due_date) ?? new Date(0);
-        const dateB = parseSafeDate(b.graded_at) ?? parseSafeDate(b.due_date) ?? new Date(0);
-        return dateB.getTime() - dateA.getTime();
-      })
-      .slice(0, 4);
-  }, [results]);
-
-  return (
-    <div className="mt-6 bg-white rounded-xl border border-[var(--color-border)] p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-semibold" style={{ color: 'var(--color-text-dark)' }}>
-          Recent Grades
-        </h3>
-        <Button variant="ghost" size="sm" onClick={onViewAll}>View all</Button>
-      </div>
-
-      {isLoading ? (
-        <p className="text-sm" style={{ color: 'var(--color-text-mid)' }}>Loading grades…</p>
-      ) : recentGraded.length === 0 ? (
-        <p className="text-sm" style={{ color: 'var(--color-text-mid)' }}>No graded assignments yet.</p>
-      ) : (
-        <div className="space-y-3">
-          {recentGraded.map((item) => {
-            const pct = item.max_score && item.max_score > 0
-              ? Math.round((item.score! / item.max_score) * 100)
-              : 0;
-            return (
-              <div key={item.assignment_id} className="rounded-lg border border-[var(--color-border)] px-4 py-3 flex items-center justify-between">
-                <div className="min-w-0 pr-4">
-                  <p className="font-medium truncate" style={{ color: 'var(--color-text-dark)' }}>{item.assignment_title}</p>
-                  <p className="text-xs" style={{ color: 'var(--color-text-mid)' }}>{item.course_name}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold" style={{ color: 'var(--color-text-dark)' }}>
-                    {item.score}/{item.max_score}
-                  </p>
-                  <p className="text-xs" style={{ color: 'var(--color-text-mid)' }}>{pct}%</p>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-interface CourseWithProgress {
-  id: number;
-  name: string;
-  code: string;
-  description?: string;
-  assignments_count?: number;
-  completed_count?: number;
-  average_score?: number;
-}
-
-function CourseCardWithProgress({ course, onClick }: { course: CourseWithProgress; onClick: () => void }) {
-  const progress = course.assignments_count && course.assignments_count > 0
-    ? Math.round((course.completed_count || 0) / course.assignments_count * 100)
-    : 0;
-
-  return (
-    <button
-      onClick={onClick}
-      className="text-left bg-white rounded-xl border border-[var(--color-border)] p-5 hover:border-[var(--color-primary)] transition-colors group"
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
-          <p className="font-semibold truncate" style={{ color: "var(--color-text-dark)" }}>
-            {course.name}
-          </p>
-          <p className="text-sm mt-0.5" style={{ color: "var(--color-text-mid)" }}>
-            {course.code}
-          </p>
-        </div>
-        <ChevronRight className="w-5 h-5 flex-shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: "var(--color-primary)" }} />
-      </div>
-
-      {/* Progress Bar */}
-      {course.assignments_count && course.assignments_count > 0 ? (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span style={{ color: "var(--color-text-mid)" }}>
-              {course.completed_count || 0} / {course.assignments_count} completed
-            </span>
-            <span className="font-medium" style={{ color: "var(--color-text-dark)" }}>
-              {progress}%
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-300"
-              style={{
-                width: `${progress}%`,
-                backgroundColor: progress === 100 ? '#16A34A' : progress > 50 ? '#2563EB' : '#D97706'
-              }}
-            />
-          </div>
-          {course.average_score !== undefined && course.average_score !== null && (
-            <div className="flex items-center gap-1 pt-1">
-              <TrendingUp className="w-3 h-3" style={{ color: "var(--color-text-mid)" }} />
-              <span className="text-xs" style={{ color: "var(--color-text-mid)" }}>
-                Average: {Math.round(course.average_score)}%
-              </span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <p className="text-xs" style={{ color: "var(--color-text-light)" }}>
-          No assignments yet
-        </p>
-      )}
-    </button>
-  );
-}
-
-function StudentDashboard() {
-  const { user, logout } = useAuth();
-  const router = useRouter();
-  const { data: stats, isLoading } = useStudentDashboardStats();
-  const { data: resultsData, isLoading: isLoadingResults } = useQuery({
-    queryKey: ['student-dashboard-results'],
-    queryFn: async () => {
-      const { data } = await api.get<DashboardResultsResponse>('/student-dashboard/results');
-      return data;
-    },
-    staleTime: 60 * 1000,
-  });
-
-  const results = resultsData?.results || [];
-
-  const { averageScore, atRiskCount } = useMemo(() => {
-    const graded = results.filter((r) => r.status === 'graded' && r.score !== null && r.max_score && r.max_score > 0);
-    const totalPct = graded.reduce((sum, row) => sum + ((row.score! / row.max_score!) * 100), 0);
-    const avg = graded.length > 0 ? Math.round(totalPct / graded.length) : null;
-
-    const now = new Date();
-    const atRisk = results.filter((r) => {
-      if (r.status === 'graded') return false;
-      const due = parseSafeDate(r.due_date);
-      if (!due) return false;
-      if (due < now) return true;
-      const diff = due.getTime() - now.getTime();
-      return diff <= 1000 * 60 * 60 * 48;
-    }).length;
-
-    return {
-      averageScore: avg,
-      atRiskCount: atRisk,
     };
   }, [results]);
 
@@ -459,88 +213,183 @@ function StudentDashboard() {
   return (
     <PageLayout>
       <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--color-text-dark)" }}>
+            <h1 className="text-4xl font-bold text-gray-900">
               Welcome back, {firstName}!
             </h1>
-            <p className="mt-1 text-sm" style={{ color: "var(--color-text-mid)" }}>
-              Here's an overview of your courses and assignments.
+            <p className="mt-2 text-gray-500">
+              Manage your courses and track your progress
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => router.push('/student/results')} className="gap-2">
-              <FileText className="w-4 h-4" />
-              View Results
-            </Button>
-            <Button variant="outline" onClick={handleLogout} className="gap-2">
-              <LogOut className="w-4 h-4" />
-              Sign Out
-            </Button>
+          <Button
+            variant="outline"
+            onClick={handleLogout}
+            className="gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign Out
+          </Button>
+        </div>
+
+        {/* Quick Stats Bar */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <p className="text-3xl font-bold text-[#6B0000]">
+              {stats?.courses?.length ?? 0}
+            </p>
+            <p className="text-sm text-gray-600 mt-1">Enrolled Courses</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <p className="text-3xl font-bold text-blue-600">
+              {stats?.total_assignments ?? 0}
+            </p>
+            <p className="text-sm text-gray-600 mt-1">Total Assignments</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <p className="text-3xl font-bold text-orange-600">
+              {overdue.length}
+            </p>
+            <p className="text-sm text-gray-600 mt-1">Overdue</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <p className="text-3xl font-bold text-green-600">
+              {stats?.completed_assignments ?? 0}
+            </p>
+            <p className="text-sm text-gray-600 mt-1">Completed</p>
           </div>
         </div>
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
-          <StatCard icon={<BookOpen className="w-6 h-6" />} label="Enrolled Courses" value={stats?.courses?.length ?? 0} color="#6B0000" />
-          <StatCard icon={<ClipboardList className="w-6 h-6" />} label="Total Assignments" value={stats?.total_assignments ?? 0} color="#2563EB" />
-          <StatCard icon={<Clock className="w-6 h-6" />} label="Pending" value={stats?.pending_assignments ?? 0} color="#D97706" />
-          <StatCard icon={<CheckCircle2 className="w-6 h-6" />} label="Completed" value={stats?.completed_assignments ?? 0} color="#16A34A" />
-          <StatCard icon={<TrendingUp className="w-6 h-6" />} label="Average Score" value={averageScore !== null ? `${averageScore}%` : '—'} color="#2563EB" />
-          <StatCard icon={<AlertCircle className="w-6 h-6" />} label="At Risk" value={atRiskCount} color="#8B0000" />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content - Courses */}
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Courses Grid */}
           <div className="lg:col-span-2">
-            <h2 className="text-lg font-semibold mb-4" style={{ color: "var(--color-text-dark)" }}>
-              Your Courses
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Courses</h2>
+
             {isLoading ? (
-              <div className="text-center py-16 text-sm" style={{ color: "var(--color-text-mid)" }}>
-                Loading courses…
+              <div className="text-center py-20">
+                <div className="animate-spin h-8 w-8 border-4 border-[#6B0000] border-t-transparent rounded-full mx-auto"></div>
+                <p className="text-gray-500 mt-4">Loading courses...</p>
               </div>
-            ) : stats?.courses?.length === 0 ? (
-              <div className="text-center py-16 border rounded-xl bg-white" style={{ borderColor: "var(--color-border)" }}>
-                <GraduationCap className="w-12 h-12 mx-auto mb-3" style={{ color: "var(--color-text-light)" }} />
-                <p className="font-medium" style={{ color: "var(--color-text-dark)" }}>
-                  No courses yet
-                </p>
-                <p className="text-sm mt-1" style={{ color: "var(--color-text-mid)" }}>
-                  You haven't been enrolled in any courses.
-                </p>
+            ) : !stats?.courses || stats.courses.length === 0 ? (
+              <div className="rounded-xl border-2 border-dashed border-gray-300 bg-white p-12 text-center">
+                <GraduationCap className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                <p className="text-xl font-semibold text-gray-900">No Courses Yet</p>
+                <p className="text-gray-500 mt-2">You haven't been enrolled in any courses yet.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {stats && Array.isArray(stats.courses)
-                  ? stats.courses.map((course: any) => (
-                      <CourseCardWithProgress
-                        key={course.id}
-                        course={course}
-                        onClick={() => router.push(`/student/courses/${course.id}`)}
-                      />
-                    ))
-                  : null}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {stats.courses.map((course: StudentCourse) => (
+                  <StudentCourseCard
+                    key={course.id}
+                    course={course}
+                    onClick={() => router.push(`/student/courses/${course.id}`)}
+                  />
+                ))}
               </div>
             )}
-
-            <RecentGradesWidget
-              results={results}
-              isLoading={isLoadingResults}
-              onViewAll={() => router.push('/student/results')}
-            />
           </div>
 
-          {/* Sidebar - Action Center + Upcoming */}
-          <div className="lg:col-span-1">
-            <ActionCenterWidget
-              results={results}
-              isLoading={isLoadingResults}
-              onOpenAssignment={(assignment) => router.push(`/student/courses/${assignment.course_id}/assignments/${assignment.assignment_id}`)}
-              onViewResults={() => router.push('/student/results')}
-            />
-            <div className="mt-6">
-              <UpcomingAssignmentsWidget results={results} isLoading={isLoadingResults} />
+          {/* Sidebar - Action Items */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Overdue Assignments */}
+            <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertCircle className="w-5 h-5 text-red-600" />
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Overdue ({overdue.length})
+                </h3>
+              </div>
+
+              {isLoadingResults ? (
+                <p className="text-sm text-gray-500">Loading...</p>
+              ) : overdue.length === 0 ? (
+                <p className="text-sm text-gray-500">No overdue assignments</p>
+              ) : (
+                <div className="space-y-2">
+                  {overdue.slice(0, 3).map((item) => (
+                    <button
+                      key={item.assignment_id}
+                      onClick={() => router.push(`/student/courses/${item.course_id}/assignments/${item.assignment_id}`)}
+                      className="w-full text-left p-3 rounded-lg bg-red-50 hover:bg-red-100 transition-colors border border-red-200"
+                    >
+                      <p className="text-sm font-medium text-red-900 truncate">
+                        {item.assignment_title}
+                      </p>
+                      <p className="text-xs text-red-700">
+                        {item.course_name}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Due Soon Assignments */}
+            <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Clock className="w-5 h-5 text-orange-600" />
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Due Soon ({dueSoon.length})
+                </h3>
+              </div>
+
+              {isLoadingResults ? (
+                <p className="text-sm text-gray-500">Loading...</p>
+              ) : dueSoon.length === 0 ? (
+                <p className="text-sm text-gray-500">No assignments due soon</p>
+              ) : (
+                <div className="space-y-2">
+                  {dueSoon.slice(0, 3).map((item) => (
+                    <button
+                      key={item.assignment_id}
+                      onClick={() => router.push(`/student/courses/${item.course_id}/assignments/${item.assignment_id}`)}
+                      className="w-full text-left p-3 rounded-lg bg-orange-50 hover:bg-orange-100 transition-colors border border-orange-200"
+                    >
+                      <p className="text-sm font-medium text-orange-900 truncate">
+                        {item.assignment_title}
+                      </p>
+                      <p className="text-xs text-orange-700">
+                        {item.course_name}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Awaiting Grade */}
+            <div className="rounded-xl border border-gray-200 bg-white shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Awaiting Grade ({waitingForGrade.length})
+                </h3>
+              </div>
+
+              {isLoadingResults ? (
+                <p className="text-sm text-gray-500">Loading...</p>
+              ) : waitingForGrade.length === 0 ? (
+                <p className="text-sm text-gray-500">No assignments pending</p>
+              ) : (
+                <div className="space-y-2">
+                  {waitingForGrade.slice(0, 3).map((item) => (
+                    <button
+                      key={item.assignment_id}
+                      onClick={() => router.push(`/student/courses/${item.course_id}/assignments/${item.assignment_id}`)}
+                      className="w-full text-left p-3 rounded-lg bg-blue-50 hover:bg-blue-100 transition-colors border border-blue-200"
+                    >
+                      <p className="text-sm font-medium text-blue-900 truncate">
+                        {item.assignment_title}
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        {item.course_name}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>
