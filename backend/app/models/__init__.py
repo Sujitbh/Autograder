@@ -11,6 +11,7 @@ from .rubric import Rubric
 from .group import Group, GroupMembership
 from .submission_result import SubmissionResult
 from .language import Language
+from .ta_invitation import TAInvitation
 
 # Expose symbols for convenience
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
 	"GroupMembership",
 	"SubmissionResult",
 	"Language",
+	"TAInvitation",
 ]

@@ -148,12 +148,15 @@ def add_course_enrollment(
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if payload.role == "student" and target_user.role != "student":
-        raise HTTPException(status_code=400, detail="Only student users can be added as student")
-    if payload.role in {"ta", "instructor"} and target_user.role not in {"faculty", "admin"}:
+    if payload.role in {"student", "ta"} and target_user.role != "student":
         raise HTTPException(
             status_code=400,
-            detail="Only faculty/admin users can be added as ta or instructor",
+            detail="Only student users can be added as student or ta",
+        )
+    if payload.role == "instructor" and target_user.role not in {"faculty", "admin"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Only faculty/admin users can be added as instructor",
         )
 
     existing = db.query(Enrollment).filter(
@@ -190,12 +193,15 @@ def update_course_enrollment(
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if payload.role == "student" and target_user.role != "student":
-        raise HTTPException(status_code=400, detail="Only student users can be assigned role=student")
-    if payload.role in {"ta", "instructor"} and target_user.role not in {"faculty", "admin"}:
+    if payload.role in {"student", "ta"} and target_user.role != "student":
         raise HTTPException(
             status_code=400,
-            detail="Only faculty/admin users can be assigned role=ta or role=instructor",
+            detail="Only student users can be assigned role=student or role=ta",
+        )
+    if payload.role == "instructor" and target_user.role not in {"faculty", "admin"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Only faculty/admin users can be assigned role=instructor",
         )
 
     enrollment.role = payload.role
