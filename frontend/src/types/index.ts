@@ -260,6 +260,7 @@ export interface RegisterData {
     name: string;
     email: string;
     password: string;
+    role?: string;
 }
 
 // ── Analytics / Report Types ────────────────────────────────────────

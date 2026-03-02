@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Eye, EyeOff, GraduationCap, CheckCircle, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, GraduationCap, CheckCircle, AlertCircle, BookOpen, Shield } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/api/authService';
+
+type SelectedRole = 'student' | 'faculty' | 'admin';
 
 interface SignupPageProps {
   onSignup: () => void;
@@ -12,6 +14,7 @@ interface SignupPageProps {
 
 export function SignupPage({ onSignup }: SignupPageProps) {
   const router = useRouter();
+  const [selectedRole, setSelectedRole] = useState<SelectedRole | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -27,19 +30,25 @@ export function SignupPage({ onSignup }: SignupPageProps) {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const validateULMEmail = (email: string) => {
+  const validateEmail = (email: string, role: SelectedRole) => {
     const emailLower = email.toLowerCase().trim();
-    // Student signup must use @warhawks.ulm.edu
-    if (!emailLower.endsWith('@warhawks.ulm.edu')) {
-      return 'Email address must be a valid @warhawks.ulm.edu address';
+    
+    if (role === 'student') {
+      if (!emailLower.endsWith('@warhawks.ulm.edu')) {
+        return 'Student email must be a valid @warhawks.ulm.edu address';
+      }
+    } else if (role === 'faculty') {
+      if (!emailLower.endsWith('@ulm.edu')) {
+        return 'Faculty email must be a valid @ulm.edu address';
+      }
     }
+    
     return null;
   };
 
   const handlePasswordChange = (password: string) => {
     setFormData({ ...formData, password });
 
-    // Calculate password strength
     if (password.length === 0) {
       setPasswordStrength(null);
     } else if (password.length < 6) {
@@ -58,14 +67,17 @@ export function SignupPage({ onSignup }: SignupPageProps) {
     setFormError(null);
     setEmailError(null);
 
-    // Validate ULM email
-    const emailValidationError = validateULMEmail(formData.email);
+    if (!selectedRole) {
+      setFormError('Please select a role');
+      return;
+    }
+
+    const emailValidationError = validateEmail(formData.email, selectedRole);
     if (emailValidationError) {
       setEmailError(emailValidationError);
       return;
     }
 
-    // Validate all required fields
     if (!formData.firstName || !formData.lastName) {
       setFormError('Please fill in all required fields');
       return;
@@ -91,19 +103,21 @@ export function SignupPage({ onSignup }: SignupPageProps) {
       return;
     }
 
-    // Register user in backend
     const registerPayload = {
       name: `${formData.firstName} ${formData.lastName}`,
       email: formData.email.toLowerCase(),
       password: formData.password,
+      role: selectedRole,
     };
+    
     authService.register(registerPayload)
       .then((user) => {
         localStorage.setItem('autograde_current_user', JSON.stringify(user));
         if (typeof onSignup === 'function') {
           onSignup();
         }
-        router.push('/student');
+        const redirectPath = selectedRole === 'student' ? '/student' : '/courses';
+        router.push(`${redirectPath}?signup=success`);
       })
       .catch((err) => {
         setFormError(err?.response?.data?.detail || 'Registration failed.');
@@ -123,9 +137,159 @@ export function SignupPage({ onSignup }: SignupPageProps) {
     }
   };
 
+  if (!selectedRole) {
+    return (
+      <div className="flex h-screen">
+        <div
+          className="hidden lg:flex lg:w-1/2 items-center justify-center relative overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, #6B0000 0%, #3A0000 100%)'
+          }}
+        >
+          <div className="text-center z-10 px-8">
+            <div className="mb-8 flex justify-center">
+              <div className="w-32 h-32 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
+                <GraduationCap className="w-20 h-20 text-white" />
+              </div>
+            </div>
+            <h1 className="text-white mb-4" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px' }}>
+              Autograder
+            </h1>
+            <p className="text-white/80" style={{ fontSize: '18px', lineHeight: '26px' }}>
+              University of Louisiana Monroe
+            </p>
+            <p className="text-white/70 mt-2" style={{ fontSize: '14px', lineHeight: '22px' }}>
+              Automated Grading System
+            </p>
+
+            <div className="mt-12 text-left max-w-md mx-auto space-y-4">
+              {[
+                'Automated code grading and testing',
+                'Real-time student performance analytics',
+                'AI-powered plagiarism detection',
+                'Seamless Canvas LMS integration'
+              ].map((feature, index) => (
+                <div key={index} className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 text-[var(--color-gold-accent)] flex-shrink-0 mt-0.5" />
+                  <p className="text-white/80" style={{ fontSize: '14px', lineHeight: '22px' }}>
+                    {feature}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 flex items-center justify-center bg-white px-8 overflow-auto">
+          <div className="w-full max-w-md py-8">
+            <div className="lg:hidden mb-8 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ backgroundColor: 'var(--color-primary)' }}>
+                <GraduationCap className="w-10 h-10 text-white" />
+              </div>
+              <h2 style={{ fontSize: '22px', fontWeight: 600, lineHeight: '30px', color: 'var(--color-text-dark)' }}>
+                Autograder
+              </h2>
+            </div>
+
+            <div className="mb-8">
+              <h2 className="mb-2" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px', color: 'var(--color-text-dark)' }}>
+                Create Account
+              </h2>
+              <p style={{ fontSize: '14px', lineHeight: '22px', color: 'var(--color-text-mid)' }}>
+                Select your account type to get started
+              </p>
+            </div>
+
+            <div className="space-y-4 mb-8">
+              <button
+                onClick={() => setSelectedRole('student')}
+                className="w-full p-4 rounded-lg border-2 text-left transition-all hover:shadow-md"
+                style={{
+                  borderColor: 'var(--color-border)',
+                  backgroundColor: 'white'
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-primary-light)' }}>
+                    <GraduationCap className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                      Student Account
+                    </h3>
+                    <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
+                      Submit assignments and view feedback
+                    </p>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setSelectedRole('faculty')}
+                className="w-full p-4 rounded-lg border-2 text-left transition-all hover:shadow-md"
+                style={{
+                  borderColor: 'var(--color-border)',
+                  backgroundColor: 'white'
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-warning-light)' }}>
+                    <BookOpen className="w-5 h-5" style={{ color: 'var(--color-warning)' }} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                      Faculty Account
+                    </h3>
+                    <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
+                      Create courses and grade assignments
+                    </p>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setSelectedRole('admin')}
+                className="w-full p-4 rounded-lg border-2 text-left transition-all hover:shadow-md"
+                style={{
+                  borderColor: 'var(--color-border)',
+                  backgroundColor: 'white'
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-error-light)' }}>
+                    <Shield className="w-5 h-5" style={{ color: 'var(--color-error)' }} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                      Admin Account
+                    </h3>
+                    <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
+                      Full system access and management
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            <p className="text-center" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-text-light)' }}>
+              Already have an account?{' '}
+              <button
+                type="button"
+                onClick={() => router.push('/login')}
+                className="hover:underline"
+                style={{ color: 'var(--color-primary)', fontWeight: 500 }}
+              >
+                Sign In
+              </button>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen">
-      {/* Left Branding Panel */}
       <div
         className="hidden lg:flex lg:w-1/2 items-center justify-center relative overflow-hidden"
         style={{
@@ -133,7 +297,6 @@ export function SignupPage({ onSignup }: SignupPageProps) {
         }}
       >
         <div className="text-center z-10 px-8">
-          {/* ULM Shield Logo */}
           <div className="mb-8 flex justify-center">
             <div className="w-32 h-32 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
               <GraduationCap className="w-20 h-20 text-white" />
@@ -146,10 +309,9 @@ export function SignupPage({ onSignup }: SignupPageProps) {
             University of Louisiana Monroe
           </p>
           <p className="text-white/70 mt-2" style={{ fontSize: '14px', lineHeight: '22px' }}>
-            Automated Grading System for Faculty
+            Automated Grading System
           </p>
 
-          {/* Features List */}
           <div className="mt-12 text-left max-w-md mx-auto space-y-4">
             {[
               'Automated code grading and testing',
@@ -168,10 +330,8 @@ export function SignupPage({ onSignup }: SignupPageProps) {
         </div>
       </div>
 
-      {/* Right Signup Form Panel */}
       <div className="flex-1 flex items-center justify-center bg-white px-8 overflow-auto">
         <div className="w-full max-w-md py-8">
-          {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ backgroundColor: 'var(--color-primary)' }}>
               <GraduationCap className="w-10 h-10 text-white" />
@@ -181,17 +341,29 @@ export function SignupPage({ onSignup }: SignupPageProps) {
             </h2>
           </div>
 
+          <button
+            type="button"
+            onClick={() => setSelectedRole(null)}
+            className="text-sm mb-4 flex items-center gap-1 hover:underline"
+            style={{ color: 'var(--color-primary)' }}
+          >
+            ← Back to role selection
+          </button>
+
           <div className="mb-8">
             <h2 className="mb-2" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px', color: 'var(--color-text-dark)' }}>
-              Create Student Account
+              Create {selectedRole === 'student' ? 'Student' : selectedRole === 'faculty' ? 'Faculty' : 'Admin'} Account
             </h2>
             <p style={{ fontSize: '14px', lineHeight: '22px', color: 'var(--color-text-mid)' }}>
-              Join the Autograder system and start submitting assignments
+              {selectedRole === 'student' 
+                ? 'Submit assignments and track your progress'
+                : selectedRole === 'faculty'
+                ? 'Create courses and manage assignments'
+                : 'Full system access and administration'}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Name Fields */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label
@@ -231,7 +403,6 @@ export function SignupPage({ onSignup }: SignupPageProps) {
               </div>
             </div>
 
-            {/* Email Field */}
             <div>
               <label
                 htmlFor="email"
@@ -243,14 +414,14 @@ export function SignupPage({ onSignup }: SignupPageProps) {
               <Input
                 id="email"
                 type="email"
-                placeholder="professor@ulm.edu"
+                placeholder={selectedRole === 'student' ? 'student@warhawks.ulm.edu' : 'professor@ulm.edu'}
                 value={formData.email}
                 onChange={(e) => {
                   setFormData({ ...formData, email: e.target.value });
                   setEmailError(null);
                 }}
                 onBlur={(e) => {
-                  const error = validateULMEmail(e.target.value);
+                  const error = validateEmail(e.target.value, selectedRole);
                   setEmailError(error);
                 }}
                 className={`h-11 border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)] ${emailError ? 'border-[var(--color-error)]' : ''
@@ -263,12 +434,11 @@ export function SignupPage({ onSignup }: SignupPageProps) {
                 </p>
               ) : (
                 <p className="mt-1 text-[var(--color-text-light)]" style={{ fontSize: '12px' }}>
-                  Must be a @ulm.edu email address
+                  Must be a {selectedRole === 'student' ? '@warhawks.ulm.edu' : '@ulm.edu'} email address
                 </p>
               )}
             </div>
 
-            {/* Password Field */}
             <div>
               <label
                 htmlFor="password"
@@ -297,7 +467,6 @@ export function SignupPage({ onSignup }: SignupPageProps) {
                 </button>
               </div>
 
-              {/* Password Strength Indicator */}
               {formData.password && (
                 <div className="mt-2">
                   <div className="flex gap-1 mb-1">
@@ -324,7 +493,6 @@ export function SignupPage({ onSignup }: SignupPageProps) {
               </p>
             </div>
 
-            {/* Confirm Password Field */}
             <div>
               <label
                 htmlFor="confirmPassword"
@@ -359,7 +527,6 @@ export function SignupPage({ onSignup }: SignupPageProps) {
               )}
             </div>
 
-            {/* Terms and Conditions */}
             <div className="flex items-start gap-2 pt-2">
               <Checkbox
                 id="terms"
@@ -383,7 +550,6 @@ export function SignupPage({ onSignup }: SignupPageProps) {
               </label>
             </div>
 
-            {/* Form Error Message */}
             {formError && (
               <div
                 className="p-3 rounded-lg flex items-start gap-3"
@@ -399,7 +565,6 @@ export function SignupPage({ onSignup }: SignupPageProps) {
               </div>
             )}
 
-            {/* Create Account Button */}
             <Button
               type="submit"
               className="w-full h-11 text-white hover:opacity-90 transition-opacity"
@@ -412,7 +577,6 @@ export function SignupPage({ onSignup }: SignupPageProps) {
               Create Account
             </Button>
 
-            {/* Sign In Link */}
             <p className="text-center" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-text-light)' }}>
               Already have an account?{' '}
               <button
@@ -425,7 +589,6 @@ export function SignupPage({ onSignup }: SignupPageProps) {
               </button>
             </p>
 
-            {/* Help Text */}
             <p className="text-center" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-text-light)' }}>
               Need assistance? Contact{' '}
               <a href="mailto:support@ulm.edu" className="hover:underline" style={{ color: 'var(--color-primary)' }}>
