@@ -1,6 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import {
+  useMemo,
+  useState,
+} from "react";
 import {
   ClipboardList,
   Clock,
@@ -14,6 +17,7 @@ import {
 import { PageLayout } from "./PageLayout";
 import { Button } from "./ui/button";
 import { useAuth } from "@/utils/AuthContext";
+import { TAInvitations } from "./TAInvitations";
 import { useRouter } from "next/navigation";
 import { useStudentDashboardStats } from "@/hooks/queries/useStudentDashboardStats";
 import { useQuery } from "@tanstack/react-query";
@@ -210,6 +214,7 @@ function StudentDashboard() {
 
   const firstName = (user as any)?.firstName ?? user?.email?.split("@")[0] ?? "Student";
 
+  const [refreshInvitations, setRefreshInvitations] = useState(0);
   return (
     <PageLayout>
       <main className="max-w-7xl mx-auto px-4 py-8">
@@ -261,6 +266,16 @@ function StudentDashboard() {
           </div>
         </div>
 
+        {/* TA Invitations Section */}
+        <div className="mb-8">
+          <TAInvitations 
+            key={refreshInvitations}
+            onAccepted={() => {
+              // Trigger refresh of invitations
+              setRefreshInvitations(prev => prev + 1);
+            }}
+          />
+        </div>
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Courses Grid */}

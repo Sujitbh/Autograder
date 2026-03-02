@@ -8,6 +8,7 @@ class RegisterRequest(BaseModel):
     name: str
     email: EmailStr
     password: str
+    role: Optional[str] = "student"  # student, faculty, admin
 
 
 class LoginRequest(BaseModel):

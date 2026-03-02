@@ -34,6 +34,11 @@ class UserService:
         """
         Register a new user.
         
+        Role determination:
+        - Uses provided role if specified
+        - Defaults to 'faculty' for @ulm.edu domain
+        - Defaults to 'student' otherwise
+        
         Raises:
             HTTPException: If email already exists
         """
@@ -44,8 +49,11 @@ class UserService:
                 detail="Email already registered",
             )
 
-        # Auto-assign faculty role for @ulm.edu domain
-        role = "faculty" if payload.email.lower().endswith("@ulm.edu") else "student"
+        # Determine role: use payload role, or infer from domain
+        if payload.role:
+            role = payload.role
+        else:
+            role = "faculty" if payload.email.lower().endswith("@ulm.edu") else "student"
 
         user = User(
             name=payload.name,
