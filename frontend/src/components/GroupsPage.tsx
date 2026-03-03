@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useState, useMemo } from 'react';
+=======
+import { useState, useMemo, useEffect } from 'react';
+>>>>>>> origin/ree_update
 import {
     Plus, Users, Search, Edit, Trash2, UserPlus, UserMinus,
     ChevronDown, ChevronUp, Shuffle, AlertTriangle, Check,
@@ -25,7 +29,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from './ui/select';
+<<<<<<< HEAD
 import { getStudentsForCourse } from '../utils/studentData';
+=======
+import { courseService } from '@/services/api';
+>>>>>>> origin/ree_update
 
 /* ═══════════════════════════════════════════
    Types
@@ -58,6 +66,7 @@ const GROUP_NAMES = [
     'Team Phi', 'Team Chi', 'Team Psi', 'Team Omega',
 ];
 
+<<<<<<< HEAD
 function getGroupStudents(courseId: string): Student[] {
     const shared = getStudentsForCourse(courseId);
     return shared.map(s => ({
@@ -85,6 +94,8 @@ function buildMockGroups(students: Student[]): Group[] {
     }
     return groups;
 }
+=======
+>>>>>>> origin/ree_update
 
 function lookupCourseCode(id: string) {
     try { const s = JSON.parse(localStorage.getItem('autograde_courses') || '[]'); const f = s.find((c: any) => c.id === id); if (f) return f.code; } catch { } return id;
@@ -106,10 +117,38 @@ function nextGroupId(groups: Group[]): string {
 export function GroupsPage() {
     const { courseId } = useParams() as { courseId: string };
     const courseCode = lookupCourseCode(courseId ?? '');
+<<<<<<< HEAD
     const allStudents = useMemo(() => getGroupStudents(courseId ?? 'cs-1001'), [courseId]);
     const [groups, setGroups] = useState<Group[]>(() => buildMockGroups(allStudents));
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedGroup, setExpandedGroup] = useState<string | null>('g1');
+=======
+    const [allStudents, setAllStudents] = useState<Student[]>([]);
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+
+    /* ── Fetch enrolled students from API ── */
+    useEffect(() => {
+        if (!courseId) return;
+        let cancelled = false;
+        courseService.getEnrollments(courseId).then((enrollments) => {
+            if (cancelled) return;
+            const students: Student[] = enrollments
+                .filter((e) => e.role === 'student' && e.user)
+                .map((e) => ({
+                    id: String(e.user!.id),
+                    name: e.user!.name,
+                    studentId: String(e.user!.id),
+                    email: e.user!.email,
+                }));
+            setAllStudents(students);
+        }).catch((err) => {
+            console.error('Failed to fetch course enrollments:', err);
+        });
+        return () => { cancelled = true; };
+    }, [courseId]);
+>>>>>>> origin/ree_update
     const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
     /* ── Modals ── */

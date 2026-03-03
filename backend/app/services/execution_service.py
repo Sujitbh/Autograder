@@ -75,23 +75,31 @@ LANGUAGE_CONFIG = {
     },
 }
 
-# Dangerous patterns to detect in code
-DANGEROUS_PATTERNS = [
+# Dangerous patterns to detect in code (per-language)
+DANGEROUS_PATTERNS_PYTHON = [
     "import os",
     "import subprocess",
-    "import sys",
+    "import shutil",
     "__import__",
     "eval(",
     "exec(",
-    "open(",
-    "file(",
+    "os.system(",
+    "os.popen(",
+    "subprocess.",
+]
+
+DANGEROUS_PATTERNS_C_CPP = [
     "system(",
     "popen(",
     "fork(",
-    "spawn",
+    "execvp(",
+    "execve(",
     "rm -rf",
-    "chmod",
-    "chown",
+]
+
+DANGEROUS_PATTERNS_UNIVERSAL = [
+    "rm -rf /",
+    "chmod 777",
 ]
 
 
@@ -117,7 +125,7 @@ class ExecutionService:
         return ext_to_lang.get(ext)
 
     @staticmethod
-    def check_security(code: str) -> tuple[bool, str]:
+    def check_security(code: str, language: str = "python") -> tuple[bool, str]:
         """
         Check code for potentially dangerous patterns.
         
@@ -125,9 +133,22 @@ class ExecutionService:
             Tuple of (is_safe: bool, reason: str)
         """
         code_lower = code.lower()
-        for pattern in DANGEROUS_PATTERNS:
+
+        # Always check universal patterns
+        for pattern in DANGEROUS_PATTERNS_UNIVERSAL:
             if pattern.lower() in code_lower:
                 return False, f"Potentially dangerous code detected: {pattern}"
+
+        # Language-specific checks
+        if language == "python":
+            for pattern in DANGEROUS_PATTERNS_PYTHON:
+                if pattern.lower() in code_lower:
+                    return False, f"Potentially dangerous code detected: {pattern}"
+        elif language in ("c", "cpp"):
+            for pattern in DANGEROUS_PATTERNS_C_CPP:
+                if pattern.lower() in code_lower:
+                    return False, f"Potentially dangerous code detected: {pattern}"
+
         return True, "OK"
 
     @staticmethod
@@ -164,7 +185,7 @@ class ExecutionService:
         timeout = timeout or config.get("timeout", ExecutionService.DEFAULT_TIMEOUT)
 
         # Security check
-        is_safe, reason = ExecutionService.check_security(code)
+        is_safe, reason = ExecutionService.check_security(code, language)
         if not is_safe:
             return ExecutionResult(
                 status=ExecutionStatus.SECURITY_ERROR,
@@ -377,10 +398,16 @@ class ExecutionService:
 
         for tc in testcases:
             # Handle both TestCase objects and dicts
-            input_data = getattr(tc, "input_data", tc.get("input_data", ""))
-            expected_output = getattr(tc, "expected_output", tc.get("expected_output", ""))
-            points = getattr(tc, "points", tc.get("points", 1))
-            tc_id = getattr(tc, "id", tc.get("id"))
+            if hasattr(tc, "input_data"):
+                input_data = tc.input_data
+                expected_output = tc.expected_output
+                points = tc.points if hasattr(tc, "points") else 1
+                tc_id = tc.id if hasattr(tc, "id") else None
+            else:
+                input_data = tc.get("input_data", "")
+                expected_output = tc.get("expected_output", "")
+                points = tc.get("points", 1)
+                tc_id = tc.get("id")
 
             result = ExecutionService.run_testcase(
                 code=code,

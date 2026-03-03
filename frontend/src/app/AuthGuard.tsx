@@ -17,14 +17,30 @@ export function AuthGuard({ children }: { children: ReactNode }) {
         }
 
         // Minimum UI-level role routing split:
+<<<<<<< HEAD
         // - students stay in /student space
+=======
+        // - students stay in /student or /ta space (TAs are students with TA enrollment)
+>>>>>>> origin/ree_update
         // - faculty/admin stay in /courses or /faculty space
         if (role === 'student' && pathname?.startsWith('/courses')) {
             router.replace('/student');
             return;
         }
         if ((role === 'faculty' || role === 'admin') && pathname?.startsWith('/student')) {
+<<<<<<< HEAD
             router.replace('/courses');
+=======
+            router.replace(role === 'admin' ? '/admin' : '/courses');
+            return;
+        }
+        if ((role === 'faculty' || role === 'admin') && pathname?.startsWith('/ta')) {
+            router.replace(role === 'admin' ? '/admin' : '/courses');
+            return;
+        }
+        if (role !== 'admin' && pathname?.startsWith('/admin')) {
+            router.replace(role === 'student' ? '/student' : '/courses');
+>>>>>>> origin/ree_update
         }
     }, [isAuthenticated, role, pathname, router]);
 

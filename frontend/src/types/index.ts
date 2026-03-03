@@ -12,7 +12,11 @@ export interface Faculty {
     title: string;
     department: string;
     profilePhoto?: string;
+<<<<<<< HEAD
     role: 'faculty';
+=======
+    role: 'faculty' | 'admin';
+>>>>>>> origin/ree_update
 }
 
 export interface Student {

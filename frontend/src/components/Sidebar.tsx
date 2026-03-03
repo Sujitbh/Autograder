@@ -13,11 +13,17 @@ import { useRouter, useParams } from 'next/navigation';
 
 interface SidebarProps {
   activeItem?: string;
+<<<<<<< HEAD
   userRole?: 'instructor' | 'ta' | 'student';
   backPath?: string;
 }
 
 export function Sidebar({ activeItem = 'assignments', userRole = 'instructor', backPath = '/courses' }: SidebarProps) {
+=======
+}
+
+export function Sidebar({ activeItem = 'assignments' }: SidebarProps) {
+>>>>>>> origin/ree_update
   const [isCollapsed, setIsCollapsed] = useState(false);
   const router = useRouter();
   const { courseId } = useParams() as { courseId: string };
@@ -28,8 +34,12 @@ export function Sidebar({ activeItem = 'assignments', userRole = 'instructor', b
     return null;
   }
 
+<<<<<<< HEAD
   // Define all menu items
   const allMenuItems = [
+=======
+  const menuItems = [
+>>>>>>> origin/ree_update
     { id: 'assignments', icon: FileText, label: 'Assignments', path: `/courses/${courseId}` },
     { id: 'grading', icon: GraduationCap, label: 'Grading', path: `/courses/${courseId}/grading` },
     { id: 'reports', icon: BarChart3, label: 'Reports', path: `/courses/${courseId}/reports` },
@@ -38,6 +48,7 @@ export function Sidebar({ activeItem = 'assignments', userRole = 'instructor', b
     { id: 'settings', icon: Settings, label: 'Settings', path: `/courses/${courseId}/settings` },
   ];
 
+<<<<<<< HEAD
   // Filter and remap paths based on user role
   let menuItems = allMenuItems;
   if (userRole === 'ta') {
@@ -50,6 +61,8 @@ export function Sidebar({ activeItem = 'assignments', userRole = 'instructor', b
       }));
   }
 
+=======
+>>>>>>> origin/ree_update
   return (
     <aside
       className="border-r h-full transition-all duration-300"
@@ -80,14 +93,22 @@ export function Sidebar({ activeItem = 'assignments', userRole = 'instructor', b
       <nav className="py-4">
         {/* Back to Courses */}
         <button
+<<<<<<< HEAD
           onClick={() => router.push(backPath)}
+=======
+          onClick={() => router.push('/courses')}
+>>>>>>> origin/ree_update
           className="w-full flex items-center gap-3 py-3 px-6 transition-colors mb-1"
           style={{ color: 'var(--color-primary)' }}
         >
           <ArrowLeft className="w-5 h-5 flex-shrink-0" />
           {!isCollapsed && (
             <span style={{ fontSize: '13px', fontWeight: 600 }}>
+<<<<<<< HEAD
               {userRole === 'ta' ? 'Teaching Assistant' : 'All Courses'}
+=======
+              All Courses
+>>>>>>> origin/ree_update
             </span>
           )}
         </button>

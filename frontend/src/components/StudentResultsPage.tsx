@@ -128,7 +128,11 @@ export function StudentResultsPage() {
     if (status === 'graded') {
       return (
         <div className="flex items-center gap-2">
+<<<<<<< HEAD
           <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+=======
+          <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: 'var(--color-success-bg)', color: 'var(--color-success)' }}>
+>>>>>>> origin/ree_update
             <CheckCircle2 className="w-3 h-3" />
             Graded
           </span>
@@ -141,14 +145,22 @@ export function StudentResultsPage() {
       );
     } else if (status === 'pending' || status === 'grading') {
       return (
+<<<<<<< HEAD
         <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+=======
+        <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}>
+>>>>>>> origin/ree_update
           <Clock className="w-3 h-3" />
           {status === 'grading' ? 'Grading' : 'Pending'}
         </span>
       );
     } else {
       return (
+<<<<<<< HEAD
         <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+=======
+        <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium" style={{ backgroundColor: 'var(--color-surface-elevated)', color: 'var(--color-text-mid)' }}>
+>>>>>>> origin/ree_update
           <XCircle className="w-3 h-3" />
           Not Submitted
         </span>
@@ -200,7 +212,11 @@ export function StudentResultsPage() {
         </div>
 
         {/* Filters */}
+<<<<<<< HEAD
         <div className="bg-white rounded-xl border border-[var(--color-border)] p-4 mb-6">
+=======
+        <div className="rounded-xl border p-4 mb-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+>>>>>>> origin/ree_update
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search */}
             <div className="md:col-span-2">
@@ -212,7 +228,11 @@ export function StudentResultsPage() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
+<<<<<<< HEAD
                   style={{ borderColor: 'var(--color-border)' }}
+=======
+                  style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-white)', color: 'var(--color-text-dark)' }}
+>>>>>>> origin/ree_update
                 />
               </div>
             </div>
@@ -223,7 +243,11 @@ export function StudentResultsPage() {
                 value={selectedCourse}
                 onChange={(e) => setSelectedCourse(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg text-sm"
+<<<<<<< HEAD
                 style={{ borderColor: 'var(--color-border)' }}
+=======
+                style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-white)', color: 'var(--color-text-dark)' }}
+>>>>>>> origin/ree_update
               >
                 <option value="all">All Courses</option>
                 {courses.map(c => (
@@ -238,7 +262,11 @@ export function StudentResultsPage() {
                 value={selectedStatus}
                 onChange={(e) => setSelectedStatus(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg text-sm"
+<<<<<<< HEAD
                 style={{ borderColor: 'var(--color-border)' }}
+=======
+                style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-white)', color: 'var(--color-text-dark)' }}
+>>>>>>> origin/ree_update
               >
                 <option value="all">All Statuses</option>
                 <option value="graded">Graded</option>
@@ -259,7 +287,11 @@ export function StudentResultsPage() {
             {rows.length === 0 ? 'No assignments yet.' : 'No results match your filters.'}
           </div>
         ) : (
+<<<<<<< HEAD
           <div className="bg-white rounded-xl border border-[var(--color-border)] overflow-hidden">
+=======
+          <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+>>>>>>> origin/ree_update
             <table className="w-full">
               <thead style={{ backgroundColor: 'var(--color-primary-bg)' }}>
                 <tr>
@@ -312,7 +344,11 @@ export function StudentResultsPage() {
               </thead>
               <tbody>
                 {filteredAndSortedRows.map((r) => (
+<<<<<<< HEAD
                   <tr key={r.assignment_id} className="border-t border-[var(--color-border)] hover:bg-gray-50 transition-colors">
+=======
+                  <tr key={r.assignment_id} className="border-t transition-colors" style={{ borderColor: 'var(--color-border)' }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)'} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+>>>>>>> origin/ree_update
                     <td className="p-3 text-sm">{r.course_name ?? `Course ${r.course_id}`}</td>
                     <td className="p-3 text-sm font-medium">{r.assignment_title}</td>
                     <td className="p-3 text-sm">{getStatusBadge(r.status, r.score, r.max_score)}</td>

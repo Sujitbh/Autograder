@@ -4,7 +4,10 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { courseService } from '@/services/api';
+<<<<<<< HEAD
 import { useAuth } from '@/utils/AuthContext';
+=======
+>>>>>>> origin/ree_update
 import type { Course, CreateCourseDto, UpdateCourseDto } from '@/types';
 
 // ── Queries ─────────────────────────────────────────────────────────
@@ -27,6 +30,7 @@ export function useCourse(courseId: string | undefined) {
     });
 }
 
+<<<<<<< HEAD
 export function useTACourses() {
     const { user } = useAuth();
 
@@ -53,6 +57,8 @@ export function useStudentCourses() {
     });
 }
 
+=======
+>>>>>>> origin/ree_update
 // ── Mutations ───────────────────────────────────────────────────────
 
 export function useCreateCourse() {

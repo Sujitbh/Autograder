@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
-from typing import List
+from typing import Annotated, List, Optional
 import random
 
 from app.api.deps import get_db, get_current_user
@@ -11,6 +11,7 @@ from app.models.enrollment import Enrollment
 from app.models.user import User
 from app.models.assignment import Assignment
 from app.models.submission import Submission
+from app.models.group import Group, GroupMembership
 from app.schemas.course import (
     CourseCreate,
     CourseOut,
@@ -25,6 +26,13 @@ router = APIRouter(prefix="/courses", tags=["courses"])
 
 ENROLLMENT_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
+# ── Shared error messages ──
+COURSE_NOT_FOUND = "Course not found"
+
+# ── Annotated dependency aliases ──
+DbSession = Annotated[Session, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
+
 
 def generate_enrollment_code(db: Session) -> str:
     """Generate a short unique course enrollment code."""
@@ -37,12 +45,26 @@ def generate_enrollment_code(db: Session) -> str:
 
 
 @router.get("/", response_model=List[CourseOut])
-def list_courses(db: Session = Depends(get_db)):
-    return db.query(Course).all()
+def list_courses(db: DbSession, user: CurrentUser):
+    """
+    Return courses scoped to the authenticated user:
+      - admin: all courses
+      - faculty: courses where user is enrolled as instructor
+      - student: courses where user is enrolled as student or ta
+    """
+    if user.role == "admin":
+        return db.query(Course).all()
+
+    # For faculty and students, only return courses they are enrolled in
+    enrollments = db.query(Enrollment).filter(Enrollment.user_id == user.id).all()
+    course_ids = [e.course_id for e in enrollments]
+    if not course_ids:
+        return []
+    return db.query(Course).filter(Course.id.in_(course_ids)).all()
 
 
-@router.post("/", response_model=CourseOut)
-def create_course(payload: CourseCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+@router.post("/", response_model=CourseOut, responses={500: {"description": "Internal server error"}})
+def create_course(payload: CourseCreate, db: DbSession, user: CurrentUser):
     require_role(user.role, {"faculty", "admin"})
     course = Course(
         name=payload.name,
@@ -70,50 +92,20 @@ def create_course(payload: CourseCreate, db: Session = Depends(get_db), user: Us
     return persisted
 
 
-@router.get("/me", response_model=List[CourseOut])
-def get_my_courses(
-    role: str | None = Query(None, description="Optional role filter: student | ta | instructor"),
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """Get courses for current user, optionally filtered by enrollment role.
-    
-    Query Parameters:
-    - role: Optional filter by 'student', 'ta', or 'instructor' enrollment role
-    
-    Returns all courses where the user is enrolled with details on their role in each course.
-    """
-    enrollments = db.query(Enrollment).filter(
-        Enrollment.user_id == user.id
-    ).all()
-    
-    courses = []
-    for enrollment in enrollments:
-        # Skip if role filter specified and doesn't match
-        if role and enrollment.role != role:
-            continue
-        
-        course = db.query(Course).filter(Course.id == enrollment.course_id).first()
-        if course:
-            courses.append(course)
-    
-    return courses
-
-
-@router.get("/{course_id}", response_model=CourseOut)
-def get_course(course_id: int, db: Session = Depends(get_db)):
+@router.get("/{course_id}", response_model=CourseOut, responses={404: {"description": "Resource not found"}})
+def get_course(course_id: int, db: DbSession):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail=COURSE_NOT_FOUND)
     return course
 
 
-@router.put("/{course_id}", response_model=CourseOut)
-def update_course(course_id: int, payload: CourseUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+@router.put("/{course_id}", response_model=CourseOut, responses={404: {"description": "Resource not found"}})
+def update_course(course_id: int, payload: CourseUpdate, db: DbSession, user: CurrentUser):
     require_role(user.role, {"faculty", "admin"})
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail=COURSE_NOT_FOUND)
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(course, k, v)
     db.add(course)
@@ -122,27 +114,27 @@ def update_course(course_id: int, payload: CourseUpdate, db: Session = Depends(g
     return course
 
 
-@router.delete("/{course_id}")
-def delete_course(course_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+@router.delete("/{course_id}", responses={404: {"description": "Resource not found"}})
+def delete_course(course_id: int, db: DbSession, user: CurrentUser):
     require_role(user.role, {"faculty", "admin"})
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail=COURSE_NOT_FOUND)
     db.delete(course)
     db.commit()
     return {"ok": True}
 
 
-@router.get("/{course_id}/enrollments", response_model=List[EnrollmentOut])
+@router.get("/{course_id}/enrollments", response_model=List[EnrollmentOut], responses={404: {"description": "Resource not found"}})
 def list_course_enrollments(
     course_id: int,
-    role: str | None = Query(None, description="Optional role filter: student | ta | instructor"),
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    db: DbSession,
+    user: CurrentUser,
+    role: Annotated[Optional[str], Query(description="Optional role filter: student | ta | instructor")] = None,
 ):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail=COURSE_NOT_FOUND)
 
     # Roster visibility is instructor/admin-only.
     require_course_role(db=db, user=user, course_id=course_id, allowed_roles=["instructor"])
@@ -154,16 +146,16 @@ def list_course_enrollments(
     return query.all()
 
 
-@router.post("/{course_id}/enrollments", response_model=EnrollmentOut)
+@router.post("/{course_id}/enrollments", response_model=EnrollmentOut, responses={400: {"description": "Bad request"}, 404: {"description": "Resource not found"}})
 def add_course_enrollment(
     course_id: int,
     payload: EnrollmentCreate,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    db: DbSession,
+    user: CurrentUser,
 ):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail=COURSE_NOT_FOUND)
     require_course_role(db=db, user=user, course_id=course_id, allowed_roles=["instructor"])
 
     if payload.user_id is None and payload.email is None:
@@ -203,13 +195,13 @@ def add_course_enrollment(
     return enrollment
 
 
-@router.patch("/{course_id}/enrollments/{enrollment_id}", response_model=EnrollmentOut)
+@router.patch("/{course_id}/enrollments/{enrollment_id}", response_model=EnrollmentOut, responses={400: {"description": "Bad request"}, 404: {"description": "Resource not found"}})
 def update_course_enrollment(
     course_id: int,
     enrollment_id: int,
     payload: EnrollmentUpdate,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    db: DbSession,
+    user: CurrentUser,
 ):
     enrollment = db.query(Enrollment).filter(
         Enrollment.id == enrollment_id,
@@ -241,12 +233,12 @@ def update_course_enrollment(
     return enrollment
 
 
-@router.delete("/{course_id}/enrollments/{enrollment_id}")
+@router.delete("/{course_id}/enrollments/{enrollment_id}", responses={404: {"description": "Resource not found"}})
 def delete_course_enrollment(
     course_id: int,
     enrollment_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    db: DbSession,
+    user: CurrentUser,
 ):
     enrollment = db.query(Enrollment).filter(
         Enrollment.id == enrollment_id,
@@ -261,11 +253,11 @@ def delete_course_enrollment(
     return {"ok": True}
 
 
-@router.post("/enroll", response_model=EnrollmentOut)
+@router.post("/enroll", response_model=EnrollmentOut, responses={404: {"description": "Resource not found"}})
 def enroll_student_by_course_code(
     payload: CourseEnrollRequest,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    db: DbSession,
+    user: CurrentUser,
 ):
     require_role(user.role, {"student"})
 
@@ -290,11 +282,11 @@ def enroll_student_by_course_code(
     return enrollment
 
 
-@router.get("/{course_id}/classmates", response_model=List[dict])
+@router.get("/{course_id}/classmates", response_model=List[dict], responses={403: {"description": "Forbidden"}})
 def get_course_classmates(
     course_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    db: DbSession,
+    user: CurrentUser,
 ):
     """Get list of classmates (students) in a course. Only accessible to enrolled students."""
     require_role(user.role, {"student"})
@@ -326,43 +318,11 @@ def get_course_classmates(
     return classmates
 
 
-@router.get("/{course_id}/ta-students")
-def get_course_students_for_ta(
-    course_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    """Get list of students in a course. Accessible to TAs and instructors for grading."""
-    # Check if user is TA or instructor for this course
-    require_course_role(
-        db=db,
-        user=user,
-        course_id=course_id,
-        allowed_roles=["instructor", "ta"],
-    )
-    
-    # Get all students enrolled in the course
-    enrollments = db.query(Enrollment).options(joinedload(Enrollment.user)).filter(
-        Enrollment.course_id == course_id,
-        Enrollment.role == "student"
-    ).all()
-    
-    students = []
-    for enrollment in enrollments:
-        students.append({
-            "id": enrollment.user.id,
-            "name": enrollment.user.name,
-            "email": enrollment.user.email,
-        })
-    
-    return students
-
-
-@router.get("/{course_id}/grades", response_model=dict)
+@router.get("/{course_id}/grades", response_model=dict, responses={403: {"description": "Forbidden"}})
 def get_course_grades(
     course_id: int,
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    db: DbSession,
+    user: CurrentUser,
 ):
     """Get student's grades and assignment performance in a course."""
     require_role(user.role, {"student"})
@@ -412,7 +372,7 @@ def get_course_grades(
             graded_scores.append(percentage)
             assignment_grades.append({
                 "assignment_id": assignment.id,
-                "assignment_name": assignment.name,
+                "assignment_name": assignment.title,
                 "score": sub.score,
                 "max_score": sub.max_score,
                 "percentage": round(percentage, 1),
@@ -421,9 +381,9 @@ def get_course_grades(
         else:
             assignment_grades.append({
                 "assignment_id": assignment.id,
-                "assignment_name": assignment.name,
+                "assignment_name": assignment.title,
                 "score": None,
-                "max_score": assignment.maxPoints,
+                "max_score": assignment.max_points,
                 "percentage": None,
                 "submitted": sub is not None
             })
@@ -438,3 +398,67 @@ def get_course_grades(
         "graded_count": len(graded_scores),
         "total_count": len(assignments)
     }
+
+
+@router.get("/{course_id}/my-groups", response_model=List[dict], responses={403: {"description": "Forbidden"}})
+def get_student_groups(
+    course_id: int,
+    db: DbSession,
+    user: CurrentUser,
+):
+    """Get groups the current student belongs to in a course."""
+    # Check enrollment
+    user_enrollment = db.query(Enrollment).filter(
+        Enrollment.course_id == course_id,
+        Enrollment.user_id == user.id,
+    ).first()
+
+    if not user_enrollment:
+        raise HTTPException(status_code=403, detail="Not enrolled in this course")
+
+    # Get assignments in this course
+    assignment_ids = [a.id for a in db.query(Assignment).filter(Assignment.course_id == course_id).all()]
+
+    # Get groups the student is a member of for this course's assignments (or reusable)
+    memberships = db.query(GroupMembership).filter(GroupMembership.user_id == user.id).all()
+    group_ids = [m.group_id for m in memberships]
+
+    if not group_ids:
+        return []
+
+    groups = db.query(Group).filter(
+        Group.id.in_(group_ids),
+        (Group.assignment_id.in_(assignment_ids)) | (Group.assignment_id.is_(None))
+    ).all()
+
+    result = []
+    for group in groups:
+        # Get assignment name if linked
+        assignment_name = None
+        if group.assignment_id:
+            assignment = db.query(Assignment).filter(Assignment.id == group.assignment_id).first()
+            if assignment:
+                assignment_name = assignment.title
+
+        # Get all members
+        all_memberships = db.query(GroupMembership).filter(GroupMembership.group_id == group.id).all()
+        members = []
+        for m in all_memberships:
+            member_user = db.query(User).filter(User.id == m.user_id).first()
+            if member_user:
+                members.append({
+                    "id": member_user.id,
+                    "name": member_user.name,
+                    "email": member_user.email,
+                    "role": m.role,
+                })
+
+        result.append({
+            "id": group.id,
+            "name": group.name,
+            "assignment_name": assignment_name,
+            "is_reusable": group.is_reusable,
+            "members": members,
+        })
+
+    return result

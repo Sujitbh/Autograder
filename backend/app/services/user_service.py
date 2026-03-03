@@ -10,6 +10,9 @@ from app.models.user import User
 from app.core.security import hash_password, verify_password, create_access_token
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
 
+# Only this email is allowed to hold the admin role
+ADMIN_EMAIL = "admin@ulm.edu"
+
 
 class UserService:
     """Service for user-related operations."""
@@ -50,6 +53,12 @@ class UserService:
             )
 
         # Determine role: use payload role, or infer from domain
+        # Admin accounts cannot be created via registration
+        if payload.role and payload.role == "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin accounts cannot be created via registration",
+            )
         if payload.role:
             role = payload.role
         else:
@@ -142,6 +151,13 @@ class UserService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found",
+            )
+
+        # Only admin@ulm.edu can hold the admin role
+        if new_role == "admin" and user.email.lower() != ADMIN_EMAIL:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin@ulm.edu can be assigned the admin role",
             )
 
         user.role = new_role
