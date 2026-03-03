@@ -12,7 +12,7 @@ export interface Faculty {
     title: string;
     department: string;
     profilePhoto?: string;
-    role: 'faculty';
+    role: 'faculty' | 'admin';
 }
 
 export interface Student {

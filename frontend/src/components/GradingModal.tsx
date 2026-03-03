@@ -1,4 +1,4 @@
-import { X, CheckCircle, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Send, AlertTriangle, Shield, Copy, Users, Download, FileText } from 'lucide-react';
+import { X, CheckCircle, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Send, Users, Download, FileText } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -52,6 +52,8 @@ export function GradingModal({
   onSaveDraft,
   isGroupAssignment = false,
   groupName,
+  groupMemberNames = [],
+  onApplyToGroup,
   submissionId,
 }: GradingModalProps) {
   const [expandedTests, setExpandedTests] = useState<Record<string, boolean>>({
@@ -59,38 +61,46 @@ export function GradingModal({
     private: false,
   });
 
-  const [expandedAIAlerts, setExpandedAIAlerts] = useState(true);
-  const [files, setFiles] = useState<Array<{id: number; filename: string; file_size: number | null}>>([]);
+  const [files, setFiles] = useState<Array<{ id: number; filename: string; file_size: number | null }>>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Mock AI detection results
-  const aiDetectionResults = {
-    plagiarismDetected: true,
-    plagiarismScore: 76,
-    similarSubmissions: [
-      { student: 'Sarah Jones', similarity: 76, matchedLines: 45 },
-      { student: 'Mike Wilson', similarity: 42, matchedLines: 22 }
-    ],
-    aiCodeDetected: true,
-    aiConfidence: 68,
-    suspiciousSections: [
-      { startLine: 15, endLine: 28, reason: 'Pattern matches common AI-generated code structure' },
-      { startLine: 35, endLine: 42, reason: 'Unusual commenting style consistent with AI output' }
-    ]
-  };
+  // Real submission detail: code contents + test results
+  const [submissionCode, setSubmissionCode] = useState<string>('');
+  const [submissionFilename, setSubmissionFilename] = useState<string>('');
+  const [realTestResults, setRealTestResults] = useState<Array<{
+    testcase_id: number;
+    test_name: string;
+    passed: boolean;
+    actual_output: string;
+    expected_output: string;
+    execution_time_ms: number;
+    points: number;
+    points_earned: number;
+    error: string | null;
+  }>>([]);
+  const [hasRealData, setHasRealData] = useState(false);
 
-  const testResults = {
-    public: [
-      { id: '1', name: 'Test Case 1: Basic Input', status: 'pass', input: '5', expected: '25', actual: '25' },
-      { id: '2', name: 'Test Case 2: Zero Input', status: 'pass', input: '0', expected: '0', actual: '0' },
-      { id: '3', name: 'Test Case 3: Negative Input', status: 'fail', input: '-3', expected: '9', actual: 'Error: invalid input' },
-    ],
-    private: [
-      { id: '4', name: 'Private Test 1: Large Numbers', status: 'pass', input: '100', expected: '10000', actual: '10000' },
-      { id: '5', name: 'Private Test 2: Edge Case', status: 'pass', input: '999', expected: '998001', actual: '998001' },
-    ],
-  };
+  // Fallback test results (only used when no backend data available)
+  const testResults = hasRealData
+    ? {
+      all: realTestResults.map((r, i) => ({
+        id: String(r.testcase_id),
+        name: r.test_name || `Test ${i + 1}`,
+        status: r.passed ? 'pass' as const : 'fail' as const,
+        input: '',
+        expected: r.expected_output,
+        actual: r.actual_output,
+        error: r.error,
+      })),
+    }
+    : {
+      all: [
+        { id: '1', name: 'Test Case 1: Basic Input', status: 'pass' as const, input: '5', expected: '25', actual: '25', error: null },
+        { id: '2', name: 'Test Case 2: Zero Input', status: 'pass' as const, input: '0', expected: '0', actual: '0', error: null },
+        { id: '3', name: 'Test Case 3: Negative Input', status: 'fail' as const, input: '-3', expected: '9', actual: 'Error: invalid input', error: null },
+      ],
+    };
 
   const defaultRubric: RubricItem[] = [
     { name: 'Code Correctness', maxPoints: 50 },
@@ -127,13 +137,29 @@ export function GradingModal({
     });
   };
 
-  /* ─── Load submitted files ─── */
+  /* ─── Load submitted files + code content + test results ─── */
   useEffect(() => {
     if (submissionId) {
       setIsLoadingFiles(true);
+      // Fetch file list (for download buttons)
       submissionService.getSubmissionFiles(submissionId)
         .then(setFiles)
-        .catch(err => console.error('Failed to load files:', err))
+        .catch(err => console.error('Failed to load files:', err));
+      // Fetch full submission detail (code contents + test results)
+      submissionService.getSubmissionDetail(submissionId)
+        .then((detail) => {
+          // Use the first file's content as the code to display
+          const firstFile = detail.files.find(f => f.content != null);
+          if (firstFile) {
+            setSubmissionCode(firstFile.content ?? '');
+            setSubmissionFilename(firstFile.filename);
+          }
+          if (detail.results && detail.results.length > 0) {
+            setRealTestResults(detail.results);
+          }
+          setHasRealData(true);
+        })
+        .catch(err => console.error('Failed to load submission detail:', err))
         .finally(() => setIsLoadingFiles(false));
     }
   }, [submissionId]);
@@ -307,111 +333,10 @@ export function GradingModal({
               </div>
             )}
 
-            {/* AI Detection Alerts */}
-            {(aiDetectionResults.plagiarismDetected || aiDetectionResults.aiCodeDetected) && (
-              <div className="p-6 border-b" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-warning-bg)' }}>
-                <button
-                  onClick={() => setExpandedAIAlerts(!expandedAIAlerts)}
-                  className="w-full flex items-center justify-between mb-4"
-                >
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-[var(--color-warning)]" />
-                    <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-warning)' }}>
-                      AI Detection Alerts (Advisory Only)
-                    </h3>
-                  </div>
-                  {expandedAIAlerts ? (
-                    <ChevronUp className="w-5 h-5 text-[var(--color-warning)]" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-[var(--color-warning)]" />
-                  )}
-                </button>
-
-                {expandedAIAlerts && (
-                  <div className="space-y-4">
-                    {/* Plagiarism Alert */}
-                    {aiDetectionResults.plagiarismDetected && (
-                      <div className="bg-white rounded-lg p-4" style={{ border: '1px solid var(--color-warning)' }}>
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <Copy className="w-4 h-4 text-[var(--color-warning)]" />
-                            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-warning)' }}>
-                              Plagiarism Detection
-                            </span>
-                          </div>
-                          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-warning)' }}>
-                            {aiDetectionResults.plagiarismScore}% Similar
-                          </span>
-                        </div>
-
-                        <p style={{ fontSize: '12px', color: 'var(--color-warning)', marginBottom: '12px' }}>
-                          Code shows high similarity to other submissions
-                        </p>
-
-                        <div className="space-y-2">
-                          {aiDetectionResults.similarSubmissions.map((match, index) => (
-                            <div key={index} className="flex justify-between items-center text-sm">
-                              <span style={{ fontSize: '12px', color: 'var(--color-text-dark)' }}>
-                                {match.student}
-                              </span>
-                              <span style={{ fontSize: '12px', color: 'var(--color-warning)', fontWeight: 500 }}>
-                                {match.similarity}% ({match.matchedLines} lines)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* AI Code Detection Alert */}
-                    {aiDetectionResults.aiCodeDetected && (
-                      <div className="bg-white rounded-lg p-4" style={{ border: '1px solid var(--color-warning)' }}>
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <Shield className="w-4 h-4 text-[var(--color-warning)]" />
-                            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-warning)' }}>
-                              AI-Generated Code Detection
-                            </span>
-                          </div>
-                          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-warning)' }}>
-                            {aiDetectionResults.aiConfidence}% Confidence
-                          </span>
-                        </div>
-
-                        <p style={{ fontSize: '12px', color: 'var(--color-warning)', marginBottom: '12px' }}>
-                          Code patterns suggest possible AI generation
-                        </p>
-
-                        <div className="space-y-2">
-                          {aiDetectionResults.suspiciousSections.map((section, index) => (
-                            <div key={index} className="text-sm">
-                              <span style={{ fontSize: '12px', color: 'var(--color-text-dark)', fontWeight: 500 }}>
-                                Lines {section.startLine}-{section.endLine}:
-                              </span>
-                              <p style={{ fontSize: '11px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
-                                {section.reason}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-start gap-2 p-3 rounded" style={{ backgroundColor: 'var(--color-warning-bg)' }}>
-                      <AlertTriangle className="w-4 h-4 text-[var(--color-warning)] flex-shrink-0 mt-0.5" />
-                      <p style={{ fontSize: '11px', color: 'var(--color-warning)' }}>
-                        <strong>Important:</strong> These are advisory alerts only. Review the code and make your final judgment. Do not automatically deduct points based on AI detection.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Code Viewer */}
             <div className="p-6">
               <h3 className="mb-3" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                Student Code
+                Student Code {submissionFilename && <span className="text-sm font-normal" style={{ color: 'var(--color-text-mid)' }}>— {submissionFilename}</span>}
               </h3>
               <div
                 className="rounded-lg p-4 overflow-x-auto"
@@ -423,24 +348,7 @@ export function GradingModal({
                 }}
               >
                 <pre className="text-white">
-                  {`def square(n):
-    """
-    Calculate the square of a number.
-    
-    Args:
-        n (int): The number to square
-        
-    Returns:
-        int: The square of n
-    """
-    if n < 0:
-        raise ValueError("Negative numbers not supported")
-    
-    result = n * n
-    return result
-
-# Test the function
-print(square(5))`}
+                  {submissionCode || (isLoadingFiles ? 'Loading...' : 'No code submitted')}
                 </pre>
               </div>
             </div>
@@ -451,7 +359,7 @@ print(square(5))`}
                 Test Results
               </h3>
 
-              {/* Public Tests */}
+              {/* Test Cases */}
               <div className="mb-4">
                 <button
                   onClick={() => toggleTestSection('public')}
@@ -459,7 +367,7 @@ print(square(5))`}
                   style={{ backgroundColor: 'var(--color-primary-bg)' }}
                 >
                   <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>
-                    Public Test Cases (2/3 passed)
+                    Test Cases ({testResults.all.filter(t => t.status === 'pass').length}/{testResults.all.length} passed)
                   </span>
                   {expandedTests.public ? (
                     <ChevronUp className="w-5 h-5 text-[var(--color-primary)]" />
@@ -470,67 +378,31 @@ print(square(5))`}
 
                 {expandedTests.public && (
                   <div className="border border-t-0 rounded-b-lg" style={{ borderColor: 'var(--color-border)' }}>
-                    {testResults.public.map((test) => (
-                      <div key={test.id} className="p-4 border-b last:border-b-0" style={{ borderColor: 'var(--color-border)' }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                            {test.name}
-                          </span>
-                          {test.status === 'pass' ? (
-                            <CheckCircle className="w-5 h-5 text-[var(--color-success)]" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-[var(--color-error)]" />
-                          )}
-                        </div>
-                        <div className="space-y-1" style={{ fontSize: '12px', color: 'var(--color-text-mid)' }}>
-                          <div><strong>Input:</strong> {test.input}</div>
-                          <div><strong>Expected:</strong> {test.expected}</div>
-                          <div><strong>Actual:</strong> {test.actual}</div>
-                        </div>
+                    {testResults.all.length === 0 ? (
+                      <div className="p-4 text-sm" style={{ color: 'var(--color-text-mid)' }}>
+                        No test results available yet. Run automated grading to see results.
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Private Tests */}
-              <div>
-                <button
-                  onClick={() => toggleTestSection('private')}
-                  className="w-full flex items-center justify-between p-3 rounded-t-lg transition-colors hover:bg-[var(--color-warning-bg)]"
-                  style={{ backgroundColor: 'var(--color-warning-bg)' }}
-                >
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-warning)' }}>
-                    Private Test Cases (2/2 passed)
-                  </span>
-                  {expandedTests.private ? (
-                    <ChevronUp className="w-5 h-5 text-[var(--color-warning)]" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-[var(--color-warning)]" />
-                  )}
-                </button>
-
-                {expandedTests.private && (
-                  <div className="border border-t-0 rounded-b-lg" style={{ borderColor: 'var(--color-border)' }}>
-                    {testResults.private.map((test) => (
-                      <div key={test.id} className="p-4 border-b last:border-b-0" style={{ borderColor: 'var(--color-border)' }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                            {test.name}
-                          </span>
-                          {test.status === 'pass' ? (
-                            <CheckCircle className="w-5 h-5 text-[var(--color-success)]" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-[var(--color-error)]" />
-                          )}
+                    ) : (
+                      testResults.all.map((test) => (
+                        <div key={test.id} className="p-4 border-b last:border-b-0" style={{ borderColor: 'var(--color-border)' }}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                              {test.name}
+                            </span>
+                            {test.status === 'pass' ? (
+                              <CheckCircle className="w-5 h-5 text-[var(--color-success)]" />
+                            ) : (
+                              <XCircle className="w-5 h-5 text-[var(--color-error)]" />
+                            )}
+                          </div>
+                          <div className="space-y-1" style={{ fontSize: '12px', color: 'var(--color-text-mid)' }}>
+                            {test.expected && <div><strong>Expected:</strong> {test.expected}</div>}
+                            {test.actual && <div><strong>Actual:</strong> {test.actual}</div>}
+                            {test.error && <div style={{ color: 'var(--color-error)' }}><strong>Error:</strong> {test.error}</div>}
+                          </div>
                         </div>
-                        <div className="space-y-1" style={{ fontSize: '12px', color: 'var(--color-text-mid)' }}>
-                          <div><strong>Input:</strong> {test.input}</div>
-                          <div><strong>Expected:</strong> {test.expected}</div>
-                          <div><strong>Actual:</strong> {test.actual}</div>
-                        </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 )}
               </div>
@@ -552,7 +424,7 @@ print(square(5))`}
                   )}
                 </div>
                 <p style={{ fontSize: '12px', color: '#1A4D7A', marginTop: '6px' }}>
-                  Tests Passed: {testResults.public.filter(t => t.status === 'pass').length + testResults.private.filter(t => t.status === 'pass').length} / {testResults.public.length + testResults.private.length}
+                  Tests Passed: {testResults.all.filter(t => t.status === 'pass').length} / {testResults.all.length}
                 </p>
               </div>
 
@@ -615,7 +487,7 @@ print(square(5))`}
                   className="border-[var(--color-border)]"
                   maxLength={500}
                 />
-                <p className="text-right mt-1" style={{ fontSize: '11px', color: feedback.length >= 450 ? '#8B0000' : '#8A8A8A' }}>
+                <p className="text-right mt-1" style={{ fontSize: '11px', color: feedback.length >= 450 ? 'var(--color-error)' : 'var(--color-text-light)' }}>
                   {feedback.length} / 500
                 </p>
               </div>
@@ -625,13 +497,13 @@ print(square(5))`}
             <div className="border-t p-6" style={{ borderColor: 'var(--color-border)' }}>
               {/* Group Assignment Banner */}
               {isGroupAssignment && groupName && groupMemberNames.length > 0 && (
-                <div className="mb-4 p-3 rounded-lg flex items-start gap-3" style={{ backgroundColor: '#F5EDED', border: '1px solid #6B0000' }}>
-                  <Users className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#6B0000' }} />
+                <div className="mb-4 p-3 rounded-lg flex items-start gap-3" style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)' }}>
+                  <Users className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-primary)' }} />
                   <div className="flex-1">
-                    <p style={{ fontSize: '13px', fontWeight: 600, color: '#6B0000' }}>
+                    <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-primary)' }}>
                       Group Assignment — {groupName}
                     </p>
-                    <p style={{ fontSize: '12px', color: '#595959', marginTop: '2px' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
                       Other members: {groupMemberNames.join(', ')}
                     </p>
                   </div>
@@ -639,7 +511,7 @@ print(square(5))`}
               )}
 
               <div className="flex items-center justify-between mb-3">
-                <button className="hover:underline" style={{ fontSize: '13px', color: '#6B0000' }}>
+                <button className="hover:underline" style={{ fontSize: '13px', color: 'var(--color-primary)' }}>
                   Request Resubmission
                 </button>
               </div>
@@ -660,7 +532,7 @@ print(square(5))`}
                 <Button
                   type="submit"
                   className="flex-1 text-white"
-                  style={{ backgroundColor: submitted ? '#2D6A2D' : 'var(--color-primary)' }}
+                  style={{ backgroundColor: submitted ? 'var(--color-success)' : 'var(--color-primary)' }}
                   disabled={isSaving}
                   onClick={() => {
                     handleSaveGradeToBackend();
@@ -681,7 +553,7 @@ print(square(5))`}
                 <Button
                   type="button"
                   className="w-full mt-3 text-white"
-                  style={{ backgroundColor: '#2D6A2D' }}
+                  style={{ backgroundColor: 'var(--color-success)' }}
                   onClick={() => onApplyToGroup(getTotalScore())}
                 >
                   <Users className="w-4 h-4 mr-2" />

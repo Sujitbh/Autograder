@@ -134,7 +134,7 @@ export function CreateCourse() {
 
         if (step === 1) {
             if (!courseCode.trim()) errors.courseCode = 'Course code is required';
-            else if (!/^[A-Z0-9\s\-]+$/i.test(courseCode.trim()))
+            else if (!/^[A-Z0-9\s-]+$/i.test(courseCode.trim()))
                 errors.courseCode = 'Use letters, numbers, spaces, or hyphens (e.g., CS-1001)';
             if (!courseName.trim()) errors.courseName = 'Course name is required';
             if (!semester) errors.semester = 'Semester is required';
@@ -216,7 +216,15 @@ export function CreateCourse() {
             setCreatedCourse(newCourse);
             setCurrentStep(4); // success step
         } catch (e) {
-            const message = e instanceof Error ? e.message : 'Failed to create course';
+            console.error('Course creation error:', e);
+            let message = 'Failed to create course';
+            if (e instanceof Error) {
+                message = e.message;
+            }
+            // Check if it's an authentication error
+            if (message.includes('authenticated') || message.includes('Unauthorized')) {
+                message = 'You must be logged in to create a course. Please log in and try again.';
+            }
             setFormErrors({ courseName: message });
         } finally {
             setIsCreating(false);
@@ -230,7 +238,7 @@ export function CreateCourse() {
         });
     };
 
-    const FieldError = ({ error }: { error?: string }) => {
+    const renderFieldError = (error?: string) => {
         if (!error) return null;
         return <p style={{ fontSize: '12px', color: '#B91C1C', marginTop: '4px' }}>{error}</p>;
     };
@@ -238,7 +246,7 @@ export function CreateCourse() {
     /* ═══════════════════════════════════════════
        Step Indicator
        ═══════════════════════════════════════════ */
-    const StepIndicator = () => (
+    const renderStepIndicator = () => (
         <div className="flex items-center justify-center gap-0 mb-10">
             {STEPS.map((step, idx) => {
                 const Icon = step.icon;
@@ -251,7 +259,11 @@ export function CreateCourse() {
                             <div
                                 className="w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300"
                                 style={{
-                                    backgroundColor: isComplete ? '#2D6A2D' : isActive ? '#6B0000' : '#F1F1F1',
+                                    backgroundColor: (() => {
+                                        if (isComplete) return '#2D6A2D';
+                                        if (isActive) return '#6B0000';
+                                        return '#F1F1F1';
+                                    })(),
                                     color: isComplete || isActive ? '#fff' : '#8A8A8A',
                                     boxShadow: isActive ? '0 0 0 4px rgba(107,0,0,0.15)' : 'none',
                                 }}
@@ -263,7 +275,11 @@ export function CreateCourse() {
                                 style={{
                                     fontSize: '12px',
                                     fontWeight: isActive ? 600 : 400,
-                                    color: isActive ? '#6B0000' : isComplete ? '#2D6A2D' : '#8A8A8A',
+                                    color: (() => {
+                                        if (isActive) return '#6B0000';
+                                        if (isComplete) return '#2D6A2D';
+                                        return '#8A8A8A';
+                                    })(),
                                 }}
                             >
                                 {step.label}
@@ -288,7 +304,7 @@ export function CreateCourse() {
     /* ═══════════════════════════════════════════
        STEP 1: Course Information
        ═══════════════════════════════════════════ */
-    const Step1 = () => (
+    const renderStep1 = () => (
         <div className="space-y-8">
             {/* Header */}
             <div className="text-center mb-2">
@@ -320,7 +336,7 @@ export function CreateCourse() {
                     <p style={{ fontSize: '11px', color: '#8A8A8A', marginTop: '6px' }}>
                         Official course code from your institution's catalog
                     </p>
-                    <FieldError error={formErrors.courseCode} />
+                    {renderFieldError(formErrors.courseCode)}
                 </div>
 
                 {/* Course Name */}
@@ -338,7 +354,7 @@ export function CreateCourse() {
                         style={{ fontSize: '15px' }}
                     />
                     <div className="flex justify-between mt-1">
-                        <FieldError error={formErrors.courseName} />
+                        {renderFieldError(formErrors.courseName)}
                         <span style={{ fontSize: '11px', color: '#8A8A8A' }}>{courseName.length}/100</span>
                     </div>
                 </div>
@@ -361,7 +377,7 @@ export function CreateCourse() {
                             ))}
                         </SelectContent>
                     </Select>
-                    <FieldError error={formErrors.semester} />
+                    {renderFieldError(formErrors.semester)}
                 </div>
                 <div>
                     <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
@@ -432,7 +448,7 @@ export function CreateCourse() {
     /* ═══════════════════════════════════════════
        STEP 2: Enrollment Method
        ═══════════════════════════════════════════ */
-    const Step2 = () => (
+    const renderStep2 = () => (
         <div className="space-y-8">
             {/* Header */}
             <div className="text-center mb-2">
@@ -571,10 +587,11 @@ export function CreateCourse() {
             )}
 
             <div>
-                <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
+                <label htmlFor="initial-student-emails" className="block mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
                     Initial Student Emails (optional)
                 </label>
                 <Textarea
+                    id="initial-student-emails"
                     value={initialStudentEmails}
                     onChange={e => setInitialStudentEmails(e.target.value)}
                     placeholder="student1@warhawks.ulm.edu, student2@warhawks.ulm.edu"
@@ -587,10 +604,11 @@ export function CreateCourse() {
             </div>
 
             <div>
-                <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
+                <label htmlFor="initial-ta-emails" className="block mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
                     Initial Grading Assistant Emails (optional)
                 </label>
                 <Textarea
+                    id="initial-ta-emails"
                     value={initialTaEmails}
                     onChange={e => setInitialTaEmails(e.target.value)}
                     placeholder="ta1@ulm.edu, ta2@ulm.edu"
@@ -607,7 +625,7 @@ export function CreateCourse() {
     /* ═══════════════════════════════════════════
        STEP 3: Review & Create
        ═══════════════════════════════════════════ */
-    const Step3 = () => (
+    const renderStep3 = () => (
         <div className="space-y-8">
             {/* Header */}
             <div className="text-center mb-2">
@@ -619,6 +637,17 @@ export function CreateCourse() {
                     Double-check everything before creating your course
                 </p>
             </div>
+
+            {/* Error Display */}
+            {formErrors.courseName && (
+                <div className="p-4 rounded-lg flex items-start gap-3" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5' }}>
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#DC2626' }} />
+                    <div>
+                        <p style={{ fontSize: '14px', fontWeight: 600, color: '#DC2626', marginBottom: '2px' }}>Unable to create course</p>
+                        <p style={{ fontSize: '13px', color: '#991B1B' }}>{formErrors.courseName}</p>
+                    </div>
+                </div>
+            )}
 
             {/* Summary Card */}
             <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)', backgroundColor: '#fff' }}>
@@ -681,15 +710,15 @@ export function CreateCourse() {
                 <p style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D', marginBottom: '10px' }}>What happens next?</p>
                 <div className="space-y-3">
                     {[
-                        { text: 'Your course will be created and set to Active status', color: '#2D6A2D' },
+                        { text: 'Your course will be created and set to Active status', color: '#2D6A2D', order: 1 },
                         enrollmentMethod === 'code'
-                            ? { text: 'A unique 7-character enrollment code will be generated for students', color: '#1A4D7A' }
-                            : { text: 'You can add students manually from the Students page', color: '#8A5700' },
-                        { text: 'You can start creating assignments right away', color: '#6B0000' },
-                    ].map((item, i) => (
-                        <div key={i} className="flex items-center gap-3">
+                            ? { text: 'A unique 7-character enrollment code will be generated for students', color: '#1A4D7A', order: 2 }
+                            : { text: 'You can add students manually from the Students page', color: '#8A5700', order: 2 },
+                        { text: 'You can start creating assignments right away', color: '#6B0000', order: 3 },
+                    ].map((item) => (
+                        <div key={item.text} className="flex items-center gap-3">
                             <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: item.color, color: '#fff' }}>
-                                <span style={{ fontSize: '11px', fontWeight: 700 }}>{i + 1}</span>
+                                <span style={{ fontSize: '11px', fontWeight: 700 }}>{item.order}</span>
                             </div>
                             <p style={{ fontSize: '13px', color: '#595959' }}>{item.text}</p>
                         </div>
@@ -702,7 +731,7 @@ export function CreateCourse() {
     /* ═══════════════════════════════════════════
        STEP 4: Success (post-creation)
        ═══════════════════════════════════════════ */
-    const SuccessStep = () => {
+    const renderSuccessStep = () => {
         if (!createdCourse) return null;
 
         return (
@@ -770,7 +799,8 @@ export function CreateCourse() {
                                 onClick={() => {
                                     const printWin = window.open('', '_blank');
                                     if (printWin) {
-                                        printWin.document.write(`
+                                        printWin.document.open();
+                                        printWin.document.writeln(`
                       <html><head><title>Course Code</title>
                       <style>body{font-family:Inter,system-ui,sans-serif;text-align:center;padding:60px}
                       h1{color:#6B0000;font-size:28px;margin-bottom:4px}
@@ -852,7 +882,7 @@ export function CreateCourse() {
                 <div className="max-w-3xl mx-auto py-10 px-6">
 
                     {/* Step Progress (hide on success) */}
-                    {currentStep <= 3 && StepIndicator()}
+                    {currentStep <= 3 && renderStepIndicator()}
 
                     {/* Step Content */}
                     <div
@@ -863,10 +893,10 @@ export function CreateCourse() {
                             border: '1px solid var(--color-border)',
                         }}
                     >
-                        {currentStep === 1 && Step1()}
-                        {currentStep === 2 && Step2()}
-                        {currentStep === 3 && Step3()}
-                        {currentStep === 4 && SuccessStep()}
+                        {currentStep === 1 && renderStep1()}
+                        {currentStep === 2 && renderStep2()}
+                        {currentStep === 3 && renderStep3()}
+                        {currentStep === 4 && renderSuccessStep()}
                     </div>
 
                     {/* Navigation Footer (hide on success) */}
@@ -920,10 +950,10 @@ export function CreateCourse() {
                                         style={{ backgroundColor: '#6B0000', height: '44px', padding: '0 28px' }}
                                     >
                                         {isCreating ? (
-                                            <>
-                                                <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
-                                                Creating Course…
-                                            </>
+                                            <span className="inline-flex items-center">
+                                                <span className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" aria-hidden="true" />
+                                                {"Creating Course…"}
+                                            </span>
                                         ) : (
                                             <>
                                                 <Check className="w-4 h-4 mr-2" />

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     ChevronLeft, ChevronRight, CalendarDays, Clock,
@@ -7,6 +7,7 @@ import {
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
 import { Button } from './ui/button';
+import { useCourses, useAllAssignments } from '@/hooks/queries';
 
 /* ═══════════════════════════════════════════
    Types
@@ -39,53 +40,28 @@ function getCourseColor(courseCode: string): string {
 }
 
 /* ═══════════════════════════════════════════
-   Assignment data
+   Load locally-created assignments (fallback)
    ═══════════════════════════════════════════ */
 
-function loadAllAssignments(): CalendarAssignment[] {
-    const mockAssignments: CalendarAssignment[] = [
-        { id: 'a1', name: 'Hello World Program', dueDate: '2026-02-24', courseName: 'Introduction to Computer Science', courseCode: 'CS-1001', courseId: 'cs-1001', language: 'Python' },
-        { id: 'a2', name: 'Variables and Data Types', dueDate: '2026-03-03', courseName: 'Introduction to Computer Science', courseCode: 'CS-1001', courseId: 'cs-1001', language: 'Python' },
-        { id: 'a3', name: 'Control Flow: Loops', dueDate: '2026-03-10', courseName: 'Introduction to Computer Science', courseCode: 'CS-1001', courseId: 'cs-1001', language: 'Python' },
-        { id: 'a4', name: 'Functions and Modules', dueDate: '2026-03-17', courseName: 'Introduction to Computer Science', courseCode: 'CS-1001', courseId: 'cs-1001', language: 'Python' },
-        { id: 'a5', name: 'Object-Oriented Programming', dueDate: '2026-03-24', courseName: 'Introduction to Computer Science', courseCode: 'CS-1001', courseId: 'cs-1001', language: 'Python' },
-        { id: 'ds1', name: 'Linked List Implementation', dueDate: '2026-02-26', courseName: 'Data Structures and Algorithms', courseCode: 'CS-2050', courseId: 'cs-2050', language: 'Java' },
-        { id: 'ds2', name: 'Binary Search Trees', dueDate: '2026-03-05', courseName: 'Data Structures and Algorithms', courseCode: 'CS-2050', courseId: 'cs-2050', language: 'Java' },
-        { id: 'ds3', name: 'Graph Algorithms', dueDate: '2026-03-19', courseName: 'Data Structures and Algorithms', courseCode: 'CS-2050', courseId: 'cs-2050', language: 'Java' },
-        { id: 'se1', name: 'Requirements Document', dueDate: '2026-02-28', courseName: 'Software Engineering Principles', courseCode: 'CS-3100', courseId: 'cs-3100' },
-        { id: 'se2', name: 'System Design Diagram', dueDate: '2026-03-12', courseName: 'Software Engineering Principles', courseCode: 'CS-3100', courseId: 'cs-3100' },
-        { id: 'se3', name: 'Sprint Review Presentation', dueDate: '2026-03-26', courseName: 'Software Engineering Principles', courseCode: 'CS-3100', courseId: 'cs-3100' },
-        { id: 'wd1', name: 'React Portfolio App', dueDate: '2026-03-07', courseName: 'Advanced Web Development', courseCode: 'CS-4200', courseId: 'cs-4200', language: 'TypeScript' },
-        { id: 'wd2', name: 'REST API Project', dueDate: '2026-03-21', courseName: 'Advanced Web Development', courseCode: 'CS-4200', courseId: 'cs-4200', language: 'TypeScript' },
-    ];
-
-    // Load course info from localStorage to map courseId to name/code
-    let courseMap: Record<string, { code: string; title: string }> = {};
-    try {
-        const storedCourses = JSON.parse(localStorage.getItem('autograde_courses') || '[]');
-        storedCourses.forEach((c: any) => {
-            courseMap[c.id] = { code: c.code || '', title: c.title || 'Unknown Course' };
-        });
-    } catch { /* ignore */ }
-
-    // Load user-created assignments
+function loadLocalAssignments(
+    courseMap: Record<string, { code: string; name: string }>
+): CalendarAssignment[] {
     try {
         const stored = JSON.parse(localStorage.getItem('createdAssignments') || '[]');
-        const created: CalendarAssignment[] = stored.map((a: any) => {
+        return stored.map((a: any) => {
             const course = courseMap[a.courseId];
             return {
                 id: a.id,
                 name: a.name,
                 dueDate: a.dueDate,
-                courseName: course?.title || a.courseName || 'My Course',
+                courseName: course?.name || a.courseName || 'My Course',
                 courseCode: course?.code || a.courseCode || '',
-                courseId: a.courseId || 'cs-1001',
+                courseId: a.courseId || '',
                 language: a.language,
             };
         });
-        return [...mockAssignments, ...created];
     } catch {
-        return mockAssignments;
+        return [];
     }
 }
 
@@ -93,13 +69,48 @@ function loadAllAssignments(): CalendarAssignment[] {
    Component
    ═══════════════════════════════════════════ */
 
-const TODAY = new Date(2026, 1, 20); // Feb 20, 2026
+const TODAY = new Date();
+
+function formatDateStr(y: number, m: number, d: number) {
+    return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
 
 export function CalendarPage() {
     const router = useRouter();
     const [calendarDate, setCalendarDate] = useState(() => new Date(TODAY.getFullYear(), TODAY.getMonth(), 1));
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
-    const [allAssignments] = useState<CalendarAssignment[]>(loadAllAssignments);
+
+    // Fetch courses and assignments from the API
+    const { data: courses = [] } = useCourses();
+    const { data: apiAssignments = [] } = useAllAssignments();
+
+    // Build a lookup from courseId -> { code, name }
+    const courseMap = useMemo(() => {
+        const map: Record<string, { code: string; name: string }> = {};
+        for (const c of courses) {
+            map[c.id] = { code: c.code, name: c.name };
+        }
+        return map;
+    }, [courses]);
+
+    // Map API assignments to CalendarAssignment[], merging with any localStorage entries
+    const allAssignments = useMemo<CalendarAssignment[]>(() => {
+        const mapped: CalendarAssignment[] = apiAssignments.map(a => {
+            const course = courseMap[a.courseId];
+            return {
+                id: a.id,
+                name: a.name,
+                dueDate: a.dueDate ? a.dueDate.slice(0, 10) : '',
+                courseName: course?.name || 'Unknown Course',
+                courseCode: course?.code || '',
+                courseId: a.courseId,
+                language: a.language,
+            };
+        });
+
+        const local = loadLocalAssignments(courseMap);
+        return [...mapped, ...local];
+    }, [apiAssignments, courseMap]);
 
     const year = calendarDate.getFullYear();
     const month = calendarDate.getMonth();
@@ -114,11 +125,11 @@ export function CalendarPage() {
         assignmentsByDate[a.dueDate].push(a);
     });
 
-    // Calendar grid cells
-    const cells: (number | null)[] = [];
-    for (let i = 0; i < firstDay; i++) cells.push(null);
-    for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-    while (cells.length % 7 !== 0) cells.push(null);
+    // Calendar grid cells — each cell gets a stable unique key
+    const cells: { key: string; day: number | null }[] = [];
+    for (let i = 0; i < firstDay; i++) cells.push({ key: `pre-${i}`, day: null });
+    for (let d = 1; d <= daysInMonth; d++) cells.push({ key: `day-${d}`, day: d });
+    { let trailing = 0; while (cells.length % 7 !== 0) { cells.push({ key: `post-${trailing}`, day: null }); trailing++; } }
 
     // Selected day assignments
     const selectedAssignments = selectedDate ? (assignmentsByDate[selectedDate] || []) : [];
@@ -149,10 +160,6 @@ export function CalendarPage() {
         setCalendarDate(new Date(TODAY.getFullYear(), TODAY.getMonth(), 1));
         setSelectedDate(formatDateStr(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()));
     };
-
-    function formatDateStr(y: number, m: number, d: number) {
-        return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    }
 
     function handleDateClick(day: number) {
         const dateStr = formatDateStr(year, month, day);
@@ -237,16 +244,17 @@ export function CalendarPage() {
 
                         {/* Calendar Grid */}
                         <div className="grid grid-cols-7">
-                            {cells.map((day, idx) => {
-                                if (day === null) {
+                            {cells.map((cell) => {
+                                if (cell.day === null) {
                                     return (
                                         <div
-                                            key={`empty-${idx}`}
+                                            key={cell.key}
                                             style={{ minHeight: '80px', borderTop: '1px solid var(--color-border)' }}
                                         />
                                     );
                                 }
 
+                                const day = cell.day;
                                 const dateStr = formatDateStr(year, month, day);
                                 const dayAssignments = assignmentsByDate[dateStr] || [];
                                 const isToday = TODAY.getFullYear() === year && TODAY.getMonth() === month && TODAY.getDate() === day;
@@ -263,11 +271,11 @@ export function CalendarPage() {
                                             minHeight: '80px',
                                             padding: '6px 8px',
                                             borderTop: '1px solid var(--color-border)',
-                                            background: isSelected
-                                                ? 'rgba(107,0,0,0.06)'
-                                                : isToday
-                                                    ? 'rgba(107,0,0,0.03)'
-                                                    : 'transparent',
+                                            background: (() => {
+                                                if (isSelected) return 'rgba(107,0,0,0.06)';
+                                                if (isToday) return 'rgba(107,0,0,0.03)';
+                                                return 'transparent';
+                                            })(),
                                             cursor: 'pointer',
                                             border: 'none',
                                             borderTopWidth: '1px',
@@ -287,7 +295,11 @@ export function CalendarPage() {
                                                     width: '28px', height: '28px',
                                                     fontSize: '13px',
                                                     fontWeight: isToday || hasDue ? 700 : 400,
-                                                    color: isToday ? 'white' : isPast && !hasDue ? 'var(--color-text-light)' : 'var(--color-text-dark)',
+                                                    color: (() => {
+                                                        if (isToday) return 'white';
+                                                        if (isPast && !hasDue) return 'var(--color-text-light)';
+                                                        return 'var(--color-text-dark)';
+                                                    })(),
                                                     backgroundColor: isToday ? 'var(--color-primary)' : 'transparent',
                                                 }}
                                             >
@@ -486,7 +498,11 @@ export function CalendarPage() {
                                                                 padding: '1px 6px', borderRadius: '4px',
                                                                 backgroundColor: '#FEF2F2', color: '#991B1B',
                                                             }}>
-                                                                {daysUntil === 0 ? 'Due today' : daysUntil === 1 ? 'Due tomorrow' : `${daysUntil} days left`}
+                                                                {(() => {
+                                                                    if (daysUntil === 0) return 'Due today';
+                                                                    if (daysUntil === 1) return 'Due tomorrow';
+                                                                    return `${daysUntil} days left`;
+                                                                })()}
                                                             </span>
                                                         )}
                                                     </div>

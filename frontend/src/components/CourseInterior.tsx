@@ -616,10 +616,7 @@ export function CourseInterior() {
                                 <DropdownMenuItem
                                   className="flex items-center gap-2 cursor-pointer"
                                   onClick={() => {
-                                    const updated = assignments.map(a =>
-                                      a.id === assignment.id ? { ...a, published: false } : a
-                                    );
-                                    setAssignments(updated);
+                                    // TODO: implement archive via API
                                   }}
                                 >
                                   <Archive className="w-4 h-4" /> Archive

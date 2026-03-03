@@ -11,18 +11,45 @@ import { Sidebar } from './Sidebar';
 import { ReportsTable } from './ReportsTable';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { useGrades } from '@/hooks/queries/useGrades';
+import { useAssignments } from '@/hooks/queries';
 import {
-  getStudentsForCourse, ASSIGNMENTS, TOTAL_MAX, SECTION_MAP,
-  hashStr, gradeColor, pctColor, letterGrade, ordinal,
-  RUBRIC_CRITERIA, FEEDBACK_POOL,
+  gradeColor, pctColor, letterGrade, ordinal,
   type SharedStudent, type AssignmentDef,
 } from '../utils/studentData';
+import type { Assignment, Grade } from '@/types';
 
 /* ═══════════════════════════════════════════════════════════════════
    TYPES (local aliases)
    ═══════════════════════════════════════════════════════════════════ */
 
-type StudentRecord = SharedStudent;
+/** Normalised student row built from API grade data */
+interface StudentRecord {
+  id: string;
+  firstName: string;
+  lastName: string;
+  name: string;
+  studentId: string;
+  sisUserId: string;
+  sisLoginId: string;
+  email: string;
+  avatarInitials: string;
+  enrollmentDate: string;
+  section: string;
+  grades: Record<string, number | null>;
+  lateFlags: Record<string, boolean>;
+}
+
+/** Normalised assignment definition built from Assignment API */
+interface NormalisedAssignment {
+  id: string;
+  shortName: string;
+  fullName: string;
+  category: 'Homework' | 'Quiz' | 'Exam';
+  maxPoints: number;
+  dueDate: string;
+  isGroup?: boolean;
+}
 
 function lookupCourseCode(id: string) {
   try {
@@ -33,6 +60,19 @@ function lookupCourseCode(id: string) {
   return id;
 }
 
+/** Convert an API Assignment to the local normalised shape. */
+function toNormalisedAssignment(a: Assignment): NormalisedAssignment {
+  return {
+    id: String(a.id),
+    shortName: a.shortName || a.name.slice(0, 8),
+    fullName: a.name,
+    category: (a.category as 'Homework' | 'Quiz' | 'Exam') || 'Homework',
+    maxPoints: a.maxPoints,
+    dueDate: a.dueDate,
+    isGroup: a.isGroup,
+  };
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    MAIN COMPONENT
    ═══════════════════════════════════════════════════════════════════ */
@@ -40,8 +80,14 @@ function lookupCourseCode(id: string) {
 export function ReportsDashboard() {
   const { courseId } = useParams() as { courseId: string };
   const courseCode = lookupCourseCode(courseId ?? '');
-  const section = SECTION_MAP[courseId ?? ''] || 'Spring 2026 - 64251';
 
+  /* ── API data ── */
+  const { data: gradesData, isLoading: gradesLoading } = useGrades(courseId);
+  const { data: assignmentsData, isLoading: assignmentsLoading } = useAssignments(courseId);
+
+  const isLoading = gradesLoading || assignmentsLoading;
+
+  /* ── State ── */
   const [view, setView] = useState<'gradebook' | 'student'>('gradebook');
   const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null);
   const [sortField, setSortField] = useState('lastName');
@@ -49,14 +95,90 @@ export function ReportsDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
-  const students = useMemo(() => getStudentsForCourse(courseId ?? 'cs-1001'), [courseId]);
+  /* ── Normalise assignments from API ── */
+  const assignments: NormalisedAssignment[] = useMemo(() => {
+    if (!assignmentsData) return [];
+    return assignmentsData.map(toNormalisedAssignment);
+  }, [assignmentsData]);
 
+  const totalMax = useMemo(
+    () => assignments.reduce((sum, a) => sum + a.maxPoints, 0),
+    [assignments],
+  );
+
+  /* ── Build student records from grades API ──
+       useGrades returns Grade[]. Each Grade has:
+         id, submissionId, rubricScores[], totalScore, maxScore,
+         percentage, letterGrade, feedback?, gradedAt, gradedBy
+       We group by gradedBy (student) — but Grade doesn't carry student info.
+
+       If the API actually returns the richer shape described by the caller
+       (with students array), handle both cases gracefully.
+  */
+  const students: StudentRecord[] = useMemo(() => {
+    if (!gradesData) return [];
+
+    // The grades API may return the enriched object shape:
+    //   { assignments, students, graded_count, total_count }
+    // or a raw Grade[]. Handle both.
+    const raw = gradesData as any;
+
+    if (Array.isArray(raw?.students)) {
+      // Enriched gradebook response
+      return (raw.students as any[]).map((s: any) => {
+        const nameParts = (s.name || '').split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
+        // s.grades is { "<assignmentId>": { score, status } | number | null }
+        const grades: Record<string, number | null> = {};
+        const lateFlags: Record<string, boolean> = {};
+
+        if (s.grades && typeof s.grades === 'object') {
+          for (const [aId, val] of Object.entries(s.grades)) {
+            if (val === null || val === undefined) {
+              grades[aId] = null;
+              lateFlags[aId] = false;
+            } else if (typeof val === 'number') {
+              grades[aId] = val;
+              lateFlags[aId] = false;
+            } else if (typeof val === 'object') {
+              const g = val as any;
+              grades[aId] = g.score ?? null;
+              lateFlags[aId] = !!g.is_late;
+            }
+          }
+        }
+
+        return {
+          id: String(s.student_id ?? s.id),
+          firstName,
+          lastName,
+          name: s.name || '',
+          studentId: String(s.student_id ?? s.id),
+          sisUserId: String(s.student_id ?? s.id),
+          sisLoginId: s.email || '',
+          email: s.email || '',
+          avatarInitials: `${firstName[0] || ''}${lastName[0] || ''}`,
+          enrollmentDate: '',
+          section: '',
+          grades,
+          lateFlags,
+        } satisfies StudentRecord;
+      });
+    }
+
+    // Fallback: raw Grade[] — cannot reconstruct student list from this alone
+    return [];
+  }, [gradesData]);
+
+  /* ── Per-student statistics ── */
   const studentStats = useMemo(() => {
     const map = new Map<string, { earned: number; possible: number; pct: number; submitted: number; total: number }>();
     students.forEach(s => {
       let earned = 0;
       let submitted = 0;
-      ASSIGNMENTS.forEach(a => {
+      assignments.forEach(a => {
         if (s.grades[a.id] !== null && s.grades[a.id] !== undefined) {
           earned += s.grades[a.id]!;
           submitted++;
@@ -64,14 +186,14 @@ export function ReportsDashboard() {
       });
       map.set(s.id, {
         earned,
-        possible: TOTAL_MAX,
-        pct: TOTAL_MAX > 0 ? (earned / TOTAL_MAX) * 100 : 0,
+        possible: totalMax,
+        pct: totalMax > 0 ? (earned / totalMax) * 100 : 0,
         submitted,
-        total: ASSIGNMENTS.length,
+        total: assignments.length,
       });
     });
     return map;
-  }, [students]);
+  }, [students, assignments, totalMax]);
 
   const filtered = useMemo(() => {
     let list = [...students];
@@ -166,20 +288,43 @@ export function ReportsDashboard() {
 
         <main className="flex-1 overflow-auto p-8" style={{ backgroundColor: 'var(--color-background)' }}>
 
+          {/* ════════════════ LOADING STATE ════════════════ */}
+          {isLoading && (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto mb-4" style={{ borderColor: '#6B0000' }} />
+                <p style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>Loading grade data...</p>
+              </div>
+            </div>
+          )}
+
+          {/* ════════════════ EMPTY STATE ════════════════ */}
+          {!isLoading && students.length === 0 && view === 'gradebook' && (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <FileText className="w-12 h-12 mx-auto mb-4" style={{ color: '#8A8A8A' }} />
+                <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>No grade data available</h2>
+                <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '8px' }}>
+                  Grades will appear here once students submit assignments and they are graded.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* ════════════════ GRADEBOOK VIEW ════════════════ */}
-          {view === 'gradebook' && (
+          {!isLoading && view === 'gradebook' && students.length > 0 && (
             <>
               <div className="flex items-start justify-between mb-6 flex-wrap gap-4">
                 <div>
                   <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--color-text-dark)' }}>Gradebook</h1>
                   <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '4px' }}>
-                    All student grades at a glance — {section}
+                    All student grades at a glance
                   </p>
                 </div>
               </div>
 
               <ReportsTable
-                assignments={ASSIGNMENTS.map(a => ({
+                assignments={assignments.map(a => ({
                   id: a.id,
                   shortName: a.shortName,
                   fullName: a.fullName,
@@ -187,7 +332,7 @@ export function ReportsDashboard() {
                 }))}
                 students={students.map(s => ({
                   id: s.id,
-                  name: `${s.lastName}, ${s.firstName}`,
+                  name: `${s.lastName}, ${s.firstName}`.trim().replace(/^,\s*/, ''),
                   studentId: s.studentId,
                   sisUserId: s.sisUserId,
                   sisLoginId: s.sisLoginId,
@@ -205,9 +350,8 @@ export function ReportsDashboard() {
                   const s = students.find(st => st.id === studentId);
                   if (s) openStudentReport(s);
                 }}
-                onExport={(format) => {
-                  console.log(`Exporting gradebook as ${format}`);
-                  // In production, call exportGrades API
+                onExport={(_format) => {
+                  // TODO: call exportGrades API
                 }}
               />
             </>
@@ -216,14 +360,15 @@ export function ReportsDashboard() {
           {/* ════════════════ STUDENT DETAIL VIEW ════════════════ */}
           {view === 'student' && selectedStudent && (() => {
             const s = selectedStudent;
-            const stats = studentStats.get(s.id)!;
+            const stats = studentStats.get(s.id);
+            if (!stats) return null;
             const pct = stats.pct;
             const grade = letterGrade(pct);
 
             const gradeCounts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, F: 0, missing: 0 };
             let onTime = 0;
             let lateCount = 0;
-            ASSIGNMENTS.forEach(a => {
+            assignments.forEach(a => {
               const g = s.grades[a.id];
               if (g === null || g === undefined) {
                 gradeCounts.missing++;
@@ -257,15 +402,15 @@ export function ReportsDashboard() {
                   <div className="flex items-start justify-between flex-wrap gap-4">
                     <div className="flex items-start gap-5">
                       <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center flex-shrink-0 text-white" style={{ backgroundColor: '#6B0000', fontSize: '22px', fontWeight: 700 }}>
-                        {s.firstName[0]}{s.lastName[0]}
+                        {s.firstName[0] || ''}{s.lastName[0] || ''}
                       </div>
                       <div>
                         <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-text-dark)' }}>{s.firstName} {s.lastName}</h1>
                         <div className="mt-2 space-y-1" style={{ fontSize: '14px', color: '#595959' }}>
                           <p>Student ID: <strong>{s.id}</strong> &nbsp;·&nbsp; CWID: <strong>{s.sisUserId}</strong></p>
-                          <p>Username: <strong>{s.sisLoginId}</strong> &nbsp;·&nbsp; Section: <strong>{s.section}</strong></p>
-                          <p>Email: <strong>{s.email}</strong></p>
-                          <p>Enrolled: <strong>{new Date(s.enrollmentDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong></p>
+                          <p>Username: <strong>{s.sisLoginId}</strong>{s.section && <> &nbsp;·&nbsp; Section: <strong>{s.section}</strong></>}</p>
+                          {s.email && <p>Email: <strong>{s.email}</strong></p>}
+                          {s.enrollmentDate && <p>Enrolled: <strong>{new Date(s.enrollmentDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong></p>}
                         </div>
                       </div>
                     </div>
@@ -318,33 +463,18 @@ export function ReportsDashboard() {
                         <th className="text-left px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Assignment</th>
                         <th className="text-left px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Category</th>
                         <th className="text-center px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Max Pts</th>
-                        <th className="text-left px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Submitted</th>
                         <th className="text-left px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Status</th>
                         <th className="text-center px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Earned</th>
                         <th className="text-center px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>%</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {ASSIGNMENTS.map((a, aIdx) => {
+                      {assignments.map((a, aIdx) => {
                         const earned = s.grades[a.id];
                         const isNull = earned === null || earned === undefined;
                         const aPct = isNull ? 0 : (earned / a.maxPoints) * 100;
                         const isLate = s.lateFlags[a.id] && !isNull;
                         const expanded = expandedRows.has(a.id);
-
-                        const rubricScores = RUBRIC_CRITERIA.map(r => {
-                          const max = Math.round(a.maxPoints * r.weight / 100);
-                          if (isNull) return { ...r, earned: 0, max };
-                          const h = hashStr(s.id + ':' + a.id + ':' + r.name);
-                          const variation = (h % 11) - 5;
-                          const rPct = Math.min(100, Math.max(25, aPct + variation));
-                          return { ...r, earned: Math.round(max * rPct / 100), max };
-                        });
-
-                        const dueDate = new Date(a.dueDate);
-                        const dayOffset = hashStr(s.id + a.id + 'sub') % 5 + 1;
-                        const submitDate = isNull ? null : new Date(dueDate.getTime() + (isLate ? 86400000 : -86400000 * dayOffset));
-                        const feedbackIdx = hashStr(s.id + ':' + a.id + ':fb') % FEEDBACK_POOL.length;
                         const altBg = aIdx % 2 ? '#FAFAF8' : '#fff';
 
                         return (
@@ -382,16 +512,6 @@ export function ReportsDashboard() {
                                 </span>
                               </td>
                               <td className="text-center px-4 py-3" style={{ color: '#595959' }}>{a.maxPoints}</td>
-                              <td className="px-4 py-3" style={{ fontSize: '13px', color: '#595959' }}>
-                                {isNull ? '—' : (
-                                  <>
-                                    {submitDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                    <span style={{ fontSize: '11px', color: '#8A8A8A', display: 'block' }}>
-                                      {submitDate?.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-                                    </span>
-                                  </>
-                                )}
-                              </td>
                               <td className="px-4 py-3">
                                 {isNull ? (
                                   <span className="flex items-center gap-1 text-xs" style={{ color: '#8B0000', fontWeight: 600 }}>
@@ -403,7 +523,7 @@ export function ReportsDashboard() {
                                   </span>
                                 ) : (
                                   <span className="flex items-center gap-1 text-xs" style={{ color: '#2D6A2D', fontWeight: 600 }}>
-                                    <CheckCircle2 className="w-3.5 h-3.5" /> On Time
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> Graded
                                   </span>
                                 )}
                               </td>
@@ -412,53 +532,21 @@ export function ReportsDashboard() {
                               </td>
                               <td className="text-center px-4 py-3" style={{ fontWeight: 600, color: isNull ? '#8A8A8A' : gradeColor(earned!, a.maxPoints) }}>
                                 {isNull ? '0%' : `${aPct.toFixed(0)}%`}
-                                {!isNull && aPct >= 90 && <span style={{ marginLeft: 4 }}>✓</span>}
-                                {isNull && <span style={{ marginLeft: 4 }}>✗</span>}
-                                {!isNull && aPct < 70 && <span style={{ marginLeft: 4 }}>⚠</span>}
+                                {!isNull && aPct >= 90 && <span style={{ marginLeft: 4 }}>&#10003;</span>}
+                                {isNull && <span style={{ marginLeft: 4 }}>&#10007;</span>}
+                                {!isNull && aPct < 70 && <span style={{ marginLeft: 4 }}>&#9888;</span>}
                               </td>
                             </tr>
 
                             {expanded && !isNull && (
                               <tr style={{ borderBottom: '1px solid #E8E8E8' }}>
-                                <td colSpan={8} className="px-6 py-5" style={{ backgroundColor: '#FAFAFA' }}>
-                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <div>
-                                      <h4 className="flex items-center gap-2 mb-3" style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>
-                                        <FileText className="w-4 h-4" style={{ color: '#6B0000' }} /> Rubric Breakdown
-                                      </h4>
-                                      <div className="space-y-2">
-                                        {rubricScores.map(r => (
-                                          <div key={r.name}>
-                                            <div className="flex items-center gap-3 mb-1">
-                                              {r.max > 0 && r.earned >= r.max * 0.7
-                                                ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#2D6A2D' }} />
-                                                : <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#8A5700' }} />
-                                              }
-                                              <span style={{ fontSize: '13px', color: '#2D2D2D', minWidth: 140 }}>{r.name}:</span>
-                                              <span style={{ fontSize: '13px', fontWeight: 600, color: gradeColor(r.earned, r.max) }}>{r.earned} / {r.max}</span>
-                                              <span style={{ fontSize: '12px', color: '#8A8A8A' }}>({r.max > 0 ? Math.round((r.earned / r.max) * 100) : 0}%)</span>
-                                            </div>
-                                            <div className="ml-7 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#E8E8E8', maxWidth: 200 }}>
-                                              <div className="h-full rounded-full" style={{ width: `${r.max > 0 ? Math.round((r.earned / r.max) * 100) : 0}%`, backgroundColor: gradeColor(r.earned, r.max), transition: 'width 0.3s ease' }} />
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <h4 className="flex items-center gap-2 mb-3" style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>
-                                        <MessageSquare className="w-4 h-4" style={{ color: '#6B0000' }} /> Details &amp; Feedback
-                                      </h4>
-                                      <div className="space-y-2" style={{ fontSize: '13px', color: '#595959' }}>
-                                        <p><strong>Submitted:</strong> {submitDate?.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} at {submitDate?.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</p>
-                                        <p><strong>Due:</strong> {dueDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} at 11:59 PM</p>
-                                        <p><strong>Status:</strong> {isLate ? 'Late (submitted after deadline)' : `On time (submitted ${dayOffset} day${dayOffset > 1 ? 's' : ''} early)`}</p>
-                                        <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: '#fff', border: '1px solid #E8E8E8' }}>
-                                          <p style={{ fontWeight: 600, marginBottom: '4px', color: '#2D2D2D', fontSize: '13px' }}>Instructor Feedback:</p>
-                                          <p style={{ fontStyle: 'italic', lineHeight: '1.6' }}>"{FEEDBACK_POOL[feedbackIdx]}"</p>
-                                        </div>
-                                      </div>
-                                    </div>
+                                <td colSpan={7} className="px-6 py-5" style={{ backgroundColor: '#FAFAFA' }}>
+                                  <div className="space-y-2" style={{ fontSize: '13px', color: '#595959' }}>
+                                    <p><strong>Score:</strong> {earned} / {a.maxPoints} ({aPct.toFixed(1)}%)</p>
+                                    {a.dueDate && (
+                                      <p><strong>Due:</strong> {new Date(a.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} at 11:59 PM</p>
+                                    )}
+                                    <p><strong>Status:</strong> {isLate ? 'Late (submitted after deadline)' : 'On time'}</p>
                                   </div>
                                 </td>
                               </tr>
@@ -476,7 +564,7 @@ export function ReportsDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ fontSize: '14px', color: '#595959', lineHeight: '1.8' }}>
                     <div>
                       <p><strong>Total Earned:</strong> {stats.earned} / {stats.possible} points ({pct.toFixed(1)}%)</p>
-                      <p><strong>Assignments Completed:</strong> {stats.submitted} / {stats.total} ({((stats.submitted / stats.total) * 100).toFixed(1)}%)</p>
+                      <p><strong>Assignments Completed:</strong> {stats.submitted} / {stats.total} ({stats.total > 0 ? ((stats.submitted / stats.total) * 100).toFixed(1) : 0}%)</p>
                       <p><strong>Average Assignment Score:</strong> {pct.toFixed(1)}%</p>
                     </div>
                     <div>

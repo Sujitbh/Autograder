@@ -27,6 +27,16 @@ function lookupCourseCode(id: string) {
 
 /** Convert form data → API DTO */
 function toDto(data: AssignmentFormData, courseId: string): CreateAssignmentDto {
+    // dueDate from datetime-local is like "2026-03-15T23:59" — convert to ISO
+    // If empty (draft with no date yet), leave it as empty string so the backend stores null
+    let isoDate = '';
+    if (data.dueDate) {
+        const parsed = new Date(data.dueDate);
+        if (!Number.isNaN(parsed.getTime())) {
+            isoDate = parsed.toISOString();
+        }
+    }
+
     return {
         courseId,
         name: data.name.trim() || 'Untitled Assignment',
@@ -34,9 +44,7 @@ function toDto(data: AssignmentFormData, courseId: string): CreateAssignmentDto 
         description: data.description || '',
         language: (data.language as 'python' | 'java') ?? 'python',
         category: 'Homework',
-        dueDate: data.dueDate
-            ? new Date(data.dueDate).toISOString()
-            : new Date().toISOString(),
+        dueDate: isoDate,
         maxPoints: data.maxPoints ?? 100,
         isGroup: data.isGroup ?? false,
         allowLateSubmissions: data.allowLateSubmissions ?? false,
@@ -63,16 +71,29 @@ export function CreateAssignmentPage() {
 
     const handleSaveDraft = useCallback(
         (data: AssignmentFormData) => {
-            // For drafts, still save locally for now
-            try {
-                localStorage.setItem(
-                    `autograde_assignment_draft_${cid}`,
-                    JSON.stringify(data),
-                );
-            } catch { /* ignore */ }
-            toast.success('Draft saved locally');
+            const dto = { ...toDto(data, cid), status: 'draft' } as CreateAssignmentDto & { status: string };
+            createMutation.mutate(dto, {
+                onSuccess: () => {
+                    // Clear local draft
+                    try {
+                        localStorage.removeItem(`autograde_assignment_draft_${cid}`);
+                    } catch { /* ignore */ }
+                    toast.success('Assignment saved as draft!');
+                    router.push(`/courses/${cid}`);
+                },
+                onError: (err) => {
+                    // Fallback: save to localStorage if backend fails
+                    try {
+                        localStorage.setItem(
+                            `autograde_assignment_draft_${cid}`,
+                            JSON.stringify(data),
+                        );
+                    } catch { /* ignore */ }
+                    toast.error(`Failed to save draft to server: ${err.message}. Saved locally instead.`);
+                },
+            });
         },
-        [cid]
+        [cid, createMutation, router]
     );
 
     const handlePublish = useCallback(
@@ -88,7 +109,7 @@ export function CreateAssignmentPage() {
                     router.push(`/courses/${cid}`);
                 },
                 onError: (err) => {
-                    toast.error(`Failed to create assignment: ${(err as Error).message}`);
+                    toast.error(`Failed to create assignment: ${err.message}`);
                 },
             });
         },

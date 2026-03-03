@@ -48,20 +48,20 @@ function mapSubmission(s: BackendSubmission): Submission {
     grade:
       s.score != null
         ? {
-            id: `grade-${s.id}`,
-            submissionId: String(s.id),
-            rubricScores: [],
-            totalScore: s.score,
-            maxScore: s.max_score ?? 100,
-            percentage:
-              s.max_score && s.max_score > 0
-                ? Number(((s.score / s.max_score) * 100).toFixed(2))
-                : 0,
-            letterGrade: '',
-            feedback: s.feedback ?? '',
-            gradedAt: s.graded_at ?? '',
-            gradedBy: '',
-          }
+          id: `grade-${s.id}`,
+          submissionId: String(s.id),
+          rubricScores: [],
+          totalScore: s.score,
+          maxScore: s.max_score ?? 100,
+          percentage:
+            s.max_score && s.max_score > 0
+              ? Number(((s.score / s.max_score) * 100).toFixed(2))
+              : 0,
+          letterGrade: '',
+          feedback: s.feedback ?? '',
+          gradedAt: s.graded_at ?? '',
+          gradedBy: '',
+        }
         : undefined,
   };
 }
@@ -79,10 +79,11 @@ export const submissionService = {
     const formData = new FormData();
     files.forEach((file) => formData.append('files', file));
 
+    // Do NOT set Content-Type manually — Axios auto-generates the correct
+    // multipart/form-data boundary when the body is FormData.
     const { data } = await api.post<BackendUploadResponse>(
       `/submissions/assignments/${assignmentId}/upload`,
       formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
     );
     return data;
   },
@@ -94,11 +95,35 @@ export const submissionService = {
     );
     return mapSubmission(data);
   },
-
-  /** Get files for a submission. */
-  async getSubmissionFiles(submissionId: string): Promise<Array<{id: number; filename: string; file_size: number | null}>> {
+  /** Get full submission detail including file contents and test results. */
+  async getSubmissionDetail(submissionId: string): Promise<{
+    id: number;
+    status: string;
+    score: number | null;
+    max_score: number | null;
+    submitted_at: string | null;
+    files: Array<{ id: number; filename: string; content: string | null }>;
+    results: Array<{
+      testcase_id: number;
+      test_name: string;
+      passed: boolean;
+      actual_output: string;
+      expected_output: string;
+      execution_time_ms: number;
+      points: number;
+      points_earned: number;
+      error: string | null;
+    }>;
+  }> {
     const { data } = await withRetry(() =>
-      api.get<Array<{id: number; filename: string; file_size: number | null}>>(`/submissions/${submissionId}/files`)
+      api.get(`/submissions/${submissionId}/detail`)
+    );
+    return data;
+  },
+  /** Get files for a submission. */
+  async getSubmissionFiles(submissionId: string): Promise<Array<{ id: number; filename: string; file_size: number | null }>> {
+    const { data } = await withRetry(() =>
+      api.get<Array<{ id: number; filename: string; file_size: number | null }>>(`/submissions/${submissionId}/files`)
     );
     return data;
   },

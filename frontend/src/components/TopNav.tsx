@@ -1,4 +1,5 @@
-import { ChevronRight, ChevronDown, GraduationCap, LogOut, Settings, User, Bell, BookOpen, Moon, Sun, StickyNote, CalendarDays } from 'lucide-react';
+import { ChevronRight, ChevronDown, GraduationCap, LogOut, User, Bell, BookOpen, Moon, Sun, StickyNote, CalendarDays, ArrowLeftRight } from 'lucide-react';
+import { LiveClock } from './LiveClock';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -6,10 +7,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useTheme } from '../utils/ThemeContext';
 import { useNotesPanel } from './PageLayout';
+import { useTAStatus } from '@/hooks/queries/useTADashboard';
+import { useAuth } from '@/utils/AuthContext';
 
 interface TopNavProps {
   breadcrumbs?: { label: string; href?: string }[];
@@ -59,20 +62,29 @@ export function TopNav({
   userName: userNameProp,
   userEmail: userEmailProp,
   hasUnreadNotifications = false
-}: TopNavProps) {
+}: Readonly<TopNavProps>) {
   const router = useRouter();
+  const pathname = usePathname();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { isDark, toggleTheme } = useTheme();
   const { notesPanelOpen, toggleNotesPanel } = useNotesPanel();
+  const { user: authUser, logout } = useAuth();
 
-  // Read current user from localStorage, fall back to props or defaults
-  const currentUser = (() => {
-    try {
-      const stored = localStorage.getItem('autograde_current_user');
-      if (stored) return JSON.parse(stored);
-    } catch { }
-    return null;
-  })();
+  // Use AuthContext user (reactive) instead of reading localStorage directly
+  const currentUser = authUser as any;
+
+  const isStudent = currentUser?.role === 'student';
+  const { data: taStatus } = useTAStatus();
+  const isTA = isStudent && taStatus?.is_ta;
+  const isInTAView = pathname?.startsWith('/ta');
+
+  const handleSwitchView = () => {
+    if (isInTAView) {
+      router.push('/student');
+    } else {
+      router.push('/ta');
+    }
+  };
 
   const userName = userNameProp ?? (
     currentUser
@@ -85,18 +97,29 @@ export function TopNav({
   const getInitials = (name: string) => {
     const parts = name.split(' ');
     if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+      return `${parts[0][0]}${parts.at(-1)![0]}`.toUpperCase();
     }
     return name.substring(0, 2).toUpperCase();
   };
 
   const handleSignOut = () => {
-    // Clear session storage
-    localStorage.removeItem('autograde_auth');
-    localStorage.removeItem('autograde_current_user');
+    // Use AuthContext logout which clears localStorage + React Query cache
+    logout();
     // Navigate to login
     router.push('/login');
-    window.location.reload();
+  };
+
+  const getHomeRoute = () => {
+    if (currentUser?.role === 'admin') return '/admin';
+    if (isInTAView) return '/ta';
+    if (currentUser?.role === 'student') return '/student';
+    return '/courses';
+  };
+
+  const getSettingsRoute = () => {
+    if (currentUser?.role === 'admin') return '/admin/account';
+    if (currentUser?.role === 'student') return '/student/settings';
+    return '/faculty/settings';
   };
 
   return (
@@ -112,11 +135,12 @@ export function TopNav({
       }}
     >
       {/* Left Zone: Logo + App Name */}
-      <div
+      <button
         className="flex items-center cursor-pointer"
-        onClick={() => router.push('/courses')}
-        role="button"
+        onClick={() => router.push(getHomeRoute())}
+        type="button"
         aria-label="Go to courses"
+        style={{ background: 'none', border: 'none', padding: 0 }}
       >
         <GraduationCap
           className="text-white"
@@ -136,13 +160,13 @@ export function TopNav({
         >
           Autograder
         </span>
-      </div>
+      </button>
 
       {/* Center Zone: Breadcrumb Trail (hidden on top-level pages) */}
       {breadcrumbs.length > 0 && (
         <div className="flex items-center gap-2">
           {breadcrumbs.map((crumb, index) => (
-            <div key={index} className="flex items-center gap-2">
+            <div key={crumb.label} className="flex items-center gap-2">
               {index > 0 && (
                 <ChevronRight
                   className="text-white"
@@ -179,8 +203,27 @@ export function TopNav({
         </div>
       )}
 
-      {/* Right Zone: Theme Toggle + Notification Bell + Divider + Profile */}
+      {/* Right Zone: Role Switcher + Theme Toggle + Notification Bell + Divider + Profile */}
       <div className="flex items-center gap-4">
+        {/* TA ↔ Student Role Switcher */}
+        {isTA && (
+          <button
+            onClick={handleSwitchView}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full transition-all hover:opacity-90"
+            style={{
+              backgroundColor: isInTAView ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.25)',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: 'white',
+            }}
+            title={isInTAView ? 'Switch to Student view' : 'Switch to TA view'}
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5" />
+            {isInTAView ? 'Student View' : 'TA View'}
+          </button>
+        )}
+
         {/* Dark Mode Toggle */}
         <button
           onClick={toggleTheme}
@@ -198,6 +241,7 @@ export function TopNav({
         <button
           className="relative hover:opacity-80 transition-opacity"
           aria-label="Notifications"
+          onClick={() => router.push(currentUser?.role === 'student' ? '/student/notifications' : '/faculty/notifications')}
         >
           <Bell
             className="text-white"
@@ -254,6 +298,9 @@ export function TopNav({
             style={{ width: '22px', height: '22px' }}
           />
         </button>
+
+        {/* Live Date & Time */}
+        <LiveClock variant="light" />
 
         {/* Divider */}
         <div
@@ -364,7 +411,7 @@ export function TopNav({
 
             {/* Row 2: Account Settings */}
             <DropdownMenuItem
-              onClick={() => router.push('/faculty/settings')}
+              onClick={() => router.push(getSettingsRoute())}
               className="cursor-pointer"
               style={{ padding: '12px 16px' }}
             >

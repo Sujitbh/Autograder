@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { BookOpen, Check, X, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { taService } from '@/services/api/taService';
+import { useAuth } from '@/utils/AuthContext';
 
 interface TAInvitation {
   id: number;
@@ -19,24 +20,38 @@ interface TAInvitationsProps {
   onAccepted?: () => void;
 }
 
-export function TAInvitations({ onAccepted }: TAInvitationsProps) {
+export function TAInvitations({ onAccepted }: Readonly<TAInvitationsProps>) {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [invitations, setInvitations] = useState<TAInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [respondingId, setRespondingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadInvitations();
-  }, []);
+    // Only load invitations if authentication is ready and user is authenticated
+    if (!authLoading && isAuthenticated) {
+      loadInvitations();
+    } else if (!authLoading && !isAuthenticated) {
+      // User is not authenticated, stop loading
+      setLoading(false);
+    }
+  }, [authLoading, isAuthenticated]);
 
   const loadInvitations = async () => {
     try {
       setLoading(true);
+      setError(null);
       const data = await taService.getMyInvitations();
       setInvitations(data);
     } catch (err) {
       console.error('Failed to load TA invitations:', err);
-      setError('Failed to load invitations');
+      // Don't show error message for authentication issues - just silently fail
+      if (err instanceof Error && err.message.includes('authenticated')) {
+        // Silent fail for auth issues
+        setInvitations([]);
+      } else {
+        setError('Failed to load invitations');
+      }
     } finally {
       setLoading(false);
     }
