@@ -160,6 +160,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         []
     );
 
+    // Listen for forced sign-out from the API interceptor (e.g. expired token)
+    useEffect(() => {
+        const handleSignout = () => {
+            logout();
+            // Redirect to login
+            if (typeof window !== 'undefined') {
+                window.location.href = '/login';
+            }
+        };
+        window.addEventListener('auth:signout', handleSignout);
+        return () => window.removeEventListener('auth:signout', handleSignout);
+    }, [logout]);
+
     return (
         <AuthContext.Provider
             value={{

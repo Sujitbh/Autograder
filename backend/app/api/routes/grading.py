@@ -12,6 +12,7 @@ from app.core.permissions import require_course_role
 from app.models.user import User
 from app.models.assignment import Assignment
 from app.models.submission import Submission
+from app.models.testcase import TestCase
 from app.services.grading_service import GradingService
 from app.services.execution_service import ExecutionService, ExecutionStatus
 
@@ -204,6 +205,32 @@ def get_submission_results(
 
     results = GradingService.get_results(db, submission_id)
 
+    is_student = user.role == "student"
+    test_results_out = []
+    for r in results:
+        # Check if the test case is private
+        tc = db.query(TestCase).filter(TestCase.id == r.testcase_id).first() if r.testcase_id else None
+        is_private = tc and not tc.is_public
+
+        if is_student and is_private:
+            test_results_out.append({
+                "id": r.id,
+                "testcase_id": r.testcase_id,
+                "passed": r.passed,
+                "output": "(hidden)",
+                "points_awarded": r.points_awarded,
+                "execution_time_ms": r.execution_time_ms,
+            })
+        else:
+            test_results_out.append({
+                "id": r.id,
+                "testcase_id": r.testcase_id,
+                "passed": r.passed,
+                "output": r.output,
+                "points_awarded": r.points_awarded,
+                "execution_time_ms": r.execution_time_ms,
+            })
+
     return {
         "submission_id": submission_id,
         "status": submission.status,
@@ -211,17 +238,7 @@ def get_submission_results(
         "max_score": submission.max_score,
         "feedback": submission.feedback,
         "graded_at": submission.graded_at,
-        "test_results": [
-            {
-                "id": r.id,
-                "testcase_id": r.testcase_id,
-                "passed": r.passed,
-                "output": r.output,
-                "points_awarded": r.points_awarded,
-                "execution_time_ms": r.execution_time_ms,
-            }
-            for r in results
-        ],
+        "test_results": test_results_out,
     }
 
 

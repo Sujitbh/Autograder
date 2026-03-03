@@ -21,6 +21,7 @@ export function useTestCaseRunner() {
 
     for (let i = 0; i < testCases.length; i++) {
       const tc = testCases[i];
+      const testName = tc.name || `Test ${i + 1}`;
       try {
         const execResult = await codeExecutionApiService.execute({
           code,
@@ -33,7 +34,7 @@ export function useTestCaseRunner() {
 
         newResults.push({
           testcaseId: tc.id,
-          testName: `Test ${i + 1}`,
+          testName,
           passed: (execResult.status === 'success' || execResult.status === 'SUCCESS') && actual === expected,
           actualOutput: execResult.stdout,
           expectedOutput: tc.expected_output ?? '',
@@ -46,7 +47,7 @@ export function useTestCaseRunner() {
       } catch {
         newResults.push({
           testcaseId: tc.id,
-          testName: `Test ${i + 1}`,
+          testName,
           passed: false,
           actualOutput: '',
           expectedOutput: tc.expected_output ?? '',

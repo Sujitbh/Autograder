@@ -8,6 +8,8 @@ import {
     useTASubmissionDetail,
     useTAGradeSubmission,
     useTACoursePermissions,
+    useTARunTests,
+    useTAAutoGrade,
 } from '@/hooks/queries/useTADashboard';
 import {
     ArrowLeft,
@@ -25,6 +27,8 @@ import {
     Calendar,
     Hash,
     FileText,
+    Play,
+    Zap,
 } from 'lucide-react';
 
 interface TAGradingPageProps {
@@ -40,12 +44,39 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const { data: permissions } = useTACoursePermissions(courseIdNum);
     const { data: detail, isLoading, error } = useTASubmissionDetail(courseIdNum, submissionIdNum);
     const gradeMutation = useTAGradeSubmission(courseIdNum);
+    const runTestsMutation = useTARunTests(courseIdNum);
+    const autoGradeMutation = useTAAutoGrade(courseIdNum);
 
     const [activeFileIndex, setActiveFileIndex] = useState(0);
     const [score, setScore] = useState<string>('');
     const [maxScore, setMaxScore] = useState<string>('');
     const [feedback, setFeedback] = useState('');
     const [expandedTests, setExpandedTests] = useState<Set<number>>(new Set());
+    const [runTestsResult, setRunTestsResult] = useState<{
+        total_testcases: number;
+        passed_testcases: number;
+        total_points: number;
+        earned_points: number;
+        score_percentage: number;
+        results: Array<{
+            id: number;
+            testcase_id: number | null;
+            testcase_name: string | null;
+            is_public?: boolean | null;
+            passed: boolean;
+            output: string | null;
+            error_output: string | null;
+            points_awarded: number | null;
+            execution_time_ms: number | null;
+        }>;
+    } | null>(null);
+    const [autoGradeResult, setAutoGradeResult] = useState<{
+        score: number | null;
+        max_score: number | null;
+        feedback: string | null;
+        percentage: number;
+        message: string;
+    } | null>(null);
 
     // Populate form when detail loads
     useEffect(() => {
@@ -86,6 +117,39 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         );
     };
 
+    const handleRunTests = () => {
+        setRunTestsResult(null);
+        runTestsMutation.mutate(submissionIdNum, {
+            onSuccess: (data) => {
+                setRunTestsResult(data);
+            },
+        });
+    };
+
+    const handleAutoGrade = () => {
+        setAutoGradeResult(null);
+        autoGradeMutation.mutate(submissionIdNum, {
+            onSuccess: (data) => {
+                setAutoGradeResult(data);
+                // Populate the grading form with auto-grade results
+                if (data.score != null) setScore(data.score.toString());
+                if (data.max_score != null) setMaxScore(data.max_score.toString());
+                if (data.feedback) setFeedback(data.feedback);
+                // Also update test results display
+                if (data.stored_results) {
+                    setRunTestsResult({
+                        total_testcases: data.stored_results.length,
+                        passed_testcases: data.stored_results.filter((r: { passed: boolean }) => r.passed).length,
+                        total_points: 0,
+                        earned_points: 0,
+                        score_percentage: data.percentage,
+                        results: data.stored_results,
+                    });
+                }
+            },
+        });
+    };
+
     const breadcrumbs = [
         { label: 'Submissions', href: `/ta/courses/${courseId}/submissions` },
         { label: `Grading #${submissionId}` },
@@ -124,7 +188,6 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     }
 
     const activeFile = detail.files[activeFileIndex];
-    const passedTests = detail.test_results.filter((t) => t.passed).length;
 
     return (
         <PageLayout>
@@ -282,120 +345,197 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                         </div>
                     </div>
 
-                    {/* Test Results Section */}
-                    {detail.test_results.length > 0 && (
-                        <div className="p-6 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                                    Test Results
-                                </h3>
-                                <span
-                                    className="px-2.5 py-1 rounded-full"
-                                    style={{
-                                        fontSize: '12px',
-                                        fontWeight: 600,
-                                        color: passedTests === detail.test_results.length ? '#059669' : '#D97706',
-                                        backgroundColor: passedTests === detail.test_results.length ? '#D1FAE5' : '#FEF3C7',
-                                    }}
-                                >
-                                    {passedTests}/{detail.test_results.length} passed
-                                </span>
-                            </div>
+                    {/* ── Action Buttons: Run Tests & Auto-Grade ── */}
+                    <div
+                        className="p-4 border-b flex items-center gap-3"
+                        style={{ borderColor: 'var(--color-border)' }}
+                    >
+                        {permissions?.can_run_tests !== false && (
+                            <button
+                                onClick={handleRunTests}
+                                disabled={runTestsMutation.isPending || autoGradeMutation.isPending}
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
+                                style={{
+                                    backgroundColor: '#1e40af',
+                                    color: 'white',
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                }}
+                            >
+                                {runTestsMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Play className="w-4 h-4" />
+                                )}
+                                Run Tests
+                            </button>
+                        )}
+                        {permissions?.can_grade !== false && (
+                            <button
+                                onClick={handleAutoGrade}
+                                disabled={runTestsMutation.isPending || autoGradeMutation.isPending}
+                                className="flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
+                                style={{
+                                    backgroundColor: '#7c3aed',
+                                    color: 'white',
+                                    fontSize: '13px',
+                                    fontWeight: 600,
+                                }}
+                            >
+                                {autoGradeMutation.isPending ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Zap className="w-4 h-4" />
+                                )}
+                                Auto Grade
+                            </button>
+                        )}
+                        {(runTestsMutation.isError || autoGradeMutation.isError) && (
+                            <span style={{ fontSize: '12px', color: '#DC2626' }}>
+                                {(runTestsMutation.error as Error)?.message || (autoGradeMutation.error as Error)?.message || 'Action failed'}
+                            </span>
+                        )}
+                    </div>
 
-                            <div className="space-y-2">
-                                {detail.test_results.map((test) => (
-                                    <div
-                                        key={test.id}
-                                        className="rounded-lg overflow-hidden"
-                                        style={{ border: '1px solid var(--color-border)' }}
-                                    >
-                                        <button
-                                            onClick={() => toggleTest(test.id)}
-                                            className="w-full flex items-center justify-between px-4 py-3 transition-colors hover:bg-[var(--color-primary-bg)]"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                {test.passed ? (
-                                                    <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#059669' }} />
-                                                ) : (
-                                                    <XCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#DC2626' }} />
-                                                )}
-                                                <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                    {test.testcase_name || `Test #${test.testcase_id}`}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                {test.points_awarded != null && (
-                                                    <span style={{ fontSize: '12px', color: 'var(--color-text-mid)' }}>
-                                                        {test.points_awarded} pts
-                                                    </span>
-                                                )}
-                                                {test.execution_time_ms != null && (
-                                                    <span style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>
-                                                        {test.execution_time_ms}ms
-                                                    </span>
-                                                )}
-                                                {expandedTests.has(test.id) ? (
-                                                    <ChevronDown className="w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
-                                                ) : (
-                                                    <ChevronRight className="w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
-                                                )}
-                                            </div>
-                                        </button>
-                                        {expandedTests.has(test.id) && (
-                                            <div
-                                                className="px-4 py-3 border-t"
-                                                style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-primary-bg)' }}
-                                            >
-                                                {test.output && (
-                                                    <div className="mb-2">
-                                                        <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>
-                                                            Output:
-                                                        </p>
-                                                        <pre
-                                                            className="p-2 rounded text-xs overflow-x-auto"
-                                                            style={{
-                                                                backgroundColor: '#1e1e1e',
-                                                                color: '#d4d4d4',
-                                                                fontFamily: 'monospace',
-                                                                maxHeight: '120px',
-                                                                overflowY: 'auto',
-                                                            }}
-                                                        >
-                                                            {test.output}
-                                                        </pre>
-                                                    </div>
-                                                )}
-                                                {test.error_output && (
-                                                    <div>
-                                                        <p style={{ fontSize: '11px', fontWeight: 600, color: '#DC2626', marginBottom: '4px' }}>
-                                                            Error:
-                                                        </p>
-                                                        <pre
-                                                            className="p-2 rounded text-xs overflow-x-auto"
-                                                            style={{
-                                                                backgroundColor: '#FEF2F2',
-                                                                color: '#991B1B',
-                                                                fontFamily: 'monospace',
-                                                                maxHeight: '120px',
-                                                                overflowY: 'auto',
-                                                            }}
-                                                        >
-                                                            {test.error_output}
-                                                        </pre>
-                                                    </div>
-                                                )}
-                                                {!test.output && !test.error_output && (
-                                                    <p style={{ fontSize: '12px', color: 'var(--color-text-light)', fontStyle: 'italic' }}>
-                                                        No output recorded
-                                                    </p>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+                    {/* Auto-Grade Result Banner */}
+                    {autoGradeResult && (
+                        <div
+                            className="mx-4 mt-3 px-4 py-3 rounded-lg"
+                            style={{ backgroundColor: '#D1FAE5', border: '1px solid #6EE7B7' }}
+                        >
+                            <p style={{ fontSize: '13px', fontWeight: 600, color: '#065F46', marginBottom: '4px' }}>
+                                {autoGradeResult.message}
+                            </p>
+                            <p style={{ fontSize: '12px', color: '#065F46' }}>
+                                Score: {autoGradeResult.score ?? '—'} / {autoGradeResult.max_score ?? '—'} ({autoGradeResult.percentage.toFixed(1)}%)
+                            </p>
+                            {autoGradeResult.feedback && (
+                                <p style={{ fontSize: '12px', color: '#065F46', marginTop: '4px' }}>
+                                    {autoGradeResult.feedback}
+                                </p>
+                            )}
                         </div>
                     )}
+
+                    {/* Test Results Section */}
+                    {(() => {
+                        const displayTests = runTestsResult?.results ?? (detail.test_results.length > 0 ? detail.test_results : null);
+                        if (!displayTests || displayTests.length === 0) return null;
+                        const passed = displayTests.filter((t) => t.passed).length;
+                        return (
+                            <div className="p-6 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                                        Test Results
+                                    </h3>
+                                    <span
+                                        className="px-2.5 py-1 rounded-full"
+                                        style={{
+                                            fontSize: '12px',
+                                            fontWeight: 600,
+                                            color: passed === displayTests.length ? '#059669' : '#D97706',
+                                            backgroundColor: passed === displayTests.length ? '#D1FAE5' : '#FEF3C7',
+                                        }}
+                                    >
+                                        {passed}/{displayTests.length} passed
+                                    </span>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {displayTests.map((test) => (
+                                        <div
+                                            key={test.id}
+                                            className="rounded-lg overflow-hidden"
+                                            style={{ border: '1px solid var(--color-border)' }}
+                                        >
+                                            <button
+                                                onClick={() => toggleTest(test.id)}
+                                                className="w-full flex items-center justify-between px-4 py-3 transition-colors hover:bg-[var(--color-primary-bg)]"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    {test.passed ? (
+                                                        <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#059669' }} />
+                                                    ) : (
+                                                        <XCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#DC2626' }} />
+                                                    )}
+                                                    <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                                                        {test.testcase_name || `Test #${test.testcase_id}`}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    {test.points_awarded != null && (
+                                                        <span style={{ fontSize: '12px', color: 'var(--color-text-mid)' }}>
+                                                            {test.points_awarded} pts
+                                                        </span>
+                                                    )}
+                                                    {test.execution_time_ms != null && (
+                                                        <span style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>
+                                                            {test.execution_time_ms}ms
+                                                        </span>
+                                                    )}
+                                                    {expandedTests.has(test.id) ? (
+                                                        <ChevronDown className="w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
+                                                    ) : (
+                                                        <ChevronRight className="w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
+                                                    )}
+                                                </div>
+                                            </button>
+                                            {expandedTests.has(test.id) && (
+                                                <div
+                                                    className="px-4 py-3 border-t"
+                                                    style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-primary-bg)' }}
+                                                >
+                                                    {test.output && (
+                                                        <div className="mb-2">
+                                                            <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>
+                                                                Output:
+                                                            </p>
+                                                            <pre
+                                                                className="p-2 rounded text-xs overflow-x-auto"
+                                                                style={{
+                                                                    backgroundColor: '#1e1e1e',
+                                                                    color: '#d4d4d4',
+                                                                    fontFamily: 'monospace',
+                                                                    maxHeight: '120px',
+                                                                    overflowY: 'auto',
+                                                                }}
+                                                            >
+                                                                {test.output}
+                                                            </pre>
+                                                        </div>
+                                                    )}
+                                                    {test.error_output && (
+                                                        <div>
+                                                            <p style={{ fontSize: '11px', fontWeight: 600, color: '#DC2626', marginBottom: '4px' }}>
+                                                                Error:
+                                                            </p>
+                                                            <pre
+                                                                className="p-2 rounded text-xs overflow-x-auto"
+                                                                style={{
+                                                                    backgroundColor: '#FEF2F2',
+                                                                    color: '#991B1B',
+                                                                    fontFamily: 'monospace',
+                                                                    maxHeight: '120px',
+                                                                    overflowY: 'auto',
+                                                                }}
+                                                            >
+                                                                {test.error_output}
+                                                            </pre>
+                                                        </div>
+                                                    )}
+                                                    {!test.output && !test.error_output && (
+                                                        <p style={{ fontSize: '12px', color: 'var(--color-text-light)', fontStyle: 'italic' }}>
+                                                            No output recorded
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        );
+                    })()}
 
                     {/* Rubric Section */}
                     {detail.rubrics.length > 0 && (

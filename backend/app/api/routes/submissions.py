@@ -43,7 +43,7 @@ def create_submission(
     assignment = db.query(Assignment).filter(Assignment.id == payload.assignment_id).first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    require_course_role(db=db, user=user, course_id=assignment.course_id, allowed_roles=["student"])
+    require_course_role(db=db, user=user, course_id=assignment.course_id, allowed_roles=["student", "ta"])
 
     s = Submission(assignment_id=payload.assignment_id, student_id=user.id)
     db.add(s)
@@ -121,19 +121,39 @@ def get_submission_detail(
         .all()
     )
     results_out = []
+    private_idx = 0
     for r in raw_results:
         tc = db.query(TestCase).filter(TestCase.id == r.testcase_id).first() if r.testcase_id else None
-        results_out.append({
-            "testcase_id": r.testcase_id or r.id,
-            "test_name": tc.name if tc else f"Test {r.id}",
-            "passed": r.passed,
-            "actual_output": r.output or "",
-            "expected_output": tc.expected_output if tc else "",
-            "execution_time_ms": r.execution_time_ms or 0,
-            "points": tc.points if tc else 0,
-            "points_earned": r.points_awarded or 0,
-            "error": r.error_output,
-        })
+        is_private = tc and not tc.is_public
+        is_student = user.role == "student"
+
+        if is_student and is_private:
+            # Students see that a private test exists and whether it passed,
+            # but never see the name, expected output, or actual output.
+            private_idx += 1
+            results_out.append({
+                "testcase_id": r.testcase_id or r.id,
+                "test_name": f"Private Test {private_idx}",
+                "passed": r.passed,
+                "actual_output": "(hidden)",
+                "expected_output": "(hidden)",
+                "execution_time_ms": r.execution_time_ms or 0,
+                "points": tc.points if tc else 0,
+                "points_earned": r.points_awarded or 0,
+                "error": None,
+            })
+        else:
+            results_out.append({
+                "testcase_id": r.testcase_id or r.id,
+                "test_name": tc.name if tc else f"Test {r.id}",
+                "passed": r.passed,
+                "actual_output": r.output or "",
+                "expected_output": tc.expected_output if tc else "",
+                "execution_time_ms": r.execution_time_ms or 0,
+                "points": tc.points if tc else 0,
+                "points_earned": r.points_awarded or 0,
+                "error": r.error_output,
+            })
 
     return {
         "id": s.id,
@@ -295,12 +315,17 @@ async def upload_submission_files(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Upload request received for assignment {assignment_id} by user {user.email}")
+    logger.info(f"Number of files: {len(files) if files else 0}")
+    
     require_role(user.role, {"student"})
 
     assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    require_course_role(db=db, user=user, course_id=assignment.course_id, allowed_roles=["student"])
+    require_course_role(db=db, user=user, course_id=assignment.course_id, allowed_roles=["student", "ta"])
 
     submission = Submission(assignment_id=assignment_id, student_id=user.id)
     db.add(submission)

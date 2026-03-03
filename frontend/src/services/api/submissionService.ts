@@ -79,13 +79,33 @@ export const submissionService = {
     const formData = new FormData();
     files.forEach((file) => formData.append('files', file));
 
-    // Do NOT set Content-Type manually — Axios auto-generates the correct
-    // multipart/form-data boundary when the body is FormData.
-    const { data } = await api.post<BackendUploadResponse>(
-      `/submissions/assignments/${assignmentId}/upload`,
-      formData,
-    );
-    return data;
+    // Use fetch directly to avoid axios Content-Type header interference with FormData
+    const token = typeof window !== 'undefined' ? localStorage.getItem('autograde_token') : null;
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    let response: Response;
+    try {
+      response = await fetch(
+        `${api.defaults.baseURL}/submissions/assignments/${assignmentId}/upload`,
+        {
+          method: 'POST',
+          headers,
+          body: formData,
+        }
+      );
+    } catch {
+      throw new Error('Could not reach the server. Please check your connection and try again.');
+    }
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      const detail = errData.detail;
+      const message = typeof detail === 'string' ? detail : Array.isArray(detail) ? detail.map((d: any) => d.msg).join(', ') : `Upload failed (${response.status})`;
+      throw new Error(message);
+    }
+
+    return response.json();
   },
 
   /** Get a specific submission. */
@@ -160,6 +180,30 @@ export const submissionService = {
     const { data } = await api.patch<BackendGradingResults>(
       `/grading/submissions/${submissionId}/score`,
       payload
+    );
+    return data;
+  },
+
+  /** Run ONLY test cases for a submission (no rubric). */
+  async runTests(submissionId: string): Promise<any> {
+    const { data } = await api.post(
+      `/grading/submissions/${submissionId}/grade?run_tests=true&apply_rubric=false`
+    );
+    return data;
+  },
+
+  /** Auto-grade a submission (tests + rubric). */
+  async autoGrade(submissionId: string): Promise<any> {
+    const { data } = await api.post(
+      `/grading/submissions/${submissionId}/grade?run_tests=true&apply_rubric=true`
+    );
+    return data;
+  },
+
+  /** Grade ALL pending submissions for an assignment. */
+  async gradeAllSubmissions(assignmentId: string): Promise<any> {
+    const { data } = await api.post(
+      `/grading/assignments/${assignmentId}/grade-all`
     );
     return data;
   },

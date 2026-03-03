@@ -91,6 +91,39 @@ export function useTAGradeSubmission(courseId: number) {
     });
 }
 
+export function useTARunTests(courseId: number) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (submissionId: number) => taDashboardService.runTests(courseId, submissionId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['ta-submission-detail', courseId] });
+            queryClient.invalidateQueries({ queryKey: ['ta-submissions', courseId] });
+        },
+    });
+}
+
+export function useTAAutoGrade(courseId: number) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (submissionId: number) => taDashboardService.autoGrade(courseId, submissionId),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['ta-submission-detail', courseId] });
+            queryClient.invalidateQueries({ queryKey: ['ta-submissions', courseId] });
+            queryClient.invalidateQueries({ queryKey: ['ta-overview'] });
+            queryClient.invalidateQueries({ queryKey: ['ta-gradebook', courseId] });
+        },
+    });
+}
+
+export function useTATestCases(courseId: number, assignmentId: number) {
+    return useQuery({
+        queryKey: ['ta-testcases', courseId, assignmentId],
+        queryFn: () => taDashboardService.getTestCases(courseId, assignmentId),
+        enabled: !!courseId && !!assignmentId,
+        staleTime: 60 * 1000,
+    });
+}
+
 // ── Students ────────────────────────────────────────────────────────
 
 export function useTACourseStudents(courseId: number, params?: { search?: string }) {
