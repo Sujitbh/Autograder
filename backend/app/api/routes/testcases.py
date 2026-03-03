@@ -7,7 +7,7 @@ from app.core.permissions import require_role, require_course_role
 from app.models.assignment import Assignment
 from app.models.testcase import TestCase
 from app.models.user import User
-from app.schemas.testcase import TestCaseCreate, TestCaseOut, TestCaseUpdate
+from app.schemas.testcase import TestCaseCreate, TestCaseOut, TestCasePublicOut, TestCaseUpdate
 
 router = APIRouter(prefix="/testcases", tags=["testcases"])
 
@@ -21,7 +21,10 @@ def _get_assignment_or_404(db: Session, assignment_id: int) -> Assignment:
 
 @router.get("/", response_model=List[TestCaseOut])
 def list_testcases(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return db.query(TestCase).all()
+    query = db.query(TestCase)
+    if user.role == "student":
+        query = query.filter(TestCase.is_public == True)
+    return query.all()
 
 
 @router.get("/by-assignment/{assignment_id}", response_model=List[TestCaseOut])
@@ -47,6 +50,7 @@ def create_testcase(
     require_course_role(db=db, user=user, course_id=assignment.course_id, allowed_roles=["instructor"])
     tc = TestCase(
         assignment_id=payload.assignment_id,
+        name=payload.name,
         input_data=payload.input_data,
         expected_output=payload.expected_output,
         is_public=payload.is_public,
@@ -63,6 +67,9 @@ def get_testcase(tc_id: int, db: Session = Depends(get_db), user: User = Depends
     tc = db.query(TestCase).filter(TestCase.id == tc_id).first()
     if not tc:
         raise HTTPException(status_code=404, detail="TestCase not found")
+    # Students cannot view private test cases
+    if user.role == "student" and not tc.is_public:
+        raise HTTPException(status_code=403, detail="Access denied")
     return tc
 
 

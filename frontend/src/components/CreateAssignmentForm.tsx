@@ -820,7 +820,7 @@ export function CreateAssignmentForm({
                             size="sm"
                             variant="outline"
                             onClick={() =>
-                                append({ name: `Test ${fields.length + 1}`, input: '', expectedOutput: '', points: 10 })
+                                append({ name: `${isPrivate ? 'Private' : 'Public'} Test ${fields.length + 1}`, input: '', expectedOutput: '', points: 10 })
                             }
                         >
                             <Plus className="mr-1 h-3.5 w-3.5" /> Add Test

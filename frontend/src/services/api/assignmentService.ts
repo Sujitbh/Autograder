@@ -20,6 +20,7 @@ interface BackendAssignment {
     max_submissions: number | null;
     max_points: number | null;
     allowed_languages: string | null;
+    starter_code: string | null;
     status: string;
     is_active: boolean;
     created_at: string;
@@ -37,6 +38,7 @@ function mapAssignment(a: BackendAssignment): Assignment {
         language: (a.allowed_languages?.split(',')[0] as 'python' | 'java') ?? 'python',
         category: 'Homework',
         dueDate: a.due_date ?? '',
+        starterCode: a.starter_code ?? undefined,
         maxPoints: a.max_points ?? 100,
         status: (a.status as 'draft' | 'published' | 'closed') ?? (a.is_active ? 'published' : 'draft'),
         isGroup: false,
@@ -82,10 +84,45 @@ export const assignmentService = {
             max_submissions: (dto as any).maxSubmissions ?? null,
             status: dto.status ?? 'published',
         };
+        // Include starter code when provided
+        if (dto.starterCode) {
+            payload.starter_code = dto.starterCode;
+        }
         // Convert dueDate string to ISO datetime for the backend
         if (dto.dueDate) {
             payload.due_date = new Date(dto.dueDate).toISOString();
         }
+
+        // Send test cases when provided
+        if (dto.publicTests && dto.publicTests.length > 0) {
+            payload.public_tests = dto.publicTests.map(t => ({
+                name: t.name,
+                input: t.input,
+                expectedOutput: t.expectedOutput,
+                isPublic: true,
+                points: t.points,
+            }));
+        }
+        if (dto.privateTests && dto.privateTests.length > 0) {
+            payload.private_tests = dto.privateTests.map(t => ({
+                name: t.name,
+                input: t.input,
+                expectedOutput: t.expectedOutput,
+                isPublic: false,
+                points: t.points,
+            }));
+        }
+
+        // Send rubric when provided
+        if (dto.rubric && dto.rubric.length > 0) {
+            payload.rubric = dto.rubric.map(r => ({
+                name: r.name,
+                description: r.description,
+                maxPoints: r.maxPoints,
+                gradingMethod: r.gradingMethod,
+            }));
+        }
+
         const { data } = await api.post<BackendAssignment>('/assignments/', payload);
         return mapAssignment(data);
     },

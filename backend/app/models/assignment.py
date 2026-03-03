@@ -18,6 +18,7 @@ class Assignment(Base):
     max_submissions = Column(Integer, nullable=True)  # None = unlimited
     max_points = Column(Integer, nullable=True, default=100)
     allowed_languages = Column(String, nullable=True)  # Comma-separated: "python,java,cpp"
+    starter_code = Column(Text, nullable=True)  # Faculty-provided starter code template
     status = Column(String, nullable=False, default="published")  # draft | published | closed
     is_active = Column(Boolean, default=True)
     

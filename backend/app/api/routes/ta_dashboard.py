@@ -11,11 +11,14 @@ from app.models.user import User
 from app.models.course import Course
 from app.models.assignment import Assignment
 from app.models.submission import Submission
+from app.models.submission_file import SubmissionFile
 from app.models.submission_result import SubmissionResult
 from app.models.enrollment import Enrollment
 from app.models.testcase import TestCase
 from app.models.rubric import Rubric
 from app.models.ta_permission import TAPermission
+from app.services.execution_service import ExecutionService
+from app.services.grading_service import GradingService
 
 router = APIRouter(prefix="/ta-dashboard", tags=["ta-dashboard"])
 
@@ -379,96 +382,358 @@ def get_submission_detail(
     user: User = Depends(get_current_user),
 ):
     """Get full details of a single submission for grading."""
-    enrollment = _require_ta_for_course(db, user.id, course_id)
-    permissions = _get_permissions(db, enrollment.id)
-    _require_permission(permissions, "can_view_submissions", "view submissions")
+    import logging, traceback, os
+    logger = logging.getLogger(__name__)
+    try:
+        enrollment = _require_ta_for_course(db, user.id, course_id)
+        permissions = _get_permissions(db, enrollment.id)
+        _require_permission(permissions, "can_view_submissions", "view submissions")
 
-    submission = db.query(Submission).filter(Submission.id == submission_id).first()
-    if not submission:
-        raise HTTPException(status_code=404, detail="Submission not found")
+        submission = db.query(Submission).filter(Submission.id == submission_id).first()
+        if not submission:
+            raise HTTPException(status_code=404, detail="Submission not found")
 
-    # Verify submission belongs to this course
-    assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
-    if not assignment or assignment.course_id != course_id:
-        raise HTTPException(status_code=404, detail="Submission not found in this course")
+        # Verify submission belongs to this course
+        assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
+        if not assignment or assignment.course_id != course_id:
+            raise HTTPException(status_code=404, detail="Submission not found in this course")
 
-    student = db.query(User).filter(User.id == submission.student_id).first()
+        student = db.query(User).filter(User.id == submission.student_id).first()
 
-    # Get test results
-    test_results = db.query(SubmissionResult).filter(
-        SubmissionResult.submission_id == submission.id,
-    ).all()
+        # Get test results
+        test_results = db.query(SubmissionResult).filter(
+            SubmissionResult.submission_id == submission.id,
+        ).all()
 
-    results_data = []
-    for tr in test_results:
-        tc = db.query(TestCase).filter(TestCase.id == tr.testcase_id).first() if tr.testcase_id else None
-        results_data.append({
-            "id": tr.id,
-            "testcase_id": tr.testcase_id,
-            "testcase_name": tc.name if tc else None,
-            "passed": tr.passed,
-            "output": tr.output,
-            "error_output": tr.error_output,
-            "points_awarded": float(tr.points_awarded) if tr.points_awarded is not None else None,
-            "execution_time_ms": tr.execution_time_ms,
-        })
-
-    # Get rubrics for this assignment
-    rubrics = db.query(Rubric).filter(
-        Rubric.assignment_id == submission.assignment_id,
-    ).order_by(Rubric.order).all()
-
-    rubrics_data = [{
-        "id": r.id,
-        "name": r.name,
-        "description": r.description,
-        "weight": float(r.weight) if r.weight is not None else None,
-        "max_points": float(r.max_points) if r.max_points is not None else None,
-        "order": r.order,
-    } for r in rubrics]
-
-    # Get submission files
-    files_data = []
-    if hasattr(submission, 'files') and submission.files:
-        for f in submission.files:
-            files_data.append({
-                "id": f.id,
-                "filename": f.filename,
-                "content": f.content if hasattr(f, 'content') else None,
-                "file_size": f.file_size if hasattr(f, 'file_size') else None,
+        results_data = []
+        for tr in test_results:
+            tc = db.query(TestCase).filter(TestCase.id == tr.testcase_id).first() if tr.testcase_id else None
+            results_data.append({
+                "id": tr.id,
+                "testcase_id": tr.testcase_id,
+                "testcase_name": tc.name if tc else None,
+                "passed": tr.passed,
+                "output": tr.output,
+                "error_output": tr.error_output,
+                "points_awarded": float(tr.points_awarded) if tr.points_awarded is not None else None,
+                "execution_time_ms": tr.execution_time_ms,
             })
 
-    # Count total submissions by this student for this assignment
-    attempt_count = db.query(func.count(Submission.id)).filter(
-        Submission.assignment_id == submission.assignment_id,
-        Submission.student_id == submission.student_id,
-    ).scalar() or 0
+        # Get rubrics for this assignment
+        rubrics = db.query(Rubric).filter(
+            Rubric.assignment_id == submission.assignment_id,
+        ).order_by(Rubric.order).all()
 
-    return {
-        "id": submission.id,
-        "student": {
-            "id": student.id if student else None,
-            "name": student.name if student else "Unknown",
-            "email": student.email if student else None,
-        },
-        "assignment": {
-            "id": assignment.id,
-            "title": assignment.title,
-            "due_date": assignment.due_date.isoformat() if assignment.due_date else None,
-            "max_submissions": assignment.max_submissions,
-            "allowed_languages": assignment.allowed_languages,
-        },
-        "status": submission.status,
-        "score": float(submission.score) if submission.score is not None else None,
-        "max_score": float(submission.max_score) if submission.max_score is not None else None,
-        "feedback": submission.feedback,
-        "created_at": submission.created_at.isoformat() if submission.created_at else None,
-        "attempt_number": attempt_count,
-        "files": files_data,
-        "test_results": results_data,
-        "rubrics": rubrics_data,
-        "permissions": permissions,
-    }
+        rubrics_data = [{
+            "id": r.id,
+            "name": r.name,
+            "description": r.description,
+            "weight": float(r.weight) if r.weight is not None else None,
+            "max_points": float(r.max_points) if r.max_points is not None else None,
+            "order": r.order,
+        } for r in rubrics]
+
+        # Get submission files
+        files_data = []
+        if hasattr(submission, 'files') and submission.files:
+            for f in submission.files:
+                # Read file content from disk
+                file_content = None
+                if f.path:
+                    try:
+                        if os.path.exists(f.path):
+                            with open(f.path, 'r', errors='replace') as fh:
+                                file_content = fh.read()
+                    except Exception:
+                        file_content = None
+
+                files_data.append({
+                    "id": f.id,
+                    "filename": f.filename,
+                    "content": file_content,
+                    "file_size": f.file_size if hasattr(f, 'file_size') else None,
+                })
+
+        # Count total submissions by this student for this assignment
+        attempt_count = db.query(func.count(Submission.id)).filter(
+            Submission.assignment_id == submission.assignment_id,
+            Submission.student_id == submission.student_id,
+        ).scalar() or 0
+
+        return {
+            "id": submission.id,
+            "student": {
+                "id": student.id if student else None,
+                "name": student.name if student else "Unknown",
+                "email": student.email if student else None,
+            },
+            "assignment": {
+                "id": assignment.id,
+                "title": assignment.title,
+                "due_date": assignment.due_date.isoformat() if assignment.due_date else None,
+                "max_submissions": assignment.max_submissions,
+                "allowed_languages": assignment.allowed_languages,
+            },
+            "status": submission.status,
+            "score": float(submission.score) if submission.score is not None else None,
+            "max_score": float(submission.max_score) if submission.max_score is not None else None,
+            "feedback": submission.feedback,
+            "created_at": submission.created_at.isoformat() if submission.created_at else None,
+            "attempt_number": attempt_count,
+            "files": files_data,
+            "test_results": results_data,
+            "rubrics": rubrics_data,
+            "permissions": permissions,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_submission_detail: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Run Tests ====================
+
+@router.post("/courses/{course_id}/submissions/{submission_id}/run-tests")
+def ta_run_tests(
+    course_id: int,
+    submission_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Run all test cases against a submission. Requires can_run_tests."""
+    import logging, traceback, os
+    logger = logging.getLogger(__name__)
+    try:
+        enrollment = _require_ta_for_course(db, user.id, course_id)
+        permissions = _get_permissions(db, enrollment.id)
+        _require_permission(permissions, "can_run_tests", "run tests")
+
+        submission = db.query(Submission).filter(Submission.id == submission_id).first()
+        if not submission:
+            raise HTTPException(status_code=404, detail="Submission not found")
+
+        assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
+        if not assignment or assignment.course_id != course_id:
+            raise HTTPException(status_code=404, detail="Submission not found in this course")
+
+        # Get test cases for the assignment
+        testcases = db.query(TestCase).filter(
+            TestCase.assignment_id == assignment.id,
+        ).all()
+
+        if not testcases:
+            raise HTTPException(status_code=400, detail="No test cases configured for this assignment")
+
+        # Read main submission file
+        files = db.query(SubmissionFile).filter(
+            SubmissionFile.submission_id == submission.id
+        ).all()
+        if not files:
+            raise HTTPException(status_code=400, detail="No files in submission")
+
+        main_file = files[0]
+        if not main_file.path or not os.path.exists(main_file.path):
+            raise HTTPException(status_code=400, detail="Submission file not found on disk")
+
+        with open(main_file.path, "r", errors="replace") as fh:
+            code = fh.read()
+
+        language = ExecutionService.detect_language(main_file.filename) or "python"
+
+        # Clear old results for this submission
+        db.query(SubmissionResult).filter(
+            SubmissionResult.submission_id == submission.id
+        ).delete()
+        db.flush()
+
+        # Run all test cases
+        execution_results = ExecutionService.run_all_testcases(
+            code=code,
+            language=language,
+            testcases=testcases,
+        )
+
+        # Store results in database
+        for result in execution_results["results"]:
+            db_result = SubmissionResult(
+                submission_id=submission.id,
+                testcase_id=result["testcase_id"],
+                passed=result["passed"],
+                output=result["actual_output"],
+                error_output=result.get("stderr", ""),
+                points_awarded=result["points_earned"],
+                execution_time_ms=result.get("execution_time_ms"),
+            )
+            db.add(db_result)
+
+        db.commit()
+
+        # Return results including test case details
+        stored_results = db.query(SubmissionResult).filter(
+            SubmissionResult.submission_id == submission.id
+        ).all()
+
+        results_data = []
+        for tr in stored_results:
+            tc = db.query(TestCase).filter(TestCase.id == tr.testcase_id).first() if tr.testcase_id else None
+            results_data.append({
+                "id": tr.id,
+                "testcase_id": tr.testcase_id,
+                "testcase_name": tc.name if tc else None,
+                "is_public": tc.is_public if tc else None,
+                "passed": tr.passed,
+                "output": tr.output,
+                "error_output": tr.error_output,
+                "points_awarded": float(tr.points_awarded) if tr.points_awarded is not None else None,
+                "execution_time_ms": tr.execution_time_ms,
+            })
+
+        return {
+            "submission_id": submission.id,
+            "total_testcases": execution_results["total_testcases"],
+            "passed_testcases": execution_results["passed_testcases"],
+            "total_points": execution_results["total_points"],
+            "earned_points": execution_results["earned_points"],
+            "score_percentage": execution_results["score_percentage"],
+            "results": results_data,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in ta_run_tests: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== Auto-Grade Submission ====================
+
+@router.post("/courses/{course_id}/submissions/{submission_id}/auto-grade")
+def ta_auto_grade(
+    course_id: int,
+    submission_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Auto-grade a submission: run tests + rubric evaluation. Requires can_grade."""
+    import logging, traceback
+    logger = logging.getLogger(__name__)
+    try:
+        enrollment = _require_ta_for_course(db, user.id, course_id)
+        permissions = _get_permissions(db, enrollment.id)
+        _require_permission(permissions, "can_grade", "grade submissions")
+
+        submission = db.query(Submission).filter(Submission.id == submission_id).first()
+        if not submission:
+            raise HTTPException(status_code=404, detail="Submission not found")
+
+        assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
+        if not assignment or assignment.course_id != course_id:
+            raise HTTPException(status_code=404, detail="Submission not found in this course")
+
+        # Clear old results
+        db.query(SubmissionResult).filter(
+            SubmissionResult.submission_id == submission.id
+        ).delete()
+        db.flush()
+
+        # Use the grading service to run tests + rubric
+        submission.status = "grading"
+        db.commit()
+
+        results = GradingService.grade_submission(
+            db=db,
+            submission_id=submission.id,
+            run_tests=True,
+            apply_rubric=True,
+        )
+
+        # Update submission with grading results
+        submission.status = "graded"
+        submission.score = results["total_score"]
+        submission.max_score = results["max_score"]
+        submission.feedback = "\n".join(results["feedback"]) if results["feedback"] else None
+        from datetime import datetime
+        submission.graded_at = datetime.utcnow()
+        db.commit()
+        db.refresh(submission)
+
+        # Also fetch the stored test results for the response
+        stored_results = db.query(SubmissionResult).filter(
+            SubmissionResult.submission_id == submission.id
+        ).all()
+
+        results_data = []
+        for tr in stored_results:
+            tc = db.query(TestCase).filter(TestCase.id == tr.testcase_id).first() if tr.testcase_id else None
+            results_data.append({
+                "id": tr.id,
+                "testcase_id": tr.testcase_id,
+                "testcase_name": tc.name if tc else None,
+                "passed": tr.passed,
+                "output": tr.output,
+                "error_output": tr.error_output,
+                "points_awarded": float(tr.points_awarded) if tr.points_awarded is not None else None,
+                "execution_time_ms": tr.execution_time_ms,
+            })
+
+        return {
+            "submission_id": submission.id,
+            "status": submission.status,
+            "score": float(submission.score) if submission.score is not None else None,
+            "max_score": float(submission.max_score) if submission.max_score is not None else None,
+            "feedback": submission.feedback,
+            "percentage": results["percentage"],
+            "test_results": results.get("test_results"),
+            "rubric_results": results.get("rubric_results"),
+            "stored_results": results_data,
+            "message": "Auto-grading complete",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in ta_auto_grade: {traceback.format_exc()}")
+        submission.status = "error"
+        submission.feedback = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Auto-grading failed: {str(e)}")
+
+
+# ==================== Get Test Cases ====================
+
+@router.get("/courses/{course_id}/assignments/{assignment_id}/testcases")
+def ta_get_testcases(
+    course_id: int,
+    assignment_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get test cases for an assignment. Respects can_view_private_tests."""
+    enrollment = _require_ta_for_course(db, user.id, course_id)
+    permissions = _get_permissions(db, enrollment.id)
+    _require_permission(permissions, "can_run_tests", "view test cases")
+
+    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    if not assignment or assignment.course_id != course_id:
+        raise HTTPException(status_code=404, detail="Assignment not found in this course")
+
+    query = db.query(TestCase).filter(TestCase.assignment_id == assignment_id)
+    if not permissions.get("can_view_private_tests", False):
+        query = query.filter(TestCase.is_public == True)
+
+    testcases = query.all()
+
+    return [
+        {
+            "id": tc.id,
+            "name": tc.name,
+            "input_data": tc.input_data,
+            "expected_output": tc.expected_output,
+            "is_public": tc.is_public,
+            "points": tc.points,
+            "timeout_seconds": tc.timeout_seconds,
+        }
+        for tc in testcases
+    ]
 
 
 # ==================== Grade Submission ====================

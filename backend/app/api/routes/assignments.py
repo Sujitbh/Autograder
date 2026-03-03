@@ -5,6 +5,8 @@ from typing import List, Optional
 from app.api.deps import get_db, get_current_user, get_current_user_optional
 from app.core.permissions import require_role, require_course_role
 from app.models.assignment import Assignment
+from app.models.testcase import TestCase
+from app.models.rubric import Rubric
 from app.models.user import User
 from app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentOut
 
@@ -46,9 +48,43 @@ def create_assignment(
         max_submissions=payload.max_submissions,
         max_points=payload.max_points,
         allowed_languages=payload.allowed_languages,
+        starter_code=payload.starter_code,
         status=payload.status or "published",
     )
     db.add(assignment)
+    db.flush()  # get assignment.id before committing so we can create children
+
+    # ── Persist test cases ──────────────────────────────────────────
+    for tc in (payload.public_tests or []):
+        db.add(TestCase(
+            assignment_id=assignment.id,
+            name=tc.name,
+            input_data=tc.input,
+            expected_output=tc.expectedOutput,
+            is_public=True,
+            points=tc.points or 1,
+        ))
+    for tc in (payload.private_tests or []):
+        db.add(TestCase(
+            assignment_id=assignment.id,
+            name=tc.name,
+            input_data=tc.input,
+            expected_output=tc.expectedOutput,
+            is_public=False,
+            points=tc.points or 1,
+        ))
+
+    # ── Persist rubric criteria ─────────────────────────────────────
+    for idx, rc in enumerate(payload.rubric or []):
+        db.add(Rubric(
+            assignment_id=assignment.id,
+            name=rc.name,
+            description=rc.description,
+            max_points=rc.maxPoints or 10,
+            weight=1.0,
+            order=idx,
+        ))
+
     db.commit()
     db.refresh(assignment)
     return assignment

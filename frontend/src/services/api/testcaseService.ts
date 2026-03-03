@@ -3,6 +3,7 @@ import api, { withRetry } from './client';
 export interface BackendTestCase {
   id: number;
   assignment_id: number;
+  name: string | null;
   input_data: string | null;
   expected_output: string | null;
   is_public: boolean;

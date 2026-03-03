@@ -3,7 +3,7 @@ import {
     ChevronLeft, Calendar, Code, Users, Download, CheckCircle2, Search,
     Inbox, BarChart3, AlertTriangle, ChevronUp, ChevronDown,
     Edit, Trash2, FileText, ClipboardList, Clock, Star, BookOpen, Settings2,
-    UserCheck, Loader2,
+    UserCheck, Loader2, Zap,
 } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
@@ -237,6 +237,23 @@ export function AssignmentGrading() {
         }
     };
 
+    /* ─── Grade All Pending handler ─── */
+    const [isGradingAll, setIsGradingAll] = useState(false);
+    const handleGradeAll = async () => {
+        if (!assignmentId) return;
+        setIsGradingAll(true);
+        try {
+            const result = await submissionService.gradeAllSubmissions(assignmentId);
+            window.alert(`Graded ${result.total_graded} submission(s). Errors: ${result.total_errors}.`);
+            refetchSubmissions();
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to grade submissions';
+            window.alert(message);
+        } finally {
+            setIsGradingAll(false);
+        }
+    };
+
     /* ─── Tab counts ─── */
     const counts = useMemo(() => {
         const all = submissionsState.length;
@@ -412,6 +429,18 @@ export function AssignmentGrading() {
                             >
                                 <Download className="w-4 h-4 mr-2" />
                                 {isDownloadingZip ? 'Downloading...' : 'Download submissions (ZIP)'}
+                            </Button>
+                            <Button
+                                className="h-9 text-white"
+                                style={{ backgroundColor: 'var(--color-primary)' }}
+                                onClick={handleGradeAll}
+                                disabled={isGradingAll}
+                            >
+                                {isGradingAll ? (
+                                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Grading...</>
+                                ) : (
+                                    <><Zap className="w-4 h-4 mr-2" /> Grade All Pending</>
+                                )}
                             </Button>
                         </div>
                     </div>
@@ -933,29 +962,29 @@ export function AssignmentGrading() {
 
             {/* Grading Modal */}
             {currentGradingStudent && gradingStudentIdx !== null && (
-                    <GradingModal
-                        studentName={currentGradingStudent.studentName}
-                        assignmentName={meta.name}
-                        submittedAt={currentGradingStudent.submittedAt ?? ''}
-                        autoScore={currentGradingStudent.autoScore}
-                        maxPoints={currentGradingStudent.maxPoints}
-                        rubric={meta.rubric}
-                        hasPrev={gradingStudentIdx > 0}
-                        hasNext={gradingStudentIdx < gradableStudents.length - 1}
-                        onPrev={() => setGradingStudentIdx(prev => (prev !== null && prev > 0 ? prev - 1 : prev))}
-                        onNext={() => setGradingStudentIdx(prev => (prev !== null && prev < gradableStudents.length - 1 ? prev + 1 : prev))}
-                        onClose={() => setGradingStudentIdx(null)}
-                        onSubmitGrade={(grade, fb) => {
-                            handleSubmitGrade(currentGradingStudent.id, grade, fb);
-                            refetchSubmissions();
-                        }}
-                        onSaveDraft={(grade, fb) => handleSubmitGrade(currentGradingStudent.id, grade, fb)}
-                        isGroupAssignment={meta.isGroupAssignment}
-                        groupName={undefined}
-                        groupMemberNames={[]}
-                        submissionId={currentGradingStudent.id}
-                        onApplyToGroup={undefined}
-                    />
+                <GradingModal
+                    studentName={currentGradingStudent.studentName}
+                    assignmentName={meta.name}
+                    submittedAt={currentGradingStudent.submittedAt ?? ''}
+                    autoScore={currentGradingStudent.autoScore}
+                    maxPoints={currentGradingStudent.maxPoints}
+                    rubric={meta.rubric}
+                    hasPrev={gradingStudentIdx > 0}
+                    hasNext={gradingStudentIdx < gradableStudents.length - 1}
+                    onPrev={() => setGradingStudentIdx(prev => (prev !== null && prev > 0 ? prev - 1 : prev))}
+                    onNext={() => setGradingStudentIdx(prev => (prev !== null && prev < gradableStudents.length - 1 ? prev + 1 : prev))}
+                    onClose={() => setGradingStudentIdx(null)}
+                    onSubmitGrade={(grade, fb) => {
+                        handleSubmitGrade(currentGradingStudent.id, grade, fb);
+                        refetchSubmissions();
+                    }}
+                    onSaveDraft={(grade, fb) => handleSubmitGrade(currentGradingStudent.id, grade, fb)}
+                    isGroupAssignment={meta.isGroupAssignment}
+                    groupName={undefined}
+                    groupMemberNames={[]}
+                    submissionId={currentGradingStudent.id}
+                    onApplyToGroup={undefined}
+                />
             )}
 
             {/* Apply Grade to Group Dialog */}

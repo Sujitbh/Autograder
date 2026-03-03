@@ -201,6 +201,68 @@ export const taDashboardService = {
         return data;
     },
 
+    // Run tests against a submission
+    async runTests(courseId: number, submissionId: number): Promise<{
+        submission_id: number;
+        total_testcases: number;
+        passed_testcases: number;
+        total_points: number;
+        earned_points: number;
+        score_percentage: number;
+        results: Array<{
+            id: number;
+            testcase_id: number | null;
+            testcase_name: string | null;
+            is_public: boolean | null;
+            passed: boolean;
+            output: string | null;
+            error_output: string | null;
+            points_awarded: number | null;
+            execution_time_ms: number | null;
+        }>;
+    }> {
+        const { data } = await api.post(`/ta-dashboard/courses/${courseId}/submissions/${submissionId}/run-tests`);
+        return data;
+    },
+
+    // Auto-grade a submission (tests + rubric)
+    async autoGrade(courseId: number, submissionId: number): Promise<{
+        submission_id: number;
+        status: string;
+        score: number | null;
+        max_score: number | null;
+        feedback: string | null;
+        percentage: number;
+        message: string;
+        stored_results: Array<{
+            id: number;
+            testcase_id: number | null;
+            testcase_name: string | null;
+            passed: boolean;
+            output: string | null;
+            error_output: string | null;
+            points_awarded: number | null;
+            execution_time_ms: number | null;
+        }>;
+    }> {
+        const { data } = await api.post(`/ta-dashboard/courses/${courseId}/submissions/${submissionId}/auto-grade`);
+        return data;
+    },
+
+    // Get test cases for an assignment
+    async getTestCases(courseId: number, assignmentId: number): Promise<Array<{
+        id: number;
+        name: string | null;
+        input_data: string | null;
+        expected_output: string | null;
+        is_public: boolean;
+        points: number;
+        timeout_seconds: number | null;
+    }>> {
+        const { data } = await api.get(`/ta-dashboard/courses/${courseId}/assignments/${assignmentId}/testcases`);
+        return data;
+    },
+
     // Students
     async getCourseStudents(courseId: number, params?: { search?: string }): Promise<TAStudent[]> {
         const { data } = await api.get(`/ta-dashboard/courses/${courseId}/students`, { params });

@@ -2,8 +2,10 @@
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueries } from '@tanstack/react-query';
 import { useAssignments } from '@/hooks/queries/useAssignments';
 import { useCourses } from '@/hooks/queries/useCourses';
+import { submissionService } from '@/services/api';
 import { StudentLayout } from './StudentLayout';
 import {
   FileText,
@@ -12,22 +14,27 @@ import {
   CheckCircle2,
   AlertCircle,
   ChevronRight,
+  Upload,
 } from 'lucide-react';
 
 interface StudentCourseInteriorProps {
   courseId: string;
 }
 
-const getStatusInfo = (status: string) => {
-  switch (status) {
-    case 'published':
-      return { label: 'Active', cssColor: 'var(--color-success)', icon: CheckCircle2 };
-    case 'draft':
-      return { label: 'Draft', cssColor: 'var(--color-warning)', icon: Clock };
-    default:
-      return { label: status, cssColor: 'var(--color-text-mid)', icon: FileText };
+/** Determine the student-facing status badge for an assignment */
+function getStudentStatus(submissionStatus: string | null, score: number | null, maxScore: number | null) {
+  if (!submissionStatus) {
+    return { label: 'Not Submitted', cssColor: 'var(--color-text-mid)', icon: Upload };
   }
-};
+  if (submissionStatus === 'graded' && score != null) {
+    return { label: `Graded — ${score}/${maxScore ?? '?'}`, cssColor: 'var(--color-success)', icon: CheckCircle2 };
+  }
+  if (submissionStatus === 'grading') {
+    return { label: 'Grading...', cssColor: 'var(--color-warning)', icon: Clock };
+  }
+  // pending or any other status = submitted but not yet graded
+  return { label: 'Submitted', cssColor: 'var(--color-info, #2563eb)', icon: CheckCircle2 };
+}
 
 export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) {
   const router = useRouter();
@@ -36,6 +43,32 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
 
   const course = courses?.find((c) => c.id === courseId);
   const now = new Date();
+
+  // Fetch submissions for each assignment to determine status
+  const submissionQueries = useQueries({
+    queries: (assignments ?? []).map((a) => ({
+      queryKey: ['submissions', a.id],
+      queryFn: () => submissionService.getSubmissions(a.id),
+      enabled: !!a.id,
+    })),
+  });
+
+  // Build a map: assignmentId → latest submission
+  const submissionMap = useMemo(() => {
+    const map: Record<string, { status: string; score: number | null; maxScore: number | null }> = {};
+    (assignments ?? []).forEach((a, idx) => {
+      const q = submissionQueries[idx];
+      if (q?.data && q.data.length > 0) {
+        const latest = q.data[0]; // most recent
+        map[a.id] = {
+          status: latest.status,
+          score: latest.grade?.totalScore ?? null,
+          maxScore: latest.grade?.maxScore ?? null,
+        };
+      }
+    });
+    return map;
+  }, [assignments, submissionQueries]);
 
   const courseStats = useMemo(() => {
     const all = assignments ?? [];
@@ -48,10 +81,11 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
       const diff = due.getTime() - now.getTime();
       return diff <= 1000 * 60 * 60 * 48;
     }).length;
-    const completed = all.filter((a) => a.status === 'published').length;
+    const submitted = all.filter((a) => submissionMap[a.id] != null).length;
+    const graded = all.filter((a) => submissionMap[a.id]?.status === 'graded').length;
 
-    return { total: all.length, published, dueSoon, completed };
-  }, [assignments, now]);
+    return { total: all.length, published, dueSoon, submitted, graded };
+  }, [assignments, now, submissionMap]);
 
   return (
     <StudentLayout
@@ -83,12 +117,12 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
                   <p className="text-3xl font-bold">{courseStats.published}</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20">
-                  <p className="text-xs opacity-80 mb-1">Due Soon</p>
-                  <p className="text-3xl font-bold">{courseStats.dueSoon}</p>
+                  <p className="text-xs opacity-80 mb-1">Submitted</p>
+                  <p className="text-3xl font-bold">{courseStats.submitted}</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl px-4 py-3 border border-white/20">
-                  <p className="text-xs opacity-80 mb-1">Completed</p>
-                  <p className="text-3xl font-bold">{courseStats.completed ?? 0}</p>
+                  <p className="text-xs opacity-80 mb-1">Graded</p>
+                  <p className="text-3xl font-bold">{courseStats.graded}</p>
                 </div>
               </div>
             </div>
@@ -119,7 +153,8 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
           ) : (
             <div className="space-y-3">
               {assignments.map((assignment) => {
-                const statusInfo = getStatusInfo(assignment.status);
+                const sub = submissionMap[assignment.id];
+                const statusInfo = getStudentStatus(sub?.status ?? null, sub?.score ?? null, sub?.maxScore ?? null);
                 const StatusIcon = statusInfo.icon;
                 const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
                 const isOverdue = dueDate && dueDate < now;
@@ -172,14 +207,14 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
                                 dueLabel.tone === 'danger'
                                   ? 'var(--color-error-bg)'
                                   : dueLabel.tone === 'warning'
-                                  ? 'var(--color-warning-bg)'
-                                  : 'var(--color-surface-elevated)',
+                                    ? 'var(--color-warning-bg)'
+                                    : 'var(--color-surface-elevated)',
                               color:
                                 dueLabel.tone === 'danger'
                                   ? 'var(--color-error)'
                                   : dueLabel.tone === 'warning'
-                                  ? 'var(--color-warning)'
-                                  : 'var(--color-text-mid)',
+                                    ? 'var(--color-warning)'
+                                    : 'var(--color-text-mid)',
                             }}
                           >
                             <DueIcon className="w-3 h-3" />

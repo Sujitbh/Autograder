@@ -1,4 +1,4 @@
-import { X, CheckCircle, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Send, Users, Download, FileText } from 'lucide-react';
+import { X, CheckCircle, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Send, Users, Download, FileText, Play, Zap, Loader2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -80,6 +80,10 @@ export function GradingModal({
     error: string | null;
   }>>([]);
   const [hasRealData, setHasRealData] = useState(false);
+
+  // Run Tests / Auto Grade state
+  const [isRunningTests, setIsRunningTests] = useState(false);
+  const [isAutoGrading, setIsAutoGrading] = useState(false);
 
   // Fallback test results (only used when no backend data available)
   const testResults = hasRealData
@@ -177,6 +181,53 @@ export function GradingModal({
     } catch (err) {
       console.error('Failed to download file:', err);
       alert('Failed to download file');
+    }
+  };
+
+  /* ─── Run Tests ─── */
+  const handleRunTests = async () => {
+    if (!submissionId) return;
+    setIsRunningTests(true);
+    try {
+      await submissionService.runTests(submissionId);
+      // Refresh submission detail to pick up new results
+      const detail = await submissionService.getSubmissionDetail(submissionId);
+      if (detail.results && detail.results.length > 0) {
+        setRealTestResults(detail.results);
+        setHasRealData(true);
+      }
+    } catch (err) {
+      console.error('Failed to run tests:', err);
+      alert('Failed to run tests: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsRunningTests(false);
+    }
+  };
+
+  /* ─── Auto Grade ─── */
+  const handleAutoGrade = async () => {
+    if (!submissionId) return;
+    setIsAutoGrading(true);
+    try {
+      const result = await submissionService.autoGrade(submissionId);
+      // Refresh submission detail to pick up new results + score
+      const detail = await submissionService.getSubmissionDetail(submissionId);
+      if (detail.results && detail.results.length > 0) {
+        setRealTestResults(detail.results);
+        setHasRealData(true);
+      }
+      // Update rubric scores from auto-graded score
+      if (result.score != null && rubricCriteria.length > 0) {
+        const totalMax = rubricCriteria.reduce((s, c) => s + c.maxPoints, 0);
+        if (totalMax > 0) {
+          setRubricScores(rubricCriteria.map(c => Math.round((result.score / totalMax) * c.maxPoints)));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to auto-grade:', err);
+      alert('Failed to auto-grade: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsAutoGrading(false);
     }
   };
 
@@ -355,9 +406,43 @@ export function GradingModal({
 
             {/* Test Results */}
             <div className="px-6 pb-6">
-              <h3 className="mb-4" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                Test Results
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                  Test Results
+                </h3>
+                {submissionId && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRunTests}
+                      disabled={isRunningTests || isAutoGrading}
+                      className="text-xs"
+                    >
+                      {isRunningTests ? (
+                        <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Running...</>
+                      ) : (
+                        <><Play className="w-3 h-3 mr-1" /> Run Tests</>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleAutoGrade}
+                      disabled={isRunningTests || isAutoGrading}
+                      className="text-xs text-white"
+                      style={{ backgroundColor: 'var(--color-primary)' }}
+                    >
+                      {isAutoGrading ? (
+                        <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Grading...</>
+                      ) : (
+                        <><Zap className="w-3 h-3 mr-1" /> Auto Grade</>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
 
               {/* Test Cases */}
               <div className="mb-4">

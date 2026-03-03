@@ -372,7 +372,7 @@ def get_course_grades(
             graded_scores.append(percentage)
             assignment_grades.append({
                 "assignment_id": assignment.id,
-                "assignment_name": assignment.name,
+                "assignment_name": assignment.title,
                 "score": sub.score,
                 "max_score": sub.max_score,
                 "percentage": round(percentage, 1),
@@ -381,9 +381,9 @@ def get_course_grades(
         else:
             assignment_grades.append({
                 "assignment_id": assignment.id,
-                "assignment_name": assignment.name,
+                "assignment_name": assignment.title,
                 "score": None,
-                "max_score": assignment.maxPoints,
+                "max_score": assignment.max_points,
                 "percentage": None,
                 "submitted": sub is not None
             })
@@ -438,7 +438,7 @@ def get_student_groups(
         if group.assignment_id:
             assignment = db.query(Assignment).filter(Assignment.id == group.assignment_id).first()
             if assignment:
-                assignment_name = assignment.name
+                assignment_name = assignment.title
 
         # Get all members
         all_memberships = db.query(GroupMembership).filter(GroupMembership.group_id == group.id).all()
