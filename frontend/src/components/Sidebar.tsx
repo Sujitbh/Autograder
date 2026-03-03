@@ -13,9 +13,11 @@ import { useRouter, useParams } from 'next/navigation';
 
 interface SidebarProps {
   activeItem?: string;
+  userRole?: 'instructor' | 'ta' | 'student';
+  backPath?: string;
 }
 
-export function Sidebar({ activeItem = 'assignments' }: SidebarProps) {
+export function Sidebar({ activeItem = 'assignments', userRole = 'instructor', backPath = '/courses' }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const router = useRouter();
   const { courseId } = useParams() as { courseId: string };
@@ -26,7 +28,8 @@ export function Sidebar({ activeItem = 'assignments' }: SidebarProps) {
     return null;
   }
 
-  const menuItems = [
+  // Define all menu items
+  const allMenuItems = [
     { id: 'assignments', icon: FileText, label: 'Assignments', path: `/courses/${courseId}` },
     { id: 'grading', icon: GraduationCap, label: 'Grading', path: `/courses/${courseId}/grading` },
     { id: 'reports', icon: BarChart3, label: 'Reports', path: `/courses/${courseId}/reports` },
@@ -34,6 +37,18 @@ export function Sidebar({ activeItem = 'assignments' }: SidebarProps) {
     { id: 'groups', icon: UsersRound, label: 'Groups', path: `/courses/${courseId}/groups` },
     { id: 'settings', icon: Settings, label: 'Settings', path: `/courses/${courseId}/settings` },
   ];
+
+  // Filter and remap paths based on user role
+  let menuItems = allMenuItems;
+  if (userRole === 'ta') {
+    // TAs can only grade and view students, with TA-specific paths
+    menuItems = allMenuItems
+      .filter((item) => ['grading', 'students'].includes(item.id))
+      .map((item) => ({
+        ...item,
+        path: `/student/teaching-assistant/${courseId}/${item.id}`,
+      }));
+  }
 
   return (
     <aside
@@ -65,14 +80,14 @@ export function Sidebar({ activeItem = 'assignments' }: SidebarProps) {
       <nav className="py-4">
         {/* Back to Courses */}
         <button
-          onClick={() => router.push('/courses')}
+          onClick={() => router.push(backPath)}
           className="w-full flex items-center gap-3 py-3 px-6 transition-colors mb-1"
           style={{ color: 'var(--color-primary)' }}
         >
           <ArrowLeft className="w-5 h-5 flex-shrink-0" />
           {!isCollapsed && (
             <span style={{ fontSize: '13px', fontWeight: 600 }}>
-              All Courses
+              {userRole === 'ta' ? 'Teaching Assistant' : 'All Courses'}
             </span>
           )}
         </button>

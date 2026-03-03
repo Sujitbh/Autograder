@@ -13,6 +13,7 @@ from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
 from app.models.user import User
 from app.schemas.submission import SubmissionCreate, SubmissionOut, SubmissionWithStudent
+from app.services.file_preview_service import FilePreviewService
 from app.settings import settings
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
@@ -289,6 +290,61 @@ def download_submission_file(
         filename=file_record.filename,
         media_type="application/octet-stream"
     )
+
+
+@router.get("/files/{file_id}/preview")
+def preview_submission_file(
+    file_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Get file content for preview.
+    Returns file content with metadata for supported text/code files.
+    """
+    file_record = db.query(SubmissionFile).filter(SubmissionFile.id == file_id).first()
+    if not file_record:
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    submission = db.query(Submission).filter(Submission.id == file_record.submission_id).first()
+    if not submission:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    
+    assignment = db.query(Assignment).filter(Assignment.id == submission.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    
+    # Check permissions - student can preview own files, TAs/instructors can preview all
+    if user.role != "admin" and submission.student_id != user.id:
+        require_course_role(
+            db=db,
+            user=user,
+            course_id=assignment.course_id,
+            allowed_roles=["instructor", "ta"],
+        )
+    
+    # Check if file exists on disk
+    if not os.path.exists(file_record.path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+    
+    # Check if file can be previewed
+    if not FilePreviewService.can_preview(file_record.filename):
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type not supported for preview: {file_record.filename}"
+        )
+    
+    # Get file content
+    try:
+        preview_data = FilePreviewService.get_file_content(
+            file_path=file_record.path,
+            filename=file_record.filename
+        )
+        return preview_data
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to preview file: {str(e)}")
 
 
 @router.post("/assignments/{assignment_id}/upload")

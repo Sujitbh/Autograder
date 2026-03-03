@@ -76,6 +76,20 @@ export const assignmentService = {
             description: dto.description ?? '',
             course_id: Number(dto.courseId) || null,
             allowed_languages: dto.language ?? 'python',
+            publicTests: (dto.publicTests ?? []).map((test: any) => ({
+                name: test.name,
+                input_data: test.input_data || test.input,
+                expected_output: test.expected_output || test.expectedOutput,
+                is_public: true,
+                points: test.points || 1,
+            })),
+            privateTests: (dto.privateTests ?? []).map((test: any) => ({
+                name: test.name,
+                input_data: test.input_data || test.input,
+                expected_output: test.expected_output || test.expectedOutput,
+                is_public: false,
+                points: test.points || 1,
+            })),
         };
         const { data } = await api.post<BackendAssignment>('/assignments/', payload);
         return mapAssignment(data);

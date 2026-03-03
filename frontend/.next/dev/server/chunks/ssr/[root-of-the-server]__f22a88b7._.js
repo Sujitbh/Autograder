@@ -3237,6 +3237,15 @@ const courseService = {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get('/courses/'));
         return data.map(mapCourse);
     },
+    /** Get courses for current user filtered by enrollment role. */ async getMyCoursesByRole (role) {
+        const params = role ? {
+            role
+        } : {};
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get('/courses/me', {
+                params
+            }));
+        return data.map(mapCourse);
+    },
     /** Get a single course by ID. */ async getCourse (courseId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}`));
         return mapCourse(data);
@@ -3279,6 +3288,10 @@ const courseService = {
         const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post('/courses/enroll', {
             enrollmentCode
         });
+        return data;
+    },
+    /** Get students in a course for TA/instructor viewing. */ async getStudentsForTA (courseId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/ta-students`));
         return data;
     }
 };
@@ -3331,7 +3344,21 @@ const assignmentService = {
             title: dto.name ?? dto.title ?? 'Untitled',
             description: dto.description ?? '',
             course_id: Number(dto.courseId) || null,
-            allowed_languages: dto.language ?? 'python'
+            allowed_languages: dto.language ?? 'python',
+            publicTests: (dto.publicTests ?? []).map((test)=>({
+                    name: test.name,
+                    input_data: test.input_data || test.input,
+                    expected_output: test.expected_output || test.expectedOutput,
+                    is_public: true,
+                    points: test.points || 1
+                })),
+            privateTests: (dto.privateTests ?? []).map((test)=>({
+                    name: test.name,
+                    input_data: test.input_data || test.input,
+                    expected_output: test.expected_output || test.expectedOutput,
+                    is_public: false,
+                    points: test.points || 1
+                }))
         };
         const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].post('/assignments/', payload);
         return mapAssignment(data);
@@ -3419,6 +3446,10 @@ const submissionService = {
         });
         return data;
     },
+    /** Preview a file (get file content for supported types). */ async previewFile (fileId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/files/${fileId}/preview`));
+        return data;
+    },
     /** List submissions for an assignment. */ async getSubmissions (assignmentId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/assignments/${assignmentId}`));
         return data.map(mapSubmission);
@@ -3443,6 +3474,15 @@ const submissionService = {
     },
     /** Student history helper; backend already filters by auth user role. */ async getStudentSubmissions (assignmentId, _studentId) {
         return this.getSubmissions(assignmentId);
+    },
+    /** Get all submissions in a course for TA/instructor grading view. */ async getSubmissionsForGrading (courseId, assignmentId) {
+        const params = assignmentId ? {
+            assignment_id: assignmentId
+        } : {};
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["default"].get(`/submissions/courses/${courseId}/for-grading`, {
+                params
+            }));
+        return data;
     }
 };
 }),
@@ -3521,6 +3561,10 @@ __turbopack_context__.s([
     ()=>useCreateCourse,
     "useDeleteCourse",
     ()=>useDeleteCourse,
+    "useStudentCourses",
+    ()=>useStudentCourses,
+    "useTACourses",
+    ()=>useTACourses,
     "useUpdateCourse",
     ()=>useUpdateCourse
 ]);
@@ -3531,6 +3575,8 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js [app-ssr] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$index$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/src/services/api/index.ts [app-ssr] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/courseService.ts [app-ssr] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/utils/AuthContext.tsx [app-ssr] (ecmascript)");
+;
 ;
 ;
 function useCourses() {
@@ -3552,6 +3598,36 @@ function useCourse(courseId) {
         ],
         queryFn: ()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["courseService"].getCourse(courseId),
         enabled: !!courseId
+    });
+}
+function useTACourses() {
+    const { user } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useQuery$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useQuery"])({
+        queryKey: [
+            'courses',
+            'ta',
+            user?.id ?? 'anonymous'
+        ],
+        queryFn: ()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["courseService"].getMyCoursesByRole('ta'),
+        enabled: !!user,
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: true,
+        refetchOnMount: 'always'
+    });
+}
+function useStudentCourses() {
+    const { user } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useAuth"])();
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useQuery$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useQuery"])({
+        queryKey: [
+            'courses',
+            'student',
+            user?.id ?? 'anonymous'
+        ],
+        queryFn: ()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["courseService"].getMyCoursesByRole('student'),
+        enabled: !!user,
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: true,
+        refetchOnMount: 'always'
     });
 }
 function useCreateCourse() {
@@ -3706,10 +3782,14 @@ function useDeleteAssignment() {
 __turbopack_context__.s([
     "useGradeSubmission",
     ()=>useGradeSubmission,
+    "useOverrideSubmissionScore",
+    ()=>useOverrideSubmissionScore,
     "useSubmission",
     ()=>useSubmission,
     "useSubmissions",
     ()=>useSubmissions,
+    "useSubmissionsForGrading",
+    ()=>useSubmissionsForGrading,
     "useSubmitCode",
     ()=>useSubmitCode
 ]);
@@ -3740,6 +3820,18 @@ function useSubmission(submissionId) {
         ],
         queryFn: ()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$submissionService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["submissionService"].getSubmission(submissionId),
         enabled: !!submissionId
+    });
+}
+function useSubmissionsForGrading(courseId, assignmentId) {
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useQuery$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useQuery"])({
+        queryKey: [
+            'submissions-for-grading',
+            courseId,
+            assignmentId
+        ],
+        queryFn: ()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$submissionService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["submissionService"].getSubmissionsForGrading(courseId, assignmentId),
+        enabled: !!courseId,
+        staleTime: 1 * 60 * 1000
     });
 }
 function useSubmitCode() {
@@ -3774,6 +3866,44 @@ function useGradeSubmission() {
                 ]
             });
             // Also refresh grades
+            qc.invalidateQueries({
+                queryKey: [
+                    'grades'
+                ]
+            });
+        }
+    });
+}
+function useOverrideSubmissionScore() {
+    const qc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useQueryClient"])();
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["useMutation"])({
+        mutationFn: ({ submissionId, score, maxScore, feedback })=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$submissionService$2e$ts__$5b$app$2d$ssr$5d$__$28$ecmascript$29$__["submissionService"].overrideSubmissionScore(submissionId, {
+                score,
+                max_score: maxScore,
+                feedback
+            }),
+        onSuccess: ()=>{
+            // Invalidate all relevant queries to refresh data
+            qc.invalidateQueries({
+                queryKey: [
+                    'submissions'
+                ]
+            });
+            qc.invalidateQueries({
+                queryKey: [
+                    'submission'
+                ]
+            });
+            qc.invalidateQueries({
+                queryKey: [
+                    'assignments'
+                ]
+            });
+            qc.invalidateQueries({
+                queryKey: [
+                    'submissions-for-grading'
+                ]
+            });
             qc.invalidateQueries({
                 queryKey: [
                     'grades'

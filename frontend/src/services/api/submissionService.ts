@@ -111,6 +111,22 @@ export const submissionService = {
     return data;
   },
 
+  /** Preview a file (get file content for supported types). */
+  async previewFile(fileId: number): Promise<{
+    filename: string;
+    content: string;
+    file_type: string;
+    size_bytes: number;
+    encoding: string;
+    line_count: number;
+    can_preview: boolean;
+  }> {
+    const { data } = await withRetry(() =>
+      api.get(`/submissions/files/${fileId}/preview`)
+    );
+    return data;
+  },
+
   /** List submissions for an assignment. */
   async getSubmissions(assignmentId: string): Promise<Submission[]> {
     const { data } = await withRetry(() =>

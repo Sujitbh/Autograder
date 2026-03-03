@@ -1,10 +1,11 @@
-import { X, CheckCircle, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Send, AlertTriangle, Shield, Copy, Users, Download, FileText } from 'lucide-react';
+import { X, CheckCircle, ChevronLeft, ChevronRight, Save, Send, Users, Download, FileText, Eye } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { submissionService } from '@/services/api';
 import { useOverrideSubmissionScore } from '@/hooks/queries';
+import { FilePreview } from './FilePreview';
 
 interface RubricItem {
   name: string;
@@ -57,43 +58,29 @@ export function GradingModal({
 }: GradingModalProps) {
   const overrideScoreMutation = useOverrideSubmissionScore();
 
-  const [expandedTests, setExpandedTests] = useState<Record<string, boolean>>({
-    public: true,
-    private: false,
-  });
 
-  const [expandedAIAlerts, setExpandedAIAlerts] = useState(true);
   const [files, setFiles] = useState<Array<{id: number; filename: string; file_size: number | null}>>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedFileForPreview, setSelectedFileForPreview] = useState<{id: number; filename: string} | null>(null);
 
-  // Mock AI detection results
-  const aiDetectionResults = {
-    plagiarismDetected: true,
-    plagiarismScore: 76,
-    similarSubmissions: [
-      { student: 'Sarah Jones', similarity: 76, matchedLines: 45 },
-      { student: 'Mike Wilson', similarity: 42, matchedLines: 22 }
-    ],
-    aiCodeDetected: true,
-    aiConfidence: 68,
-    suspiciousSections: [
-      { startLine: 15, endLine: 28, reason: 'Pattern matches common AI-generated code structure' },
-      { startLine: 35, endLine: 42, reason: 'Unusual commenting style consistent with AI output' }
-    ]
+  // Helper function to check if file can be previewed (text/code files only)
+  const canPreviewFile = (filename: string): boolean => {
+    const ext = filename.toLowerCase().match(/\.[^.]+$/);
+    if (!ext) return false;
+    
+    const textExtensions = [
+      '.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.cpp', '.c', '.h', '.hpp',
+      '.cs', '.rb', '.go', '.rs', '.php', '.swift', '.kt', '.scala', '.r', '.m',
+      '.html', '.htm', '.xml', '.css', '.scss', '.sass', '.less', '.sql',
+      '.sh', '.bash', '.zsh', '.yml', '.yaml', '.json', '.md', '.txt', '.log',
+      '.ini', '.cfg', '.conf', '.dockerfile', '.gitignore', '.env'
+    ];
+    
+    return textExtensions.includes(ext[0]);
   };
 
-  const testResults = {
-    public: [
-      { id: '1', name: 'Test Case 1: Basic Input', status: 'pass', input: '5', expected: '25', actual: '25' },
-      { id: '2', name: 'Test Case 2: Zero Input', status: 'pass', input: '0', expected: '0', actual: '0' },
-      { id: '3', name: 'Test Case 3: Negative Input', status: 'fail', input: '-3', expected: '9', actual: 'Error: invalid input' },
-    ],
-    private: [
-      { id: '4', name: 'Private Test 1: Large Numbers', status: 'pass', input: '100', expected: '10000', actual: '10000' },
-      { id: '5', name: 'Private Test 2: Edge Case', status: 'pass', input: '999', expected: '998001', actual: '998001' },
-    ],
-  };
+
 
   const defaultRubric: RubricItem[] = [
     { name: 'Code Correctness', maxPoints: 50 },
@@ -114,10 +101,6 @@ export function GradingModal({
   const [feedback, setFeedback] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [savedDraft, setSavedDraft] = useState(false);
-
-  const toggleTestSection = (section: string) => {
-    setExpandedTests(prev => ({ ...prev, [section]: !prev[section] }));
-  };
 
   const getTotalScore = () => rubricScores.reduce((sum, s) => sum + s, 0);
   const getTotalMaxPoints = () => rubricCriteria.reduce((sum, c) => sum + c.maxPoints, 0);
@@ -295,213 +278,49 @@ export function GradingModal({
                             </span>
                           )}
                         </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleDownloadFile(file.id, file.filename)}
-                          className="flex-shrink-0 ml-2"
-                        >
-                          <Download className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                          {canPreviewFile(file.filename) && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedFileForPreview({ id: file.id, filename: file.filename })}
+                              className="flex items-center gap-1"
+                              title="Preview file"
+                            >
+                              <Eye className="w-4 h-4" />
+                              <span className="text-xs">Preview</span>
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDownloadFile(file.id, file.filename)}
+                            title="Download file"
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
+                  </div>
+                )}
+                
+                {/* File Preview Section */}
+                {selectedFileForPreview && (
+                  <div className="mt-4">
+                    <FilePreview
+                      fileId={selectedFileForPreview.id}
+                      filename={selectedFileForPreview.filename}
+                      onClose={() => setSelectedFileForPreview(null)}
+                    />
                   </div>
                 )}
               </div>
             )}
 
-            {/* AI Detection Alerts */}
-            {(aiDetectionResults.plagiarismDetected || aiDetectionResults.aiCodeDetected) && (
-              <div className="p-6 border-b" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-warning-bg)' }}>
-                <button
-                  onClick={() => setExpandedAIAlerts(!expandedAIAlerts)}
-                  className="w-full flex items-center justify-between mb-4"
-                >
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-[var(--color-warning)]" />
-                    <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-warning)' }}>
-                      AI Detection Alerts (Advisory Only)
-                    </h3>
-                  </div>
-                  {expandedAIAlerts ? (
-                    <ChevronUp className="w-5 h-5 text-[var(--color-warning)]" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-[var(--color-warning)]" />
-                  )}
-                </button>
 
-                {expandedAIAlerts && (
-                  <div className="space-y-4">
-                    {/* Plagiarism Alert */}
-                    {aiDetectionResults.plagiarismDetected && (
-                      <div className="bg-white rounded-lg p-4" style={{ border: '1px solid var(--color-warning)' }}>
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <Copy className="w-4 h-4 text-[var(--color-warning)]" />
-                            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-warning)' }}>
-                              Plagiarism Detection
-                            </span>
-                          </div>
-                          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-warning)' }}>
-                            {aiDetectionResults.plagiarismScore}% Similar
-                          </span>
-                        </div>
-
-                        <p style={{ fontSize: '12px', color: 'var(--color-warning)', marginBottom: '12px' }}>
-                          Code shows high similarity to other submissions
-                        </p>
-
-                        <div className="space-y-2">
-                          {aiDetectionResults.similarSubmissions.map((match, index) => (
-                            <div key={index} className="flex justify-between items-center text-sm">
-                              <span style={{ fontSize: '12px', color: 'var(--color-text-dark)' }}>
-                                {match.student}
-                              </span>
-                              <span style={{ fontSize: '12px', color: 'var(--color-warning)', fontWeight: 500 }}>
-                                {match.similarity}% ({match.matchedLines} lines)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* AI Code Detection Alert */}
-                    {aiDetectionResults.aiCodeDetected && (
-                      <div className="bg-white rounded-lg p-4" style={{ border: '1px solid var(--color-warning)' }}>
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <Shield className="w-4 h-4 text-[var(--color-warning)]" />
-                            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-warning)' }}>
-                              AI-Generated Code Detection
-                            </span>
-                          </div>
-                          <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-warning)' }}>
-                            {aiDetectionResults.aiConfidence}% Confidence
-                          </span>
-                        </div>
-
-                        <p style={{ fontSize: '12px', color: 'var(--color-warning)', marginBottom: '12px' }}>
-                          Code patterns suggest possible AI generation
-                        </p>
-
-                        <div className="space-y-2">
-                          {aiDetectionResults.suspiciousSections.map((section, index) => (
-                            <div key={index} className="text-sm">
-                              <span style={{ fontSize: '12px', color: 'var(--color-text-dark)', fontWeight: 500 }}>
-                                Lines {section.startLine}-{section.endLine}:
-                              </span>
-                              <p style={{ fontSize: '11px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
-                                {section.reason}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-start gap-2 p-3 rounded" style={{ backgroundColor: 'var(--color-warning-bg)' }}>
-                      <AlertTriangle className="w-4 h-4 text-[var(--color-warning)] flex-shrink-0 mt-0.5" />
-                      <p style={{ fontSize: '11px', color: 'var(--color-warning)' }}>
-                        <strong>Important:</strong> These are advisory alerts only. Review the code and make your final judgment. Do not automatically deduct points based on AI detection.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Test Results */}
-            <div className="px-6 pb-6">
-              <h3 className="mb-4" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                Test Results
-              </h3>
-
-              {/* Public Tests */}
-              <div className="mb-4">
-                <button
-                  onClick={() => toggleTestSection('public')}
-                  className="w-full flex items-center justify-between p-3 rounded-t-lg transition-colors hover:bg-[var(--color-primary-bg)]"
-                  style={{ backgroundColor: 'var(--color-primary-bg)' }}
-                >
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>
-                    Public Test Cases (2/3 passed)
-                  </span>
-                  {expandedTests.public ? (
-                    <ChevronUp className="w-5 h-5 text-[var(--color-primary)]" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-[var(--color-primary)]" />
-                  )}
-                </button>
-
-                {expandedTests.public && (
-                  <div className="border border-t-0 rounded-b-lg" style={{ borderColor: 'var(--color-border)' }}>
-                    {testResults.public.map((test) => (
-                      <div key={test.id} className="p-4 border-b last:border-b-0" style={{ borderColor: 'var(--color-border)' }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                            {test.name}
-                          </span>
-                          {test.status === 'pass' ? (
-                            <CheckCircle className="w-5 h-5 text-[var(--color-success)]" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-[var(--color-error)]" />
-                          )}
-                        </div>
-                        <div className="space-y-1" style={{ fontSize: '12px', color: 'var(--color-text-mid)' }}>
-                          <div><strong>Input:</strong> {test.input}</div>
-                          <div><strong>Expected:</strong> {test.expected}</div>
-                          <div><strong>Actual:</strong> {test.actual}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Private Tests */}
-              <div>
-                <button
-                  onClick={() => toggleTestSection('private')}
-                  className="w-full flex items-center justify-between p-3 rounded-t-lg transition-colors hover:bg-[var(--color-warning-bg)]"
-                  style={{ backgroundColor: 'var(--color-warning-bg)' }}
-                >
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-warning)' }}>
-                    Private Test Cases (2/2 passed)
-                  </span>
-                  {expandedTests.private ? (
-                    <ChevronUp className="w-5 h-5 text-[var(--color-warning)]" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-[var(--color-warning)]" />
-                  )}
-                </button>
-
-                {expandedTests.private && (
-                  <div className="border border-t-0 rounded-b-lg" style={{ borderColor: 'var(--color-border)' }}>
-                    {testResults.private.map((test) => (
-                      <div key={test.id} className="p-4 border-b last:border-b-0" style={{ borderColor: 'var(--color-border)' }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                            {test.name}
-                          </span>
-                          {test.status === 'pass' ? (
-                            <CheckCircle className="w-5 h-5 text-[var(--color-success)]" />
-                          ) : (
-                            <XCircle className="w-5 h-5 text-[var(--color-error)]" />
-                          )}
-                        </div>
-                        <div className="space-y-1" style={{ fontSize: '12px', color: 'var(--color-text-mid)' }}>
-                          <div><strong>Input:</strong> {test.input}</div>
-                          <div><strong>Expected:</strong> {test.expected}</div>
-                          <div><strong>Actual:</strong> {test.actual}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
 
           {/* Right Panel: Rubric & Feedback (40%) */}
@@ -518,9 +337,7 @@ export function GradingModal({
                     <span style={{ fontSize: '14px', color: '#595959' }}>({autoScorePct}%)</span>
                   )}
                 </div>
-                <p style={{ fontSize: '12px', color: '#1A4D7A', marginTop: '6px' }}>
-                  Tests Passed: {testResults.public.filter(t => t.status === 'pass').length + testResults.private.filter(t => t.status === 'pass').length} / {testResults.public.length + testResults.private.length}
-                </p>
+
               </div>
 
               {/* Rubric Grading */}

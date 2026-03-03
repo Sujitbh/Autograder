@@ -2620,7 +2620,7 @@ var _s = __turbopack_context__.k.signature();
 ;
 ;
 ;
-function Sidebar({ activeItem = 'assignments' }) {
+function Sidebar({ activeItem = 'assignments', userRole = 'instructor', backPath = '/courses' }) {
     _s();
     const [isCollapsed, setIsCollapsed] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
@@ -2630,7 +2630,8 @@ function Sidebar({ activeItem = 'assignments' }) {
         console.error('Sidebar: courseId is undefined');
         return null;
     }
-    const menuItems = [
+    // Define all menu items
+    const allMenuItems = [
         {
             id: 'assignments',
             icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$file$2d$text$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FileText$3e$__["FileText"],
@@ -2668,6 +2669,18 @@ function Sidebar({ activeItem = 'assignments' }) {
             path: `/courses/${courseId}/settings`
         }
     ];
+    // Filter and remap paths based on user role
+    let menuItems = allMenuItems;
+    if (userRole === 'ta') {
+        // TAs can only grade and view students, with TA-specific paths
+        menuItems = allMenuItems.filter((item)=>[
+                'grading',
+                'students'
+            ].includes(item.id)).map((item)=>({
+                ...item,
+                path: `/student/teaching-assistant/${courseId}/${item.id}`
+            }));
+    }
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("aside", {
         className: "border-r h-full transition-all duration-300",
         style: {
@@ -2693,24 +2706,24 @@ function Sidebar({ activeItem = 'assignments' }) {
                         }
                     }, void 0, false, {
                         fileName: "[project]/src/components/Sidebar.tsx",
-                        lineNumber: 60,
+                        lineNumber: 75,
                         columnNumber: 11
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/src/components/Sidebar.tsx",
-                    lineNumber: 55,
+                    lineNumber: 70,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/Sidebar.tsx",
-                lineNumber: 48,
+                lineNumber: 63,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("nav", {
                 className: "py-4",
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                        onClick: ()=>router.push('/courses'),
+                        onClick: ()=>router.push(backPath),
                         className: "w-full flex items-center gap-3 py-3 px-6 transition-colors mb-1",
                         style: {
                             color: 'var(--color-primary)'
@@ -2720,7 +2733,7 @@ function Sidebar({ activeItem = 'assignments' }) {
                                 className: "w-5 h-5 flex-shrink-0"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/Sidebar.tsx",
-                                lineNumber: 72,
+                                lineNumber: 87,
                                 columnNumber: 11
                             }, this),
                             !isCollapsed && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2728,16 +2741,16 @@ function Sidebar({ activeItem = 'assignments' }) {
                                     fontSize: '13px',
                                     fontWeight: 600
                                 },
-                                children: "All Courses"
+                                children: userRole === 'ta' ? 'Teaching Assistant' : 'All Courses'
                             }, void 0, false, {
                                 fileName: "[project]/src/components/Sidebar.tsx",
-                                lineNumber: 74,
+                                lineNumber: 89,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/Sidebar.tsx",
-                        lineNumber: 67,
+                        lineNumber: 82,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2748,7 +2761,7 @@ function Sidebar({ activeItem = 'assignments' }) {
                         }
                     }, void 0, false, {
                         fileName: "[project]/src/components/Sidebar.tsx",
-                        lineNumber: 80,
+                        lineNumber: 95,
                         columnNumber: 9
                     }, this),
                     menuItems.map((item)=>{
@@ -2769,14 +2782,14 @@ function Sidebar({ activeItem = 'assignments' }) {
                                     }
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Sidebar.tsx",
-                                    lineNumber: 98,
+                                    lineNumber: 113,
                                     columnNumber: 17
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(Icon, {
                                     className: "w-5 h-5 flex-shrink-0"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Sidebar.tsx",
-                                    lineNumber: 104,
+                                    lineNumber: 119,
                                     columnNumber: 15
                                 }, this),
                                 !isCollapsed && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2787,26 +2800,26 @@ function Sidebar({ activeItem = 'assignments' }) {
                                     children: item.label
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Sidebar.tsx",
-                                    lineNumber: 107,
+                                    lineNumber: 122,
                                     columnNumber: 17
                                 }, this)
                             ]
                         }, item.id, true, {
                             fileName: "[project]/src/components/Sidebar.tsx",
-                            lineNumber: 87,
+                            lineNumber: 102,
                             columnNumber: 13
                         }, this);
                     })
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/Sidebar.tsx",
-                lineNumber: 65,
+                lineNumber: 80,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/Sidebar.tsx",
-        lineNumber: 39,
+        lineNumber: 54,
         columnNumber: 5
     }, this);
 }
@@ -3499,7 +3512,7 @@ __turbopack_context__.s([
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 /* ═══════════════════════════════════════════════════════════════════
-   CreateAssignmentForm — Multi-step wizard (9 steps)
+    CreateAssignmentForm — Multi-step wizard (8 steps)
    Features:
    - Rubric templates (save / load / preloaded)
    - PDF rubric upload & parsing
@@ -3519,7 +3532,6 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$re
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$trash$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Trash2$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/trash-2.js [app-client] (ecmascript) <export default as Trash2>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$grip$2d$vertical$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__GripVertical$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/grip-vertical.js [app-client] (ecmascript) <export default as GripVertical>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$check$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Check$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/check.js [app-client] (ecmascript) <export default as Check>");
-var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$code$2d$xml$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Code2$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/code-xml.js [app-client] (ecmascript) <export default as Code2>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$file$2d$text$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FileText$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/file-text.js [app-client] (ecmascript) <export default as FileText>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$test$2d$tube$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__TestTube$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/test-tube.js [app-client] (ecmascript) <export default as TestTube>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$lock$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Lock$3e$__ = __turbopack_context__.i("[project]/node_modules/lucide-react/dist/esm/icons/lock.js [app-client] (ecmascript) <export default as Lock>");
@@ -3742,10 +3754,6 @@ const STEPS = [
         icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$file$2d$text$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FileText$3e$__["FileText"]
     },
     {
-        label: 'Starter Code',
-        icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$code$2d$xml$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Code2$3e$__["Code2"]
-    },
-    {
         label: 'Public Tests',
         icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$test$2d$tube$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__TestTube$3e$__["TestTube"]
     },
@@ -3857,7 +3865,6 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
     const watchPlagiarism = watch('plagiarismEnabled');
     const watchAiDetection = watch('aiDetectionEnabled');
     const watchAutoFlag = watch('autoFlagEnabled');
-    const watchLanguage = watch('language');
     // ── Auto-save to localStorage every 30 seconds ────────────────
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "CreateAssignmentForm.useEffect": ()=>{
@@ -3902,16 +3909,12 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
         [
             'name',
             'shortName',
-            'language',
             'category',
             'dueDate',
             'maxPoints'
         ],
         [
             'description'
-        ],
-        [
-            'starterCode'
         ],
         [
             'publicTests'
@@ -4137,18 +4140,18 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     className: "h-3.5 w-3.5"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 560,
+                                    lineNumber: 556,
                                     columnNumber: 41
                                 }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(StepIcon, {
                                     className: "h-3.5 w-3.5"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 562,
+                                    lineNumber: 558,
                                     columnNumber: 41
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 546,
+                                lineNumber: 542,
                                 columnNumber: 33
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -4156,31 +4159,31 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                 children: step.label
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 565,
+                                lineNumber: 561,
                                 columnNumber: 33
                             }, this),
                             idx < STEPS.length - 1 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                 className: `h-px w-4 xl:w-6 ${isCompleted ? 'bg-green-400' : 'bg-gray-200 dark:bg-gray-700'}`
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 572,
+                                lineNumber: 568,
                                 columnNumber: 37
                             }, this)
                         ]
                     }, idx, true, {
                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                        lineNumber: 545,
+                        lineNumber: 541,
                         columnNumber: 29
                     }, this);
                 })
             }, void 0, false, {
                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                lineNumber: 539,
+                lineNumber: 535,
                 columnNumber: 17
             }, this)
         }, void 0, false, {
             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-            lineNumber: 538,
+            lineNumber: 534,
             columnNumber: 13
         }, this);
     }
@@ -4198,14 +4201,14 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     className: "h-5 w-5 text-[#6B0000]"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 592,
+                                    lineNumber: 588,
                                     columnNumber: 25
                                 }, this),
                                 " Basic Information"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 591,
+                            lineNumber: 587,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4213,13 +4216,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Configure the assignment's core details."
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 594,
+                            lineNumber: 590,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 590,
+                    lineNumber: 586,
                     columnNumber: 17
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4233,7 +4236,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Assignment Name *"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 599,
+                                    lineNumber: 595,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -4242,7 +4245,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     placeholder: "e.g. Homework 3 — Binary Trees"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 600,
+                                    lineNumber: 596,
                                     columnNumber: 25
                                 }, this),
                                 errors.name && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4250,13 +4253,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: errors.name.message
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 601,
+                                    lineNumber: 597,
                                     columnNumber: 41
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 598,
+                            lineNumber: 594,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4266,7 +4269,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Short Name *"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 605,
+                                    lineNumber: 601,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -4276,7 +4279,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     maxLength: 10
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 606,
+                                    lineNumber: 602,
                                     columnNumber: 25
                                 }, this),
                                 errors.shortName && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4284,81 +4287,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: errors.shortName.message
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 607,
+                                    lineNumber: 603,
                                     columnNumber: 46
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 604,
-                            columnNumber: 21
-                        }, this),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$label$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Label"], {
-                                    children: "Language *"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 611,
-                                    columnNumber: 25
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2d$hook$2d$form$2f$dist$2f$index$2e$esm$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Controller"], {
-                                    control: control,
-                                    name: "language",
-                                    render: ({ field })=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Select"], {
-                                            value: field.value,
-                                            onValueChange: field.onChange,
-                                            children: [
-                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectTrigger"], {
-                                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectValue"], {}, void 0, false, {
-                                                        fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                        lineNumber: 617,
-                                                        columnNumber: 52
-                                                    }, void 0)
-                                                }, void 0, false, {
-                                                    fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 617,
-                                                    columnNumber: 37
-                                                }, void 0),
-                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectContent"], {
-                                                    children: [
-                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
-                                                            value: "python",
-                                                            children: "Python 3.10"
-                                                        }, void 0, false, {
-                                                            fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                            lineNumber: 619,
-                                                            columnNumber: 41
-                                                        }, void 0),
-                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
-                                                            value: "java",
-                                                            children: "Java 17"
-                                                        }, void 0, false, {
-                                                            fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                            lineNumber: 620,
-                                                            columnNumber: 41
-                                                        }, void 0)
-                                                    ]
-                                                }, void 0, true, {
-                                                    fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 618,
-                                                    columnNumber: 37
-                                                }, void 0)
-                                            ]
-                                        }, void 0, true, {
-                                            fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 616,
-                                            columnNumber: 33
-                                        }, void 0)
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 612,
-                                    columnNumber: 25
-                                }, this)
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 610,
+                            lineNumber: 600,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4367,7 +4302,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Category *"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 628,
+                                    lineNumber: 607,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2d$hook$2d$form$2f$dist$2f$index$2e$esm$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Controller"], {
@@ -4380,12 +4315,12 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectTrigger"], {
                                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectValue"], {}, void 0, false, {
                                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                        lineNumber: 634,
+                                                        lineNumber: 613,
                                                         columnNumber: 52
                                                     }, void 0)
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 634,
+                                                    lineNumber: 613,
                                                     columnNumber: 37
                                                 }, void 0),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectContent"], {
@@ -4400,29 +4335,29 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                             children: c
                                                         }, c, false, {
                                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                            lineNumber: 637,
+                                                            lineNumber: 616,
                                                             columnNumber: 45
                                                         }, void 0))
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 635,
+                                                    lineNumber: 614,
                                                     columnNumber: 37
                                                 }, void 0)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 633,
+                                            lineNumber: 612,
                                             columnNumber: 33
                                         }, void 0)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 629,
+                                    lineNumber: 608,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 627,
+                            lineNumber: 606,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4432,7 +4367,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Due Date *"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 646,
+                                    lineNumber: 625,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -4441,7 +4376,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     ...register('dueDate')
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 647,
+                                    lineNumber: 626,
                                     columnNumber: 25
                                 }, this),
                                 errors.dueDate && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4449,13 +4384,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: errors.dueDate.message
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 648,
+                                    lineNumber: 627,
                                     columnNumber: 44
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 645,
+                            lineNumber: 624,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4465,7 +4400,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Max Points *"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 652,
+                                    lineNumber: 631,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -4476,7 +4411,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     })
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 653,
+                                    lineNumber: 632,
                                     columnNumber: 25
                                 }, this),
                                 errors.maxPoints && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4484,13 +4419,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: errors.maxPoints.message
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 654,
+                                    lineNumber: 633,
                                     columnNumber: 46
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 651,
+                            lineNumber: 630,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4505,12 +4440,12 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             onCheckedChange: field.onChange
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 662,
+                                            lineNumber: 641,
                                             columnNumber: 33
                                         }, void 0)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 658,
+                                    lineNumber: 637,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$label$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Label"], {
@@ -4523,25 +4458,25 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 className: "h-4 w-4 text-gray-400"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 671,
+                                                lineNumber: 650,
                                                 columnNumber: 33
                                             }, this),
                                             " Group Assignment"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 670,
+                                        lineNumber: 649,
                                         columnNumber: 29
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 669,
+                                    lineNumber: 648,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 657,
+                            lineNumber: 636,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4556,12 +4491,12 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             onCheckedChange: field.onChange
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 681,
+                                            lineNumber: 660,
                                             columnNumber: 33
                                         }, void 0)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 677,
+                                    lineNumber: 656,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$label$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Label"], {
@@ -4570,13 +4505,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Allow Late Submissions"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 688,
+                                    lineNumber: 667,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 676,
+                            lineNumber: 655,
                             columnNumber: 21
                         }, this),
                         watchAllowLate && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4588,7 +4523,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Penalty Type"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 694,
+                                            lineNumber: 673,
                                             columnNumber: 33
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2d$hook$2d$form$2f$dist$2f$index$2e$esm$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Controller"], {
@@ -4601,12 +4536,12 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectTrigger"], {
                                                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectValue"], {}, void 0, false, {
                                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                                lineNumber: 700,
+                                                                lineNumber: 679,
                                                                 columnNumber: 60
                                                             }, void 0)
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                            lineNumber: 700,
+                                                            lineNumber: 679,
                                                             columnNumber: 45
                                                         }, void 0),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectContent"], {
@@ -4616,7 +4551,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                                     children: "Percentage per day"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                                    lineNumber: 702,
+                                                                    lineNumber: 681,
                                                                     columnNumber: 49
                                                                 }, void 0),
                                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -4624,30 +4559,30 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                                     children: "Fixed points per day"
                                                                 }, void 0, false, {
                                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                                    lineNumber: 703,
+                                                                    lineNumber: 682,
                                                                     columnNumber: 49
                                                                 }, void 0)
                                                             ]
                                                         }, void 0, true, {
                                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                            lineNumber: 701,
+                                                            lineNumber: 680,
                                                             columnNumber: 45
                                                         }, void 0)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 699,
+                                                    lineNumber: 678,
                                                     columnNumber: 41
                                                 }, void 0)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 695,
+                                            lineNumber: 674,
                                             columnNumber: 33
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 693,
+                                    lineNumber: 672,
                                     columnNumber: 29
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4657,7 +4592,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Penalty Amount"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 710,
+                                            lineNumber: 689,
                                             columnNumber: 33
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -4668,31 +4603,31 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             })
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 711,
+                                            lineNumber: 690,
                                             columnNumber: 33
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 709,
+                                    lineNumber: 688,
                                     columnNumber: 29
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 692,
+                            lineNumber: 671,
                             columnNumber: 25
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 597,
+                    lineNumber: 593,
                     columnNumber: 17
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-            lineNumber: 589,
+            lineNumber: 585,
             columnNumber: 13
         }, this);
     }
@@ -4710,14 +4645,14 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     className: "h-5 w-5 text-[#6B0000]"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 731,
+                                    lineNumber: 710,
                                     columnNumber: 25
                                 }, this),
                                 " Assignment Description"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 730,
+                            lineNumber: 709,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4725,13 +4660,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Provide detailed instructions and requirements."
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 733,
+                            lineNumber: 712,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 729,
+                    lineNumber: 708,
                     columnNumber: 17
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4741,7 +4676,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Description"
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 736,
+                            lineNumber: 715,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$textarea$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Textarea"], {
@@ -4752,7 +4687,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             className: "font-mono text-sm"
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 737,
+                            lineNumber: 716,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4760,131 +4695,23 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Supports Markdown formatting."
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 744,
+                            lineNumber: 723,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 735,
+                    lineNumber: 714,
                     columnNumber: 17
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-            lineNumber: 728,
+            lineNumber: 707,
             columnNumber: 13
         }, this);
     }
-    // ── Step 2: Starter Code ──────────────────────────────────────
-    function renderStarterCode() {
-        return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-            className: "space-y-6",
-            children: [
-                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                    children: [
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h2", {
-                            className: "flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100",
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$code$2d$xml$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Code2$3e$__["Code2"], {
-                                    className: "h-5 w-5 text-[#6B0000]"
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 757,
-                                    columnNumber: 25
-                                }, this),
-                                " Starter Code"
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 756,
-                            columnNumber: 21
-                        }, this),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                            className: "text-xs text-gray-500 mt-1",
-                            children: "Optional template code that students will start with."
-                        }, void 0, false, {
-                            fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 759,
-                            columnNumber: 21
-                        }, this)
-                    ]
-                }, void 0, true, {
-                    fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 755,
-                    columnNumber: 17
-                }, this),
-                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                    children: [
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$label$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Label"], {
-                            htmlFor: "starterCode",
-                            children: "Code Template"
-                        }, void 0, false, {
-                            fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 762,
-                            columnNumber: 21
-                        }, this),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                            className: "rounded-lg overflow-hidden border dark:border-gray-700",
-                            children: [
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                    className: "flex items-center justify-between px-4 py-2 bg-[#1E1E2E] border-b border-gray-700",
-                                    children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
-                                        className: "text-xs text-gray-400",
-                                        children: watchLanguage === 'python' ? 'main.py' : 'Main.java'
-                                    }, void 0, false, {
-                                        fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 765,
-                                        columnNumber: 29
-                                    }, this)
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 764,
-                                    columnNumber: 25
-                                }, this),
-                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$textarea$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Textarea"], {
-                                    id: "starterCode",
-                                    ...register('starterCode'),
-                                    rows: 16,
-                                    placeholder: watchLanguage === 'python' ? '# Write your starter code here...\n\ndef solution():\n    pass' : '// Write your starter code here...\n\npublic class Main {\n    public static void main(String[] args) {\n    }\n}',
-                                    className: "font-mono text-sm border-0 rounded-none focus-visible:ring-0",
-                                    style: {
-                                        backgroundColor: '#1E1E2E',
-                                        color: '#E0E0E0'
-                                    }
-                                }, void 0, false, {
-                                    fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 769,
-                                    columnNumber: 25
-                                }, this)
-                            ]
-                        }, void 0, true, {
-                            fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 763,
-                            columnNumber: 21
-                        }, this),
-                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                            className: "mt-1 text-xs text-gray-400",
-                            children: "Students will see this code pre-filled when they start the assignment."
-                        }, void 0, false, {
-                            fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 780,
-                            columnNumber: 21
-                        }, this)
-                    ]
-                }, void 0, true, {
-                    fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 761,
-                    columnNumber: 17
-                }, this)
-            ]
-        }, void 0, true, {
-            fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-            lineNumber: 754,
-            columnNumber: 13
-        }, this);
-    }
-    // ── Step 3 & 4: Test Cases (shared renderer) ──────────────────
+    // ── Step 2 & 3: Test Cases (shared renderer) ──────────────────
     function renderTestCases(fields, append, remove, prefix, isPrivate) {
         return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
             className: "space-y-4",
@@ -4901,13 +4728,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             className: "h-5 w-5 text-[#6B0000]"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 802,
+                                            lineNumber: 743,
                                             columnNumber: 42
                                         }, this) : /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$test$2d$tube$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__TestTube$3e$__["TestTube"], {
                                             className: "h-5 w-5 text-[#6B0000]"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 802,
+                                            lineNumber: 743,
                                             columnNumber: 88
                                         }, this),
                                         isPrivate ? 'Private' : 'Public',
@@ -4915,7 +4742,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 801,
+                                    lineNumber: 742,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -4923,13 +4750,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: isPrivate ? 'Hidden from students — used for final grading.' : 'Visible to students — they can run these before submitting.'
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 805,
+                                    lineNumber: 746,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 800,
+                            lineNumber: 741,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4948,7 +4775,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 812,
+                                    lineNumber: 753,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -4966,26 +4793,26 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             className: "mr-1 h-3.5 w-3.5"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 826,
+                                            lineNumber: 767,
                                             columnNumber: 29
                                         }, this),
                                         " Add Test"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 818,
+                                    lineNumber: 759,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 811,
+                            lineNumber: 752,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 799,
+                    lineNumber: 740,
                     columnNumber: 17
                 }, this),
                 fields.length === 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -4993,7 +4820,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                     children: 'No test cases yet. Click "Add Test" to get started.'
                 }, void 0, false, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 832,
+                    lineNumber: 773,
                     columnNumber: 21
                 }, this),
                 fields.map((field, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5015,17 +4842,17 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                         className: "h-3.5 w-3.5"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 852,
+                                        lineNumber: 793,
                                         columnNumber: 33
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 844,
+                                    lineNumber: 785,
                                     columnNumber: 29
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 843,
+                                lineNumber: 784,
                                 columnNumber: 25
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5038,7 +4865,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 className: "h-4 w-4 text-gray-300"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 858,
+                                                lineNumber: 799,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -5050,7 +4877,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 ]
                                             }, void 0, true, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 859,
+                                                lineNumber: 800,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -5059,7 +4886,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 className: "max-w-xs text-sm"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 862,
+                                                lineNumber: 803,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -5071,13 +4898,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 placeholder: "pts"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 867,
+                                                lineNumber: 808,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 857,
+                                        lineNumber: 798,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5087,7 +4914,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: "Input (stdin)"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 875,
+                                                lineNumber: 816,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$textarea$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Textarea"], {
@@ -5097,13 +4924,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 placeholder: "Input data..."
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 876,
+                                                lineNumber: 817,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 874,
+                                        lineNumber: 815,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5113,7 +4940,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: "Expected Output"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 884,
+                                                lineNumber: 825,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$textarea$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Textarea"], {
@@ -5123,25 +4950,25 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 placeholder: "Expected output..."
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 885,
+                                                lineNumber: 826,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 883,
+                                        lineNumber: 824,
                                         columnNumber: 29
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 856,
+                                lineNumber: 797,
                                 columnNumber: 25
                             }, this)
                         ]
                     }, field.id, true, {
                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                        lineNumber: 838,
+                        lineNumber: 779,
                         columnNumber: 21
                     }, this)),
                 fields.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5155,7 +4982,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Total test points: "
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 898,
+                            lineNumber: 839,
                             columnNumber: 25
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -5166,19 +4993,19 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             }, 0)
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 899,
+                            lineNumber: 840,
                             columnNumber: 25
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 897,
+                    lineNumber: 838,
                     columnNumber: 21
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-            lineNumber: 798,
+            lineNumber: 739,
             columnNumber: 13
         }, this);
     }
@@ -5198,14 +5025,14 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     className: "h-5 w-5 text-[#C9A84C]"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 921,
+                                    lineNumber: 862,
                                     columnNumber: 25
                                 }, this),
                                 " Rubric Design"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 920,
+                            lineNumber: 861,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -5213,13 +5040,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Configure grading criteria and point allocation."
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 923,
+                            lineNumber: 864,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 919,
+                    lineNumber: 860,
                     columnNumber: 17
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5232,7 +5059,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     className: "h-4 w-4 flex-shrink-0 text-[#6B0000]"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 929,
+                                    lineNumber: 870,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Select"], {
@@ -5244,12 +5071,12 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 placeholder: "Load saved rubric..."
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 932,
+                                                lineNumber: 873,
                                                 columnNumber: 33
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 931,
+                                            lineNumber: 872,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectContent"], {
@@ -5259,7 +5086,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                     children: "Built-in Templates"
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 935,
+                                                    lineNumber: 876,
                                                     columnNumber: 33
                                                 }, this),
                                                 BUILTIN_RUBRIC_TEMPLATES.map((t)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -5272,7 +5099,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                         ]
                                                     }, t.id, true, {
                                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                        lineNumber: 937,
+                                                        lineNumber: 878,
                                                         columnNumber: 37
                                                     }, this)),
                                                 savedTemplates.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Fragment"], {
@@ -5282,7 +5109,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                             children: "Your Templates"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                            lineNumber: 943,
+                                                            lineNumber: 884,
                                                             columnNumber: 41
                                                         }, this),
                                                         savedTemplates.map((t)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -5295,7 +5122,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                                 ]
                                                             }, t.id, true, {
                                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                                lineNumber: 945,
+                                                                lineNumber: 886,
                                                                 columnNumber: 45
                                                             }, this))
                                                     ]
@@ -5303,19 +5130,19 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 934,
+                                            lineNumber: 875,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 930,
+                                    lineNumber: 871,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 928,
+                            lineNumber: 869,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5332,7 +5159,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     }
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 957,
+                                    lineNumber: 898,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -5348,7 +5175,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 className: "h-4 w-4 mr-1.5 animate-spin"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 976,
+                                                lineNumber: 917,
                                                 columnNumber: 35
                                             }, this),
                                             " Parsing…"
@@ -5359,7 +5186,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 className: "h-4 w-4 mr-1.5 text-[#6B0000]"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 978,
+                                                lineNumber: 919,
                                                 columnNumber: 35
                                             }, this),
                                             " Upload Rubric PDF"
@@ -5367,7 +5194,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     }, void 0, true)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 967,
+                                    lineNumber: 908,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -5385,14 +5212,14 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             className: "h-4 w-4 mr-1.5 text-[#6B0000]"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 989,
+                                            lineNumber: 930,
                                             columnNumber: 29
                                         }, this),
                                         " Save Rubric"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 981,
+                                    lineNumber: 922,
                                     columnNumber: 25
                                 }, this),
                                 rubricSaveSuccess && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -5402,26 +5229,26 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             className: "h-3.5 w-3.5"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 993,
+                                            lineNumber: 934,
                                             columnNumber: 33
                                         }, this),
                                         " Saved!"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 992,
+                                    lineNumber: 933,
                                     columnNumber: 29
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 955,
+                            lineNumber: 896,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 927,
+                    lineNumber: 868,
                     columnNumber: 17
                 }, this),
                 pdfError && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5431,7 +5258,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             className: "mt-0.5 h-4 w-4 shrink-0"
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1002,
+                            lineNumber: 943,
                             columnNumber: 25
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5441,7 +5268,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "PDF Parsing Issue"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1004,
+                                    lineNumber: 945,
                                     columnNumber: 29
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -5449,13 +5276,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: pdfError
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1005,
+                                    lineNumber: 946,
                                     columnNumber: 29
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1003,
+                            lineNumber: 944,
                             columnNumber: 25
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -5466,13 +5293,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "✕"
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1007,
+                            lineNumber: 948,
                             columnNumber: 25
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1001,
+                    lineNumber: 942,
                     columnNumber: 21
                 }, this),
                 savedTemplates.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5483,7 +5310,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Your Saved Templates:"
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1014,
+                            lineNumber: 955,
                             columnNumber: 25
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5498,7 +5325,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: t.name
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1018,
+                                            lineNumber: 959,
                                             columnNumber: 37
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -5510,29 +5337,29 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 className: "h-3 w-3"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1031,
+                                                lineNumber: 972,
                                                 columnNumber: 41
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1025,
+                                            lineNumber: 966,
                                             columnNumber: 37
                                         }, this)
                                     ]
                                 }, t.id, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1017,
+                                    lineNumber: 958,
                                     columnNumber: 33
                                 }, this))
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1015,
+                            lineNumber: 956,
                             columnNumber: 25
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1013,
+                    lineNumber: 954,
                     columnNumber: 21
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5546,7 +5373,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1041,
+                            lineNumber: 982,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -5564,20 +5391,20 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     className: "mr-1 h-3.5 w-3.5"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1055,
+                                    lineNumber: 996,
                                     columnNumber: 25
                                 }, this),
                                 " Add Criterion"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1042,
+                            lineNumber: 983,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1040,
+                    lineNumber: 981,
                     columnNumber: 17
                 }, this),
                 rubricFields.length === 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5585,7 +5412,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                     children: "No rubric criteria yet. Use a template, upload a PDF, or add criteria manually."
                 }, void 0, false, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1060,
+                    lineNumber: 1001,
                     columnNumber: 21
                 }, this),
                 rubricFields.map((field, idx)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5604,17 +5431,17 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                         className: "h-3.5 w-3.5"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1079,
+                                        lineNumber: 1020,
                                         columnNumber: 33
                                     }, this)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1071,
+                                    lineNumber: 1012,
                                     columnNumber: 29
                                 }, this)
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 1070,
+                                lineNumber: 1011,
                                 columnNumber: 25
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5628,7 +5455,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: "Criterion Name *"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1085,
+                                                lineNumber: 1026,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -5636,7 +5463,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 placeholder: "e.g. Code Correctness"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1086,
+                                                lineNumber: 1027,
                                                 columnNumber: 33
                                             }, this),
                                             errors.rubric?.[idx]?.name && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -5644,13 +5471,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: errors.rubric[idx]?.name?.message
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1091,
+                                                lineNumber: 1032,
                                                 columnNumber: 37
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1084,
+                                        lineNumber: 1025,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5660,7 +5487,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: "Max Points *"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1095,
+                                                lineNumber: 1036,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -5670,13 +5497,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 })
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1096,
+                                                lineNumber: 1037,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1094,
+                                        lineNumber: 1035,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5687,7 +5514,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: "Description"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1102,
+                                                lineNumber: 1043,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$textarea$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Textarea"], {
@@ -5697,13 +5524,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 className: "text-sm"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1103,
+                                                lineNumber: 1044,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1101,
+                                        lineNumber: 1042,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5713,7 +5540,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: "Grading Method"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1111,
+                                                lineNumber: 1052,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2d$hook$2d$form$2f$dist$2f$index$2e$esm$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Controller"], {
@@ -5726,12 +5553,12 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectTrigger"], {
                                                                 children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectValue"], {}, void 0, false, {
                                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                                    lineNumber: 1117,
+                                                                    lineNumber: 1058,
                                                                     columnNumber: 60
                                                                 }, void 0)
                                                             }, void 0, false, {
                                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                                lineNumber: 1117,
+                                                                lineNumber: 1058,
                                                                 columnNumber: 45
                                                             }, void 0),
                                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectContent"], {
@@ -5741,7 +5568,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                                         children: "Auto (Test-Based)"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                                        lineNumber: 1119,
+                                                                        lineNumber: 1060,
                                                                         columnNumber: 49
                                                                     }, void 0),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -5749,7 +5576,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                                         children: "Manual"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                                        lineNumber: 1120,
+                                                                        lineNumber: 1061,
                                                                         columnNumber: 49
                                                                     }, void 0),
                                                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -5757,42 +5584,42 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                                         children: "Hybrid"
                                                                     }, void 0, false, {
                                                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                                        lineNumber: 1121,
+                                                                        lineNumber: 1062,
                                                                         columnNumber: 49
                                                                     }, void 0)
                                                                 ]
                                                             }, void 0, true, {
                                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                                lineNumber: 1118,
+                                                                lineNumber: 1059,
                                                                 columnNumber: 45
                                                             }, void 0)
                                                         ]
                                                     }, void 0, true, {
                                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                        lineNumber: 1116,
+                                                        lineNumber: 1057,
                                                         columnNumber: 41
                                                     }, void 0)
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1112,
+                                                lineNumber: 1053,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1110,
+                                        lineNumber: 1051,
                                         columnNumber: 29
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 1083,
+                                lineNumber: 1024,
                                 columnNumber: 25
                             }, this)
                         ]
                     }, field.id, true, {
                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                        lineNumber: 1066,
+                        lineNumber: 1007,
                         columnNumber: 21
                     }, this)),
                 rubricFields.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5808,7 +5635,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                 children: "Total Rubric Points:"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 1135,
+                                lineNumber: 1076,
                                 columnNumber: 29
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -5816,24 +5643,24 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                 children: totalRubricPoints
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 1136,
+                                lineNumber: 1077,
                                 columnNumber: 29
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                        lineNumber: 1134,
+                        lineNumber: 1075,
                         columnNumber: 25
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1133,
+                    lineNumber: 1074,
                     columnNumber: 21
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-            lineNumber: 918,
+            lineNumber: 859,
             columnNumber: 13
         }, this);
     }
@@ -5851,14 +5678,14 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     className: "h-5 w-5 text-[#6B0000]"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1151,
+                                    lineNumber: 1092,
                                     columnNumber: 25
                                 }, this),
                                 " Submission Settings"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1150,
+                            lineNumber: 1091,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -5866,13 +5693,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Configure how students submit their work."
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1153,
+                            lineNumber: 1094,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1149,
+                    lineNumber: 1090,
                     columnNumber: 17
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5885,7 +5712,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Maximum Attempts"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1158,
+                                    lineNumber: 1099,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5901,7 +5728,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             max: 100
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1160,
+                                            lineNumber: 1101,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -5909,19 +5736,19 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "attempts per student"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1167,
+                                            lineNumber: 1108,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1159,
+                                    lineNumber: 1100,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1157,
+                            lineNumber: 1098,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5931,7 +5758,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Allowed File Types"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1172,
+                                    lineNumber: 1113,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -5940,7 +5767,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     className: "mt-2"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1173,
+                                    lineNumber: 1114,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -5948,13 +5775,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Comma-separated extensions"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1178,
+                                    lineNumber: 1119,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1171,
+                            lineNumber: 1112,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5964,7 +5791,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Maximum File Size"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1182,
+                                    lineNumber: 1123,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -5980,7 +5807,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             max: 50
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1184,
+                                            lineNumber: 1125,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -5988,19 +5815,19 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "MB per file"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1191,
+                                            lineNumber: 1132,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1183,
+                                    lineNumber: 1124,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1181,
+                            lineNumber: 1122,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6010,7 +5837,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Grading Strategy"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1196,
+                                    lineNumber: 1137,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2d$hook$2d$form$2f$dist$2f$index$2e$esm$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Controller"], {
@@ -6024,12 +5851,12 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                     className: "mt-2",
                                                     children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectValue"], {}, void 0, false, {
                                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                        lineNumber: 1202,
+                                                        lineNumber: 1143,
                                                         columnNumber: 69
                                                     }, void 0)
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 1202,
+                                                    lineNumber: 1143,
                                                     columnNumber: 37
                                                 }, void 0),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectContent"], {
@@ -6039,7 +5866,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                             children: "Grade Latest Submission"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                            lineNumber: 1204,
+                                                            lineNumber: 1145,
                                                             columnNumber: 41
                                                         }, void 0),
                                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$select$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SelectItem"], {
@@ -6047,36 +5874,36 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                             children: "Grade Best Submission"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                            lineNumber: 1205,
+                                                            lineNumber: 1146,
                                                             columnNumber: 41
                                                         }, void 0)
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 1203,
+                                                    lineNumber: 1144,
                                                     columnNumber: 37
                                                 }, void 0)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1201,
+                                            lineNumber: 1142,
                                             columnNumber: 33
                                         }, void 0)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1197,
+                                    lineNumber: 1138,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1195,
+                            lineNumber: 1136,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1156,
+                    lineNumber: 1097,
                     columnNumber: 17
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6089,7 +5916,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             control: control
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1214,
+                            lineNumber: 1155,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(ToggleSettingRow, {
@@ -6099,7 +5926,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             control: control
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1220,
+                            lineNumber: 1161,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(ToggleSettingRow, {
@@ -6109,19 +5936,19 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             control: control
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1226,
+                            lineNumber: 1167,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1213,
+                    lineNumber: 1154,
                     columnNumber: 17
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-            lineNumber: 1148,
+            lineNumber: 1089,
             columnNumber: 13
         }, this);
     }
@@ -6139,14 +5966,14 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     className: "h-5 w-5 text-[#6B0000]"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1244,
+                                    lineNumber: 1185,
                                     columnNumber: 25
                                 }, this),
                                 " AI-Assisted Detection"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1243,
+                            lineNumber: 1184,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -6154,13 +5981,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Configure plagiarism and AI-generated code detection."
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1246,
+                            lineNumber: 1187,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1242,
+                    lineNumber: 1183,
                     columnNumber: 17
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6174,7 +6001,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             className: "h-5 w-5 flex-shrink-0 mt-0.5 text-amber-700"
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1251,
+                            lineNumber: 1192,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6184,7 +6011,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "CRITICAL: AI detection results are ADVISORY ONLY"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1253,
+                                    lineNumber: 1194,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -6192,19 +6019,19 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "They will never automatically deduct points or fail submissions. Instructors review flagged submissions and make final decisions."
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1254,
+                                    lineNumber: 1195,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1252,
+                            lineNumber: 1193,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1250,
+                    lineNumber: 1191,
                     columnNumber: 17
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6220,7 +6047,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Plagiarism Detection"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1264,
+                                            lineNumber: 1205,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -6228,13 +6055,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Compare submissions to detect code similarity between students."
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1265,
+                                            lineNumber: 1206,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1263,
+                                    lineNumber: 1204,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2d$hook$2d$form$2f$dist$2f$index$2e$esm$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Controller"], {
@@ -6245,18 +6072,18 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             onCheckedChange: field.onChange
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1271,
+                                            lineNumber: 1212,
                                             columnNumber: 33
                                         }, void 0)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1267,
+                                    lineNumber: 1208,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1262,
+                            lineNumber: 1203,
                             columnNumber: 21
                         }, this),
                         watchPlagiarism && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6273,13 +6100,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                     children: getSensitivityLabel(watch('plagiarismSensitivity'))
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 1279,
+                                                    lineNumber: 1220,
                                                     columnNumber: 50
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1278,
+                                            lineNumber: 1219,
                                             columnNumber: 33
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -6290,13 +6117,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1281,
+                                            lineNumber: 1222,
                                             columnNumber: 33
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1277,
+                                    lineNumber: 1218,
                                     columnNumber: 29
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2d$hook$2d$form$2f$dist$2f$index$2e$esm$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Controller"], {
@@ -6311,12 +6138,12 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             step: 1
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1287,
+                                            lineNumber: 1228,
                                             columnNumber: 37
                                         }, void 0)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1283,
+                                    lineNumber: 1224,
                                     columnNumber: 29
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6327,7 +6154,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Low (Fewer flags)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1296,
+                                            lineNumber: 1237,
                                             columnNumber: 33
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -6335,25 +6162,25 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "High (More flags)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1297,
+                                            lineNumber: 1238,
                                             columnNumber: 33
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1295,
+                                    lineNumber: 1236,
                                     columnNumber: 29
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1276,
+                            lineNumber: 1217,
                             columnNumber: 25
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1261,
+                    lineNumber: 1202,
                     columnNumber: 17
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6369,7 +6196,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "AI-Generated Code Detection"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1307,
+                                            lineNumber: 1248,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -6377,13 +6204,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Flag submissions that may contain AI-generated code (ChatGPT, Copilot, etc.)."
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1308,
+                                            lineNumber: 1249,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1306,
+                                    lineNumber: 1247,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2d$hook$2d$form$2f$dist$2f$index$2e$esm$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Controller"], {
@@ -6394,18 +6221,18 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             onCheckedChange: field.onChange
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1314,
+                                            lineNumber: 1255,
                                             columnNumber: 33
                                         }, void 0)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1310,
+                                    lineNumber: 1251,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1305,
+                            lineNumber: 1246,
                             columnNumber: 21
                         }, this),
                         watchAiDetection && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6422,13 +6249,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                     children: getSensitivityLabel(watch('aiDetectionSensitivity'))
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 1322,
+                                                    lineNumber: 1263,
                                                     columnNumber: 50
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1321,
+                                            lineNumber: 1262,
                                             columnNumber: 33
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -6439,13 +6266,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1324,
+                                            lineNumber: 1265,
                                             columnNumber: 33
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1320,
+                                    lineNumber: 1261,
                                     columnNumber: 29
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2d$hook$2d$form$2f$dist$2f$index$2e$esm$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Controller"], {
@@ -6460,12 +6287,12 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             step: 1
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1330,
+                                            lineNumber: 1271,
                                             columnNumber: 37
                                         }, void 0)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1326,
+                                    lineNumber: 1267,
                                     columnNumber: 29
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6476,7 +6303,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Low (Fewer flags)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1339,
+                                            lineNumber: 1280,
                                             columnNumber: 33
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -6484,25 +6311,25 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "High (More flags)"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1340,
+                                            lineNumber: 1281,
                                             columnNumber: 33
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1338,
+                                    lineNumber: 1279,
                                     columnNumber: 29
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1319,
+                            lineNumber: 1260,
                             columnNumber: 25
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1304,
+                    lineNumber: 1245,
                     columnNumber: 17
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6518,7 +6345,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Auto-Flag for Manual Review"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1350,
+                                            lineNumber: 1291,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -6526,13 +6353,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Submissions with similarity above threshold are flagged for instructor review."
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1351,
+                                            lineNumber: 1292,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1349,
+                                    lineNumber: 1290,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2d$hook$2d$form$2f$dist$2f$index$2e$esm$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Controller"], {
@@ -6543,18 +6370,18 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             onCheckedChange: field.onChange
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1357,
+                                            lineNumber: 1298,
                                             columnNumber: 33
                                         }, void 0)
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1353,
+                                    lineNumber: 1294,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1348,
+                            lineNumber: 1289,
                             columnNumber: 21
                         }, this),
                         watchAutoFlag && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6565,7 +6392,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Flag Threshold:"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1363,
+                                    lineNumber: 1304,
                                     columnNumber: 29
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -6578,7 +6405,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     max: 100
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1364,
+                                    lineNumber: 1305,
                                     columnNumber: 29
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -6586,19 +6413,19 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "% similarity triggers review"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1371,
+                                    lineNumber: 1312,
                                     columnNumber: 29
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1362,
+                            lineNumber: 1303,
                             columnNumber: 25
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1347,
+                    lineNumber: 1288,
                     columnNumber: 17
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6609,7 +6436,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Similarity Report Settings"
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1378,
+                            lineNumber: 1319,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6623,7 +6450,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             defaultChecked: true
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1381,
+                                            lineNumber: 1322,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
@@ -6632,13 +6459,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Show similarity percentages and source matches"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1382,
+                                            lineNumber: 1323,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1380,
+                                    lineNumber: 1321,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6649,7 +6476,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             defaultChecked: true
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1387,
+                                            lineNumber: 1328,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
@@ -6658,13 +6485,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Highlight suspicious code sections"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1388,
+                                            lineNumber: 1329,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1386,
+                                    lineNumber: 1327,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6679,12 +6506,12 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                     onCheckedChange: field.onChange
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 1397,
+                                                    lineNumber: 1338,
                                                     columnNumber: 37
                                                 }, void 0)
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1393,
+                                            lineNumber: 1334,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
@@ -6693,31 +6520,31 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Compare across course sections"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1404,
+                                            lineNumber: 1345,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1392,
+                                    lineNumber: 1333,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1379,
+                            lineNumber: 1320,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1377,
+                    lineNumber: 1318,
                     columnNumber: 17
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-            lineNumber: 1241,
+            lineNumber: 1182,
             columnNumber: 13
         }, this);
     }
@@ -6739,10 +6566,6 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                     {
                         label: 'Short Name',
                         value: values.shortName || '—'
-                    },
-                    {
-                        label: 'Language',
-                        value: values.language === 'python' ? 'Python 3.10' : 'Java 17'
                     },
                     {
                         label: 'Category',
@@ -6778,19 +6601,8 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                 ]
             },
             {
-                title: 'Starter Code',
-                step: 2,
-                icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$code$2d$xml$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Code2$3e$__["Code2"],
-                items: [
-                    {
-                        label: 'Code',
-                        value: values.starterCode ? `${values.starterCode.split('\n').length} lines` : 'None provided'
-                    }
-                ]
-            },
-            {
                 title: 'Test Cases',
-                step: 3,
+                step: 2,
                 icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$test$2d$tube$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__TestTube$3e$__["TestTube"],
                 items: [
                     {
@@ -6809,7 +6621,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
             },
             {
                 title: 'Rubric',
-                step: 5,
+                step: 4,
                 icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$clipboard$2d$list$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ClipboardList$3e$__["ClipboardList"],
                 items: [
                     {
@@ -6830,7 +6642,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
             },
             {
                 title: 'Submission Settings',
-                step: 6,
+                step: 5,
                 icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$settings$2d$2$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__Settings2$3e$__["Settings2"],
                 items: [
                     {
@@ -6861,7 +6673,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
             },
             {
                 title: 'AI Detection',
-                step: 7,
+                step: 6,
                 icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$shield$2d$alert$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__ShieldAlert$3e$__["ShieldAlert"],
                 items: [
                     {
@@ -6895,14 +6707,14 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     className: "h-5 w-5 text-[#6B0000]"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1505,
+                                    lineNumber: 1437,
                                     columnNumber: 25
                                 }, this),
                                 " Review Assignment"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1504,
+                            lineNumber: 1436,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -6910,13 +6722,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Review all settings before publishing. Click any section to edit."
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1507,
+                            lineNumber: 1439,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1503,
+                    lineNumber: 1435,
                     columnNumber: 17
                 }, this),
                 sections.map((section)=>/*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -6934,7 +6746,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 className: "h-4 w-4 text-[#6B0000]"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1519,
+                                                lineNumber: 1451,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("h3", {
@@ -6942,13 +6754,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: section.title
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1520,
+                                                lineNumber: 1452,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1518,
+                                        lineNumber: 1450,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -6958,20 +6770,20 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 className: "h-3 w-3"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1523,
+                                                lineNumber: 1455,
                                                 columnNumber: 33
                                             }, this),
                                             " Complete"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1522,
+                                        lineNumber: 1454,
                                         columnNumber: 29
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 1517,
+                                lineNumber: 1449,
                                 columnNumber: 25
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -6983,7 +6795,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: item.label
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1529,
+                                                lineNumber: 1461,
                                                 columnNumber: 37
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -6991,24 +6803,24 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: item.value
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1530,
+                                                lineNumber: 1462,
                                                 columnNumber: 37
                                             }, this)
                                         ]
                                     }, i, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1528,
+                                        lineNumber: 1460,
                                         columnNumber: 33
                                     }, this))
                             }, void 0, false, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 1526,
+                                lineNumber: 1458,
                                 columnNumber: 25
                             }, this)
                         ]
                     }, section.step, true, {
                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                        lineNumber: 1511,
+                        lineNumber: 1443,
                         columnNumber: 21
                     }, this)),
                 values.description && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7019,7 +6831,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Description Preview"
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1540,
+                            lineNumber: 1472,
                             columnNumber: 25
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -7030,13 +6842,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1541,
+                            lineNumber: 1473,
                             columnNumber: 25
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1539,
+                    lineNumber: 1471,
                     columnNumber: 21
                 }, this),
                 values.rubric.length > 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7047,7 +6859,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                             children: "Rubric Breakdown"
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1551,
+                            lineNumber: 1483,
                             columnNumber: 25
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7062,7 +6874,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                     children: c.name
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 1556,
+                                                    lineNumber: 1488,
                                                     columnNumber: 41
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -7070,13 +6882,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                     children: c.gradingMethod
                                                 }, void 0, false, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 1557,
+                                                    lineNumber: 1489,
                                                     columnNumber: 41
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1555,
+                                            lineNumber: 1487,
                                             columnNumber: 37
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -7087,24 +6899,24 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1561,
+                                            lineNumber: 1493,
                                             columnNumber: 37
                                         }, this)
                                     ]
                                 }, i, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1554,
+                                    lineNumber: 1486,
                                     columnNumber: 33
                                 }, this))
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1552,
+                            lineNumber: 1484,
                             columnNumber: 25
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1550,
+                    lineNumber: 1482,
                     columnNumber: 21
                 }, this),
                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7120,14 +6932,14 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     className: "h-4 w-4 mr-2"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1576,
+                                    lineNumber: 1508,
                                     columnNumber: 25
                                 }, this),
                                 " Save as Draft"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1570,
+                            lineNumber: 1502,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -7139,26 +6951,26 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     className: "h-4 w-4 mr-2"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1583,
+                                    lineNumber: 1515,
                                     columnNumber: 25
                                 }, this),
                                 " Publish Assignment"
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1578,
+                            lineNumber: 1510,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1569,
+                    lineNumber: 1501,
                     columnNumber: 17
                 }, this)
             ]
         }, void 0, true, {
             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-            lineNumber: 1502,
+            lineNumber: 1434,
             columnNumber: 13
         }, this);
     }
@@ -7166,7 +6978,6 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
     const stepRenderers = [
         renderBasicInfo,
         renderDescription,
-        renderStarterCode,
         ()=>renderTestCases(publicTestFields, appendPublicTest, removePublicTest, 'publicTests', false),
         ()=>renderTestCases(privateTestFields, appendPrivateTest, removePrivateTest, 'privateTests', true),
         renderRubric,
@@ -7187,7 +6998,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                         children: stepRenderers[currentStep]()
                     }, void 0, false, {
                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                        lineNumber: 1615,
+                        lineNumber: 1546,
                         columnNumber: 17
                     }, this),
                     !isReviewStep && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7205,14 +7016,14 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 className: "mr-1 h-4 w-4"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1623,
+                                                lineNumber: 1554,
                                                 columnNumber: 37
                                             }, this),
                                             " Previous"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1622,
+                                        lineNumber: 1553,
                                         columnNumber: 33
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -7222,13 +7033,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                         children: "Cancel"
                                     }, void 0, false, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1626,
+                                        lineNumber: 1557,
                                         columnNumber: 29
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 1620,
+                                lineNumber: 1551,
                                 columnNumber: 25
                             }, this),
                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7244,7 +7055,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1636,
+                                        lineNumber: 1567,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -7256,14 +7067,14 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 className: "mr-1 h-4 w-4"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1644,
+                                                lineNumber: 1575,
                                                 columnNumber: 33
                                             }, this),
                                             " Save Draft"
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1639,
+                                        lineNumber: 1570,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -7276,31 +7087,31 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 className: "ml-1 h-4 w-4"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1652,
+                                                lineNumber: 1583,
                                                 columnNumber: 38
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1647,
+                                        lineNumber: 1578,
                                         columnNumber: 29
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 1635,
+                                lineNumber: 1566,
                                 columnNumber: 25
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                        lineNumber: 1619,
+                        lineNumber: 1550,
                         columnNumber: 21
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                lineNumber: 1608,
+                lineNumber: 1539,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Dialog"], {
@@ -7315,20 +7126,20 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Save Rubric Template"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1663,
+                                    lineNumber: 1594,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DialogDescription"], {
                                     children: "Save the current rubric configuration as a reusable template for future assignments."
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1664,
+                                    lineNumber: 1595,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1662,
+                            lineNumber: 1593,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7340,7 +7151,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "Template Name"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1670,
+                                            lineNumber: 1601,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -7350,13 +7161,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             maxLength: 60
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1671,
+                                            lineNumber: 1602,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1669,
+                                    lineNumber: 1600,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7370,7 +7181,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: "This template will include:"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1679,
+                                            lineNumber: 1610,
                                             columnNumber: 29
                                         }, this),
                                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("ul", {
@@ -7383,7 +7194,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                             className: "h-3.5 w-3.5 text-green-600"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                            lineNumber: 1682,
+                                                            lineNumber: 1613,
                                                             columnNumber: 37
                                                         }, this),
                                                         " ",
@@ -7392,7 +7203,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 1681,
+                                                    lineNumber: 1612,
                                                     columnNumber: 33
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("li", {
@@ -7402,7 +7213,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                             className: "h-3.5 w-3.5 text-green-600"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                            lineNumber: 1685,
+                                                            lineNumber: 1616,
                                                             columnNumber: 37
                                                         }, this),
                                                         " Grading methods: ",
@@ -7412,7 +7223,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 1684,
+                                                    lineNumber: 1615,
                                                     columnNumber: 33
                                                 }, this),
                                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("li", {
@@ -7422,7 +7233,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                             className: "h-3.5 w-3.5 text-green-600"
                                                         }, void 0, false, {
                                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                            lineNumber: 1688,
+                                                            lineNumber: 1619,
                                                             columnNumber: 37
                                                         }, this),
                                                         " Total: ",
@@ -7431,25 +7242,25 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                     ]
                                                 }, void 0, true, {
                                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                    lineNumber: 1687,
+                                                    lineNumber: 1618,
                                                     columnNumber: 33
                                                 }, this)
                                             ]
                                         }, void 0, true, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1680,
+                                            lineNumber: 1611,
                                             columnNumber: 29
                                         }, this)
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1678,
+                                    lineNumber: 1609,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1668,
+                            lineNumber: 1599,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DialogFooter"], {
@@ -7461,7 +7272,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Cancel"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1694,
+                                    lineNumber: 1625,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -7473,31 +7284,31 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             className: "h-4 w-4 mr-2"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1700,
+                                            lineNumber: 1631,
                                             columnNumber: 29
                                         }, this),
                                         " Save Template"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1695,
+                                    lineNumber: 1626,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1693,
+                            lineNumber: 1624,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1661,
+                    lineNumber: 1592,
                     columnNumber: 17
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                lineNumber: 1660,
+                lineNumber: 1591,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Dialog"], {
@@ -7512,7 +7323,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Publish Assignment?"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1710,
+                                    lineNumber: 1641,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DialogDescription"], {
@@ -7522,20 +7333,20 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             children: getValues('name') || 'This assignment'
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1712,
+                                            lineNumber: 1643,
                                             columnNumber: 29
                                         }, this),
                                         " will be visible to all students immediately. They can begin submitting right away."
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1711,
+                                    lineNumber: 1642,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1709,
+                            lineNumber: 1640,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7550,34 +7361,10 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                         children: [
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
                                                 className: "text-[11px] text-gray-400",
-                                                children: "Language"
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1718,
-                                                columnNumber: 33
-                                            }, this),
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                className: "text-xs font-medium text-gray-700",
-                                                children: getValues('language') === 'python' ? 'Python' : 'Java'
-                                            }, void 0, false, {
-                                                fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1719,
-                                                columnNumber: 33
-                                            }, this)
-                                        ]
-                                    }, void 0, true, {
-                                        fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1717,
-                                        columnNumber: 29
-                                    }, this),
-                                    /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
-                                        children: [
-                                            /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
-                                                className: "text-[11px] text-gray-400",
                                                 children: "Due Date"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1722,
+                                                lineNumber: 1649,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -7585,13 +7372,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: getValues('dueDate') ? new Date(getValues('dueDate')).toLocaleDateString() : '—'
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1723,
+                                                lineNumber: 1650,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1721,
+                                        lineNumber: 1648,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7601,7 +7388,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: "Points"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1726,
+                                                lineNumber: 1653,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -7609,13 +7396,13 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: getValues('maxPoints')
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1727,
+                                                lineNumber: 1654,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1725,
+                                        lineNumber: 1652,
                                         columnNumber: 29
                                     }, this),
                                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -7625,7 +7412,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: "Test Cases"
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1730,
+                                                lineNumber: 1657,
                                                 columnNumber: 33
                                             }, this),
                                             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -7633,24 +7420,24 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                                 children: getValues('publicTests').length + getValues('privateTests').length
                                             }, void 0, false, {
                                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                                lineNumber: 1731,
+                                                lineNumber: 1658,
                                                 columnNumber: 33
                                             }, this)
                                         ]
                                     }, void 0, true, {
                                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                        lineNumber: 1729,
+                                        lineNumber: 1656,
                                         columnNumber: 29
                                     }, this)
                                 ]
                             }, void 0, true, {
                                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                lineNumber: 1716,
+                                lineNumber: 1647,
                                 columnNumber: 25
                             }, this)
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1715,
+                            lineNumber: 1646,
                             columnNumber: 21
                         }, this),
                         /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DialogFooter"], {
@@ -7662,7 +7449,7 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                     children: "Cancel"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1736,
+                                    lineNumber: 1663,
                                     columnNumber: 25
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$components$2f$ui$2f$button$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Button"], {
@@ -7676,31 +7463,31 @@ function CreateAssignmentForm({ courseId, onSaveDraft, onPublish, onCancel, init
                                             className: "h-4 w-4 mr-2"
                                         }, void 0, false, {
                                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                            lineNumber: 1744,
+                                            lineNumber: 1671,
                                             columnNumber: 29
                                         }, this),
                                         " Publish Now"
                                     ]
                                 }, void 0, true, {
                                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                                    lineNumber: 1737,
+                                    lineNumber: 1664,
                                     columnNumber: 25
                                 }, this)
                             ]
                         }, void 0, true, {
                             fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                            lineNumber: 1735,
+                            lineNumber: 1662,
                             columnNumber: 21
                         }, this)
                     ]
                 }, void 0, true, {
                     fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                    lineNumber: 1708,
+                    lineNumber: 1639,
                     columnNumber: 17
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                lineNumber: 1707,
+                lineNumber: 1638,
                 columnNumber: 13
             }, this)
         ]
@@ -7727,7 +7514,7 @@ function ToggleSettingRow({ label, description, fieldName, control }) {
                         children: label
                     }, void 0, false, {
                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                        lineNumber: 1770,
+                        lineNumber: 1697,
                         columnNumber: 17
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -7735,13 +7522,13 @@ function ToggleSettingRow({ label, description, fieldName, control }) {
                         children: description
                     }, void 0, false, {
                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                        lineNumber: 1771,
+                        lineNumber: 1698,
                         columnNumber: 17
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                lineNumber: 1769,
+                lineNumber: 1696,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$react$2d$hook$2d$form$2f$dist$2f$index$2e$esm$2e$mjs__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Controller"], {
@@ -7752,18 +7539,18 @@ function ToggleSettingRow({ label, description, fieldName, control }) {
                         onCheckedChange: field.onChange
                     }, void 0, false, {
                         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                        lineNumber: 1777,
+                        lineNumber: 1704,
                         columnNumber: 21
                     }, void 0)
             }, void 0, false, {
                 fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-                lineNumber: 1773,
+                lineNumber: 1700,
                 columnNumber: 13
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/CreateAssignmentForm.tsx",
-        lineNumber: 1768,
+        lineNumber: 1695,
         columnNumber: 9
     }, this);
 }
@@ -8049,6 +7836,15 @@ const courseService = {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get('/courses/'));
         return data.map(mapCourse);
     },
+    /** Get courses for current user filtered by enrollment role. */ async getMyCoursesByRole (role) {
+        const params = role ? {
+            role
+        } : {};
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get('/courses/me', {
+                params
+            }));
+        return data.map(mapCourse);
+    },
     /** Get a single course by ID. */ async getCourse (courseId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}`));
         return mapCourse(data);
@@ -8091,6 +7887,10 @@ const courseService = {
         const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/courses/enroll', {
             enrollmentCode
         });
+        return data;
+    },
+    /** Get students in a course for TA/instructor viewing. */ async getStudentsForTA (courseId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/ta-students`));
         return data;
     }
 };
@@ -8146,7 +7946,21 @@ const assignmentService = {
             title: dto.name ?? dto.title ?? 'Untitled',
             description: dto.description ?? '',
             course_id: Number(dto.courseId) || null,
-            allowed_languages: dto.language ?? 'python'
+            allowed_languages: dto.language ?? 'python',
+            publicTests: (dto.publicTests ?? []).map((test)=>({
+                    name: test.name,
+                    input_data: test.input_data || test.input,
+                    expected_output: test.expected_output || test.expectedOutput,
+                    is_public: true,
+                    points: test.points || 1
+                })),
+            privateTests: (dto.privateTests ?? []).map((test)=>({
+                    name: test.name,
+                    input_data: test.input_data || test.input,
+                    expected_output: test.expected_output || test.expectedOutput,
+                    is_public: false,
+                    points: test.points || 1
+                }))
         };
         const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/assignments/', payload);
         return mapAssignment(data);
@@ -8237,6 +8051,10 @@ const submissionService = {
         });
         return data;
     },
+    /** Preview a file (get file content for supported types). */ async previewFile (fileId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/files/${fileId}/preview`));
+        return data;
+    },
     /** List submissions for an assignment. */ async getSubmissions (assignmentId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/assignments/${assignmentId}`));
         return data.map(mapSubmission);
@@ -8261,6 +8079,15 @@ const submissionService = {
     },
     /** Student history helper; backend already filters by auth user role. */ async getStudentSubmissions (assignmentId, _studentId) {
         return this.getSubmissions(assignmentId);
+    },
+    /** Get all submissions in a course for TA/instructor grading view. */ async getSubmissionsForGrading (courseId, assignmentId) {
+        const params = assignmentId ? {
+            assignment_id: assignmentId
+        } : {};
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/courses/${courseId}/for-grading`, {
+                params
+            }));
+        return data;
     }
 };
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {
@@ -8348,6 +8175,10 @@ __turbopack_context__.s([
     ()=>useCreateCourse,
     "useDeleteCourse",
     ()=>useDeleteCourse,
+    "useStudentCourses",
+    ()=>useStudentCourses,
+    "useTACourses",
+    ()=>useTACourses,
     "useUpdateCourse",
     ()=>useUpdateCourse
 ]);
@@ -8358,7 +8189,9 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$index$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/src/services/api/index.ts [app-client] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/courseService.ts [app-client] (ecmascript)");
-var _s = __turbopack_context__.k.signature(), _s1 = __turbopack_context__.k.signature(), _s2 = __turbopack_context__.k.signature(), _s3 = __turbopack_context__.k.signature(), _s4 = __turbopack_context__.k.signature();
+var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/utils/AuthContext.tsx [app-client] (ecmascript)");
+var _s = __turbopack_context__.k.signature(), _s1 = __turbopack_context__.k.signature(), _s2 = __turbopack_context__.k.signature(), _s3 = __turbopack_context__.k.signature(), _s4 = __turbopack_context__.k.signature(), _s5 = __turbopack_context__.k.signature(), _s6 = __turbopack_context__.k.signature();
+;
 ;
 ;
 function useCourses() {
@@ -8398,8 +8231,56 @@ _s1(useCourse, "4ZpngI1uv+Uo3WQHEZmTQ5FNM+k=", false, function() {
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useQuery$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQuery"]
     ];
 });
-function useCreateCourse() {
+function useTACourses() {
     _s2();
+    const { user } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useQuery$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQuery"])({
+        queryKey: [
+            'courses',
+            'ta',
+            user?.id ?? 'anonymous'
+        ],
+        queryFn: {
+            "useTACourses.useQuery": ()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["courseService"].getMyCoursesByRole('ta')
+        }["useTACourses.useQuery"],
+        enabled: !!user,
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: true,
+        refetchOnMount: 'always'
+    });
+}
+_s2(useTACourses, "feBfegY2LWvVkHAo3/+H6/HJ9O4=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useQuery$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQuery"]
+    ];
+});
+function useStudentCourses() {
+    _s3();
+    const { user } = (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"])();
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useQuery$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQuery"])({
+        queryKey: [
+            'courses',
+            'student',
+            user?.id ?? 'anonymous'
+        ],
+        queryFn: {
+            "useStudentCourses.useQuery": ()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$courseService$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["courseService"].getMyCoursesByRole('student')
+        }["useStudentCourses.useQuery"],
+        enabled: !!user,
+        staleTime: 5 * 60 * 1000,
+        refetchOnWindowFocus: true,
+        refetchOnMount: 'always'
+    });
+}
+_s3(useStudentCourses, "feBfegY2LWvVkHAo3/+H6/HJ9O4=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$utils$2f$AuthContext$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useQuery$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQuery"]
+    ];
+});
+function useCreateCourse() {
+    _s4();
     const qc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"])();
     return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMutation"])({
         mutationFn: {
@@ -8432,14 +8313,14 @@ function useCreateCourse() {
         }["useCreateCourse.useMutation"]
     });
 }
-_s2(useCreateCourse, "ec0A66mtyLA0kdwNsMUsaWj/EHM=", false, function() {
+_s4(useCreateCourse, "ec0A66mtyLA0kdwNsMUsaWj/EHM=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"],
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMutation"]
     ];
 });
 function useUpdateCourse() {
-    _s3();
+    _s5();
     const qc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"])();
     return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMutation"])({
         mutationFn: {
@@ -8462,14 +8343,14 @@ function useUpdateCourse() {
         }["useUpdateCourse.useMutation"]
     });
 }
-_s3(useUpdateCourse, "ec0A66mtyLA0kdwNsMUsaWj/EHM=", false, function() {
+_s5(useUpdateCourse, "ec0A66mtyLA0kdwNsMUsaWj/EHM=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"],
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMutation"]
     ];
 });
 function useDeleteCourse() {
-    _s4();
+    _s6();
     const qc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"])();
     return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMutation"])({
         mutationFn: {
@@ -8486,7 +8367,7 @@ function useDeleteCourse() {
         }["useDeleteCourse.useMutation"]
     });
 }
-_s4(useDeleteCourse, "ec0A66mtyLA0kdwNsMUsaWj/EHM=", false, function() {
+_s6(useDeleteCourse, "ec0A66mtyLA0kdwNsMUsaWj/EHM=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"],
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMutation"]
@@ -8643,10 +8524,14 @@ if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelper
 __turbopack_context__.s([
     "useGradeSubmission",
     ()=>useGradeSubmission,
+    "useOverrideSubmissionScore",
+    ()=>useOverrideSubmissionScore,
     "useSubmission",
     ()=>useSubmission,
     "useSubmissions",
     ()=>useSubmissions,
+    "useSubmissionsForGrading",
+    ()=>useSubmissionsForGrading,
     "useSubmitCode",
     ()=>useSubmitCode
 ]);
@@ -8657,7 +8542,7 @@ var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$index$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$locals$3e$__ = __turbopack_context__.i("[project]/src/services/api/index.ts [app-client] (ecmascript) <locals>");
 var __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$submissionService$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/src/services/api/submissionService.ts [app-client] (ecmascript)");
-var _s = __turbopack_context__.k.signature(), _s1 = __turbopack_context__.k.signature(), _s2 = __turbopack_context__.k.signature(), _s3 = __turbopack_context__.k.signature();
+var _s = __turbopack_context__.k.signature(), _s1 = __turbopack_context__.k.signature(), _s2 = __turbopack_context__.k.signature(), _s3 = __turbopack_context__.k.signature(), _s4 = __turbopack_context__.k.signature(), _s5 = __turbopack_context__.k.signature();
 ;
 ;
 function useSubmissions(assignmentId) {
@@ -8696,8 +8581,28 @@ _s1(useSubmission, "4ZpngI1uv+Uo3WQHEZmTQ5FNM+k=", false, function() {
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useQuery$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQuery"]
     ];
 });
-function useSubmitCode() {
+function useSubmissionsForGrading(courseId, assignmentId) {
     _s2();
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useQuery$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQuery"])({
+        queryKey: [
+            'submissions-for-grading',
+            courseId,
+            assignmentId
+        ],
+        queryFn: {
+            "useSubmissionsForGrading.useQuery": ()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$submissionService$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["submissionService"].getSubmissionsForGrading(courseId, assignmentId)
+        }["useSubmissionsForGrading.useQuery"],
+        enabled: !!courseId,
+        staleTime: 1 * 60 * 1000
+    });
+}
+_s2(useSubmissionsForGrading, "4ZpngI1uv+Uo3WQHEZmTQ5FNM+k=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useQuery$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQuery"]
+    ];
+});
+function useSubmitCode() {
+    _s3();
     const qc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"])();
     return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMutation"])({
         mutationFn: {
@@ -8715,14 +8620,14 @@ function useSubmitCode() {
         }["useSubmitCode.useMutation"]
     });
 }
-_s2(useSubmitCode, "ec0A66mtyLA0kdwNsMUsaWj/EHM=", false, function() {
+_s3(useSubmitCode, "ec0A66mtyLA0kdwNsMUsaWj/EHM=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"],
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMutation"]
     ];
 });
 function useGradeSubmission() {
-    _s3();
+    _s4();
     const qc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"])();
     return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMutation"])({
         mutationFn: {
@@ -8752,7 +8657,56 @@ function useGradeSubmission() {
         }["useGradeSubmission.useMutation"]
     });
 }
-_s3(useGradeSubmission, "ec0A66mtyLA0kdwNsMUsaWj/EHM=", false, function() {
+_s4(useGradeSubmission, "ec0A66mtyLA0kdwNsMUsaWj/EHM=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"],
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMutation"]
+    ];
+});
+function useOverrideSubmissionScore() {
+    _s5();
+    const qc = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"])();
+    return (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMutation"])({
+        mutationFn: {
+            "useOverrideSubmissionScore.useMutation": ({ submissionId, score, maxScore, feedback })=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$submissionService$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["submissionService"].overrideSubmissionScore(submissionId, {
+                    score,
+                    max_score: maxScore,
+                    feedback
+                })
+        }["useOverrideSubmissionScore.useMutation"],
+        onSuccess: {
+            "useOverrideSubmissionScore.useMutation": ()=>{
+                // Invalidate all relevant queries to refresh data
+                qc.invalidateQueries({
+                    queryKey: [
+                        'submissions'
+                    ]
+                });
+                qc.invalidateQueries({
+                    queryKey: [
+                        'submission'
+                    ]
+                });
+                qc.invalidateQueries({
+                    queryKey: [
+                        'assignments'
+                    ]
+                });
+                qc.invalidateQueries({
+                    queryKey: [
+                        'submissions-for-grading'
+                    ]
+                });
+                qc.invalidateQueries({
+                    queryKey: [
+                        'grades'
+                    ]
+                });
+            }
+        }["useOverrideSubmissionScore.useMutation"]
+    });
+}
+_s5(useOverrideSubmissionScore, "ec0A66mtyLA0kdwNsMUsaWj/EHM=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"],
         __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$useMutation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useMutation"]
@@ -8970,8 +8924,20 @@ function lookupCourseCode(id) {
             amount: data.latePenaltyAmount ?? 10,
             maxDaysLate: 7
         } : undefined,
-        publicTests: [],
-        privateTests: [],
+        publicTests: (data.publicTests ?? []).map((test)=>({
+                name: test.name,
+                input_data: test.input,
+                expected_output: test.expectedOutput,
+                is_public: true,
+                points: test.points
+            })),
+        privateTests: (data.privateTests ?? []).map((test)=>({
+                name: test.name,
+                input_data: test.input,
+                expected_output: test.expectedOutput,
+                is_public: false,
+                points: test.points
+            })),
         rubric: (data.rubric ?? []).map((c)=>({
                 name: c.name,
                 description: c.description,
@@ -9050,7 +9016,7 @@ function CreateAssignmentPage() {
                 ]
             }, void 0, false, {
                 fileName: "[project]/src/components/CreateAssignmentPage.tsx",
-                lineNumber: 104,
+                lineNumber: 116,
                 columnNumber: 13
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -9060,7 +9026,7 @@ function CreateAssignmentPage() {
                         activeItem: "assignments"
                     }, void 0, false, {
                         fileName: "[project]/src/components/CreateAssignmentPage.tsx",
-                        lineNumber: 113,
+                        lineNumber: 125,
                         columnNumber: 17
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
@@ -9072,24 +9038,24 @@ function CreateAssignmentPage() {
                             onCancel: handleCancel
                         }, void 0, false, {
                             fileName: "[project]/src/components/CreateAssignmentPage.tsx",
-                            lineNumber: 116,
+                            lineNumber: 128,
                             columnNumber: 21
                         }, this)
                     }, void 0, false, {
                         fileName: "[project]/src/components/CreateAssignmentPage.tsx",
-                        lineNumber: 115,
+                        lineNumber: 127,
                         columnNumber: 17
                     }, this)
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/CreateAssignmentPage.tsx",
-                lineNumber: 112,
+                lineNumber: 124,
                 columnNumber: 13
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/CreateAssignmentPage.tsx",
-        lineNumber: 103,
+        lineNumber: 115,
         columnNumber: 9
     }, this);
 }

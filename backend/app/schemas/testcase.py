@@ -3,6 +3,7 @@ from typing import Optional
 
 
 class TestCaseBase(BaseModel):
+    name: Optional[str] = None
     input_data: Optional[str] = None
     expected_output: Optional[str] = None
     is_public: Optional[bool] = False
