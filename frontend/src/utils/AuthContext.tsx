@@ -8,6 +8,10 @@ import {
     useEffect,
     type ReactNode,
 } from 'react';
+<<<<<<< HEAD
+=======
+import { useQueryClient } from '@tanstack/react-query';
+>>>>>>> origin/ree_update
 import type { User, UserRole, Faculty, Student, RegisterData } from '@/types';
 
 // ── Context shape ───────────────────────────────────────────────────
@@ -77,6 +81,10 @@ function buildUser(partial?: Partial<User>): User {
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+<<<<<<< HEAD
+=======
+    const queryClient = useQueryClient();
+>>>>>>> origin/ree_update
 
     // Restore session from localStorage on mount
     useEffect(() => {
@@ -101,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = useCallback(
         (userData?: Partial<User>, token?: string) => {
+<<<<<<< HEAD
             const u = buildUser(userData);
             persistUser(u);
             // If a JWT token was provided, ensure it's stored for API calls
@@ -109,6 +118,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         },
         [persistUser]
+=======
+            // STEP 1: Clear ALL previous session state first
+            localStorage.removeItem('autograde_current_user');
+            localStorage.removeItem('autograde_auth');
+            localStorage.removeItem('autograde_token');
+            localStorage.removeItem('autograde_refresh_token');
+            setUser(null);
+
+            // STEP 2: Clear React Query cache so old user's data doesn't leak
+            queryClient.clear();
+
+            // STEP 3: Build and persist new user
+            const u = buildUser(userData);
+            persistUser(u);
+
+            // STEP 4: Store JWT token for API calls
+            if (token && typeof globalThis.window !== 'undefined') {
+                localStorage.setItem('autograde_token', token);
+            }
+        },
+        [persistUser, queryClient]
+>>>>>>> origin/ree_update
     );
 
     const signup = useCallback(
@@ -120,11 +151,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     const logout = useCallback(() => {
+<<<<<<< HEAD
+=======
+        // Clear all auth state
+>>>>>>> origin/ree_update
         setUser(null);
         localStorage.removeItem('autograde_current_user');
         localStorage.removeItem('autograde_auth');
         localStorage.removeItem('autograde_token');
+<<<<<<< HEAD
     }, []);
+=======
+        localStorage.removeItem('autograde_refresh_token');
+
+        // Clear React Query cache so no stale data from this user persists
+        queryClient.clear();
+    }, [queryClient]);
+>>>>>>> origin/ree_update
 
     const updateUser = useCallback(
         (patch: Partial<User>) => {
@@ -141,6 +184,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         []
     );
 
+<<<<<<< HEAD
+=======
+    // Listen for forced sign-out from the API interceptor (e.g. expired token)
+    useEffect(() => {
+        const handleSignout = () => {
+            logout();
+            // Redirect to login
+            if (typeof window !== 'undefined') {
+                window.location.href = '/login';
+            }
+        };
+        window.addEventListener('auth:signout', handleSignout);
+        return () => window.removeEventListener('auth:signout', handleSignout);
+    }, [logout]);
+
+>>>>>>> origin/ree_update
     return (
         <AuthContext.Provider
             value={{

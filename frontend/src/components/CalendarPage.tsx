@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useState } from 'react';
+=======
+import { useState, useMemo } from 'react';
+>>>>>>> origin/ree_update
 import { useRouter } from 'next/navigation';
 import {
     ChevronLeft, ChevronRight, CalendarDays, Clock,
@@ -7,6 +11,10 @@ import {
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
 import { Button } from './ui/button';
+<<<<<<< HEAD
+=======
+import { useCourses, useAllAssignments } from '@/hooks/queries';
+>>>>>>> origin/ree_update
 
 /* ═══════════════════════════════════════════
    Types
@@ -39,6 +47,7 @@ function getCourseColor(courseCode: string): string {
 }
 
 /* ═══════════════════════════════════════════
+<<<<<<< HEAD
    Assignment data
    ═══════════════════════════════════════════ */
 
@@ -72,11 +81,23 @@ function loadAllAssignments(): CalendarAssignment[] {
     try {
         const stored = JSON.parse(localStorage.getItem('createdAssignments') || '[]');
         const created: CalendarAssignment[] = stored.map((a: any) => {
+=======
+   Load locally-created assignments (fallback)
+   ═══════════════════════════════════════════ */
+
+function loadLocalAssignments(
+    courseMap: Record<string, { code: string; name: string }>
+): CalendarAssignment[] {
+    try {
+        const stored = JSON.parse(localStorage.getItem('createdAssignments') || '[]');
+        return stored.map((a: any) => {
+>>>>>>> origin/ree_update
             const course = courseMap[a.courseId];
             return {
                 id: a.id,
                 name: a.name,
                 dueDate: a.dueDate,
+<<<<<<< HEAD
                 courseName: course?.title || a.courseName || 'My Course',
                 courseCode: course?.code || a.courseCode || '',
                 courseId: a.courseId || 'cs-1001',
@@ -86,6 +107,16 @@ function loadAllAssignments(): CalendarAssignment[] {
         return [...mockAssignments, ...created];
     } catch {
         return mockAssignments;
+=======
+                courseName: course?.name || a.courseName || 'My Course',
+                courseCode: course?.code || a.courseCode || '',
+                courseId: a.courseId || '',
+                language: a.language,
+            };
+        });
+    } catch {
+        return [];
+>>>>>>> origin/ree_update
     }
 }
 
@@ -93,13 +124,56 @@ function loadAllAssignments(): CalendarAssignment[] {
    Component
    ═══════════════════════════════════════════ */
 
+<<<<<<< HEAD
 const TODAY = new Date(2026, 1, 20); // Feb 20, 2026
+=======
+const TODAY = new Date();
+
+function formatDateStr(y: number, m: number, d: number) {
+    return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+>>>>>>> origin/ree_update
 
 export function CalendarPage() {
     const router = useRouter();
     const [calendarDate, setCalendarDate] = useState(() => new Date(TODAY.getFullYear(), TODAY.getMonth(), 1));
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
+<<<<<<< HEAD
     const [allAssignments] = useState<CalendarAssignment[]>(loadAllAssignments);
+=======
+
+    // Fetch courses and assignments from the API
+    const { data: courses = [] } = useCourses();
+    const { data: apiAssignments = [] } = useAllAssignments();
+
+    // Build a lookup from courseId -> { code, name }
+    const courseMap = useMemo(() => {
+        const map: Record<string, { code: string; name: string }> = {};
+        for (const c of courses) {
+            map[c.id] = { code: c.code, name: c.name };
+        }
+        return map;
+    }, [courses]);
+
+    // Map API assignments to CalendarAssignment[], merging with any localStorage entries
+    const allAssignments = useMemo<CalendarAssignment[]>(() => {
+        const mapped: CalendarAssignment[] = apiAssignments.map(a => {
+            const course = courseMap[a.courseId];
+            return {
+                id: a.id,
+                name: a.name,
+                dueDate: a.dueDate ? a.dueDate.slice(0, 10) : '',
+                courseName: course?.name || 'Unknown Course',
+                courseCode: course?.code || '',
+                courseId: a.courseId,
+                language: a.language,
+            };
+        });
+
+        const local = loadLocalAssignments(courseMap);
+        return [...mapped, ...local];
+    }, [apiAssignments, courseMap]);
+>>>>>>> origin/ree_update
 
     const year = calendarDate.getFullYear();
     const month = calendarDate.getMonth();
@@ -114,11 +188,19 @@ export function CalendarPage() {
         assignmentsByDate[a.dueDate].push(a);
     });
 
+<<<<<<< HEAD
     // Calendar grid cells
     const cells: (number | null)[] = [];
     for (let i = 0; i < firstDay; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) cells.push(d);
     while (cells.length % 7 !== 0) cells.push(null);
+=======
+    // Calendar grid cells — each cell gets a stable unique key
+    const cells: { key: string; day: number | null }[] = [];
+    for (let i = 0; i < firstDay; i++) cells.push({ key: `pre-${i}`, day: null });
+    for (let d = 1; d <= daysInMonth; d++) cells.push({ key: `day-${d}`, day: d });
+    { let trailing = 0; while (cells.length % 7 !== 0) { cells.push({ key: `post-${trailing}`, day: null }); trailing++; } }
+>>>>>>> origin/ree_update
 
     // Selected day assignments
     const selectedAssignments = selectedDate ? (assignmentsByDate[selectedDate] || []) : [];
@@ -150,10 +232,13 @@ export function CalendarPage() {
         setSelectedDate(formatDateStr(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()));
     };
 
+<<<<<<< HEAD
     function formatDateStr(y: number, m: number, d: number) {
         return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     }
 
+=======
+>>>>>>> origin/ree_update
     function handleDateClick(day: number) {
         const dateStr = formatDateStr(year, month, day);
         setSelectedDate(prev => prev === dateStr ? null : dateStr);
@@ -237,16 +322,28 @@ export function CalendarPage() {
 
                         {/* Calendar Grid */}
                         <div className="grid grid-cols-7">
+<<<<<<< HEAD
                             {cells.map((day, idx) => {
                                 if (day === null) {
                                     return (
                                         <div
                                             key={`empty-${idx}`}
+=======
+                            {cells.map((cell) => {
+                                if (cell.day === null) {
+                                    return (
+                                        <div
+                                            key={cell.key}
+>>>>>>> origin/ree_update
                                             style={{ minHeight: '80px', borderTop: '1px solid var(--color-border)' }}
                                         />
                                     );
                                 }
 
+<<<<<<< HEAD
+=======
+                                const day = cell.day;
+>>>>>>> origin/ree_update
                                 const dateStr = formatDateStr(year, month, day);
                                 const dayAssignments = assignmentsByDate[dateStr] || [];
                                 const isToday = TODAY.getFullYear() === year && TODAY.getMonth() === month && TODAY.getDate() === day;
@@ -263,11 +360,19 @@ export function CalendarPage() {
                                             minHeight: '80px',
                                             padding: '6px 8px',
                                             borderTop: '1px solid var(--color-border)',
+<<<<<<< HEAD
                                             background: isSelected
                                                 ? 'rgba(107,0,0,0.06)'
                                                 : isToday
                                                     ? 'rgba(107,0,0,0.03)'
                                                     : 'transparent',
+=======
+                                            background: (() => {
+                                                if (isSelected) return 'rgba(107,0,0,0.06)';
+                                                if (isToday) return 'rgba(107,0,0,0.03)';
+                                                return 'transparent';
+                                            })(),
+>>>>>>> origin/ree_update
                                             cursor: 'pointer',
                                             border: 'none',
                                             borderTopWidth: '1px',
@@ -287,7 +392,15 @@ export function CalendarPage() {
                                                     width: '28px', height: '28px',
                                                     fontSize: '13px',
                                                     fontWeight: isToday || hasDue ? 700 : 400,
+<<<<<<< HEAD
                                                     color: isToday ? 'white' : isPast && !hasDue ? 'var(--color-text-light)' : 'var(--color-text-dark)',
+=======
+                                                    color: (() => {
+                                                        if (isToday) return 'white';
+                                                        if (isPast && !hasDue) return 'var(--color-text-light)';
+                                                        return 'var(--color-text-dark)';
+                                                    })(),
+>>>>>>> origin/ree_update
                                                     backgroundColor: isToday ? 'var(--color-primary)' : 'transparent',
                                                 }}
                                             >
@@ -486,7 +599,15 @@ export function CalendarPage() {
                                                                 padding: '1px 6px', borderRadius: '4px',
                                                                 backgroundColor: '#FEF2F2', color: '#991B1B',
                                                             }}>
+<<<<<<< HEAD
                                                                 {daysUntil === 0 ? 'Due today' : daysUntil === 1 ? 'Due tomorrow' : `${daysUntil} days left`}
+=======
+                                                                {(() => {
+                                                                    if (daysUntil === 0) return 'Due today';
+                                                                    if (daysUntil === 1) return 'Due tomorrow';
+                                                                    return `${daysUntil} days left`;
+                                                                })()}
+>>>>>>> origin/ree_update
                                                             </span>
                                                         )}
                                                     </div>

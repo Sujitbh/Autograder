@@ -50,6 +50,16 @@ api.interceptors.request.use((req: InternalAxiosRequestConfig) => {
             req.headers.Authorization = `Bearer ${token}`;
         }
     }
+<<<<<<< HEAD
+=======
+
+    // If the request body is FormData, remove Content-Type header
+    // so axios can set the correct multipart/form-data boundary
+    if (req.data instanceof FormData && req.headers) {
+        req.headers.set('Content-Type', false as any);
+    }
+
+>>>>>>> origin/ree_update
     return req;
 });
 
@@ -69,11 +79,20 @@ api.interceptors.response.use(
             ?? data?.error;
 
         if (status === 401) {
+<<<<<<< HEAD
             // Token expired — clear local auth and redirect
             if (typeof window !== 'undefined') {
                 localStorage.removeItem('autograde_token');
                 localStorage.removeItem('autograde_auth');
                 // Let the AuthContext handle the redirect
+=======
+            // Token expired / invalid — clear local auth and notify AuthContext
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem('autograde_token');
+                localStorage.removeItem('autograde_auth');
+                localStorage.removeItem('autograde_current_user');
+                window.dispatchEvent(new Event('auth:signout'));
+>>>>>>> origin/ree_update
             }
             throw new AuthError(backendMessage ?? 'Unauthorized');
         }

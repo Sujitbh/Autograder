@@ -24,6 +24,7 @@ export function useSubmission(submissionId: string | undefined) {
     });
 }
 
+<<<<<<< HEAD
 export function useSubmissionsForGrading(courseId: number | undefined, assignmentId?: number) {
     return useQuery({
         queryKey: ['submissions-for-grading', courseId, assignmentId],
@@ -33,6 +34,8 @@ export function useSubmissionsForGrading(courseId: number | undefined, assignmen
     });
 }
 
+=======
+>>>>>>> origin/ree_update
 // ── Mutations ───────────────────────────────────────────────────────
 
 export function useSubmitCode() {
@@ -63,6 +66,7 @@ export function useGradeSubmission() {
         },
     });
 }
+<<<<<<< HEAD
 
 export function useOverrideSubmissionScore() {
     const qc = useQueryClient();
@@ -94,3 +98,5 @@ export function useOverrideSubmissionScore() {
         },
     });
 }
+=======
+>>>>>>> origin/ree_update

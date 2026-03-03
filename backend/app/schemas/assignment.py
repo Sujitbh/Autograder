@@ -16,16 +16,28 @@ class TestCaseData(BaseModel):
     points: int = 1
 
 
+class RubricInline(BaseModel):
+    """Rubric criterion embedded inside an assignment creation payload."""
+    name: str
+    description: Optional[str] = None
+    maxPoints: Optional[int] = 10
+    gradingMethod: Optional[str] = None  # auto | manual | hybrid
+
+
 class AssignmentCreate(BaseModel):
     """Schema for creating an assignment."""
     title: str
     description: Optional[str] = None
     course_id: Optional[int] = None
     due_date: Optional[datetime] = None
-    max_submissions: Optional[int] = None  # None = unlimited
+    max_submissions: Optional[int] = None
+    max_points: Optional[int] = 100
     allowed_languages: Optional[str] = None  # Comma-separated: "python,java,cpp"
+    starter_code: Optional[str] = None  # Faculty-provided starter code template
+    status: Optional[str] = "published"  # draft | published | closed
     publicTests: Optional[List[TestCaseData]] = None
     privateTests: Optional[List[TestCaseData]] = None
+    rubric: Optional[List[RubricInline]] = None
 
 
 class AssignmentUpdate(BaseModel):
@@ -35,7 +47,10 @@ class AssignmentUpdate(BaseModel):
     course_id: Optional[int] = None
     due_date: Optional[datetime] = None
     max_submissions: Optional[int] = None
+    max_points: Optional[int] = None
     allowed_languages: Optional[str] = None
+    starter_code: Optional[str] = None
+    status: Optional[str] = None
     is_active: Optional[bool] = None
 
 
@@ -48,7 +63,10 @@ class AssignmentOut(BaseModel):
     created_by: Optional[int] = None
     due_date: Optional[datetime] = None
     max_submissions: Optional[int] = None
+    max_points: Optional[int] = None
     allowed_languages: Optional[str] = None
+    starter_code: Optional[str] = None
+    status: str = "published"
     is_active: bool = True
     created_at: Optional[datetime] = None
 

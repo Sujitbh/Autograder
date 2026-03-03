@@ -22,7 +22,11 @@ interface TAInvitation {
   id: number;
   student_id: number;
   status: 'pending' | 'accepted' | 'declined';
+<<<<<<< HEAD
   student_name: string;
+=======
+  student_name?: string;
+>>>>>>> origin/ree_update
 }
 
 interface TAManagementProps {

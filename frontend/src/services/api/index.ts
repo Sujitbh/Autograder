@@ -9,3 +9,10 @@ export { courseService } from './courseService';
 export { assignmentService } from './assignmentService';
 export { submissionService } from './submissionService';
 export { gradeService, reportService } from './gradeService';
+<<<<<<< HEAD
+=======
+export { adminService } from './adminService';
+export { testcaseService } from './testcaseService';
+export { codeExecutionApiService } from './codeExecutionApiService';
+export { taDashboardService } from './taDashboardService';
+>>>>>>> origin/ree_update

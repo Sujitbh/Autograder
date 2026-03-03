@@ -3,7 +3,11 @@ import {
     ChevronLeft, Calendar, Code, Users, Download, CheckCircle2, Search,
     Inbox, BarChart3, AlertTriangle, ChevronUp, ChevronDown,
     Edit, Trash2, FileText, ClipboardList, Clock, Star, BookOpen, Settings2,
+<<<<<<< HEAD
     UserCheck, Loader2,
+=======
+    UserCheck, Loader2, Zap,
+>>>>>>> origin/ree_update
 } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
@@ -11,7 +15,11 @@ import { Sidebar } from './Sidebar';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
+<<<<<<< HEAD
 import { useRouter, useParams, usePathname } from 'next/navigation';
+=======
+import { useRouter, useParams } from 'next/navigation';
+>>>>>>> origin/ree_update
 import { GradingModal } from './GradingModal';
 import {
     Dialog,
@@ -21,7 +29,11 @@ import {
     DialogFooter,
     DialogDescription,
 } from './ui/dialog';
+<<<<<<< HEAD
 import { getStudentsForCourse, hashStr, COURSE_STUDENT_COUNTS } from '../utils/studentData';
+=======
+
+>>>>>>> origin/ree_update
 import { useAssignment } from '@/hooks/queries';
 import { useSubmissions } from '@/hooks/queries/useSubmissions';
 import { submissionService } from '@/services/api';
@@ -54,6 +66,7 @@ function lookupCourseCode(id: string) {
     try { const s = JSON.parse(localStorage.getItem('autograde_courses') || '[]'); const f = s.find((c: any) => c.id === id); if (f) return f.code; } catch { } return id;
 }
 
+<<<<<<< HEAD
 const assignmentsMeta: Record<string, AssignmentMeta> = {
     a1: {
         name: 'Hello World Program',
@@ -315,6 +328,8 @@ const assignmentsMeta: Record<string, AssignmentMeta> = {
     },
 };
 
+=======
+>>>>>>> origin/ree_update
 interface StudentSubmission {
     id: string;
     studentName: string;
@@ -329,6 +344,7 @@ interface StudentSubmission {
     flagged: boolean;
 }
 
+<<<<<<< HEAD
 function makeMockSubmissions(assignmentId: string, courseId: string): StudentSubmission[] {
     const students = getStudentsForCourse(courseId);
     const maxPts = 100; // assignment max points
@@ -416,6 +432,8 @@ function getGroupMembers(studentId: string, submissionsState: StudentSubmission[
     return submissionsState.filter(s => group.memberIds.includes(s.studentId) && s.studentId !== studentId);
 }
 
+=======
+>>>>>>> origin/ree_update
 type SortField = 'studentName' | 'submittedAt' | 'autoScore' | 'finalGrade';
 type SortOrder = 'asc' | 'desc';
 
@@ -428,6 +446,7 @@ function scoreColor(score: number, max: number): string {
 
 export function AssignmentGrading() {
     const router = useRouter();
+<<<<<<< HEAD
     const pathname = usePathname();
     const { courseId, assignmentId } = useParams() as { courseId: string; assignmentId: string };
     const [isDownloadingZip, setIsDownloadingZip] = useState(false);
@@ -435,10 +454,16 @@ export function AssignmentGrading() {
     // Detect if we're rendering inside the TA route space
     const isTAContext = pathname?.includes('/student/teaching-assistant/');
 
+=======
+    const { courseId, assignmentId } = useParams() as { courseId: string; assignmentId: string };
+    const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+
+>>>>>>> origin/ree_update
     // Fetch from API
     const { data: apiAssignment, isLoading: isLoadingAssignment } = useAssignment(courseId, assignmentId);
     const { data: apiSubmissions, isLoading: isLoadingSubmissions, refetch: refetchSubmissions } = useSubmissions(assignmentId);
 
+<<<<<<< HEAD
     // Try hardcoded meta first; then API data; then localStorage fallback
     const meta: AssignmentMeta | undefined = useMemo(() => {
         // 1. Hardcoded mock data (for legacy mock IDs like a1, a2, etc.)
@@ -446,6 +471,11 @@ export function AssignmentGrading() {
         if (hardcoded) return hardcoded;
 
         // 2. API data (for real assignments from the database)
+=======
+    // Derive assignment metadata from API data or localStorage fallback
+    const meta: AssignmentMeta | undefined = useMemo(() => {
+        // 1. API data (for real assignments from the database)
+>>>>>>> origin/ree_update
         if (apiAssignment) {
             return {
                 name: apiAssignment.name ?? 'Untitled',
@@ -470,7 +500,11 @@ export function AssignmentGrading() {
             } as AssignmentMeta;
         }
 
+<<<<<<< HEAD
         // 3. localStorage fallback (for recently created assignments not yet refetched)
+=======
+        // 2. localStorage fallback (for recently created assignments not yet refetched)
+>>>>>>> origin/ree_update
         try {
             const stored: any[] = JSON.parse(localStorage.getItem('createdAssignments') || '[]');
             const found = stored.find((a: any) => a.id === assignmentId);
@@ -502,7 +536,11 @@ export function AssignmentGrading() {
     // Map API submissions to StudentSubmission format
     const submissions = useMemo(() => {
         if (!apiSubmissions || isLoadingSubmissions) {
+<<<<<<< HEAD
             return makeMockSubmissions(assignmentId ?? '', courseId ?? 'cs-1001');
+=======
+            return [];
+>>>>>>> origin/ree_update
         }
 
         const getInitials = (name: string) =>
@@ -513,10 +551,16 @@ export function AssignmentGrading() {
                 .toUpperCase()
                 .slice(0, 2);
 
+<<<<<<< HEAD
         const normalizedApiSubs = (apiSubmissions as any[]).map((sub: any) => {
             const studentPk = Number(sub.student_id ?? sub.studentId ?? sub.student?.id ?? -1);
             const studentName = sub.student?.name ?? 'Student';
             const studentIdentifier = sub.student?.student_id ?? String(sub.studentId ?? studentPk);
+=======
+        return (apiSubmissions as any[]).map((sub: any) => {
+            const studentName = sub.student?.name ?? 'Student';
+            const studentIdentifier = sub.student?.student_id ?? String(sub.studentId ?? sub.student_id ?? sub.student?.id ?? '');
+>>>>>>> origin/ree_update
             const submittedAt = sub.created_at ?? sub.submittedAt ?? null;
             const score = sub.score ?? sub.grade?.totalScore ?? null;
             const maxScore = sub.max_score ?? sub.grade?.maxScore ?? meta?.totalPoints ?? 100;
@@ -524,6 +568,7 @@ export function AssignmentGrading() {
 
             return {
                 id: String(sub.id),
+<<<<<<< HEAD
                 studentPk,
                 studentName,
                 studentIdentifier,
@@ -587,17 +632,34 @@ export function AssignmentGrading() {
                 finalGrade: null,
                 maxPoints: meta?.totalPoints || 100,
                 status: 'not-submitted' as const,
+=======
+                studentName,
+                studentId: studentIdentifier,
+                avatarInitials: getInitials(studentName),
+                submittedAt,
+                autoScore: score,
+                finalGrade: score,
+                maxPoints: maxScore,
+                status,
+>>>>>>> origin/ree_update
                 late: false,
                 flagged: false,
             } as StudentSubmission;
         });
+<<<<<<< HEAD
     }, [apiSubmissions, isLoadingSubmissions, assignmentId, courseId, meta]);
+=======
+    }, [apiSubmissions, isLoadingSubmissions, meta]);
+>>>>>>> origin/ree_update
 
     const [submissionsState, setSubmissionsState] = useState<StudentSubmission[]>(submissions);
     // Update local state when API data changes
     useEffect(() => { setSubmissionsState(submissions); }, [submissions]);
+<<<<<<< HEAD
     const mockGroups = useMemo(() => buildMockGroups(courseId ?? 'cs-1001'), [courseId]);
 
+=======
+>>>>>>> origin/ree_update
     /* ─── Grade submission handler ─── */
     const handleSubmitGrade = (studentId: string, grade: number, _feedback: string) => {
         setSubmissionsState(prev => prev.map(s =>
@@ -607,6 +669,7 @@ export function AssignmentGrading() {
         ));
     };
 
+<<<<<<< HEAD
     /* ─── Apply grade to all group members ─── */
     const handleApplyGroupGrade = (sourceStudentId: string, grade: number) => {
         const group = getGroupForStudent(
@@ -618,6 +681,11 @@ export function AssignmentGrading() {
                 ? { ...s, finalGrade: grade, status: 'graded' as const }
                 : s
         ));
+=======
+    /* ─── Apply grade to all group members (placeholder until group API is available) ─── */
+    const handleApplyGroupGrade = (_sourceStudentId: string, _grade: number) => {
+        // No-op: group membership is not yet available from the API
+>>>>>>> origin/ree_update
     };
 
     const [activeTab, setActiveTab] = useState('all');
@@ -659,6 +727,26 @@ export function AssignmentGrading() {
         }
     };
 
+<<<<<<< HEAD
+=======
+    /* ─── Grade All Pending handler ─── */
+    const [isGradingAll, setIsGradingAll] = useState(false);
+    const handleGradeAll = async () => {
+        if (!assignmentId) return;
+        setIsGradingAll(true);
+        try {
+            const result = await submissionService.gradeAllSubmissions(assignmentId);
+            window.alert(`Graded ${result.total_graded} submission(s). Errors: ${result.total_errors}.`);
+            refetchSubmissions();
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to grade submissions';
+            window.alert(message);
+        } finally {
+            setIsGradingAll(false);
+        }
+    };
+
+>>>>>>> origin/ree_update
     /* ─── Tab counts ─── */
     const counts = useMemo(() => {
         const all = submissionsState.length;
@@ -721,6 +809,7 @@ export function AssignmentGrading() {
     const gradableStudents = sorted.filter(s => s.status !== 'not-submitted');
     const currentGradingStudent = gradingStudentIdx !== null ? gradableStudents[gradingStudentIdx] : null;
 
+<<<<<<< HEAD
     // Build breadcrumbs and back path based on context
     const homeBreadcrumbs = isTAContext
         ? [
@@ -743,6 +832,12 @@ export function AssignmentGrading() {
         return (
             <PageLayout>
                 <TopNav breadcrumbs={[homeBreadcrumbs[0]]} />
+=======
+    if (!courseId || !assignmentId || (!meta && !isLoadingAssignment)) {
+        return (
+            <PageLayout>
+                <TopNav breadcrumbs={[{ label: 'Courses', href: '/courses' }]} />
+>>>>>>> origin/ree_update
                 <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
                     <div className="text-center">
                         <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '16px' }}>Assignment Not Found</h2>
@@ -756,7 +851,11 @@ export function AssignmentGrading() {
     if (isLoadingAssignment && !meta) {
         return (
             <PageLayout>
+<<<<<<< HEAD
                 <TopNav breadcrumbs={[homeBreadcrumbs[0]]} />
+=======
+                <TopNav breadcrumbs={[{ label: 'Courses', href: '/courses' }]} />
+>>>>>>> origin/ree_update
                 <div className="flex items-center justify-center gap-3" style={{ minHeight: 'calc(100vh - 64px)', color: 'var(--color-text-mid)' }}>
                     <Loader2 className="w-5 h-5 animate-spin" />
                     <span>Loading assignment…</span>
@@ -765,29 +864,53 @@ export function AssignmentGrading() {
         );
     }
 
+<<<<<<< HEAD
     return (
         <PageLayout>
             <TopNav breadcrumbs={[
                 ...homeBreadcrumbs,
+=======
+    if (!meta) return null;
+
+    return (
+        <PageLayout>
+            <TopNav breadcrumbs={[
+                { label: 'Courses', href: '/courses' },
+                { label: lookupCourseCode(courseId!), href: `/courses/${courseId}` },
+                { label: 'Grading' },
+>>>>>>> origin/ree_update
                 { label: meta.name },
             ]} />
 
             <div className="flex h-[calc(100vh-64px)]">
+<<<<<<< HEAD
                 <Sidebar
                     activeItem={isTAContext ? 'grading' : 'assignments'}
                     userRole={isTAContext ? 'ta' : undefined}
                     backPath={isTAContext ? '/student/teaching-assistant' : undefined}
                 />
+=======
+                <Sidebar activeItem="assignments" />
+>>>>>>> origin/ree_update
 
                 <main className="flex-1 overflow-auto p-8">
                     {/* Back link */}
                     <button
+<<<<<<< HEAD
                         onClick={() => router.push(backPath)}
                         className="flex items-center gap-1 mb-5 hover:underline transition-colors"
                         style={{ fontSize: '13px', color: '#6B0000' }}
                     >
                         <ChevronLeft className="w-5 h-5" />
                         {isTAContext ? 'Back to Grading' : 'Back to Assignments'}
+=======
+                        onClick={() => router.push(`/courses/${courseId}`)}
+                        className="flex items-center gap-1 mb-5 hover:underline transition-colors"
+                        style={{ fontSize: '13px', color: 'var(--color-primary)' }}
+                    >
+                        <ChevronLeft className="w-5 h-5" />
+                        Back to Assignments
+>>>>>>> origin/ree_update
                     </button>
 
                     {/* Page Header */}
@@ -853,6 +976,21 @@ export function AssignmentGrading() {
                                 <Download className="w-4 h-4 mr-2" />
                                 {isDownloadingZip ? 'Downloading...' : 'Download submissions (ZIP)'}
                             </Button>
+<<<<<<< HEAD
+=======
+                            <Button
+                                className="h-9 text-white"
+                                style={{ backgroundColor: 'var(--color-primary)' }}
+                                onClick={handleGradeAll}
+                                disabled={isGradingAll}
+                            >
+                                {isGradingAll ? (
+                                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Grading...</>
+                                ) : (
+                                    <><Zap className="w-4 h-4 mr-2" /> Grade All Pending</>
+                                )}
+                            </Button>
+>>>>>>> origin/ree_update
                         </div>
                     </div>
 
@@ -1199,6 +1337,7 @@ export function AssignmentGrading() {
                                                                         {rowFlagged && <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#FF6B00' }} />}
                                                                         <span style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>{sub.studentName}</span>
                                                                     </div>
+<<<<<<< HEAD
                                                                     {meta.isGroupAssignment && (() => {
                                                                         const grp = getGroupForStudent(sub.studentId, mockGroups);
                                                                         return grp ? (
@@ -1207,6 +1346,13 @@ export function AssignmentGrading() {
                                                                             </span>
                                                                         ) : null;
                                                                     })()}
+=======
+                                                                    {meta.isGroupAssignment && (
+                                                                        <span style={{ fontSize: '11px', color: '#6B0000', fontWeight: 500 }}>
+                                                                            Group Assignment
+                                                                        </span>
+                                                                    )}
+>>>>>>> origin/ree_update
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -1375,6 +1521,7 @@ export function AssignmentGrading() {
             </Dialog>
 
             {/* Grading Modal */}
+<<<<<<< HEAD
             {currentGradingStudent && gradingStudentIdx !== null && (() => {
                 const studentGroup = meta.isGroupAssignment ? getGroupForStudent(currentGradingStudent.studentId, mockGroups) : undefined;
                 const groupMembers = meta.isGroupAssignment ? getGroupMembers(currentGradingStudent.studentId, submissionsState, mockGroups) : [];
@@ -1408,6 +1555,33 @@ export function AssignmentGrading() {
                     />
                 );
             })()}
+=======
+            {currentGradingStudent && gradingStudentIdx !== null && (
+                <GradingModal
+                    studentName={currentGradingStudent.studentName}
+                    assignmentName={meta.name}
+                    submittedAt={currentGradingStudent.submittedAt ?? ''}
+                    autoScore={currentGradingStudent.autoScore}
+                    maxPoints={currentGradingStudent.maxPoints}
+                    rubric={meta.rubric}
+                    hasPrev={gradingStudentIdx > 0}
+                    hasNext={gradingStudentIdx < gradableStudents.length - 1}
+                    onPrev={() => setGradingStudentIdx(prev => (prev !== null && prev > 0 ? prev - 1 : prev))}
+                    onNext={() => setGradingStudentIdx(prev => (prev !== null && prev < gradableStudents.length - 1 ? prev + 1 : prev))}
+                    onClose={() => setGradingStudentIdx(null)}
+                    onSubmitGrade={(grade, fb) => {
+                        handleSubmitGrade(currentGradingStudent.id, grade, fb);
+                        refetchSubmissions();
+                    }}
+                    onSaveDraft={(grade, fb) => handleSubmitGrade(currentGradingStudent.id, grade, fb)}
+                    isGroupAssignment={meta.isGroupAssignment}
+                    groupName={undefined}
+                    groupMemberNames={[]}
+                    submissionId={currentGradingStudent.id}
+                    onApplyToGroup={undefined}
+                />
+            )}
+>>>>>>> origin/ree_update
 
             {/* Apply Grade to Group Dialog */}
             <Dialog open={showApplyGroupDialog} onOpenChange={setShowApplyGroupDialog}>
@@ -1418,8 +1592,12 @@ export function AssignmentGrading() {
                             Apply Grade to Group Members
                         </DialogTitle>
                         <DialogDescription style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '8px' }}>
+<<<<<<< HEAD
                             Apply the same grade from <strong style={{ color: '#2D2D2D' }}>{applyGroupStudent?.studentName}</strong> to all other members of{' '}
                             <strong style={{ color: '#6B0000' }}>{applyGroupStudent ? getGroupForStudent(applyGroupStudent.studentId, mockGroups)?.name : ''}</strong>.
+=======
+                            Apply the same grade from <strong style={{ color: '#2D2D2D' }}>{applyGroupStudent?.studentName}</strong> to all other members of the group.
+>>>>>>> origin/ree_update
                         </DialogDescription>
                     </DialogHeader>
 
@@ -1435,6 +1613,7 @@ export function AssignmentGrading() {
 
                     {/* Members who will receive the grade */}
                     <div className="mt-3">
+<<<<<<< HEAD
                         <p style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D', marginBottom: '8px' }}>
                             Group members who will receive this grade:
                         </p>
@@ -1464,6 +1643,11 @@ export function AssignmentGrading() {
                                 </div>
                             ))}
                         </div>
+=======
+                        <p style={{ fontSize: '13px', fontWeight: 500, color: '#8A8A8A' }}>
+                            Group membership data is not yet available from the API.
+                        </p>
+>>>>>>> origin/ree_update
                     </div>
 
                     {groupGradeApplied && (

@@ -3,9 +3,10 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app.api.deps import get_db, get_current_user, get_current_user_optional
-from app.core.permissions import require_role
+from app.core.permissions import require_role, require_course_role
 from app.models.assignment import Assignment
 from app.models.testcase import TestCase
+from app.models.rubric import Rubric
 from app.models.user import User
 from app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentOut
 
@@ -22,11 +23,11 @@ def list_assignments(
     q = db.query(Assignment)
     if course_id is not None:
         q = q.filter(Assignment.course_id == course_id)
-    
+
     # Students should only see active assignments
     if user and user.role == "student":
         q = q.filter(Assignment.is_active == True)
-    
+
     return q.all()
 
 
@@ -37,6 +38,7 @@ def create_assignment(
     user: User = Depends(get_current_user),
 ):
     require_role(user.role, {"faculty", "admin"})
+    require_course_role(db=db, user=user, course_id=payload.course_id, allowed_roles=["instructor"])
 
     assignment = Assignment(
         title=payload.title,
@@ -45,7 +47,10 @@ def create_assignment(
         created_by=user.id,
         due_date=payload.due_date,
         max_submissions=payload.max_submissions,
+        max_points=payload.max_points,
         allowed_languages=payload.allowed_languages,
+        starter_code=payload.starter_code,
+        status=payload.status or "published",
     )
     db.add(assignment)
     db.flush()  # Flush to get the assignment ID before creating test cases
@@ -76,13 +81,25 @@ def create_assignment(
             )
             db.add(test_case)
     
+    # Persist rubric criteria
+    if hasattr(payload, 'rubric') and payload.rubric:
+        for idx, rc in enumerate(payload.rubric):
+            db.add(Rubric(
+                assignment_id=assignment.id,
+                name=rc.name,
+                description=rc.description,
+                max_points=getattr(rc, 'maxPoints', 10) or 10,
+                weight=1.0,
+                order=idx,
+            ))
+    
     db.commit()
     db.refresh(assignment)
     return assignment
 
 
 @router.get("/{assignment_id}", response_model=AssignmentOut)
-def get_assignment(assignment_id: int, db: Session = Depends(get_db)):
+def get_assignment(assignment_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -96,11 +113,10 @@ def update_assignment(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    require_role(user.role, {"faculty", "admin"})
-
     assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    require_course_role(db=db, user=user, course_id=assignment.course_id, allowed_roles=["instructor"])
 
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(assignment, k, v)
@@ -116,11 +132,11 @@ def delete_assignment(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    require_role(user.role, {"faculty", "admin"})
-
     assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
+    require_course_role(db=db, user=user, course_id=assignment.course_id, allowed_roles=["instructor"])
+
     db.delete(assignment)
     db.commit()
     return {"ok": True}

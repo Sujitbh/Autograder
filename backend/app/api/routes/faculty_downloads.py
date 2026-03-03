@@ -2,7 +2,7 @@ import os
 import tempfile
 import zipfile
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,7 @@ router = APIRouter(prefix="/faculty", tags=["faculty"])
 @router.get("/assignments/{assignment_id}/download-zip")
 def download_assignment_zip(
     assignment_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -62,4 +63,5 @@ def download_assignment_zip(
                 z.write(f.path, arcname=arcname)
 
     download_name = f"assignment_{assignment_id}_submissions.zip"
+    background_tasks.add_task(os.unlink, tmp.name)
     return FileResponse(tmp.name, filename=download_name, media_type="application/zip")

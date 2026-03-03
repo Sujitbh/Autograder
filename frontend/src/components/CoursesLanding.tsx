@@ -238,7 +238,11 @@ export function CoursesLanding() {
           <div className="flex flex-col items-center justify-center py-20 gap-2" style={{ color: 'var(--color-danger, #ef4444)' }}>
             <AlertTriangle className="w-6 h-6" />
             <span>Failed to load courses. Is the backend running at {config.apiUrl}?</span>
+<<<<<<< HEAD
             <span style={{ fontSize: '12px', opacity: 0.7 }}>{(error as Error).message}</span>
+=======
+            <span style={{ fontSize: '12px', opacity: 0.7 }}>{error.message}</span>
+>>>>>>> origin/ree_update
           </div>
         )}
 
@@ -253,15 +257,31 @@ export function CoursesLanding() {
           {filteredCourses.map((course) => (
             <div
               key={course.id}
+<<<<<<< HEAD
               className="overflow-hidden transition-shadow hover:shadow-md cursor-pointer"
+=======
+              role="article"
+              className="overflow-hidden transition-shadow hover:shadow-md cursor-pointer text-left"
+>>>>>>> origin/ree_update
               style={{
                 backgroundColor: 'var(--color-surface)',
                 borderRadius: '12px',
                 boxShadow: 'var(--shadow-card)',
                 display: 'flex',
+<<<<<<< HEAD
                 flexDirection: 'column'
               }}
               onClick={() => router.push(`/courses/${course.id}`)}
+=======
+                flexDirection: 'column',
+                border: 'none',
+                padding: 0,
+                width: '100%',
+              }}
+              onClick={() => router.push(`/courses/${course.id}`)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/courses/${course.id}`); } }}
+              tabIndex={0}
+>>>>>>> origin/ree_update
             >
               {/* Maroon Top Bar */}
               <div style={{ height: '6px', width: '100%', backgroundColor: 'var(--color-primary)' }} />
@@ -333,7 +353,11 @@ export function CoursesLanding() {
                   {course.nextDueDays != null && course.nextDueDays > 0 && (
                     <div className="flex items-center gap-2" style={{ fontSize: '13px', color: 'var(--color-text-mid)', fontFamily: 'Inter, sans-serif' }}>
                       <CalendarDays className="w-4 h-4 shrink-0" />
+<<<<<<< HEAD
                       <span>Assignment due in {course.nextDueDays} day{course.nextDueDays !== 1 ? 's' : ''}</span>
+=======
+                      <span>Assignment due in {course.nextDueDays} day{course.nextDueDays === 1 ? '' : 's'}</span>
+>>>>>>> origin/ree_update
                     </div>
                   )}
                   {course.pendingGrades === 0 && (course.nextDueDays == null || course.nextDueDays <= 0) && (

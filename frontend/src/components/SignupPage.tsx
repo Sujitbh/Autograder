@@ -1,15 +1,26 @@
 import { useState } from 'react';
+<<<<<<< HEAD
 import { Eye, EyeOff, GraduationCap, CheckCircle, AlertCircle, BookOpen, Shield } from 'lucide-react';
+=======
+import { Eye, EyeOff, GraduationCap, CheckCircle, AlertCircle, BookOpen } from 'lucide-react';
+>>>>>>> origin/ree_update
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/api/authService';
 
+<<<<<<< HEAD
 type SelectedRole = 'student' | 'faculty' | 'admin';
 
 interface SignupPageProps {
   onSignup: (userData?: any, token?: string) => void;
+=======
+type SelectedRole = 'student' | 'faculty';
+
+interface SignupPageProps {
+  onSignup: () => void;
+>>>>>>> origin/ree_update
 }
 
 export function SignupPage({ onSignup }: SignupPageProps) {
@@ -32,7 +43,11 @@ export function SignupPage({ onSignup }: SignupPageProps) {
 
   const validateEmail = (email: string, role: SelectedRole) => {
     const emailLower = email.toLowerCase().trim();
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> origin/ree_update
     if (role === 'student') {
       if (!emailLower.endsWith('@warhawks.ulm.edu')) {
         return 'Student email must be a valid @warhawks.ulm.edu address';
@@ -42,7 +57,11 @@ export function SignupPage({ onSignup }: SignupPageProps) {
         return 'Faculty email must be a valid @ulm.edu address';
       }
     }
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> origin/ree_update
     return null;
   };
 
@@ -109,6 +128,7 @@ export function SignupPage({ onSignup }: SignupPageProps) {
       password: formData.password,
       role: selectedRole,
     };
+<<<<<<< HEAD
     
     authService.register(registerPayload)
       .then(async () => {
@@ -122,6 +142,16 @@ export function SignupPage({ onSignup }: SignupPageProps) {
           onSignup(user, token);
         }
         const redirectPath = user.role === 'student' ? '/student' : '/courses';
+=======
+
+    authService.register(registerPayload)
+      .then((user) => {
+        localStorage.setItem('autograde_current_user', JSON.stringify(user));
+        if (typeof onSignup === 'function') {
+          onSignup();
+        }
+        const redirectPath = selectedRole === 'student' ? '/student' : '/courses';
+>>>>>>> origin/ree_update
         router.push(`${redirectPath}?signup=success`);
       })
       .catch((err) => {
@@ -252,6 +282,7 @@ export function SignupPage({ onSignup }: SignupPageProps) {
                 </div>
               </button>
 
+<<<<<<< HEAD
               <button
                 onClick={() => setSelectedRole('admin')}
                 className="w-full p-4 rounded-lg border-2 text-left transition-all hover:shadow-md"
@@ -274,6 +305,9 @@ export function SignupPage({ onSignup }: SignupPageProps) {
                   </div>
                 </div>
               </button>
+=======
+
+>>>>>>> origin/ree_update
             </div>
 
             <p className="text-center" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-text-light)' }}>
@@ -357,6 +391,7 @@ export function SignupPage({ onSignup }: SignupPageProps) {
 
           <div className="mb-8">
             <h2 className="mb-2" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px', color: 'var(--color-text-dark)' }}>
+<<<<<<< HEAD
               Create {selectedRole === 'student' ? 'Student' : selectedRole === 'faculty' ? 'Faculty' : 'Admin'} Account
             </h2>
             <p style={{ fontSize: '14px', lineHeight: '22px', color: 'var(--color-text-mid)' }}>
@@ -365,6 +400,14 @@ export function SignupPage({ onSignup }: SignupPageProps) {
                 : selectedRole === 'faculty'
                 ? 'Create courses and manage assignments'
                 : 'Full system access and administration'}
+=======
+              Create {selectedRole === 'student' ? 'Student' : 'Faculty'} Account
+            </h2>
+            <p style={{ fontSize: '14px', lineHeight: '22px', color: 'var(--color-text-mid)' }}>
+              {selectedRole === 'student'
+                ? 'Submit assignments and track your progress'
+                : 'Create courses and manage assignments'}
+>>>>>>> origin/ree_update
             </p>
           </div>
 

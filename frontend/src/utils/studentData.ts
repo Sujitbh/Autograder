@@ -1,5 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════
+<<<<<<< HEAD
    SHARED STUDENT DATA — Single source of truth for the entire app
+=======
+   SHARED TYPES & UTILITY FUNCTIONS
+>>>>>>> origin/ree_update
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Types ── */
@@ -10,6 +14,7 @@ export interface StudentSeed {
     id: string;
     sis: string;
     login: string;
+<<<<<<< HEAD
     base: number;           // base grade percentage (0-100)
 }
 
@@ -35,6 +40,28 @@ export interface SharedStudent {
     submissions: number;    // number of assignments submitted
 
     // Detailed grades
+=======
+    base: number;
+}
+
+export interface SharedStudent {
+    id: string;
+    firstName: string;
+    lastName: string;
+    name: string;
+    studentId: string;
+    sisUserId: string;
+    sisLoginId: string;
+    email: string;
+    avatarInitials: string;
+    enrollmentDate: string;
+    section: string;
+    baseGrade: number;
+    avgGrade: number;
+    trend: 'up' | 'down' | 'stable';
+    lastActive: string;
+    submissions: number;
+>>>>>>> origin/ree_update
     grades: Record<string, number | null>;
     lateFlags: Record<string, boolean>;
 }
@@ -49,6 +76,7 @@ export interface AssignmentDef {
     isGroup?: boolean;
 }
 
+<<<<<<< HEAD
 /* ── Course roster sizes ── */
 
 export const COURSE_STUDENT_COUNTS: Record<string, number> = {
@@ -146,6 +174,9 @@ export const STUDENT_SEEDS: StudentSeed[] = [
 ];
 
 /* ── Deterministic hash (same as previous) ── */
+=======
+/* ── Deterministic hash ── */
+>>>>>>> origin/ree_update
 
 export function hashStr(s: string): number {
     let h = 0;
@@ -156,6 +187,7 @@ export function hashStr(s: string): number {
     return Math.abs(h);
 }
 
+<<<<<<< HEAD
 /* ── Grade computation for a single student across all assignments ── */
 
 function computeGrades(seedId: string, base: number): { grades: Record<string, number | null>; lateFlags: Record<string, boolean> } {
@@ -243,6 +275,8 @@ export function getStudentsForCourse(courseId: string): SharedStudent[] {
     return students;
 }
 
+=======
+>>>>>>> origin/ree_update
 /* ── Helper utilities used by multiple components ── */
 
 export function gradeColor(earned: number, max: number): string {
@@ -282,6 +316,7 @@ export function ordinal(n: number): string {
     if (n % 10 === 3) return n + 'rd';
     return n + 'th';
 }
+<<<<<<< HEAD
 
 /* ── Rubric & feedback (shared by grading pages) ── */
 
@@ -302,3 +337,5 @@ export const FEEDBACK_POOL = [
     'Strong performance overall. Keep up the good work!',
     'Needs improvement in error handling — consider try/catch blocks.',
 ];
+=======
+>>>>>>> origin/ree_update

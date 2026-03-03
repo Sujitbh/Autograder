@@ -25,7 +25,11 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
     DialogFooter, DialogDescription,
 } from './ui/dialog';
+<<<<<<< HEAD
 import { COURSE_STUDENT_COUNTS } from '../utils/studentData';
+=======
+
+>>>>>>> origin/ree_update
 
 function lookupCourseCode(id: string) {
     try { const s = JSON.parse(localStorage.getItem('autograde_courses') || '[]'); const f = s.find((c: any) => c.id === id); if (f) return f.code; } catch { } return id;
@@ -400,7 +404,11 @@ export function CreateAssignment() {
         language: language ? (langLabel(language)) : 'Python',
         dueDate: dueDate || new Date().toISOString().slice(0, 10),
         submissions: 0,
+<<<<<<< HEAD
         totalStudents: COURSE_STUDENT_COUNTS[cid] ?? 42,
+=======
+        totalStudents: 0,
+>>>>>>> origin/ree_update
         gradedCount: 0,
         published,
         courseId: cid,

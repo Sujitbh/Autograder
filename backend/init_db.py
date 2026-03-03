@@ -2,7 +2,8 @@
 Initialize database tables.
 """
 import sys
-sys.path.insert(0, '/Users/sujitbhattarai/Desktop/Autograder/autograder/backend')
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sqlalchemy import text
 from app.core.database import Base, engine
