@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { Eye, EyeOff, GraduationCap, CheckCircle, AlertCircle, BookOpen, Shield } from 'lucide-react';
+import { Eye, EyeOff, GraduationCap, CheckCircle, AlertCircle, BookOpen } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/api/authService';
 
-type SelectedRole = 'student' | 'faculty' | 'admin';
+type SelectedRole = 'student' | 'faculty';
 
 interface SignupPageProps {
   onSignup: () => void;
@@ -32,7 +32,7 @@ export function SignupPage({ onSignup }: SignupPageProps) {
 
   const validateEmail = (email: string, role: SelectedRole) => {
     const emailLower = email.toLowerCase().trim();
-    
+
     if (role === 'student') {
       if (!emailLower.endsWith('@warhawks.ulm.edu')) {
         return 'Student email must be a valid @warhawks.ulm.edu address';
@@ -42,7 +42,7 @@ export function SignupPage({ onSignup }: SignupPageProps) {
         return 'Faculty email must be a valid @ulm.edu address';
       }
     }
-    
+
     return null;
   };
 
@@ -109,7 +109,7 @@ export function SignupPage({ onSignup }: SignupPageProps) {
       password: formData.password,
       role: selectedRole,
     };
-    
+
     authService.register(registerPayload)
       .then((user) => {
         localStorage.setItem('autograde_current_user', JSON.stringify(user));
@@ -247,28 +247,7 @@ export function SignupPage({ onSignup }: SignupPageProps) {
                 </div>
               </button>
 
-              <button
-                onClick={() => setSelectedRole('admin')}
-                className="w-full p-4 rounded-lg border-2 text-left transition-all hover:shadow-md"
-                style={{
-                  borderColor: 'var(--color-border)',
-                  backgroundColor: 'white'
-                }}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="p-2 rounded-lg" style={{ backgroundColor: 'var(--color-error-light)' }}>
-                    <Shield className="w-5 h-5" style={{ color: 'var(--color-error)' }} />
-                  </div>
-                  <div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                      Admin Account
-                    </h3>
-                    <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
-                      Full system access and management
-                    </p>
-                  </div>
-                </div>
-              </button>
+
             </div>
 
             <p className="text-center" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-text-light)' }}>
@@ -352,14 +331,12 @@ export function SignupPage({ onSignup }: SignupPageProps) {
 
           <div className="mb-8">
             <h2 className="mb-2" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px', color: 'var(--color-text-dark)' }}>
-              Create {selectedRole === 'student' ? 'Student' : selectedRole === 'faculty' ? 'Faculty' : 'Admin'} Account
+              Create {selectedRole === 'student' ? 'Student' : 'Faculty'} Account
             </h2>
             <p style={{ fontSize: '14px', lineHeight: '22px', color: 'var(--color-text-mid)' }}>
-              {selectedRole === 'student' 
+              {selectedRole === 'student'
                 ? 'Submit assignments and track your progress'
-                : selectedRole === 'faculty'
-                ? 'Create courses and manage assignments'
-                : 'Full system access and administration'}
+                : 'Create courses and manage assignments'}
             </p>
           </div>
 

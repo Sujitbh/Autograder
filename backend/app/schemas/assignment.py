@@ -13,8 +13,10 @@ class AssignmentCreate(BaseModel):
     description: Optional[str] = None
     course_id: Optional[int] = None
     due_date: Optional[datetime] = None
-    max_submissions: Optional[int] = None  # None = unlimited
+    max_submissions: Optional[int] = None
+    max_points: Optional[int] = 100
     allowed_languages: Optional[str] = None  # Comma-separated: "python,java,cpp"
+    status: Optional[str] = "published"  # draft | published | closed
 
 
 class AssignmentUpdate(BaseModel):
@@ -24,7 +26,9 @@ class AssignmentUpdate(BaseModel):
     course_id: Optional[int] = None
     due_date: Optional[datetime] = None
     max_submissions: Optional[int] = None
+    max_points: Optional[int] = None
     allowed_languages: Optional[str] = None
+    status: Optional[str] = None
     is_active: Optional[bool] = None
 
 
@@ -37,7 +41,9 @@ class AssignmentOut(BaseModel):
     created_by: Optional[int] = None
     due_date: Optional[datetime] = None
     max_submissions: Optional[int] = None
+    max_points: Optional[int] = None
     allowed_languages: Optional[str] = None
+    status: str = "published"
     is_active: bool = True
     created_at: Optional[datetime] = None
 

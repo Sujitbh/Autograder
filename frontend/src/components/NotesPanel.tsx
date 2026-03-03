@@ -428,7 +428,7 @@ export function NotesPanel({ open, onClose }: NotesPanelProps) {
                                             onClick={() => toggleTodo(todo.id)}
                                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0 0 0', flexShrink: 0 }}
                                         >
-                                            <CheckSquare className="w-[18px] h-[18px]" style={{ color: '#2D6A2D' }} />
+                                            <CheckSquare className="w-[18px] h-[18px]" style={{ color: 'var(--color-success)' }} />
                                         </button>
                                         <p style={{ fontSize: '13px', color: 'var(--color-text-mid)', lineHeight: '1.4', textDecoration: 'line-through', flex: 1, wordBreak: 'break-word' }}>{todo.text}</p>
                                         <button
@@ -443,7 +443,7 @@ export function NotesPanel({ open, onClose }: NotesPanelProps) {
                                 ))}
                                 <button
                                     onClick={clearCompleted}
-                                    style={{ fontSize: '12px', color: '#8B0000', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', marginTop: '4px' }}
+                                    style={{ fontSize: '12px', color: 'var(--color-error)', fontWeight: 500, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 10px', marginTop: '4px' }}
                                 >
                                     Clear completed
                                 </button>

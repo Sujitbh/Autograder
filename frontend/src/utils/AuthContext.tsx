@@ -8,6 +8,7 @@ import {
     useEffect,
     type ReactNode,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import type { User, UserRole, Faculty, Student, RegisterData } from '@/types';
 
 // ── Context shape ───────────────────────────────────────────────────
@@ -77,6 +78,7 @@ function buildUser(partial?: Partial<User>): User {
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const queryClient = useQueryClient();
 
     // Restore session from localStorage on mount
     useEffect(() => {
@@ -101,14 +103,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = useCallback(
         (userData?: Partial<User>, token?: string) => {
+            // STEP 1: Clear ALL previous session state first
+            localStorage.removeItem('autograde_current_user');
+            localStorage.removeItem('autograde_auth');
+            localStorage.removeItem('autograde_token');
+            localStorage.removeItem('autograde_refresh_token');
+            setUser(null);
+
+            // STEP 2: Clear React Query cache so old user's data doesn't leak
+            queryClient.clear();
+
+            // STEP 3: Build and persist new user
             const u = buildUser(userData);
             persistUser(u);
-            // If a JWT token was provided, ensure it's stored for API calls
-            if (token && typeof window !== 'undefined') {
+
+            // STEP 4: Store JWT token for API calls
+            if (token && typeof globalThis.window !== 'undefined') {
                 localStorage.setItem('autograde_token', token);
             }
         },
-        [persistUser]
+        [persistUser, queryClient]
     );
 
     const signup = useCallback(
@@ -120,11 +134,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     const logout = useCallback(() => {
+        // Clear all auth state
         setUser(null);
         localStorage.removeItem('autograde_current_user');
         localStorage.removeItem('autograde_auth');
         localStorage.removeItem('autograde_token');
-    }, []);
+        localStorage.removeItem('autograde_refresh_token');
+
+        // Clear React Query cache so no stale data from this user persists
+        queryClient.clear();
+    }, [queryClient]);
 
     const updateUser = useCallback(
         (patch: Partial<User>) => {

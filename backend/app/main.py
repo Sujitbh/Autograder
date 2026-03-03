@@ -16,6 +16,8 @@ from app.api.routes import (
     grading,
     student_dashboard,
     ta,
+    ta_dashboard,
+    admin,
 )
 from app.settings import settings
 import logging
@@ -67,6 +69,8 @@ app.include_router(grading.router, prefix="/api")
 app.include_router(faculty_downloads.router, prefix="/api")
 app.include_router(student_dashboard.router, prefix="/api")
 app.include_router(ta.router, prefix="/api")
+app.include_router(ta_dashboard.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
 @app.get("/health")
 def health():
@@ -77,7 +81,7 @@ def health():
 def health_db(db: Session = Depends(get_db)):
     """Database connectivity check — returns success/fail with diagnostics."""
     try:
-        result = db.execute(text("SELECT 1")).scalar()
+        db.execute(text("SELECT 1")).scalar()
         table_count = db.execute(
             text("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'")
         ).scalar()

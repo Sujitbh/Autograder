@@ -2,7 +2,8 @@
 Seed script to create initial users for the autograder system.
 """
 import sys
-sys.path.insert(0, '/Users/sujitbhattarai/Desktop/Autograder/autograder/backend')
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
@@ -30,7 +31,7 @@ def create_initial_users():
             },
             {
                 "name": "Arturo Rodriguez",
-                "email": "arturo.rodriguez@admin.edu",
+                "email": "admin@ulm.edu",
                 "password": "Admin@123",
                 "role": "admin"
             }

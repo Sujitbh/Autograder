@@ -18,7 +18,9 @@ interface BackendAssignment {
     created_by: number | null;
     due_date: string | null;
     max_submissions: number | null;
+    max_points: number | null;
     allowed_languages: string | null;
+    status: string;
     is_active: boolean;
     created_at: string;
     updated_at?: string | null;
@@ -35,8 +37,8 @@ function mapAssignment(a: BackendAssignment): Assignment {
         language: (a.allowed_languages?.split(',')[0] as 'python' | 'java') ?? 'python',
         category: 'Homework',
         dueDate: a.due_date ?? '',
-        maxPoints: 100,
-        status: a.is_active ? 'published' : 'draft',
+        maxPoints: a.max_points ?? 100,
+        status: (a.status as 'draft' | 'published' | 'closed') ?? (a.is_active ? 'published' : 'draft'),
         isGroup: false,
         allowLateSubmissions: false,
         publicTests: [],
@@ -54,7 +56,7 @@ export const assignmentService = {
         const url = courseId
             ? `/assignments/?course_id=${courseId}`
             : '/assignments/';
-        
+
         const { data } = await withRetry(() =>
             api.get<BackendAssignment[]>(url)
         );
@@ -69,14 +71,21 @@ export const assignmentService = {
         return mapAssignment(data);
     },
 
-    /** Create a new assignment. */
-    async createAssignment(dto: CreateAssignmentDto): Promise<Assignment> {
-        const payload = {
+    /** Create a new assignment (draft or published). */
+    async createAssignment(dto: CreateAssignmentDto & { status?: string }): Promise<Assignment> {
+        const payload: Record<string, unknown> = {
             title: dto.name ?? (dto as any).title ?? 'Untitled',
             description: dto.description ?? '',
             course_id: Number(dto.courseId) || null,
             allowed_languages: dto.language ?? 'python',
+            max_points: dto.maxPoints ?? 100,
+            max_submissions: (dto as any).maxSubmissions ?? null,
+            status: dto.status ?? 'published',
         };
+        // Convert dueDate string to ISO datetime for the backend
+        if (dto.dueDate) {
+            payload.due_date = new Date(dto.dueDate).toISOString();
+        }
         const { data } = await api.post<BackendAssignment>('/assignments/', payload);
         return mapAssignment(data);
     },

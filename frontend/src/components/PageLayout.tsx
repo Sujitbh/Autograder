@@ -1,4 +1,4 @@
-import { ReactNode, useState, createContext, useContext } from 'react';
+import { ReactNode, useState, useMemo, useCallback, createContext, useContext } from 'react';
 import { NotesPanel } from './NotesPanel';
 
 /* ── Notes panel context (shared with TopNav) ── */
@@ -25,12 +25,17 @@ interface PageLayoutProps {
  * Provides consistent layout with fixed TopNav
  * Adds 64px top padding to account for fixed navigation bar
  */
-export function PageLayout({ children }: PageLayoutProps) {
+export function PageLayout({ children }: Readonly<PageLayoutProps>) {
   const [notesPanelOpen, setNotesPanelOpen] = useState(false);
-  const toggleNotesPanel = () => setNotesPanelOpen(prev => !prev);
+  const toggleNotesPanel = useCallback(() => setNotesPanelOpen(prev => !prev), []);
+
+  const contextValue = useMemo(
+    () => ({ notesPanelOpen, toggleNotesPanel }),
+    [notesPanelOpen, toggleNotesPanel]
+  );
 
   return (
-    <NotesPanelContext.Provider value={{ notesPanelOpen, toggleNotesPanel }}>
+    <NotesPanelContext.Provider value={contextValue}>
       <div
         className="min-h-screen"
         style={{

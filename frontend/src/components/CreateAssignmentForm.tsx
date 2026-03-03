@@ -61,7 +61,7 @@ import {
     DialogFooter,
     DialogDescription,
 } from '@/components/ui/dialog';
-import { COURSE_STUDENT_COUNTS } from '@/utils/studentData';
+
 
 // ── Rubric Template types ───────────────────────────────────────────
 
@@ -147,7 +147,7 @@ const formSchema = z.object({
     shortName: z.string().min(1, 'Short name is required').max(10),
     language: z.enum(['python', 'java']),
     category: z.enum(['Homework', 'Quiz', 'Exam', 'Lab', 'Project']),
-    dueDate: z.string().min(1, 'Due date is required'),
+    dueDate: z.string(),  // Optional for drafts; validated on publish
     maxPoints: z.number().min(1, 'Must be at least 1 point'),
     isGroup: z.boolean(),
     allowLateSubmissions: z.boolean(),
@@ -548,10 +548,10 @@ export function CreateAssignmentForm({
                                     onClick={() => idx <= currentStep && setCurrentStep(idx)}
                                     disabled={idx > currentStep}
                                     className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors ${isActive
-                                            ? 'border-[#6B0000] bg-[#6B0000] text-white'
-                                            : isCompleted
-                                                ? 'border-green-500 bg-green-50 text-green-600 cursor-pointer'
-                                                : 'border-gray-200 bg-white text-gray-400 dark:border-gray-700 dark:bg-gray-800'
+                                        ? 'border-[#6B0000] bg-[#6B0000] text-white'
+                                        : isCompleted
+                                            ? 'border-green-500 bg-green-50 text-green-600 cursor-pointer'
+                                            : 'border-gray-200 bg-white text-gray-400 dark:border-gray-700 dark:bg-gray-800'
                                         }`}
                                     aria-label={`Step ${idx + 1}: ${step.label}`}
                                     aria-current={isActive ? 'step' : undefined}
@@ -643,7 +643,7 @@ export function CreateAssignmentForm({
                     </div>
 
                     <div>
-                        <Label htmlFor="dueDate">Due Date *</Label>
+                        <Label htmlFor="dueDate">Due Date <span className="text-xs text-gray-400">(required to publish)</span></Label>
                         <Input id="dueDate" type="datetime-local" {...register('dueDate')} />
                         {errors.dueDate && <p className="mt-1 text-xs text-red-600">{errors.dueDate.message}</p>}
                     </div>
@@ -1736,6 +1736,13 @@ export function CreateAssignmentForm({
                         <Button variant="outline" onClick={() => setShowPublishDialog(false)}>Cancel</Button>
                         <Button
                             onClick={() => {
+                                // Validate due date is set before publishing
+                                if (!getValues('dueDate')) {
+                                    setShowPublishDialog(false);
+                                    setCurrentStep(0); // Go back to Basic Info step
+                                    alert('Due date is required to publish an assignment. Please set a due date.');
+                                    return;
+                                }
                                 setShowPublishDialog(false);
                                 handleSubmit(onPublish)();
                             }}

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     Plus, Users, Search, Edit, Trash2, UserPlus, UserMinus,
     ChevronDown, ChevronUp, Shuffle, AlertTriangle, Check,
@@ -25,7 +25,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from './ui/select';
-import { getStudentsForCourse } from '../utils/studentData';
+import { courseService } from '@/services/api';
 
 /* ═══════════════════════════════════════════
    Types
@@ -58,33 +58,6 @@ const GROUP_NAMES = [
     'Team Phi', 'Team Chi', 'Team Psi', 'Team Omega',
 ];
 
-function getGroupStudents(courseId: string): Student[] {
-    const shared = getStudentsForCourse(courseId);
-    return shared.map(s => ({
-        id: s.id,
-        name: s.name,
-        studentId: s.studentId,
-        email: s.email,
-    }));
-}
-
-function buildMockGroups(students: Student[]): Group[] {
-    const groups: Group[] = [];
-    const groupSize = 4;
-    const numGroups = Math.min(Math.ceil(students.length / groupSize), GROUP_NAMES.length);
-    for (let i = 0; i < numGroups; i++) {
-        const members = students.slice(i * groupSize, (i + 1) * groupSize);
-        if (members.length === 0) break;
-        groups.push({
-            id: `g${i + 1}`,
-            name: GROUP_NAMES[i],
-            members,
-            maxSize: groupSize,
-            createdAt: '2026-02-10',
-        });
-    }
-    return groups;
-}
 
 function lookupCourseCode(id: string) {
     try { const s = JSON.parse(localStorage.getItem('autograde_courses') || '[]'); const f = s.find((c: any) => c.id === id); if (f) return f.code; } catch { } return id;
@@ -106,10 +79,31 @@ function nextGroupId(groups: Group[]): string {
 export function GroupsPage() {
     const { courseId } = useParams() as { courseId: string };
     const courseCode = lookupCourseCode(courseId ?? '');
-    const allStudents = useMemo(() => getGroupStudents(courseId ?? 'cs-1001'), [courseId]);
-    const [groups, setGroups] = useState<Group[]>(() => buildMockGroups(allStudents));
+    const [allStudents, setAllStudents] = useState<Student[]>([]);
+    const [groups, setGroups] = useState<Group[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [expandedGroup, setExpandedGroup] = useState<string | null>('g1');
+    const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+
+    /* ── Fetch enrolled students from API ── */
+    useEffect(() => {
+        if (!courseId) return;
+        let cancelled = false;
+        courseService.getEnrollments(courseId).then((enrollments) => {
+            if (cancelled) return;
+            const students: Student[] = enrollments
+                .filter((e) => e.role === 'student' && e.user)
+                .map((e) => ({
+                    id: String(e.user!.id),
+                    name: e.user!.name,
+                    studentId: String(e.user!.id),
+                    email: e.user!.email,
+                }));
+            setAllStudents(students);
+        }).catch((err) => {
+            console.error('Failed to fetch course enrollments:', err);
+        });
+        return () => { cancelled = true; };
+    }, [courseId]);
     const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
 
     /* ── Modals ── */

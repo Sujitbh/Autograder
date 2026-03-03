@@ -13,6 +13,7 @@ interface TAInvitation {
     status: 'pending' | 'accepted' | 'declined';
     created_at: string;
     responded_at?: string;
+    student_name?: string;
 }
 
 interface TAInvitationWithDetails extends TAInvitation {

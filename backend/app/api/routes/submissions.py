@@ -11,6 +11,8 @@ from app.core.permissions import require_role, require_course_role
 from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
+from app.models.submission_result import SubmissionResult
+from app.models.testcase import TestCase
 from app.models.user import User
 from app.schemas.submission import SubmissionCreate, SubmissionOut, SubmissionWithStudent
 from app.settings import settings
@@ -24,7 +26,11 @@ def safe_folder_name(s: str) -> str:
 
 
 @router.get("/", response_model=List[SubmissionOut])
-def list_submissions(db: Session = Depends(get_db)):
+def list_submissions(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    if user.role == "admin":
+        return db.query(Submission).all()
+    if user.role == "student":
+        return db.query(Submission).filter(Submission.student_id == user.id).all()
     return db.query(Submission).all()
 
 
@@ -67,6 +73,77 @@ def get_submission(
             allowed_roles=["instructor", "ta"],
         )
     return s
+
+
+@router.get("/{s_id}/detail")
+def get_submission_detail(
+    s_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get detailed submission with file contents and test results."""
+    s = db.query(Submission).filter(Submission.id == s_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    assignment = db.query(Assignment).filter(Assignment.id == s.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    if user.role != "admin" and s.student_id != user.id:
+        require_course_role(
+            db=db,
+            user=user,
+            course_id=assignment.course_id,
+            allowed_roles=["instructor", "ta"],
+        )
+
+    # Build files with content
+    files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == s_id).all()
+    files_out = []
+    for f in files:
+        content = None
+        if os.path.exists(f.path):
+            try:
+                with open(f.path, "r", encoding="utf-8", errors="replace") as fh:
+                    content = fh.read()
+            except Exception:
+                content = None
+        files_out.append({
+            "id": f.id,
+            "filename": f.filename,
+            "content": content,
+        })
+
+    # Build test results
+    raw_results = (
+        db.query(SubmissionResult)
+        .filter(SubmissionResult.submission_id == s_id)
+        .all()
+    )
+    results_out = []
+    for r in raw_results:
+        tc = db.query(TestCase).filter(TestCase.id == r.testcase_id).first() if r.testcase_id else None
+        results_out.append({
+            "testcase_id": r.testcase_id or r.id,
+            "test_name": tc.name if tc else f"Test {r.id}",
+            "passed": r.passed,
+            "actual_output": r.output or "",
+            "expected_output": tc.expected_output if tc else "",
+            "execution_time_ms": r.execution_time_ms or 0,
+            "points": tc.points if tc else 0,
+            "points_earned": r.points_awarded or 0,
+            "error": r.error_output,
+        })
+
+    return {
+        "id": s.id,
+        "status": s.status,
+        "score": s.score,
+        "max_score": s.max_score,
+        "submitted_at": s.created_at.isoformat() if s.created_at else None,
+        "files": files_out,
+        "results": results_out,
+    }
 
 
 @router.delete("/{s_id}")
@@ -253,6 +330,7 @@ async def upload_submission_files(
             submission_id=submission.id,
             filename=filename,
             path=str(dest_path),
+            file_size=len(content),
         )
         db.add(rec)
         saved += 1
