@@ -70,6 +70,36 @@ def create_course(payload: CourseCreate, db: Session = Depends(get_db), user: Us
     return persisted
 
 
+@router.get("/me", response_model=List[CourseOut])
+def get_my_courses(
+    role: str | None = Query(None, description="Optional role filter: student | ta | instructor"),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get courses for current user, optionally filtered by enrollment role.
+    
+    Query Parameters:
+    - role: Optional filter by 'student', 'ta', or 'instructor' enrollment role
+    
+    Returns all courses where the user is enrolled with details on their role in each course.
+    """
+    enrollments = db.query(Enrollment).filter(
+        Enrollment.user_id == user.id
+    ).all()
+    
+    courses = []
+    for enrollment in enrollments:
+        # Skip if role filter specified and doesn't match
+        if role and enrollment.role != role:
+            continue
+        
+        course = db.query(Course).filter(Course.id == enrollment.course_id).first()
+        if course:
+            courses.append(course)
+    
+    return courses
+
+
 @router.get("/{course_id}", response_model=CourseOut)
 def get_course(course_id: int, db: Session = Depends(get_db)):
     course = db.query(Course).filter(Course.id == course_id).first()
@@ -294,6 +324,38 @@ def get_course_classmates(
         })
     
     return classmates
+
+
+@router.get("/{course_id}/ta-students")
+def get_course_students_for_ta(
+    course_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get list of students in a course. Accessible to TAs and instructors for grading."""
+    # Check if user is TA or instructor for this course
+    require_course_role(
+        db=db,
+        user=user,
+        course_id=course_id,
+        allowed_roles=["instructor", "ta"],
+    )
+    
+    # Get all students enrolled in the course
+    enrollments = db.query(Enrollment).options(joinedload(Enrollment.user)).filter(
+        Enrollment.course_id == course_id,
+        Enrollment.role == "student"
+    ).all()
+    
+    students = []
+    for enrollment in enrollments:
+        students.append({
+            "id": enrollment.user.id,
+            "name": enrollment.user.name,
+            "email": enrollment.user.email,
+        })
+    
+    return students
 
 
 @router.get("/{course_id}/grades", response_model=dict)

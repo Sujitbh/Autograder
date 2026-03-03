@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.api.deps import get_db, get_current_user
-from app.core.permissions import require_course_role
+from app.core.permissions import require_course_role, get_course_enrollment_role
 from app.models.user import User
 from app.models.assignment import Assignment
 from app.models.submission import Submission
@@ -187,20 +187,15 @@ def get_submission_results(
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
-    # Students can only view their own results; instructors/TAs can view course submissions.
-    if user.role == "student":
+    # IMPORTANT: global role may be "student" even for course-level TAs.
+    # Allow TA/instructor enrollment roles to view any submission in the course.
+    course_role = get_course_enrollment_role(db=db, user_id=user.id, course_id=assignment.course_id)
+    if user.role != "admin" and course_role not in {"instructor", "ta"}:
         if submission.student_id != user.id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Can only view your own results",
             )
-    else:
-        require_course_role(
-            db=db,
-            user=user,
-            course_id=assignment.course_id,
-            allowed_roles=["instructor", "ta"],
-        )
 
     results = GradingService.get_results(db, submission_id)
 

@@ -1,7 +1,7 @@
 'use client';
 
 /* ═══════════════════════════════════════════════════════════════════
-   CreateAssignmentForm — Multi-step wizard (9 steps)
+    CreateAssignmentForm — Multi-step wizard (8 steps)
    Features:
    - Rubric templates (save / load / preloaded)
    - PDF rubric upload & parsing
@@ -24,7 +24,6 @@ import {
     Trash2,
     GripVertical,
     Check,
-    Code2,
     FileText,
     TestTube,
     Lock,
@@ -184,7 +183,6 @@ export type AssignmentFormData = z.infer<typeof formSchema>;
 const STEPS = [
     { label: 'Basic Info', icon: FileText },
     { label: 'Description', icon: FileText },
-    { label: 'Starter Code', icon: Code2 },
     { label: 'Public Tests', icon: TestTube },
     { label: 'Private Tests', icon: Lock },
     { label: 'Rubric', icon: ClipboardList },
@@ -312,7 +310,6 @@ export function CreateAssignmentForm({
     const watchPlagiarism = watch('plagiarismEnabled');
     const watchAiDetection = watch('aiDetectionEnabled');
     const watchAutoFlag = watch('autoFlagEnabled');
-    const watchLanguage = watch('language');
 
     // ── Auto-save to localStorage every 30 seconds ────────────────
 
@@ -342,9 +339,8 @@ export function CreateAssignmentForm({
     // ── Step validation map ───────────────────────────────────────
 
     const stepFields: (keyof AssignmentFormData)[][] = [
-        ['name', 'shortName', 'language', 'category', 'dueDate', 'maxPoints'],
+        ['name', 'shortName', 'category', 'dueDate', 'maxPoints'],
         ['description'],
-        ['starterCode'],
         ['publicTests'],
         ['privateTests'],
         ['rubric'],
@@ -608,23 +604,6 @@ export function CreateAssignmentForm({
                     </div>
 
                     <div>
-                        <Label>Language *</Label>
-                        <Controller
-                            control={control}
-                            name="language"
-                            render={({ field }) => (
-                                <Select value={field.value} onValueChange={field.onChange}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="python">Python 3.10</SelectItem>
-                                        <SelectItem value="java">Java 17</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            )}
-                        />
-                    </div>
-
-                    <div>
                         <Label>Category *</Label>
                         <Controller
                             control={control}
@@ -747,45 +726,7 @@ export function CreateAssignmentForm({
         );
     }
 
-    // ── Step 2: Starter Code ──────────────────────────────────────
-
-    function renderStarterCode() {
-        return (
-            <div className="space-y-6">
-                <div>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
-                        <Code2 className="h-5 w-5 text-[#6B0000]" /> Starter Code
-                    </h2>
-                    <p className="text-xs text-gray-500 mt-1">Optional template code that students will start with.</p>
-                </div>
-                <div>
-                    <Label htmlFor="starterCode">Code Template</Label>
-                    <div className="rounded-lg overflow-hidden border dark:border-gray-700">
-                        <div className="flex items-center justify-between px-4 py-2 bg-[#1E1E2E] border-b border-gray-700">
-                            <span className="text-xs text-gray-400">
-                                {watchLanguage === 'python' ? 'main.py' : 'Main.java'}
-                            </span>
-                        </div>
-                        <Textarea
-                            id="starterCode"
-                            {...register('starterCode')}
-                            rows={16}
-                            placeholder={watchLanguage === 'python'
-                                ? '# Write your starter code here...\n\ndef solution():\n    pass'
-                                : '// Write your starter code here...\n\npublic class Main {\n    public static void main(String[] args) {\n    }\n}'}
-                            className="font-mono text-sm border-0 rounded-none focus-visible:ring-0"
-                            style={{ backgroundColor: '#1E1E2E', color: '#E0E0E0' }}
-                        />
-                    </div>
-                    <p className="mt-1 text-xs text-gray-400">
-                        Students will see this code pre-filled when they start the assignment.
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
-    // ── Step 3 & 4: Test Cases (shared renderer) ──────────────────
+    // ── Step 2 & 3: Test Cases (shared renderer) ──────────────────
 
     function renderTestCases(
         fields: Array<Record<string, unknown> & { id: string }>,
@@ -1428,7 +1369,6 @@ export function CreateAssignmentForm({
                 items: [
                     { label: 'Name', value: values.name || '—' },
                     { label: 'Short Name', value: values.shortName || '—' },
-                    { label: 'Language', value: values.language === 'python' ? 'Python 3.10' : 'Java 17' },
                     { label: 'Category', value: values.category },
                     { label: 'Due Date', value: values.dueDate ? new Date(values.dueDate).toLocaleString() : '—' },
                     { label: 'Max Points', value: String(values.maxPoints) },
@@ -1445,16 +1385,8 @@ export function CreateAssignmentForm({
                 ],
             },
             {
-                title: 'Starter Code',
-                step: 2,
-                icon: Code2,
-                items: [
-                    { label: 'Code', value: values.starterCode ? `${values.starterCode.split('\n').length} lines` : 'None provided' },
-                ],
-            },
-            {
                 title: 'Test Cases',
-                step: 3,
+                step: 2,
                 icon: TestTube,
                 items: [
                     { label: 'Public Tests', value: `${values.publicTests.length} test(s)` },
@@ -1464,7 +1396,7 @@ export function CreateAssignmentForm({
             },
             {
                 title: 'Rubric',
-                step: 5,
+                step: 4,
                 icon: ClipboardList,
                 items: [
                     { label: 'Criteria', value: `${values.rubric.length} criterion/criteria` },
@@ -1474,7 +1406,7 @@ export function CreateAssignmentForm({
             },
             {
                 title: 'Submission Settings',
-                step: 6,
+                step: 5,
                 icon: Settings2,
                 items: [
                     { label: 'Max Attempts', value: String(values.maxAttempts) },
@@ -1487,7 +1419,7 @@ export function CreateAssignmentForm({
             },
             {
                 title: 'AI Detection',
-                step: 7,
+                step: 6,
                 icon: ShieldAlert,
                 items: [
                     { label: 'Plagiarism', value: values.plagiarismEnabled ? `Enabled (${getSensitivityLabel(values.plagiarismSensitivity)})` : 'Disabled' },
@@ -1592,7 +1524,6 @@ export function CreateAssignmentForm({
     const stepRenderers = [
         renderBasicInfo,
         renderDescription,
-        renderStarterCode,
         () => renderTestCases(publicTestFields, appendPublicTest, removePublicTest, 'publicTests', false),
         () => renderTestCases(privateTestFields, appendPrivateTest, removePrivateTest, 'privateTests', true),
         renderRubric,
@@ -1714,10 +1645,6 @@ export function CreateAssignmentForm({
                     </DialogHeader>
                     <div className="mt-3 rounded-lg p-4" style={{ backgroundColor: '#F5EDED' }}>
                         <div className="grid grid-cols-2 gap-3">
-                            <div>
-                                <p className="text-[11px] text-gray-400">Language</p>
-                                <p className="text-xs font-medium text-gray-700">{getValues('language') === 'python' ? 'Python' : 'Java'}</p>
-                            </div>
                             <div>
                                 <p className="text-[11px] text-gray-400">Due Date</p>
                                 <p className="text-xs font-medium text-gray-700">{getValues('dueDate') ? new Date(getValues('dueDate')).toLocaleDateString() : '—'}</p>

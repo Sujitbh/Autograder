@@ -24,6 +24,15 @@ export function useSubmission(submissionId: string | undefined) {
     });
 }
 
+export function useSubmissionsForGrading(courseId: number | undefined, assignmentId?: number) {
+    return useQuery({
+        queryKey: ['submissions-for-grading', courseId, assignmentId],
+        queryFn: () => submissionService.getSubmissionsForGrading(courseId!, assignmentId),
+        enabled: !!courseId,
+        staleTime: 1 * 60 * 1000, // 1 minute
+    });
+}
+
 // ── Mutations ───────────────────────────────────────────────────────
 
 export function useSubmitCode() {
@@ -50,6 +59,37 @@ export function useGradeSubmission() {
             qc.invalidateQueries({ queryKey: ['submission', dto.submissionId] });
             qc.invalidateQueries({ queryKey: ['submissions'] });
             // Also refresh grades
+            qc.invalidateQueries({ queryKey: ['grades'] });
+        },
+    });
+}
+
+export function useOverrideSubmissionScore() {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            submissionId,
+            score,
+            maxScore,
+            feedback,
+        }: {
+            submissionId: string;
+            score: number;
+            maxScore: number;
+            feedback?: string;
+        }) =>
+            submissionService.overrideSubmissionScore(submissionId, {
+                score,
+                max_score: maxScore,
+                feedback,
+            }),
+        onSuccess: () => {
+            // Invalidate all relevant queries to refresh data
+            qc.invalidateQueries({ queryKey: ['submissions'] });
+            qc.invalidateQueries({ queryKey: ['submission'] });
+            qc.invalidateQueries({ queryKey: ['assignments'] });
+            qc.invalidateQueries({ queryKey: ['submissions-for-grading'] });
             qc.invalidateQueries({ queryKey: ['grades'] });
         },
     });

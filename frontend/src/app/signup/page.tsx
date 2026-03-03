@@ -6,25 +6,16 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function Signup() {
-    const { isAuthenticated, signup } = useAuth();
+    const { isAuthenticated, user, login } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
-        if (isAuthenticated) router.replace('/courses');
-    }, [isAuthenticated, router]);
+        if (!isAuthenticated) return;
+        const redirectPath = user?.role === 'student' ? '/student' : '/courses';
+        router.replace(redirectPath);
+    }, [isAuthenticated, user, router]);
 
-    return <SignupPage onSignup={() => {
-        try {
-            const stored = localStorage.getItem('autograde_current_user');
-            if (stored) {
-                const userData = JSON.parse(stored);
-                signup(userData);
-            } else {
-                signup();
-            }
-        } catch {
-            signup();
-        }
-        router.push('/courses');
+    return <SignupPage onSignup={(userData, token) => {
+        login(userData, token);
     }} />;
 }

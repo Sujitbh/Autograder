@@ -9,7 +9,7 @@ import { authService } from '@/services/api/authService';
 type SelectedRole = 'student' | 'faculty' | 'admin';
 
 interface SignupPageProps {
-  onSignup: () => void;
+  onSignup: (userData?: any, token?: string) => void;
 }
 
 export function SignupPage({ onSignup }: SignupPageProps) {
@@ -111,12 +111,17 @@ export function SignupPage({ onSignup }: SignupPageProps) {
     };
     
     authService.register(registerPayload)
-      .then((user) => {
+      .then(async () => {
+        const { user, token } = await authService.login(
+          formData.email.toLowerCase(),
+          formData.password
+        );
+
         localStorage.setItem('autograde_current_user', JSON.stringify(user));
         if (typeof onSignup === 'function') {
-          onSignup();
+          onSignup(user, token);
         }
-        const redirectPath = selectedRole === 'student' ? '/student' : '/courses';
+        const redirectPath = user.role === 'student' ? '/student' : '/courses';
         router.push(`${redirectPath}?signup=success`);
       })
       .catch((err) => {

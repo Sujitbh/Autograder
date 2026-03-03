@@ -8,6 +8,8 @@ export {
     useCreateCourse,
     useUpdateCourse,
     useDeleteCourse,
+    useTACourses,
+    useStudentCourses,
 } from './useCourses';
 
 export {
@@ -23,6 +25,8 @@ export {
     useSubmission,
     useSubmitCode,
     useGradeSubmission,
+    useSubmissionsForGrading,
+    useOverrideSubmissionScore,
 } from './useSubmissions';
 
 export {
