@@ -159,4 +159,13 @@ export const submissionService = {
   async getStudentSubmissions(assignmentId: string, _studentId: string): Promise<Submission[]> {
     return this.getSubmissions(assignmentId);
   },
+
+  /** Get all submissions in a course for TA/instructor grading view. */
+  async getSubmissionsForGrading(courseId: number, assignmentId?: number): Promise<any[]> {
+    const params = assignmentId ? { assignment_id: assignmentId } : {};
+    const { data } = await withRetry(() =>
+      api.get<any[]>(`/submissions/courses/${courseId}/for-grading`, { params })
+    );
+    return data;
+  },
 };

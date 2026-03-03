@@ -18,8 +18,10 @@ import { PageLayout } from "./PageLayout";
 import { Button } from "./ui/button";
 import { useAuth } from "@/utils/AuthContext";
 import { TAInvitations } from "./TAInvitations";
+import { TeachingAssistantSection } from "./TeachingAssistantSection";
 import { useRouter } from "next/navigation";
 import { useStudentDashboardStats } from "@/hooks/queries/useStudentDashboardStats";
+import { useTACourses } from "@/hooks/queries/useCourses";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/services/api/client";
 
@@ -167,11 +169,13 @@ function StudentDashboard() {
   const router = useRouter();
   const { data: stats, isLoading } = useStudentDashboardStats();
   const { data: resultsData, isLoading: isLoadingResults } = useQuery({
-    queryKey: ['student-dashboard-results'],
+    queryKey: ['student-dashboard-results', user?.id ?? 'anonymous'],
     queryFn: async () => {
       const { data } = await api.get<DashboardResultsResponse>('/student-dashboard/results');
       return data;
     },
+    enabled: !!user,
+    refetchOnMount: 'always',
     staleTime: 60 * 1000,
   });
 
@@ -215,6 +219,10 @@ function StudentDashboard() {
   const firstName = (user as any)?.firstName ?? user?.email?.split("@")[0] ?? "Student";
 
   const [refreshInvitations, setRefreshInvitations] = useState(0);
+
+  // Get TA courses for the Teaching Assistant section
+  const { data: taCourses = [], isLoading: isLoadingTACourses } = useTACourses();
+
   return (
     <PageLayout>
       <main className="max-w-7xl mx-auto px-4 py-8">
@@ -276,7 +284,17 @@ function StudentDashboard() {
             }}
           />
         </div>
-        {/* Main Content Grid */}
+
+        {/* Teaching Assistant Section - Show only if user is a TA */}
+        {taCourses.length > 0 && (
+          <div className="mb-12">
+            <TeachingAssistantSection
+              courses={taCourses}
+              isLoading={isLoadingTACourses}
+              onSelectCourse={(courseId) => router.push(`/student/teaching-assistant/${courseId}/grading`)}
+            />
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Courses Grid */}
           <div className="lg:col-span-2">

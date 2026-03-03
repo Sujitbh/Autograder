@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user
-from app.core.permissions import require_role, require_course_role
+from app.core.permissions import require_role, require_course_role, get_course_enrollment_role
 from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
@@ -94,6 +94,87 @@ def delete_submission(
     return {"ok": True}
 
 
+@router.get("/courses/{course_id}/for-grading")
+def get_submissions_for_grading(
+    course_id: int,
+    assignment_id: int | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Get all submissions in a course for grading (TA/instructor view).
+    
+    Requires user to be TA or instructor for the course.
+    Optionally filter by assignment_id.
+    
+    Returns submissions with student details, files, and grading info.
+    """
+    from app.models.course import Course as CourseModel
+    
+    # Verify course exists
+    course = db.query(CourseModel).filter(CourseModel.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    # Check user is TA or instructor for this course
+    require_course_role(
+        db=db,
+        user=user,
+        course_id=course_id,
+        allowed_roles=["instructor", "ta"],
+    )
+    
+    # Get all assignments in the course
+    assignments = db.query(Assignment).filter(
+        Assignment.course_id == course_id
+    ).all()
+    
+    if not assignments:
+        return []
+    
+    assignment_ids = [a.id for a in assignments]
+    if assignment_id is not None:
+        assignment_ids = [assignment_id]
+    
+    # Get all submissions for these assignments
+    submissions = db.query(Submission).filter(
+        Submission.assignment_id.in_(assignment_ids)
+    ).all()
+    
+    # Enrich with student and file details
+    result = []
+    for sub in submissions:
+        student = db.query(User).filter(User.id == sub.student_id).first()
+        files = db.query(SubmissionFile).filter(
+            SubmissionFile.submission_id == sub.id
+        ).all()
+        
+        # Get the assignment
+        assignment = db.query(Assignment).filter(
+            Assignment.id == sub.assignment_id
+        ).first()
+        
+        result.append({
+            "id": sub.id,
+            "assignment_id": sub.assignment_id,
+            "assignment_name": assignment.title if assignment else "Unknown",
+            "student_id": sub.student_id,
+            "student_name": student.name if student else "Unknown",
+            "student_email": student.email if student else None,
+            "status": sub.status,
+            "score": sub.score,
+            "max_score": sub.max_score,
+            "feedback": sub.feedback,
+            "graded_at": sub.graded_at,
+            "created_at": sub.created_at,
+            "files": [
+                {"id": f.id, "filename": f.filename, "file_size": f.file_size}
+                for f in files
+            ],
+        })
+    
+    return result
+
+
 @router.get("/assignments/{assignment_id}")
 def get_submissions_by_assignment(
     assignment_id: int,
@@ -106,18 +187,17 @@ def get_submissions_by_assignment(
         raise HTTPException(status_code=404, detail="Assignment not found")
 
     query = db.query(Submission).filter(Submission.assignment_id == assignment_id)
-    if user.role == "student":
+
+    # IMPORTANT: global role may be "student" even for course-level TAs.
+    # Prioritize course enrollment role for this assignment's course.
+    course_role = get_course_enrollment_role(db=db, user_id=user.id, course_id=assignment.course_id)
+
+    # If user is not admin/instructor/ta for this course, restrict to own submissions.
+    if user.role != "admin" and course_role not in {"instructor", "ta"}:
         query = query.filter(Submission.student_id == user.id)
         return query.all()
-    elif user.role != "admin":
-        require_course_role(
-            db=db,
-            user=user,
-            course_id=assignment.course_id,
-            allowed_roles=["instructor", "ta"],
-        )
     
-    # For faculty/admin, return submissions with student details and files
+    # For instructor/ta/admin, return submissions with student details and files
     submissions = query.all()
     result = []
     for sub in submissions:

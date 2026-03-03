@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { submissionService } from '@/services/api';
+import { useOverrideSubmissionScore } from '@/hooks/queries';
 
 interface RubricItem {
   name: string;
@@ -54,6 +55,8 @@ export function GradingModal({
   groupName,
   submissionId,
 }: GradingModalProps) {
+  const overrideScoreMutation = useOverrideSubmissionScore();
+
   const [expandedTests, setExpandedTests] = useState<Record<string, boolean>>({
     public: true,
     private: false,
@@ -164,9 +167,10 @@ export function GradingModal({
 
     setIsSaving(true);
     try {
-      await submissionService.overrideSubmissionScore(submissionId, {
+      await overrideScoreMutation.mutateAsync({
+        submissionId,
         score: getTotalScore(),
-        max_score: getTotalMaxPoints(),
+        maxScore: getTotalMaxPoints(),
         feedback: feedback || undefined,
       });
       setSubmitted(true);
@@ -407,43 +411,6 @@ export function GradingModal({
                 )}
               </div>
             )}
-
-            {/* Code Viewer */}
-            <div className="p-6">
-              <h3 className="mb-3" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                Student Code
-              </h3>
-              <div
-                className="rounded-lg p-4 overflow-x-auto"
-                style={{
-                  backgroundColor: '#1E1E1E',
-                  fontFamily: 'JetBrains Mono, monospace',
-                  fontSize: '13px',
-                  lineHeight: '20px'
-                }}
-              >
-                <pre className="text-white">
-                  {`def square(n):
-    """
-    Calculate the square of a number.
-    
-    Args:
-        n (int): The number to square
-        
-    Returns:
-        int: The square of n
-    """
-    if n < 0:
-        raise ValueError("Negative numbers not supported")
-    
-    result = n * n
-    return result
-
-# Test the function
-print(square(5))`}
-                </pre>
-              </div>
-            </div>
 
             {/* Test Results */}
             <div className="px-6 pb-6">

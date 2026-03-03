@@ -11,7 +11,7 @@ import { Sidebar } from './Sidebar';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, usePathname } from 'next/navigation';
 import { GradingModal } from './GradingModal';
 import {
     Dialog,
@@ -428,8 +428,12 @@ function scoreColor(score: number, max: number): string {
 
 export function AssignmentGrading() {
     const router = useRouter();
+    const pathname = usePathname();
     const { courseId, assignmentId } = useParams() as { courseId: string; assignmentId: string };
     const [isDownloadingZip, setIsDownloadingZip] = useState(false);
+
+    // Detect if we're rendering inside the TA route space
+    const isTAContext = pathname?.includes('/student/teaching-assistant/');
 
     // Fetch from API
     const { data: apiAssignment, isLoading: isLoadingAssignment } = useAssignment(courseId, assignmentId);
@@ -717,10 +721,28 @@ export function AssignmentGrading() {
     const gradableStudents = sorted.filter(s => s.status !== 'not-submitted');
     const currentGradingStudent = gradingStudentIdx !== null ? gradableStudents[gradingStudentIdx] : null;
 
+    // Build breadcrumbs and back path based on context
+    const homeBreadcrumbs = isTAContext
+        ? [
+            { label: 'Dashboard', href: '/student' },
+            { label: 'Teaching Assistant', href: '/student/teaching-assistant' },
+            { label: lookupCourseCode(courseId!), href: `/student/teaching-assistant/${courseId}/grading` },
+            { label: 'Grading' },
+          ]
+        : [
+            { label: 'Courses', href: '/courses' },
+            { label: lookupCourseCode(courseId!), href: `/courses/${courseId}` },
+            { label: 'Grading' },
+          ];
+
+    const backPath = isTAContext
+        ? `/student/teaching-assistant/${courseId}/grading`
+        : `/courses/${courseId}`;
+
     if (!courseId || !assignmentId || (!meta && !isLoadingAssignment)) {
         return (
             <PageLayout>
-                <TopNav breadcrumbs={[{ label: 'Courses', href: '/courses' }]} />
+                <TopNav breadcrumbs={[homeBreadcrumbs[0]]} />
                 <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
                     <div className="text-center">
                         <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '16px' }}>Assignment Not Found</h2>
@@ -734,7 +756,7 @@ export function AssignmentGrading() {
     if (isLoadingAssignment && !meta) {
         return (
             <PageLayout>
-                <TopNav breadcrumbs={[{ label: 'Courses', href: '/courses' }]} />
+                <TopNav breadcrumbs={[homeBreadcrumbs[0]]} />
                 <div className="flex items-center justify-center gap-3" style={{ minHeight: 'calc(100vh - 64px)', color: 'var(--color-text-mid)' }}>
                     <Loader2 className="w-5 h-5 animate-spin" />
                     <span>Loading assignment…</span>
@@ -746,24 +768,26 @@ export function AssignmentGrading() {
     return (
         <PageLayout>
             <TopNav breadcrumbs={[
-                { label: 'Courses', href: '/courses' },
-                { label: lookupCourseCode(courseId!), href: `/courses/${courseId}` },
-                { label: 'Grading' },
+                ...homeBreadcrumbs,
                 { label: meta.name },
             ]} />
 
             <div className="flex h-[calc(100vh-64px)]">
-                <Sidebar activeItem="assignments" />
+                <Sidebar
+                    activeItem={isTAContext ? 'grading' : 'assignments'}
+                    userRole={isTAContext ? 'ta' : undefined}
+                    backPath={isTAContext ? '/student/teaching-assistant' : undefined}
+                />
 
                 <main className="flex-1 overflow-auto p-8">
                     {/* Back link */}
                     <button
-                        onClick={() => router.push(`/courses/${courseId}`)}
+                        onClick={() => router.push(backPath)}
                         className="flex items-center gap-1 mb-5 hover:underline transition-colors"
                         style={{ fontSize: '13px', color: '#6B0000' }}
                     >
                         <ChevronLeft className="w-5 h-5" />
-                        Back to Assignments
+                        {isTAContext ? 'Back to Grading' : 'Back to Assignments'}
                     </button>
 
                     {/* Page Header */}
