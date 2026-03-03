@@ -435,6 +435,15 @@ const courseService = {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get('/courses/'));
         return data.map(mapCourse);
     },
+    /** Get courses for current user filtered by enrollment role. */ async getMyCoursesByRole (role) {
+        const params = role ? {
+            role
+        } : {};
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get('/courses/me', {
+                params
+            }));
+        return data.map(mapCourse);
+    },
     /** Get a single course by ID. */ async getCourse (courseId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}`));
         return mapCourse(data);
@@ -477,6 +486,10 @@ const courseService = {
         const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/courses/enroll', {
             enrollmentCode
         });
+        return data;
+    },
+    /** Get students in a course for TA/instructor viewing. */ async getStudentsForTA (courseId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/courses/${courseId}/ta-students`));
         return data;
     }
 };
@@ -532,7 +545,21 @@ const assignmentService = {
             title: dto.name ?? dto.title ?? 'Untitled',
             description: dto.description ?? '',
             course_id: Number(dto.courseId) || null,
-            allowed_languages: dto.language ?? 'python'
+            allowed_languages: dto.language ?? 'python',
+            publicTests: (dto.publicTests ?? []).map((test)=>({
+                    name: test.name,
+                    input_data: test.input_data || test.input,
+                    expected_output: test.expected_output || test.expectedOutput,
+                    is_public: true,
+                    points: test.points || 1
+                })),
+            privateTests: (dto.privateTests ?? []).map((test)=>({
+                    name: test.name,
+                    input_data: test.input_data || test.input,
+                    expected_output: test.expected_output || test.expectedOutput,
+                    is_public: false,
+                    points: test.points || 1
+                }))
         };
         const { data } = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].post('/assignments/', payload);
         return mapAssignment(data);
@@ -623,6 +650,10 @@ const submissionService = {
         });
         return data;
     },
+    /** Preview a file (get file content for supported types). */ async previewFile (fileId) {
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/files/${fileId}/preview`));
+        return data;
+    },
     /** List submissions for an assignment. */ async getSubmissions (assignmentId) {
         const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/assignments/${assignmentId}`));
         return data.map(mapSubmission);
@@ -647,6 +678,15 @@ const submissionService = {
     },
     /** Student history helper; backend already filters by auth user role. */ async getStudentSubmissions (assignmentId, _studentId) {
         return this.getSubmissions(assignmentId);
+    },
+    /** Get all submissions in a course for TA/instructor grading view. */ async getSubmissionsForGrading (courseId, assignmentId) {
+        const params = assignmentId ? {
+            assignment_id: assignmentId
+        } : {};
+        const { data } = await (0, __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["withRetry"])(()=>__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$services$2f$api$2f$client$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["default"].get(`/submissions/courses/${courseId}/for-grading`, {
+                params
+            }));
+        return data;
     }
 };
 if (typeof globalThis.$RefreshHelpers$ === 'object' && globalThis.$RefreshHelpers !== null) {

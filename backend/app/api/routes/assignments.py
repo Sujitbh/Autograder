@@ -5,8 +5,10 @@ from typing import List, Optional
 from app.api.deps import get_db, get_current_user, get_current_user_optional
 from app.core.permissions import require_role
 from app.models.assignment import Assignment
+from app.models.testcase import TestCase
 from app.models.user import User
 from app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentOut
+
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
 
@@ -46,6 +48,34 @@ def create_assignment(
         allowed_languages=payload.allowed_languages,
     )
     db.add(assignment)
+    db.flush()  # Flush to get the assignment ID before creating test cases
+    
+    # Create public test cases
+    if payload.publicTests:
+        for test_data in payload.publicTests:
+            test_case = TestCase(
+                assignment_id=assignment.id,
+                name=test_data.name,
+                input_data=test_data.input_data,
+                expected_output=test_data.expected_output,
+                is_public=True,
+                points=test_data.points,
+            )
+            db.add(test_case)
+    
+    # Create private test cases
+    if payload.privateTests:
+        for test_data in payload.privateTests:
+            test_case = TestCase(
+                assignment_id=assignment.id,
+                name=test_data.name,
+                input_data=test_data.input_data,
+                expected_output=test_data.expected_output,
+                is_public=False,
+                points=test_data.points,
+            )
+            db.add(test_case)
+    
     db.commit()
     db.refresh(assignment)
     return assignment

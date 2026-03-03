@@ -7,6 +7,15 @@ from typing import Optional, List
 from pydantic import BaseModel
 
 
+class TestCaseData(BaseModel):
+    """Nested test case in assignment creation."""
+    name: Optional[str] = None
+    input_data: Optional[str] = None
+    expected_output: Optional[str] = None
+    is_public: bool = False
+    points: int = 1
+
+
 class AssignmentCreate(BaseModel):
     """Schema for creating an assignment."""
     title: str
@@ -15,6 +24,8 @@ class AssignmentCreate(BaseModel):
     due_date: Optional[datetime] = None
     max_submissions: Optional[int] = None  # None = unlimited
     allowed_languages: Optional[str] = None  # Comma-separated: "python,java,cpp"
+    publicTests: Optional[List[TestCaseData]] = None
+    privateTests: Optional[List[TestCaseData]] = None
 
 
 class AssignmentUpdate(BaseModel):

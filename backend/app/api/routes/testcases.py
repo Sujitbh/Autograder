@@ -14,10 +14,17 @@ def list_testcases(db: Session = Depends(get_db)):
     return db.query(TestCase).all()
 
 
+@router.get("/assignment/{assignment_id}", response_model=List[TestCaseOut])
+def list_testcases_by_assignment(assignment_id: int, db: Session = Depends(get_db)):
+    """Get all test cases for a specific assignment."""
+    return db.query(TestCase).filter(TestCase.assignment_id == assignment_id).all()
+
+
 @router.post("/", response_model=TestCaseOut)
 def create_testcase(payload: TestCaseCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     tc = TestCase(
         assignment_id=payload.assignment_id,
+        name=payload.name,
         input_data=payload.input_data,
         expected_output=payload.expected_output,
         is_public=payload.is_public,

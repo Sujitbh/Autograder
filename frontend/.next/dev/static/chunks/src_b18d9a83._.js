@@ -2620,7 +2620,7 @@ var _s = __turbopack_context__.k.signature();
 ;
 ;
 ;
-function Sidebar({ activeItem = 'assignments' }) {
+function Sidebar({ activeItem = 'assignments', userRole = 'instructor', backPath = '/courses' }) {
     _s();
     const [isCollapsed, setIsCollapsed] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(false);
     const router = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$navigation$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useRouter"])();
@@ -2630,7 +2630,8 @@ function Sidebar({ activeItem = 'assignments' }) {
         console.error('Sidebar: courseId is undefined');
         return null;
     }
-    const menuItems = [
+    // Define all menu items
+    const allMenuItems = [
         {
             id: 'assignments',
             icon: __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$lucide$2d$react$2f$dist$2f$esm$2f$icons$2f$file$2d$text$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__$3c$export__default__as__FileText$3e$__["FileText"],
@@ -2668,6 +2669,18 @@ function Sidebar({ activeItem = 'assignments' }) {
             path: `/courses/${courseId}/settings`
         }
     ];
+    // Filter and remap paths based on user role
+    let menuItems = allMenuItems;
+    if (userRole === 'ta') {
+        // TAs can only grade and view students, with TA-specific paths
+        menuItems = allMenuItems.filter((item)=>[
+                'grading',
+                'students'
+            ].includes(item.id)).map((item)=>({
+                ...item,
+                path: `/student/teaching-assistant/${courseId}/${item.id}`
+            }));
+    }
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("aside", {
         className: "border-r h-full transition-all duration-300",
         style: {
@@ -2693,24 +2706,24 @@ function Sidebar({ activeItem = 'assignments' }) {
                         }
                     }, void 0, false, {
                         fileName: "[project]/src/components/Sidebar.tsx",
-                        lineNumber: 60,
+                        lineNumber: 75,
                         columnNumber: 11
                     }, this)
                 }, void 0, false, {
                     fileName: "[project]/src/components/Sidebar.tsx",
-                    lineNumber: 55,
+                    lineNumber: 70,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/src/components/Sidebar.tsx",
-                lineNumber: 48,
+                lineNumber: 63,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("nav", {
                 className: "py-4",
                 children: [
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
-                        onClick: ()=>router.push('/courses'),
+                        onClick: ()=>router.push(backPath),
                         className: "w-full flex items-center gap-3 py-3 px-6 transition-colors mb-1",
                         style: {
                             color: 'var(--color-primary)'
@@ -2720,7 +2733,7 @@ function Sidebar({ activeItem = 'assignments' }) {
                                 className: "w-5 h-5 flex-shrink-0"
                             }, void 0, false, {
                                 fileName: "[project]/src/components/Sidebar.tsx",
-                                lineNumber: 72,
+                                lineNumber: 87,
                                 columnNumber: 11
                             }, this),
                             !isCollapsed && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2728,16 +2741,16 @@ function Sidebar({ activeItem = 'assignments' }) {
                                     fontSize: '13px',
                                     fontWeight: 600
                                 },
-                                children: "All Courses"
+                                children: userRole === 'ta' ? 'Teaching Assistant' : 'All Courses'
                             }, void 0, false, {
                                 fileName: "[project]/src/components/Sidebar.tsx",
-                                lineNumber: 74,
+                                lineNumber: 89,
                                 columnNumber: 13
                             }, this)
                         ]
                     }, void 0, true, {
                         fileName: "[project]/src/components/Sidebar.tsx",
-                        lineNumber: 67,
+                        lineNumber: 82,
                         columnNumber: 9
                     }, this),
                     /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
@@ -2748,7 +2761,7 @@ function Sidebar({ activeItem = 'assignments' }) {
                         }
                     }, void 0, false, {
                         fileName: "[project]/src/components/Sidebar.tsx",
-                        lineNumber: 80,
+                        lineNumber: 95,
                         columnNumber: 9
                     }, this),
                     menuItems.map((item)=>{
@@ -2769,14 +2782,14 @@ function Sidebar({ activeItem = 'assignments' }) {
                                     }
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Sidebar.tsx",
-                                    lineNumber: 98,
+                                    lineNumber: 113,
                                     columnNumber: 17
                                 }, this),
                                 /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(Icon, {
                                     className: "w-5 h-5 flex-shrink-0"
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Sidebar.tsx",
-                                    lineNumber: 104,
+                                    lineNumber: 119,
                                     columnNumber: 15
                                 }, this),
                                 !isCollapsed && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -2787,26 +2800,26 @@ function Sidebar({ activeItem = 'assignments' }) {
                                     children: item.label
                                 }, void 0, false, {
                                     fileName: "[project]/src/components/Sidebar.tsx",
-                                    lineNumber: 107,
+                                    lineNumber: 122,
                                     columnNumber: 17
                                 }, this)
                             ]
                         }, item.id, true, {
                             fileName: "[project]/src/components/Sidebar.tsx",
-                            lineNumber: 87,
+                            lineNumber: 102,
                             columnNumber: 13
                         }, this);
                     })
                 ]
             }, void 0, true, {
                 fileName: "[project]/src/components/Sidebar.tsx",
-                lineNumber: 65,
+                lineNumber: 80,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/src/components/Sidebar.tsx",
-        lineNumber: 39,
+        lineNumber: 54,
         columnNumber: 5
     }, this);
 }
