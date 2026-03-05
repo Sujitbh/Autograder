@@ -73,18 +73,6 @@ export const courseService = {
         return data.map(mapCourse);
     },
 
-<<<<<<< HEAD
-    /** Get courses for current user filtered by enrollment role. */
-    async getMyCoursesByRole(role?: 'student' | 'ta' | 'instructor'): Promise<Course[]> {
-        const params = role ? { role } : {};
-        const { data } = await withRetry(() =>
-            api.get<BackendCourse[]>('/courses/me', { params })
-        );
-        return data.map(mapCourse);
-    },
-
-=======
->>>>>>> origin/ree_update
     /** Get a single course by ID. */
     async getCourse(courseId: string): Promise<Course> {
         const { data } = await withRetry(() =>
@@ -162,15 +150,4 @@ export const courseService = {
         );
         return data;
     },
-<<<<<<< HEAD
-
-    /** Get students in a course for TA/instructor viewing. */
-    async getStudentsForTA(courseId: string | number): Promise<Array<{ id: number; name: string; email: string }>> {
-        const { data } = await withRetry(() =>
-            api.get<Array<{ id: number; name: string; email: string }>>(`/courses/${courseId}/ta-students`)
-        );
-        return data;
-    },
-=======
->>>>>>> origin/ree_update
 };

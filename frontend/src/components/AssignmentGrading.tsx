@@ -3,11 +3,7 @@ import {
     ChevronLeft, Calendar, Code, Users, Download, CheckCircle2, Search,
     Inbox, BarChart3, AlertTriangle, ChevronUp, ChevronDown,
     Edit, Trash2, FileText, ClipboardList, Clock, Star, BookOpen, Settings2,
-<<<<<<< HEAD
-    UserCheck, Loader2,
-=======
     UserCheck, Loader2, Zap,
->>>>>>> origin/ree_update
 } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
@@ -15,11 +11,7 @@ import { Sidebar } from './Sidebar';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-<<<<<<< HEAD
-import { useRouter, useParams, usePathname } from 'next/navigation';
-=======
 import { useRouter, useParams } from 'next/navigation';
->>>>>>> origin/ree_update
 import { GradingModal } from './GradingModal';
 import {
     Dialog,
@@ -29,11 +21,7 @@ import {
     DialogFooter,
     DialogDescription,
 } from './ui/dialog';
-<<<<<<< HEAD
-import { getStudentsForCourse, hashStr, COURSE_STUDENT_COUNTS } from '../utils/studentData';
-=======
 
->>>>>>> origin/ree_update
 import { useAssignment } from '@/hooks/queries';
 import { useSubmissions } from '@/hooks/queries/useSubmissions';
 import { submissionService } from '@/services/api';
@@ -66,270 +54,6 @@ function lookupCourseCode(id: string) {
     try { const s = JSON.parse(localStorage.getItem('autograde_courses') || '[]'); const f = s.find((c: any) => c.id === id); if (f) return f.code; } catch { } return id;
 }
 
-<<<<<<< HEAD
-const assignmentsMeta: Record<string, AssignmentMeta> = {
-    a1: {
-        name: 'Hello World Program',
-        language: 'Python',
-        dueDate: '2026-02-24',
-        createdDate: '2026-02-10',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-1001'],
-        totalPoints: 100,
-        description: 'Write your first Python program that prints "Hello, World!" to the console. This introductory assignment familiarizes students with basic syntax, the print function, and running Python scripts.',
-        instructions: '1. Create a file named hello.py\n2. Write a program that prints "Hello, World!"\n3. Add a comment at the top with your name and date\n4. Test your program locally before submitting\n5. Submit via AutoGrade before the deadline',
-        allowedAttempts: 3,
-        latePolicy: '10% deduction per day, max 3 days late',
-        aiDetection: true,
-        rubric: [
-            { name: 'Correct Output', description: 'Program prints exactly "Hello, World!"', maxPoints: 40 },
-            { name: 'Code Style', description: 'Proper indentation, naming conventions, PEP8 compliance', maxPoints: 20 },
-            { name: 'Documentation', description: 'Header comment with name, date, and purpose', maxPoints: 20 },
-            { name: 'File Structure', description: 'Correct file name and structure', maxPoints: 20 },
-        ],
-    },
-    a2: {
-        name: 'Variables and Data Types',
-        language: 'Python',
-        dueDate: '2026-03-03',
-        createdDate: '2026-02-17',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-1001'],
-        totalPoints: 100,
-        description: 'Explore Python\'s built-in data types including integers, floats, strings, and booleans. Students will practice variable declaration, type conversion, and basic operations on different data types.',
-        instructions: '1. Create a file named datatypes.py\n2. Declare variables of each type (int, float, str, bool)\n3. Perform type conversions between types\n4. Implement the required functions as specified\n5. All test cases must pass for full marks',
-        allowedAttempts: 5,
-        latePolicy: '10% deduction per day, max 3 days late',
-        aiDetection: true,
-        rubric: [
-            { name: 'Code Correctness', description: 'All functions return expected results and pass test cases', maxPoints: 40 },
-            { name: 'Type Handling', description: 'Proper use of type conversions and type checking', maxPoints: 20 },
-            { name: 'Code Style', description: 'Clean code, proper naming, PEP8 compliance', maxPoints: 20 },
-            { name: 'Documentation', description: 'Docstrings for functions, inline comments where needed', maxPoints: 20 },
-        ],
-    },
-    a3: {
-        name: 'Control Flow: Loops',
-        language: 'Python',
-        dueDate: '2026-03-10',
-        createdDate: '2026-02-24',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-1001'],
-        totalPoints: 100,
-        description: 'Master Python\'s loop constructs including for loops, while loops, and nested loops. Implement algorithms using iteration patterns and loop control statements.',
-        instructions: '1. Implement all functions in loops.py\n2. Use appropriate loop types (for vs while)\n3. Avoid infinite loops — include proper termination conditions\n4. Optimize for efficiency where possible\n5. Include error handling for edge cases',
-        allowedAttempts: 5,
-        latePolicy: '10% deduction per day, max 3 days late',
-        aiDetection: true,
-        rubric: [
-            { name: 'Correctness', description: 'All loop implementations produce correct results', maxPoints: 50 },
-            { name: 'Efficiency', description: 'Appropriate algorithm complexity, no unnecessary iterations', maxPoints: 20 },
-            { name: 'Code Style', description: 'Readable loop structures, proper indentation', maxPoints: 15 },
-            { name: 'Documentation', description: 'Comments explaining loop logic and edge cases', maxPoints: 15 },
-        ],
-    },
-    a4: {
-        name: 'Functions and Modules',
-        language: 'Python',
-        dueDate: '2026-03-17',
-        createdDate: '2026-03-03',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-1001'],
-        totalPoints: 100,
-        description: 'Learn to write modular code using functions, parameters, return values, and modules. Create reusable code components and understand scope, default parameters, and *args/**kwargs.',
-        instructions: '1. Create a module file named utils.py with helper functions\n2. Create main.py that imports and uses the module\n3. All functions must have type hints and docstrings\n4. Implement at least one function with *args and **kwargs\n5. Write a __main__ guard in main.py',
-        allowedAttempts: 5,
-        latePolicy: '10% deduction per day, max 3 days late',
-        aiDetection: true,
-        rubric: [
-            { name: 'Function Design', description: 'Well-designed functions with single responsibility', maxPoints: 30 },
-            { name: 'Module Structure', description: 'Proper module organization and imports', maxPoints: 20 },
-            { name: 'Type Hints & Docstrings', description: 'Complete type annotations and documentation', maxPoints: 20 },
-            { name: 'Correctness', description: 'All functions work correctly with edge cases', maxPoints: 30 },
-        ],
-    },
-    a5: {
-        name: 'Object-Oriented Programming',
-        language: 'Python',
-        dueDate: '2026-03-24',
-        createdDate: '2026-03-10',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-1001'],
-        totalPoints: 100,
-        description: 'Introduction to OOP concepts in Python including classes, objects, inheritance, encapsulation, and polymorphism. Build a small class hierarchy to model a real-world system.',
-        instructions: '1. Design a class hierarchy with at least 3 classes\n2. Use inheritance and method overriding\n3. Implement __str__ and __repr__ for all classes\n4. Use encapsulation with property decorators\n5. Write unit tests for your classes',
-        allowedAttempts: 5,
-        latePolicy: '10% deduction per day, max 3 days late',
-        aiDetection: true,
-        isGroupAssignment: true,
-        rubric: [
-            { name: 'Class Design', description: 'Well-structured classes with proper inheritance', maxPoints: 30 },
-            { name: 'Encapsulation', description: 'Proper use of private attributes and properties', maxPoints: 20 },
-            { name: 'Polymorphism', description: 'Effective use of method overriding and duck typing', maxPoints: 20 },
-            { name: 'Testing', description: 'Comprehensive unit tests for all classes', maxPoints: 15 },
-            { name: 'Documentation', description: 'Docstrings, type hints, and inline comments', maxPoints: 15 },
-        ],
-    },
-
-    /* ─── CS-2050: Data Structures and Algorithms ─── */
-    ds1: {
-        name: 'Linked List Implementation',
-        language: 'Java',
-        dueDate: '2026-02-26',
-        createdDate: '2026-02-12',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-2050'],
-        totalPoints: 100,
-        description: 'Implement a singly linked list data structure with standard operations. Students will build the list from scratch including insert, delete, search, and traversal operations.',
-        instructions: '1. Create a LinkedList<T> generic class\n2. Implement add, remove, contains, size, and toString methods\n3. Handle edge cases (empty list, single element)\n4. Write JUnit tests for all operations\n5. Ensure O(1) head insertion and O(n) search',
-        allowedAttempts: 5,
-        latePolicy: '10% deduction per day, max 3 days late',
-        aiDetection: true,
-        rubric: [
-            { name: 'Correctness', description: 'All list operations work correctly', maxPoints: 40 },
-            { name: 'Edge Cases', description: 'Proper handling of empty list, null, and boundary conditions', maxPoints: 20 },
-            { name: 'Testing', description: 'Comprehensive JUnit test coverage', maxPoints: 20 },
-            { name: 'Code Quality', description: 'Clean Java style, generics usage, documentation', maxPoints: 20 },
-        ],
-    },
-    ds2: {
-        name: 'Binary Search Trees',
-        language: 'Java',
-        dueDate: '2026-03-05',
-        createdDate: '2026-02-19',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-2050'],
-        totalPoints: 100,
-        description: 'Implement a binary search tree with insert, search, delete, and traversal operations. Understand tree properties and recursive algorithms.',
-        instructions: '1. Implement a BST<T extends Comparable<T>> class\n2. Implement insert, search, delete, and three traversal orders\n3. Handle deletion of nodes with 0, 1, and 2 children\n4. Implement a height() and isBalanced() method\n5. Write comprehensive JUnit tests',
-        allowedAttempts: 5,
-        latePolicy: '10% deduction per day, max 3 days late',
-        aiDetection: true,
-        rubric: [
-            { name: 'BST Operations', description: 'Insert, search, delete work correctly', maxPoints: 35 },
-            { name: 'Traversals', description: 'In-order, pre-order, post-order implemented correctly', maxPoints: 25 },
-            { name: 'Edge Cases', description: 'Empty tree, single node, duplicate handling', maxPoints: 20 },
-            { name: 'Testing & Style', description: 'JUnit tests and clean code', maxPoints: 20 },
-        ],
-    },
-    ds3: {
-        name: 'Graph Algorithms',
-        language: 'Java',
-        dueDate: '2026-03-19',
-        createdDate: '2026-03-05',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-2050'],
-        totalPoints: 100,
-        description: 'Implement graph representations and fundamental graph algorithms including BFS, DFS, and shortest path. Work with both adjacency list and adjacency matrix representations.',
-        instructions: '1. Implement a Graph class with adjacency list representation\n2. Implement BFS and DFS traversals\n3. Implement Dijkstra\'s shortest path algorithm\n4. Handle both directed and undirected graphs\n5. Write tests with various graph topologies',
-        allowedAttempts: 5,
-        latePolicy: '10% deduction per day, max 3 days late',
-        aiDetection: true,
-        rubric: [
-            { name: 'Graph Representation', description: 'Correct adjacency list with add/remove operations', maxPoints: 25 },
-            { name: 'BFS & DFS', description: 'Correct traversal implementations', maxPoints: 30 },
-            { name: 'Shortest Path', description: 'Working Dijkstra implementation', maxPoints: 25 },
-            { name: 'Testing & Documentation', description: 'Comprehensive tests and code documentation', maxPoints: 20 },
-        ],
-    },
-
-    /* ─── CS-3100: Software Engineering Principles ─── */
-    se1: {
-        name: 'Requirements Document',
-        language: 'Markdown',
-        dueDate: '2026-02-28',
-        createdDate: '2026-02-14',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-3100'],
-        totalPoints: 100,
-        description: 'Draft a complete Software Requirements Specification (SRS) document for your team project. Apply requirements elicitation techniques and write clear functional and non-functional requirements.',
-        instructions: '1. Use the IEEE SRS template provided\n2. Include at least 15 functional requirements\n3. Include at least 5 non-functional requirements\n4. Create use case diagrams for key features\n5. Submit as a Markdown file with proper formatting',
-        allowedAttempts: 3,
-        latePolicy: '10% deduction per day, max 3 days late',
-        aiDetection: false,
-        isGroupAssignment: true,
-        rubric: [
-            { name: 'Functional Requirements', description: 'Clear, testable, and complete requirements', maxPoints: 35 },
-            { name: 'Non-Functional Requirements', description: 'Performance, security, usability requirements', maxPoints: 20 },
-            { name: 'Use Cases', description: 'Well-defined use case diagrams and descriptions', maxPoints: 25 },
-            { name: 'Document Quality', description: 'Formatting, clarity, and consistency', maxPoints: 20 },
-        ],
-    },
-    se2: {
-        name: 'System Design Diagram',
-        language: 'UML',
-        dueDate: '2026-03-12',
-        createdDate: '2026-02-26',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-3100'],
-        totalPoints: 100,
-        description: 'Create comprehensive system design diagrams for your team project including architecture, class, and sequence diagrams. Apply design patterns and SOLID principles.',
-        instructions: '1. Create a high-level architecture diagram\n2. Create detailed class diagrams with relationships\n3. Create sequence diagrams for 3 key use cases\n4. Identify and document at least 2 design patterns used\n5. Submit all diagrams as PNG/SVG with a written explanation',
-        allowedAttempts: 3,
-        latePolicy: '10% deduction per day, max 3 days late',
-        aiDetection: false,
-        isGroupAssignment: true,
-        rubric: [
-            { name: 'Architecture Diagram', description: 'Clear high-level system architecture', maxPoints: 25 },
-            { name: 'Class Diagrams', description: 'Detailed UML class diagrams with relationships', maxPoints: 30 },
-            { name: 'Sequence Diagrams', description: 'Accurate sequence diagrams for key flows', maxPoints: 25 },
-            { name: 'Design Patterns', description: 'Appropriate pattern identification and documentation', maxPoints: 20 },
-        ],
-    },
-    se3: {
-        name: 'Sprint Review Presentation',
-        language: 'Presentation',
-        dueDate: '2026-03-26',
-        createdDate: '2026-03-12',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-3100'],
-        totalPoints: 100,
-        description: 'Present your team\'s sprint review demonstrating working software, sprint metrics, and retrospective insights. Showcase agile methodology in practice.',
-        instructions: '1. Prepare a 15-minute presentation\n2. Demo working features from the sprint\n3. Show sprint burndown chart and velocity\n4. Conduct a brief retrospective summary\n5. Submit slides and a recorded demo video',
-        allowedAttempts: 2,
-        latePolicy: 'No late submissions accepted',
-        aiDetection: false,
-        isGroupAssignment: true,
-        rubric: [
-            { name: 'Demo Quality', description: 'Working software demonstration with clear narration', maxPoints: 30 },
-            { name: 'Sprint Metrics', description: 'Burndown chart, velocity, and completion rate', maxPoints: 25 },
-            { name: 'Retrospective', description: 'Meaningful retrospective with actionable improvements', maxPoints: 20 },
-            { name: 'Presentation', description: 'Professional slides, timing, and delivery', maxPoints: 25 },
-        ],
-    },
-
-    /* ─── CS-4200: Advanced Web Development ─── */
-    wd1: {
-        name: 'React Portfolio App',
-        language: 'TypeScript',
-        dueDate: '2026-03-07',
-        createdDate: '2026-02-21',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-4200'],
-        totalPoints: 100,
-        description: 'Build a personal portfolio single-page application using React and TypeScript. Implement responsive design, component composition, and client-side routing.',
-        instructions: '1. Use Create React App or Vite with TypeScript template\n2. Implement at least 4 pages with React Router\n3. Use responsive CSS (mobile-first approach)\n4. Fetch and display data from a public API\n5. Deploy to Vercel or Netlify and submit the live URL',
-        allowedAttempts: 5,
-        latePolicy: '10% deduction per day, max 3 days late',
-        aiDetection: true,
-        rubric: [
-            { name: 'React Components', description: 'Well-structured, reusable component architecture', maxPoints: 30 },
-            { name: 'TypeScript Usage', description: 'Proper types, interfaces, and type safety', maxPoints: 20 },
-            { name: 'Responsive Design', description: 'Works well on mobile, tablet, and desktop', maxPoints: 25 },
-            { name: 'Deployment & Polish', description: 'Live deployment, loading states, error handling', maxPoints: 25 },
-        ],
-    },
-    wd2: {
-        name: 'REST API Project',
-        language: 'TypeScript',
-        dueDate: '2026-03-21',
-        createdDate: '2026-03-07',
-        totalStudents: COURSE_STUDENT_COUNTS['cs-4200'],
-        totalPoints: 100,
-        description: 'Design and implement a RESTful API using Node.js, Express, and TypeScript. Include authentication, database integration, and comprehensive API documentation.',
-        instructions: '1. Set up Express with TypeScript\n2. Implement CRUD endpoints for at least 2 resources\n3. Add JWT authentication middleware\n4. Connect to a PostgreSQL or MongoDB database\n5. Write Swagger/OpenAPI documentation\n6. Include integration tests with Supertest',
-        allowedAttempts: 5,
-        latePolicy: '10% deduction per day, max 3 days late',
-        aiDetection: true,
-        rubric: [
-            { name: 'API Design', description: 'RESTful endpoints with proper HTTP methods and status codes', maxPoints: 25 },
-            { name: 'Authentication', description: 'JWT auth with proper middleware and security', maxPoints: 25 },
-            { name: 'Database Integration', description: 'Schema design, migrations, and query efficiency', maxPoints: 25 },
-            { name: 'Testing & Docs', description: 'Integration tests and Swagger documentation', maxPoints: 25 },
-        ],
-    },
-};
-
-=======
->>>>>>> origin/ree_update
 interface StudentSubmission {
     id: string;
     studentName: string;
@@ -344,96 +68,6 @@ interface StudentSubmission {
     flagged: boolean;
 }
 
-<<<<<<< HEAD
-function makeMockSubmissions(assignmentId: string, courseId: string): StudentSubmission[] {
-    const students = getStudentsForCourse(courseId);
-    const maxPts = 100; // assignment max points
-
-    return students.map((s, i) => {
-        // Deterministic status/score based on student+assignment hash
-        const h = hashStr(s.id + ':' + assignmentId + ':status');
-        const scoreH = hashStr(s.id + ':' + assignmentId + ':score');
-        const scoreVal = Math.round(55 + (scoreH % 46)); // 55-100
-        const isLate = hashStr(s.id + ':' + assignmentId + ':late') % 8 === 0;
-        const isFlagged = hashStr(s.id + ':' + assignmentId + ':flag') % 12 === 0;
-
-        // ~15% not-submitted, ~30% graded, ~30% submitted, ~25% needs-review
-        const statusRoll = h % 100;
-        let status: StudentSubmission['status'];
-        let autoScore: number | null = null;
-        let finalGrade: number | null = null;
-        let submittedAt: string | null = null;
-
-        if (statusRoll < 15) {
-            status = 'not-submitted';
-        } else {
-            // Generate a deterministic submit time
-            const dayOff = (hashStr(s.id + assignmentId + 'day') % 5) + 1;
-            const hourOff = hashStr(s.id + assignmentId + 'hr') % 24;
-            const minOff = hashStr(s.id + assignmentId + 'min') % 60;
-            submittedAt = `2026-03-0${dayOff}T${String(hourOff).padStart(2, '0')}:${String(minOff).padStart(2, '0')}:00`;
-            autoScore = scoreVal;
-
-            if (statusRoll < 45) {
-                status = 'graded';
-                finalGrade = scoreVal;
-            } else if (statusRoll < 75) {
-                status = 'submitted';
-            } else {
-                status = 'needs-review';
-            }
-        }
-
-        return {
-            id: `${assignmentId}-sub-${i}`,
-            studentName: s.name,
-            studentId: s.studentId,
-            avatarInitials: s.avatarInitials,
-            submittedAt,
-            autoScore,
-            finalGrade,
-            maxPoints: maxPts,
-            status,
-            late: status !== 'not-submitted' && isLate,
-            flagged: status !== 'not-submitted' && isFlagged,
-        };
-    });
-}
-
-/* ─── Mock group membership (maps studentId → group) ─── */
-interface MockGroup {
-    id: string;
-    name: string;
-    memberIds: string[];   // studentIds within the group
-}
-
-function buildMockGroups(courseId: string): MockGroup[] {
-    const students = getStudentsForCourse(courseId);
-    const GROUP_NAMES = ['Team Alpha', 'Team Beta', 'Team Gamma', 'Team Delta', 'Team Epsilon',
-        'Team Zeta', 'Team Eta', 'Team Theta', 'Team Iota', 'Team Kappa'];
-    const groupSize = 4;
-    const groups: MockGroup[] = [];
-    const numGroups = Math.min(Math.ceil(students.length / groupSize), GROUP_NAMES.length);
-    for (let i = 0; i < numGroups; i++) {
-        const members = students.slice(i * groupSize, (i + 1) * groupSize);
-        if (members.length === 0) break;
-        groups.push({ id: `g${i + 1}`, name: GROUP_NAMES[i], memberIds: members.map(m => m.studentId) });
-    }
-    return groups;
-}
-
-function getGroupForStudent(studentId: string, groups: MockGroup[]): MockGroup | undefined {
-    return groups.find(g => g.memberIds.includes(studentId));
-}
-
-function getGroupMembers(studentId: string, submissionsState: StudentSubmission[], groups: MockGroup[]): StudentSubmission[] {
-    const group = getGroupForStudent(studentId, groups);
-    if (!group) return [];
-    return submissionsState.filter(s => group.memberIds.includes(s.studentId) && s.studentId !== studentId);
-}
-
-=======
->>>>>>> origin/ree_update
 type SortField = 'studentName' | 'submittedAt' | 'autoScore' | 'finalGrade';
 type SortOrder = 'asc' | 'desc';
 
@@ -446,36 +80,16 @@ function scoreColor(score: number, max: number): string {
 
 export function AssignmentGrading() {
     const router = useRouter();
-<<<<<<< HEAD
-    const pathname = usePathname();
     const { courseId, assignmentId } = useParams() as { courseId: string; assignmentId: string };
     const [isDownloadingZip, setIsDownloadingZip] = useState(false);
 
-    // Detect if we're rendering inside the TA route space
-    const isTAContext = pathname?.includes('/student/teaching-assistant/');
-
-=======
-    const { courseId, assignmentId } = useParams() as { courseId: string; assignmentId: string };
-    const [isDownloadingZip, setIsDownloadingZip] = useState(false);
-
->>>>>>> origin/ree_update
     // Fetch from API
     const { data: apiAssignment, isLoading: isLoadingAssignment } = useAssignment(courseId, assignmentId);
     const { data: apiSubmissions, isLoading: isLoadingSubmissions, refetch: refetchSubmissions } = useSubmissions(assignmentId);
 
-<<<<<<< HEAD
-    // Try hardcoded meta first; then API data; then localStorage fallback
-    const meta: AssignmentMeta | undefined = useMemo(() => {
-        // 1. Hardcoded mock data (for legacy mock IDs like a1, a2, etc.)
-        const hardcoded = assignmentsMeta[assignmentId ?? ''];
-        if (hardcoded) return hardcoded;
-
-        // 2. API data (for real assignments from the database)
-=======
     // Derive assignment metadata from API data or localStorage fallback
     const meta: AssignmentMeta | undefined = useMemo(() => {
         // 1. API data (for real assignments from the database)
->>>>>>> origin/ree_update
         if (apiAssignment) {
             return {
                 name: apiAssignment.name ?? 'Untitled',
@@ -500,11 +114,7 @@ export function AssignmentGrading() {
             } as AssignmentMeta;
         }
 
-<<<<<<< HEAD
-        // 3. localStorage fallback (for recently created assignments not yet refetched)
-=======
         // 2. localStorage fallback (for recently created assignments not yet refetched)
->>>>>>> origin/ree_update
         try {
             const stored: any[] = JSON.parse(localStorage.getItem('createdAssignments') || '[]');
             const found = stored.find((a: any) => a.id === assignmentId);
@@ -536,11 +146,7 @@ export function AssignmentGrading() {
     // Map API submissions to StudentSubmission format
     const submissions = useMemo(() => {
         if (!apiSubmissions || isLoadingSubmissions) {
-<<<<<<< HEAD
-            return makeMockSubmissions(assignmentId ?? '', courseId ?? 'cs-1001');
-=======
             return [];
->>>>>>> origin/ree_update
         }
 
         const getInitials = (name: string) =>
@@ -551,16 +157,9 @@ export function AssignmentGrading() {
                 .toUpperCase()
                 .slice(0, 2);
 
-<<<<<<< HEAD
-        const normalizedApiSubs = (apiSubmissions as any[]).map((sub: any) => {
-            const studentPk = Number(sub.student_id ?? sub.studentId ?? sub.student?.id ?? -1);
-            const studentName = sub.student?.name ?? 'Student';
-            const studentIdentifier = sub.student?.student_id ?? String(sub.studentId ?? studentPk);
-=======
         return (apiSubmissions as any[]).map((sub: any) => {
             const studentName = sub.student?.name ?? 'Student';
             const studentIdentifier = sub.student?.student_id ?? String(sub.studentId ?? sub.student_id ?? sub.student?.id ?? '');
->>>>>>> origin/ree_update
             const submittedAt = sub.created_at ?? sub.submittedAt ?? null;
             const score = sub.score ?? sub.grade?.totalScore ?? null;
             const maxScore = sub.max_score ?? sub.grade?.maxScore ?? meta?.totalPoints ?? 100;
@@ -568,71 +167,6 @@ export function AssignmentGrading() {
 
             return {
                 id: String(sub.id),
-<<<<<<< HEAD
-                studentPk,
-                studentName,
-                studentIdentifier,
-                submittedAt,
-                score,
-                maxScore,
-                status,
-            };
-        });
-
-        const allStudents = getStudentsForCourse(courseId ?? 'cs-1001');
-
-        // Real courses may not exist in local mock roster. In that case, show API submissions directly.
-        if (!allStudents || allStudents.length === 0) {
-            return normalizedApiSubs.map((submission) => ({
-                id: submission.id,
-                studentName: submission.studentName,
-                studentId: submission.studentIdentifier,
-                avatarInitials: getInitials(submission.studentName),
-                submittedAt: submission.submittedAt,
-                autoScore: submission.score,
-                finalGrade: submission.score,
-                maxPoints: submission.maxScore,
-                status: submission.status,
-                late: false,
-                flagged: false,
-            } as StudentSubmission));
-        }
-
-        const submissionMap = new Map<number, (typeof normalizedApiSubs)[number]>();
-        normalizedApiSubs.forEach((sub) => {
-            if (sub.studentPk >= 0) submissionMap.set(sub.studentPk, sub);
-        });
-
-        return allStudents.map((student) => {
-            const submission = submissionMap.get(Number(student.id));
-
-            if (submission) {
-                return {
-                    id: submission.id,
-                    studentName: submission.studentName || student.name,
-                    studentId: submission.studentIdentifier || student.studentId,
-                    avatarInitials: getInitials(submission.studentName || student.name),
-                    submittedAt: submission.submittedAt,
-                    autoScore: submission.score,
-                    finalGrade: submission.score,
-                    maxPoints: submission.maxScore,
-                    status: submission.status,
-                    late: false,
-                    flagged: false,
-                } as StudentSubmission;
-            }
-
-            return {
-                id: `nosub-${student.id}`,
-                studentName: student.name,
-                studentId: student.studentId,
-                avatarInitials: student.avatarInitials,
-                submittedAt: null,
-                autoScore: null,
-                finalGrade: null,
-                maxPoints: meta?.totalPoints || 100,
-                status: 'not-submitted' as const,
-=======
                 studentName,
                 studentId: studentIdentifier,
                 avatarInitials: getInitials(studentName),
@@ -641,25 +175,15 @@ export function AssignmentGrading() {
                 finalGrade: score,
                 maxPoints: maxScore,
                 status,
->>>>>>> origin/ree_update
                 late: false,
                 flagged: false,
             } as StudentSubmission;
         });
-<<<<<<< HEAD
-    }, [apiSubmissions, isLoadingSubmissions, assignmentId, courseId, meta]);
-=======
     }, [apiSubmissions, isLoadingSubmissions, meta]);
->>>>>>> origin/ree_update
 
     const [submissionsState, setSubmissionsState] = useState<StudentSubmission[]>(submissions);
     // Update local state when API data changes
     useEffect(() => { setSubmissionsState(submissions); }, [submissions]);
-<<<<<<< HEAD
-    const mockGroups = useMemo(() => buildMockGroups(courseId ?? 'cs-1001'), [courseId]);
-
-=======
->>>>>>> origin/ree_update
     /* ─── Grade submission handler ─── */
     const handleSubmitGrade = (studentId: string, grade: number, _feedback: string) => {
         setSubmissionsState(prev => prev.map(s =>
@@ -669,23 +193,9 @@ export function AssignmentGrading() {
         ));
     };
 
-<<<<<<< HEAD
-    /* ─── Apply grade to all group members ─── */
-    const handleApplyGroupGrade = (sourceStudentId: string, grade: number) => {
-        const group = getGroupForStudent(
-            submissionsState.find(s => s.id === sourceStudentId)?.studentId ?? '', mockGroups
-        );
-        if (!group) return;
-        setSubmissionsState(prev => prev.map(s =>
-            group.memberIds.includes(s.studentId)
-                ? { ...s, finalGrade: grade, status: 'graded' as const }
-                : s
-        ));
-=======
     /* ─── Apply grade to all group members (placeholder until group API is available) ─── */
     const handleApplyGroupGrade = (_sourceStudentId: string, _grade: number) => {
         // No-op: group membership is not yet available from the API
->>>>>>> origin/ree_update
     };
 
     const [activeTab, setActiveTab] = useState('all');
@@ -727,8 +237,6 @@ export function AssignmentGrading() {
         }
     };
 
-<<<<<<< HEAD
-=======
     /* ─── Grade All Pending handler ─── */
     const [isGradingAll, setIsGradingAll] = useState(false);
     const handleGradeAll = async () => {
@@ -746,7 +254,6 @@ export function AssignmentGrading() {
         }
     };
 
->>>>>>> origin/ree_update
     /* ─── Tab counts ─── */
     const counts = useMemo(() => {
         const all = submissionsState.length;
@@ -809,35 +316,10 @@ export function AssignmentGrading() {
     const gradableStudents = sorted.filter(s => s.status !== 'not-submitted');
     const currentGradingStudent = gradingStudentIdx !== null ? gradableStudents[gradingStudentIdx] : null;
 
-<<<<<<< HEAD
-    // Build breadcrumbs and back path based on context
-    const homeBreadcrumbs = isTAContext
-        ? [
-            { label: 'Dashboard', href: '/student' },
-            { label: 'Teaching Assistant', href: '/student/teaching-assistant' },
-            { label: lookupCourseCode(courseId!), href: `/student/teaching-assistant/${courseId}/grading` },
-            { label: 'Grading' },
-          ]
-        : [
-            { label: 'Courses', href: '/courses' },
-            { label: lookupCourseCode(courseId!), href: `/courses/${courseId}` },
-            { label: 'Grading' },
-          ];
-
-    const backPath = isTAContext
-        ? `/student/teaching-assistant/${courseId}/grading`
-        : `/courses/${courseId}`;
-
-    if (!courseId || !assignmentId || (!meta && !isLoadingAssignment)) {
-        return (
-            <PageLayout>
-                <TopNav breadcrumbs={[homeBreadcrumbs[0]]} />
-=======
     if (!courseId || !assignmentId || (!meta && !isLoadingAssignment)) {
         return (
             <PageLayout>
                 <TopNav breadcrumbs={[{ label: 'Courses', href: '/courses' }]} />
->>>>>>> origin/ree_update
                 <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 64px)' }}>
                     <div className="text-center">
                         <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '16px' }}>Assignment Not Found</h2>
@@ -851,11 +333,7 @@ export function AssignmentGrading() {
     if (isLoadingAssignment && !meta) {
         return (
             <PageLayout>
-<<<<<<< HEAD
-                <TopNav breadcrumbs={[homeBreadcrumbs[0]]} />
-=======
                 <TopNav breadcrumbs={[{ label: 'Courses', href: '/courses' }]} />
->>>>>>> origin/ree_update
                 <div className="flex items-center justify-center gap-3" style={{ minHeight: 'calc(100vh - 64px)', color: 'var(--color-text-mid)' }}>
                     <Loader2 className="w-5 h-5 animate-spin" />
                     <span>Loading assignment…</span>
@@ -864,12 +342,6 @@ export function AssignmentGrading() {
         );
     }
 
-<<<<<<< HEAD
-    return (
-        <PageLayout>
-            <TopNav breadcrumbs={[
-                ...homeBreadcrumbs,
-=======
     if (!meta) return null;
 
     return (
@@ -878,39 +350,21 @@ export function AssignmentGrading() {
                 { label: 'Courses', href: '/courses' },
                 { label: lookupCourseCode(courseId!), href: `/courses/${courseId}` },
                 { label: 'Grading' },
->>>>>>> origin/ree_update
                 { label: meta.name },
             ]} />
 
             <div className="flex h-[calc(100vh-64px)]">
-<<<<<<< HEAD
-                <Sidebar
-                    activeItem={isTAContext ? 'grading' : 'assignments'}
-                    userRole={isTAContext ? 'ta' : undefined}
-                    backPath={isTAContext ? '/student/teaching-assistant' : undefined}
-                />
-=======
                 <Sidebar activeItem="assignments" />
->>>>>>> origin/ree_update
 
                 <main className="flex-1 overflow-auto p-8">
                     {/* Back link */}
                     <button
-<<<<<<< HEAD
-                        onClick={() => router.push(backPath)}
-                        className="flex items-center gap-1 mb-5 hover:underline transition-colors"
-                        style={{ fontSize: '13px', color: '#6B0000' }}
-                    >
-                        <ChevronLeft className="w-5 h-5" />
-                        {isTAContext ? 'Back to Grading' : 'Back to Assignments'}
-=======
                         onClick={() => router.push(`/courses/${courseId}`)}
                         className="flex items-center gap-1 mb-5 hover:underline transition-colors"
                         style={{ fontSize: '13px', color: 'var(--color-primary)' }}
                     >
                         <ChevronLeft className="w-5 h-5" />
                         Back to Assignments
->>>>>>> origin/ree_update
                     </button>
 
                     {/* Page Header */}
@@ -976,8 +430,6 @@ export function AssignmentGrading() {
                                 <Download className="w-4 h-4 mr-2" />
                                 {isDownloadingZip ? 'Downloading...' : 'Download submissions (ZIP)'}
                             </Button>
-<<<<<<< HEAD
-=======
                             <Button
                                 className="h-9 text-white"
                                 style={{ backgroundColor: 'var(--color-primary)' }}
@@ -990,7 +442,6 @@ export function AssignmentGrading() {
                                     <><Zap className="w-4 h-4 mr-2" /> Grade All Pending</>
                                 )}
                             </Button>
->>>>>>> origin/ree_update
                         </div>
                     </div>
 
@@ -1337,22 +788,11 @@ export function AssignmentGrading() {
                                                                         {rowFlagged && <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#FF6B00' }} />}
                                                                         <span style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>{sub.studentName}</span>
                                                                     </div>
-<<<<<<< HEAD
-                                                                    {meta.isGroupAssignment && (() => {
-                                                                        const grp = getGroupForStudent(sub.studentId, mockGroups);
-                                                                        return grp ? (
-                                                                            <span style={{ fontSize: '11px', color: '#6B0000', fontWeight: 500 }}>
-                                                                                {grp.name}
-                                                                            </span>
-                                                                        ) : null;
-                                                                    })()}
-=======
                                                                     {meta.isGroupAssignment && (
                                                                         <span style={{ fontSize: '11px', color: '#6B0000', fontWeight: 500 }}>
                                                                             Group Assignment
                                                                         </span>
                                                                     )}
->>>>>>> origin/ree_update
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -1521,41 +961,6 @@ export function AssignmentGrading() {
             </Dialog>
 
             {/* Grading Modal */}
-<<<<<<< HEAD
-            {currentGradingStudent && gradingStudentIdx !== null && (() => {
-                const studentGroup = meta.isGroupAssignment ? getGroupForStudent(currentGradingStudent.studentId, mockGroups) : undefined;
-                const groupMembers = meta.isGroupAssignment ? getGroupMembers(currentGradingStudent.studentId, submissionsState, mockGroups) : [];
-                return (
-                    <GradingModal
-                        studentName={currentGradingStudent.studentName}
-                        assignmentName={meta.name}
-                        submittedAt={currentGradingStudent.submittedAt ?? ''}
-                        autoScore={currentGradingStudent.autoScore}
-                        maxPoints={currentGradingStudent.maxPoints}
-                        rubric={meta.rubric}
-                        hasPrev={gradingStudentIdx > 0}
-                        hasNext={gradingStudentIdx < gradableStudents.length - 1}
-                        onPrev={() => setGradingStudentIdx(prev => (prev !== null && prev > 0 ? prev - 1 : prev))}
-                        onNext={() => setGradingStudentIdx(prev => (prev !== null && prev < gradableStudents.length - 1 ? prev + 1 : prev))}
-                        onClose={() => setGradingStudentIdx(null)}
-                        onSubmitGrade={(grade, fb) => {
-                            handleSubmitGrade(currentGradingStudent.id, grade, fb);
-                            refetchSubmissions();
-                        }}
-                        onSaveDraft={(grade, fb) => handleSubmitGrade(currentGradingStudent.id, grade, fb)}
-                        isGroupAssignment={meta.isGroupAssignment}
-                        groupName={studentGroup?.name}
-                        groupMemberNames={groupMembers.map(m => m.studentName)}
-                        submissionId={currentGradingStudent.id}
-                        onApplyToGroup={meta.isGroupAssignment && studentGroup ? (grade: number) => {
-                            setApplyGroupStudent(currentGradingStudent);
-                            setApplyGroupGrade(grade);
-                            setShowApplyGroupDialog(true);
-                        } : undefined}
-                    />
-                );
-            })()}
-=======
             {currentGradingStudent && gradingStudentIdx !== null && (
                 <GradingModal
                     studentName={currentGradingStudent.studentName}
@@ -1581,7 +986,6 @@ export function AssignmentGrading() {
                     onApplyToGroup={undefined}
                 />
             )}
->>>>>>> origin/ree_update
 
             {/* Apply Grade to Group Dialog */}
             <Dialog open={showApplyGroupDialog} onOpenChange={setShowApplyGroupDialog}>
@@ -1592,12 +996,7 @@ export function AssignmentGrading() {
                             Apply Grade to Group Members
                         </DialogTitle>
                         <DialogDescription style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '8px' }}>
-<<<<<<< HEAD
-                            Apply the same grade from <strong style={{ color: '#2D2D2D' }}>{applyGroupStudent?.studentName}</strong> to all other members of{' '}
-                            <strong style={{ color: '#6B0000' }}>{applyGroupStudent ? getGroupForStudent(applyGroupStudent.studentId, mockGroups)?.name : ''}</strong>.
-=======
                             Apply the same grade from <strong style={{ color: '#2D2D2D' }}>{applyGroupStudent?.studentName}</strong> to all other members of the group.
->>>>>>> origin/ree_update
                         </DialogDescription>
                     </DialogHeader>
 
@@ -1613,41 +1012,9 @@ export function AssignmentGrading() {
 
                     {/* Members who will receive the grade */}
                     <div className="mt-3">
-<<<<<<< HEAD
-                        <p style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D', marginBottom: '8px' }}>
-                            Group members who will receive this grade:
-                        </p>
-                        <div className="space-y-2">
-                            {applyGroupStudent && getGroupMembers(applyGroupStudent.studentId, submissionsState, mockGroups).map(member => (
-                                <div key={member.id} className="flex items-center justify-between p-3 rounded-lg border" style={{ borderColor: 'var(--color-border)' }}>
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-7 h-7 rounded-full flex items-center justify-center" style={{ backgroundColor: 'var(--color-primary-bg)', color: '#6B0000', fontSize: '10px', fontWeight: 700 }}>
-                                            {member.avatarInitials}
-                                        </div>
-                                        <div>
-                                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>{member.studentName}</span>
-                                            <span style={{ fontSize: '11px', color: '#8A8A8A', marginLeft: '8px' }}>{member.studentId}</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        {member.finalGrade !== null ? (
-                                            <span style={{ fontSize: '12px', color: '#8A8A8A' }}>
-                                                Current: {member.finalGrade}/{member.maxPoints} → <strong style={{ color: '#6B0000' }}>{applyGroupGrade}</strong>
-                                            </span>
-                                        ) : (
-                                            <span style={{ fontSize: '12px', color: '#2D6A2D', fontWeight: 500 }}>
-                                                Will receive: {applyGroupGrade}/{member.maxPoints}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-=======
                         <p style={{ fontSize: '13px', fontWeight: 500, color: '#8A8A8A' }}>
                             Group membership data is not yet available from the API.
                         </p>
->>>>>>> origin/ree_update
                     </div>
 
                     {groupGradeApplied && (

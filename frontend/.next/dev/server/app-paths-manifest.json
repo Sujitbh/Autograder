@@ -1,7 +1,5 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/courses/[courseId]/assignment/new/page": "app/courses/[courseId]/assignment/new/page.js",
-  "/courses/[courseId]/assignments/[assignmentId]/grading/page": "app/courses/[courseId]/assignments/[assignmentId]/grading/page.js",
   "/courses/[courseId]/grading/page": "app/courses/[courseId]/grading/page.js",
   "/courses/[courseId]/groups/page": "app/courses/[courseId]/groups/page.js",
   "/courses/[courseId]/page": "app/courses/[courseId]/page.js",
@@ -11,11 +9,15 @@
   "/courses/page": "app/courses/page.js",
   "/login/page": "app/login/page.js",
   "/page": "app/page.js",
-  "/signup/page": "app/signup/page.js",
-  "/student/courses/[id]/assignments/[assignmentId]/page": "app/student/courses/[id]/assignments/[assignmentId]/page.js",
+  "/student/courses/[id]/classmates/page": "app/student/courses/[id]/classmates/page.js",
+  "/student/courses/[id]/grades/page": "app/student/courses/[id]/grades/page.js",
+  "/student/courses/[id]/groups/page": "app/student/courses/[id]/groups/page.js",
   "/student/courses/[id]/page": "app/student/courses/[id]/page.js",
   "/student/page": "app/student/page.js",
-  "/student/teaching-assistant/[courseId]/assignments/[assignmentId]/grading/page": "app/student/teaching-assistant/[courseId]/assignments/[assignmentId]/grading/page.js",
-  "/student/teaching-assistant/[courseId]/grading/page": "app/student/teaching-assistant/[courseId]/grading/page.js",
-  "/student/teaching-assistant/[courseId]/students/page": "app/student/teaching-assistant/[courseId]/students/page.js"
+  "/ta/courses/[courseId]/gradebook/page": "app/ta/courses/[courseId]/gradebook/page.js",
+  "/ta/courses/[courseId]/grading/page": "app/ta/courses/[courseId]/grading/page.js",
+  "/ta/courses/[courseId]/page": "app/ta/courses/[courseId]/page.js",
+  "/ta/courses/[courseId]/students/page": "app/ta/courses/[courseId]/students/page.js",
+  "/ta/courses/[courseId]/submissions/page": "app/ta/courses/[courseId]/submissions/page.js",
+  "/ta/page": "app/ta/page.js"
 }

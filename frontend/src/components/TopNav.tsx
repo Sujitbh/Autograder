@@ -1,9 +1,5 @@
-<<<<<<< HEAD
-import { ChevronRight, ChevronDown, GraduationCap, LogOut, Settings, User, Bell, BookOpen, Moon, Sun, StickyNote, CalendarDays } from 'lucide-react';
-=======
 import { ChevronRight, ChevronDown, GraduationCap, LogOut, User, Bell, BookOpen, Moon, Sun, StickyNote, CalendarDays, ArrowLeftRight } from 'lucide-react';
 import { LiveClock } from './LiveClock';
->>>>>>> origin/ree_update
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,19 +7,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-<<<<<<< HEAD
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { useTheme } from '../utils/ThemeContext';
-import { useNotesPanel } from './PageLayout';
-=======
 import { useRouter, usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useTheme } from '../utils/ThemeContext';
 import { useNotesPanel } from './PageLayout';
 import { useTAStatus } from '@/hooks/queries/useTADashboard';
 import { useAuth } from '@/utils/AuthContext';
->>>>>>> origin/ree_update
 
 interface TopNavProps {
   breadcrumbs?: { label: string; href?: string }[];
@@ -73,22 +62,6 @@ export function TopNav({
   userName: userNameProp,
   userEmail: userEmailProp,
   hasUnreadNotifications = false
-<<<<<<< HEAD
-}: TopNavProps) {
-  const router = useRouter();
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const { isDark, toggleTheme } = useTheme();
-  const { notesPanelOpen, toggleNotesPanel } = useNotesPanel();
-
-  // Read current user from localStorage, fall back to props or defaults
-  const currentUser = (() => {
-    try {
-      const stored = localStorage.getItem('autograde_current_user');
-      if (stored) return JSON.parse(stored);
-    } catch { }
-    return null;
-  })();
-=======
 }: Readonly<TopNavProps>) {
   const router = useRouter();
   const pathname = usePathname();
@@ -112,7 +85,6 @@ export function TopNav({
       router.push('/ta');
     }
   };
->>>>>>> origin/ree_update
 
   const userName = userNameProp ?? (
     currentUser
@@ -125,24 +97,12 @@ export function TopNav({
   const getInitials = (name: string) => {
     const parts = name.split(' ');
     if (parts.length >= 2) {
-<<<<<<< HEAD
-      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
-=======
       return `${parts[0][0]}${parts.at(-1)![0]}`.toUpperCase();
->>>>>>> origin/ree_update
     }
     return name.substring(0, 2).toUpperCase();
   };
 
   const handleSignOut = () => {
-<<<<<<< HEAD
-    // Clear session storage
-    localStorage.removeItem('autograde_auth');
-    localStorage.removeItem('autograde_current_user');
-    // Navigate to login
-    router.push('/login');
-    window.location.reload();
-=======
     // Use AuthContext logout which clears localStorage + React Query cache
     logout();
     // Navigate to login
@@ -160,7 +120,6 @@ export function TopNav({
     if (currentUser?.role === 'admin') return '/admin/account';
     if (currentUser?.role === 'student') return '/student/settings';
     return '/faculty/settings';
->>>>>>> origin/ree_update
   };
 
   return (
@@ -176,20 +135,12 @@ export function TopNav({
       }}
     >
       {/* Left Zone: Logo + App Name */}
-<<<<<<< HEAD
-      <div
-        className="flex items-center cursor-pointer"
-        onClick={() => router.push('/courses')}
-        role="button"
-        aria-label="Go to courses"
-=======
       <button
         className="flex items-center cursor-pointer"
         onClick={() => router.push(getHomeRoute())}
         type="button"
         aria-label="Go to courses"
         style={{ background: 'none', border: 'none', padding: 0 }}
->>>>>>> origin/ree_update
       >
         <GraduationCap
           className="text-white"
@@ -209,21 +160,13 @@ export function TopNav({
         >
           Autograder
         </span>
-<<<<<<< HEAD
-      </div>
-=======
       </button>
->>>>>>> origin/ree_update
 
       {/* Center Zone: Breadcrumb Trail (hidden on top-level pages) */}
       {breadcrumbs.length > 0 && (
         <div className="flex items-center gap-2">
           {breadcrumbs.map((crumb, index) => (
-<<<<<<< HEAD
-            <div key={index} className="flex items-center gap-2">
-=======
             <div key={crumb.label} className="flex items-center gap-2">
->>>>>>> origin/ree_update
               {index > 0 && (
                 <ChevronRight
                   className="text-white"
@@ -260,10 +203,6 @@ export function TopNav({
         </div>
       )}
 
-<<<<<<< HEAD
-      {/* Right Zone: Theme Toggle + Notification Bell + Divider + Profile */}
-      <div className="flex items-center gap-4">
-=======
       {/* Right Zone: Role Switcher + Theme Toggle + Notification Bell + Divider + Profile */}
       <div className="flex items-center gap-4">
         {/* TA ↔ Student Role Switcher */}
@@ -285,7 +224,6 @@ export function TopNav({
           </button>
         )}
 
->>>>>>> origin/ree_update
         {/* Dark Mode Toggle */}
         <button
           onClick={toggleTheme}
@@ -303,10 +241,7 @@ export function TopNav({
         <button
           className="relative hover:opacity-80 transition-opacity"
           aria-label="Notifications"
-<<<<<<< HEAD
-=======
           onClick={() => router.push(currentUser?.role === 'student' ? '/student/notifications' : '/faculty/notifications')}
->>>>>>> origin/ree_update
         >
           <Bell
             className="text-white"
@@ -364,12 +299,9 @@ export function TopNav({
           />
         </button>
 
-<<<<<<< HEAD
-=======
         {/* Live Date & Time */}
         <LiveClock variant="light" />
 
->>>>>>> origin/ree_update
         {/* Divider */}
         <div
           style={{
@@ -479,11 +411,7 @@ export function TopNav({
 
             {/* Row 2: Account Settings */}
             <DropdownMenuItem
-<<<<<<< HEAD
-              onClick={() => router.push('/faculty/settings')}
-=======
               onClick={() => router.push(getSettingsRoute())}
->>>>>>> origin/ree_update
               className="cursor-pointer"
               style={{ padding: '12px 16px' }}
             >

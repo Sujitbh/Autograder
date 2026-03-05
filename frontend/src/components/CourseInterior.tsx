@@ -51,11 +51,7 @@ function mapApiAssignment(a: any): Assignment {
 }
 
 // Current date for overdue logic
-<<<<<<< HEAD
-const NOW = new Date('2026-02-19');
-=======
 const NOW = new Date();
->>>>>>> origin/ree_update
 
 type SortField = 'name' | 'language' | 'dueDate' | 'submitted' | 'needsGrade' | 'status';
 type SortOrder = 'asc' | 'desc';
@@ -68,11 +64,7 @@ function getStatus(a: Assignment): 'draft' | 'open' | 'graded' | 'closed' {
   if (!a.published) return 'draft';
   const needsGrade = getNeedsGrade(a);
   if (needsGrade === 0 && a.submissions > 0) return 'graded';
-<<<<<<< HEAD
-  if (new Date(a.dueDate) < NOW && needsGrade === 0) return 'closed';
-=======
   if (a.dueDate && new Date(a.dueDate).getTime() > 0 && new Date(a.dueDate) < NOW && needsGrade === 0) return 'closed';
->>>>>>> origin/ree_update
   return 'open';
 }
 
@@ -82,10 +74,7 @@ function getSubmittedPct(a: Assignment): number {
 }
 
 function isOverdue(a: Assignment): boolean {
-<<<<<<< HEAD
-=======
   if (!a.dueDate) return false;
->>>>>>> origin/ree_update
   const status = getStatus(a);
   return new Date(a.dueDate) < NOW && status === 'open' && getNeedsGrade(a) > 0;
 }
@@ -200,11 +189,7 @@ export function CourseInterior() {
       switch (sortField) {
         case 'name': cmp = a.name.localeCompare(b.name); break;
         case 'language': cmp = a.language.localeCompare(b.language); break;
-<<<<<<< HEAD
-        case 'dueDate': cmp = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(); break;
-=======
         case 'dueDate': cmp = (a.dueDate ? new Date(a.dueDate).getTime() : 0) - (b.dueDate ? new Date(b.dueDate).getTime() : 0); break;
->>>>>>> origin/ree_update
         case 'submitted': cmp = getSubmittedPct(a) - getSubmittedPct(b); break;
         case 'needsGrade': cmp = getNeedsGrade(a) - getNeedsGrade(b); break;
         case 'status': cmp = (STATUS_ORDER[getStatus(a)] ?? 9) - (STATUS_ORDER[getStatus(b)] ?? 9); break;
@@ -335,324 +320,6 @@ export function CourseInterior() {
           )}
 
           {!isLoading && !fetchError && (<>
-<<<<<<< HEAD
-          {/* Search Bar */}
-          <div className="mb-4">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-light)]" />
-              <Input
-                placeholder="Search assignments..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 border-[var(--color-border)]"
-              />
-            </div>
-          </div>
-
-          {/* Filter Tabs with Counts */}
-          <div className="flex gap-1 mb-6 border-b-2" style={{ borderColor: 'var(--color-border)' }}>
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className="px-4 py-3 transition-colors relative flex items-center gap-2"
-                style={{
-                  color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-mid)',
-                  fontSize: '14px',
-                  fontWeight: activeTab === tab.id ? 600 : 400,
-                }}
-              >
-                {tab.label}
-                {tab.count > 0 && (
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      fontWeight: 600,
-                      backgroundColor: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-border)',
-                      color: activeTab === tab.id ? '#fff' : 'var(--color-text-mid)',
-                      padding: '1px 7px',
-                      borderRadius: '10px',
-                      lineHeight: '16px',
-                    }}
-                  >
-                    {tab.count}
-                  </span>
-                )}
-                {activeTab === tab.id && (
-                  <div
-                    className="absolute bottom-0 left-0 right-0"
-                    style={{ height: '2px', backgroundColor: 'var(--color-primary)' }}
-                  />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Assignments Table */}
-          {assignments.length === 0 ? (
-            /* Empty State: No Assignments at all */
-            <div className="text-center py-20">
-              <ClipboardX className="w-16 h-16 mx-auto mb-4" style={{ color: '#D9D9D9' }} />
-              <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '8px' }}>
-                No Assignments Yet
-              </p>
-              <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginBottom: '24px' }}>
-                Create your first assignment to get started.
-              </p>
-              <Button
-                onClick={() => router.push(`/courses/${courseId}/assignment/new`)}
-                className="text-white hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: 'var(--color-primary)' }}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                New Assignment
-              </Button>
-            </div>
-          ) : sorted.length === 0 ? (
-            /* Empty State: No Filter Results */
-            <div className="text-center py-20">
-              <FilterX className="w-12 h-12 mx-auto mb-4" style={{ color: '#D9D9D9' }} />
-              <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '8px' }}>
-                No {tabs.find(t => t.id === activeTab)?.label} Assignments
-              </p>
-              <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginBottom: '16px' }}>
-                Try selecting a different filter.
-              </p>
-              <button
-                onClick={() => { setActiveTab('all'); setSearchQuery(''); }}
-                style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}
-                className="hover:underline"
-              >
-                Clear filters
-              </button>
-            </div>
-          ) : (
-            <div className="rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
-              <table className="w-full">
-                <thead style={{ backgroundColor: 'var(--color-primary-bg)', borderBottom: '1px solid var(--color-border)' }}>
-                  <tr>
-                    <th className="text-left px-6 py-4">
-                      <button onClick={() => handleSort('name')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                        Assignment Name <SortIcon field="name" />
-                      </button>
-                    </th>
-                    <th className="text-left px-5 py-4 hidden md:table-cell">
-                      <button onClick={() => handleSort('language')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                        Language <SortIcon field="language" />
-                      </button>
-                    </th>
-                    <th className="text-left px-5 py-4">
-                      <button onClick={() => handleSort('dueDate')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                        Due Date <SortIcon field="dueDate" />
-                      </button>
-                    </th>
-                    <th className="text-left px-5 py-4">
-                      <button onClick={() => handleSort('submitted')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                        Submitted <SortIcon field="submitted" />
-                      </button>
-                    </th>
-                    <th className="text-left px-5 py-4">
-                      <button onClick={() => handleSort('needsGrade')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                        Needs Grade <SortIcon field="needsGrade" />
-                      </button>
-                    </th>
-                    <th className="text-left px-5 py-4">
-                      <button onClick={() => handleSort('status')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                        Status <SortIcon field="status" />
-                      </button>
-                    </th>
-                    <th className="text-left px-5 py-4" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sorted.map((assignment) => {
-                    const status = getStatus(assignment);
-                    const needsGrade = getNeedsGrade(assignment);
-                    const pct = getSubmittedPct(assignment);
-                    const overdue = isOverdue(assignment);
-
-                    // Submitted color per spec: green ≥80%, orange 50-79%, red <50%
-                    const submittedColor = pct >= 80 ? '#2D6A2D' : pct >= 50 ? '#8A5700' : '#8B0000';
-
-                    // Needs Grade color: gray if 0, orange 1-10, red >10, dash for draft
-                    const needsGradeColor = needsGrade === 0 ? '#8A8A8A' : needsGrade <= 10 ? '#8A5700' : '#8B0000';
-
-                    // Due date overdue if past AND status is open
-                    const dueDateOverdue = new Date(assignment.dueDate) < NOW && status === 'open';
-
-                    return (
-                      <tr
-                        key={assignment.id}
-                        className="border-b transition-colors"
-                        style={{
-                          borderColor: 'var(--color-border)',
-                          borderLeft: overdue ? '4px solid #8B0000' : '4px solid transparent',
-                          cursor: 'pointer',
-                        }}
-                        tabIndex={0}
-                        role="button"
-                        aria-label={`View grading for ${assignment.name}`}
-                        onClick={(e) => {
-                          if ((e.target as HTMLElement).closest('.actions-column')) return;
-                          router.push(`/courses/${courseId}/assignments/${assignment.id}/grading`);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            if (!(e.target as HTMLElement).closest('.actions-column')) {
-                              router.push(`/courses/${courseId}/assignments/${assignment.id}/grading`);
-                            }
-                          }
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F5EDED'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
-                      >
-                        {/* Assignment Name */}
-                        <td className="px-6 py-4">
-                          <span
-                            className="assignment-name"
-                            style={{ fontSize: '14px', fontWeight: 600, color: '#6B0000' }}
-                          >
-                            {assignment.name}
-                          </span>
-                        </td>
-
-                        {/* Language — hidden on small screens */}
-                        <td className="px-5 py-4 hidden md:table-cell">
-                          {getLanguageChip(assignment.language)}
-                        </td>
-
-                        {/* Due Date — overdue warning */}
-                        <td className="px-5 py-4">
-                          <div className="flex items-center gap-1.5">
-                            {dueDateOverdue && (
-                              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#8B0000' }} />
-                            )}
-                            <span style={{
-                              fontSize: '13px',
-                              color: dueDateOverdue ? '#8B0000' : '#595959',
-                              fontWeight: dueDateOverdue ? 500 : 400,
-                            }}>
-                              {new Date(assignment.dueDate).toLocaleDateString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric'
-                              })}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Submitted — stacked: "X / Y" + "(Z%)" */}
-                        <td className="px-5 py-4">
-                          <div>
-                            <span style={{ fontSize: '14px', fontWeight: 600, color: submittedColor }}>
-                              {assignment.submissions} / {assignment.totalStudents}
-                            </span>
-                            <br />
-                            <span style={{ fontSize: '12px', fontWeight: 400, color: submittedColor }}>
-                              ({pct}%)
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Needs Grade — color-coded count or dash for draft */}
-                        <td className="px-5 py-4">
-                          {status === 'draft' ? (
-                            <span style={{ fontSize: '16px', fontWeight: 700, color: '#8A8A8A' }}>—</span>
-                          ) : (
-                            <span style={{ fontSize: '16px', fontWeight: 700, color: needsGradeColor }}>
-                              {needsGrade}
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Status */}
-                        <td className="px-5 py-4">
-                          {getStatusBadge(status)}
-                        </td>
-
-                        {/* Actions — Edit, Duplicate, Delete (red on hover), More dropdown */}
-                        <td className="px-5 py-4 actions-column" onClick={(e) => e.stopPropagation()} style={{ cursor: 'default' }}>
-                          <div className="flex items-center gap-1">
-                            <button
-                              className="p-1.5 hover:bg-[var(--color-primary-bg)] rounded transition-colors"
-                              aria-label="Edit assignment"
-                              title="Edit"
-                              onClick={() => router.push(`/courses/${courseId}/assignments/${assignment.id}/grading`)}
-                            >
-                              <Edit className="w-4.5 h-4.5 text-[var(--color-text-mid)]" />
-                            </button>
-                            <button
-                              className="p-1.5 hover:bg-[var(--color-primary-bg)] rounded transition-colors"
-                              aria-label="Duplicate assignment"
-                              title="Duplicate"
-                              onClick={() => setDuplicateTarget(assignment)}
-                            >
-                              <Copy className="w-4.5 h-4.5 text-[var(--color-text-mid)]" />
-                            </button>
-                            <button
-                              className="p-1.5 rounded transition-colors group hover:bg-red-50"
-                              aria-label="Delete assignment"
-                              title="Delete"
-                              onClick={() => setDeleteTarget(assignment)}
-                            >
-                              <Trash2 className="w-4.5 h-4.5 text-[var(--color-text-mid)] group-hover:text-[#8B0000]" />
-                            </button>
-
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button
-                                  className="p-1.5 hover:bg-[var(--color-primary-bg)] rounded transition-colors"
-                                  aria-label="More actions"
-                                  title="More"
-                                >
-                                  <MoreVertical className="w-4.5 h-4.5 text-[var(--color-text-mid)]" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuItem
-                                  className="flex items-center gap-2 cursor-pointer"
-                                  onClick={() => router.push(`/courses/${courseId}/assignments/${assignment.id}/grading`)}
-                                >
-                                  <Eye className="w-4 h-4" /> View Submissions
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="flex items-center gap-2 cursor-pointer"
-                                  onClick={() => router.push(`/courses/${courseId}/reports`)}
-                                >
-                                  <Download className="w-4 h-4" /> Export Grades
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="flex items-center gap-2 cursor-pointer"
-                                  onClick={() => router.push(`/courses/${courseId}/reports`)}
-                                >
-                                  <BarChart3 className="w-4 h-4" /> View Reports
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  className="flex items-center gap-2 cursor-pointer"
-                                  onClick={() => {
-                                    const updated = assignments.map(a =>
-                                      a.id === assignment.id ? { ...a, published: false } : a
-                                    );
-                                    setAssignments(updated);
-                                  }}
-                                >
-                                  <Archive className="w-4 h-4" /> Archive
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-=======
             {/* Search Bar */}
             <div className="mb-4">
               <div className="relative max-w-md">
@@ -968,7 +635,6 @@ export function CourseInterior() {
                 </table>
               </div>
             )}
->>>>>>> origin/ree_update
           </>)}
         </main>
       </div>

@@ -44,11 +44,7 @@ function mapUser(u: BackendUser): User {
         email: u.email,
         title: '',
         department: '',
-<<<<<<< HEAD
-        role: 'faculty',
-=======
         role: u.role === 'admin' ? 'admin' : 'faculty',
->>>>>>> origin/ree_update
     };
 }
 

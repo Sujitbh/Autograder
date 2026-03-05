@@ -4,10 +4,6 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { courseService } from '@/services/api';
-<<<<<<< HEAD
-import { useAuth } from '@/utils/AuthContext';
-=======
->>>>>>> origin/ree_update
 import type { Course, CreateCourseDto, UpdateCourseDto } from '@/types';
 
 // ── Queries ─────────────────────────────────────────────────────────
@@ -30,35 +26,6 @@ export function useCourse(courseId: string | undefined) {
     });
 }
 
-<<<<<<< HEAD
-export function useTACourses() {
-    const { user } = useAuth();
-
-    return useQuery({
-        queryKey: ['courses', 'ta', user?.id ?? 'anonymous'],
-        queryFn: () => courseService.getMyCoursesByRole('ta'),
-        enabled: !!user,
-        staleTime: 5 * 60 * 1000, // 5 minutes
-        refetchOnWindowFocus: true,
-        refetchOnMount: 'always',
-    });
-}
-
-export function useStudentCourses() {
-    const { user } = useAuth();
-
-    return useQuery({
-        queryKey: ['courses', 'student', user?.id ?? 'anonymous'],
-        queryFn: () => courseService.getMyCoursesByRole('student'),
-        enabled: !!user,
-        staleTime: 5 * 60 * 1000, // 5 minutes
-        refetchOnWindowFocus: true,
-        refetchOnMount: 'always',
-    });
-}
-
-=======
->>>>>>> origin/ree_update
 // ── Mutations ───────────────────────────────────────────────────────
 
 export function useCreateCourse() {

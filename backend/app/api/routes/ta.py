@@ -1,11 +1,7 @@
 """
 TA (Grading Assistant) routes.
 """
-<<<<<<< HEAD
-from typing import List
-=======
 from typing import Annotated, List
->>>>>>> origin/ree_update
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -22,13 +18,10 @@ from app.services.ta_service import TAService
 
 router = APIRouter(prefix="/ta", tags=["ta"])
 
-<<<<<<< HEAD
-=======
 # ── Annotated dependency aliases ──
 DbSession = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
->>>>>>> origin/ree_update
 
 # ==================== Faculty: Send TA Invitations ====================
 
@@ -36,13 +29,8 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 def invite_ta(
     course_id: int,
     payload: TAInvitationCreate,
-<<<<<<< HEAD
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-=======
     db: DbSession,
     current_user: CurrentUser,
->>>>>>> origin/ree_update
 ):
     """
     Faculty invites a student to be a Grading Assistant for a course.
@@ -62,17 +50,6 @@ def invite_ta(
     return invitation
 
 
-<<<<<<< HEAD
-@router.get("/courses/{course_id}/invitations", response_model=List[TAInvitationOut])
-def get_course_ta_invitations(
-    course_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Get all TA invitations for a course (faculty view).
-    
-=======
 @router.get("/courses/{course_id}/invitations")
 def get_course_ta_invitations(
     course_id: int,
@@ -82,24 +59,16 @@ def get_course_ta_invitations(
     """
     Get all TA invitations for a course (faculty view).
 
->>>>>>> origin/ree_update
     Requires:
     - Current user must be the course instructor
     """
     require_role(current_user.role, {"faculty", "admin"})
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> origin/ree_update
     invitations = TAService.get_course_ta_invitations(
         db,
         course_id=course_id,
         faculty_id=current_user.id,
     )
-<<<<<<< HEAD
-    return invitations
-=======
     # Enrich with student names
     from app.models.user import User as UserModel
     result = []
@@ -116,20 +85,14 @@ def get_course_ta_invitations(
             "student_name": student.name if student else "Unknown",
         })
     return result
->>>>>>> origin/ree_update
 
 
 # ==================== Student: View & Respond to Invitations ====================
 
 @router.get("/me/invitations", response_model=List[TAInvitationWithDetails])
 def get_my_ta_invitations(
-<<<<<<< HEAD
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-=======
     db: DbSession,
     current_user: CurrentUser,
->>>>>>> origin/ree_update
 ):
     """
     Get all TA invitations for the current student.
@@ -154,13 +117,8 @@ def get_my_ta_invitations(
 def respond_to_ta_invitation(
     invitation_id: int,
     payload: TAInvitationResponse,
-<<<<<<< HEAD
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-=======
     db: DbSession,
     current_user: CurrentUser,
->>>>>>> origin/ree_update
 ):
     """
     Student accepts or declines a TA invitation.

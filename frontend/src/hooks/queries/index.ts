@@ -8,19 +8,11 @@ export {
     useCreateCourse,
     useUpdateCourse,
     useDeleteCourse,
-<<<<<<< HEAD
-    useTACourses,
-    useStudentCourses,
-=======
->>>>>>> origin/ree_update
 } from './useCourses';
 
 export {
     useAssignments,
-<<<<<<< HEAD
-=======
     useAllAssignments,
->>>>>>> origin/ree_update
     useAssignment,
     useCreateAssignment,
     useUpdateAssignment,
@@ -32,11 +24,6 @@ export {
     useSubmission,
     useSubmitCode,
     useGradeSubmission,
-<<<<<<< HEAD
-    useSubmissionsForGrading,
-    useOverrideSubmissionScore,
-=======
->>>>>>> origin/ree_update
 } from './useSubmissions';
 
 export {
@@ -46,8 +33,6 @@ export {
     useUpdateGrade,
     useExportGrades,
 } from './useGrades';
-<<<<<<< HEAD
-=======
 
 export {
     useAdminStats,
@@ -88,4 +73,3 @@ export {
     useTACourseStudents,
     useTAGradebook,
 } from './useTADashboard';
->>>>>>> origin/ree_update

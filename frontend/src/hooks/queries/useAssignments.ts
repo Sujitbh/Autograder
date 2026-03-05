@@ -16,8 +16,6 @@ export function useAssignments(courseId: string | undefined) {
     });
 }
 
-<<<<<<< HEAD
-=======
 /** Fetch ALL assignments across every course. */
 export function useAllAssignments() {
     return useQuery({
@@ -26,7 +24,6 @@ export function useAllAssignments() {
     });
 }
 
->>>>>>> origin/ree_update
 export function useAssignment(
     courseId: string | undefined,
     assignmentId: string | undefined

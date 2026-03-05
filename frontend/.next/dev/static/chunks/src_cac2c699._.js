@@ -113,9 +113,11 @@ __turbopack_context__.s([
 ]);
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/jsx-dev-runtime.js [app-client] (ecmascript)");
 var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/next/dist/compiled/react/index.js [app-client] (ecmascript)");
+var __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__ = __turbopack_context__.i("[project]/node_modules/@tanstack/react-query/build/modern/QueryClientProvider.js [app-client] (ecmascript)");
 ;
 var _s = __turbopack_context__.k.signature(), _s1 = __turbopack_context__.k.signature();
 'use client';
+;
 ;
 const AuthContext = /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["createContext"])({
     user: null,
@@ -159,6 +161,7 @@ function AuthProvider({ children }) {
     _s();
     const [user, setUser] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(null);
     const [isLoading, setIsLoading] = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useState"])(true);
+    const queryClient = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"])();
     // Restore session from localStorage on mount
     (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
         "AuthProvider.useEffect": ()=>{
@@ -184,15 +187,25 @@ function AuthProvider({ children }) {
     }["AuthProvider.useCallback[persistUser]"], []);
     const login = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "AuthProvider.useCallback[login]": (userData, token)=>{
+            // STEP 1: Clear ALL previous session state first
+            localStorage.removeItem('autograde_current_user');
+            localStorage.removeItem('autograde_auth');
+            localStorage.removeItem('autograde_token');
+            localStorage.removeItem('autograde_refresh_token');
+            setUser(null);
+            // STEP 2: Clear React Query cache so old user's data doesn't leak
+            queryClient.clear();
+            // STEP 3: Build and persist new user
             const u = buildUser(userData);
             persistUser(u);
-            // If a JWT token was provided, ensure it's stored for API calls
-            if (token && ("TURBOPACK compile-time value", "object") !== 'undefined') {
+            // STEP 4: Store JWT token for API calls
+            if (token && typeof globalThis.window !== 'undefined') {
                 localStorage.setItem('autograde_token', token);
             }
         }
     }["AuthProvider.useCallback[login]"], [
-        persistUser
+        persistUser,
+        queryClient
     ]);
     const signup = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "AuthProvider.useCallback[signup]": (userData)=>{
@@ -204,12 +217,18 @@ function AuthProvider({ children }) {
     ]);
     const logout = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "AuthProvider.useCallback[logout]": ()=>{
+            // Clear all auth state
             setUser(null);
             localStorage.removeItem('autograde_current_user');
             localStorage.removeItem('autograde_auth');
             localStorage.removeItem('autograde_token');
+            localStorage.removeItem('autograde_refresh_token');
+            // Clear React Query cache so no stale data from this user persists
+            queryClient.clear();
         }
-    }["AuthProvider.useCallback[logout]"], []);
+    }["AuthProvider.useCallback[logout]"], [
+        queryClient
+    ]);
     const updateUser = (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useCallback"])({
         "AuthProvider.useCallback[updateUser]": (patch)=>{
             setUser({
@@ -225,6 +244,26 @@ function AuthProvider({ children }) {
             }["AuthProvider.useCallback[updateUser]"]);
         }
     }["AuthProvider.useCallback[updateUser]"], []);
+    // Listen for forced sign-out from the API interceptor (e.g. expired token)
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "AuthProvider.useEffect": ()=>{
+            const handleSignout = {
+                "AuthProvider.useEffect.handleSignout": ()=>{
+                    logout();
+                    // Redirect to login
+                    if ("TURBOPACK compile-time truthy", 1) {
+                        window.location.href = '/login';
+                    }
+                }
+            }["AuthProvider.useEffect.handleSignout"];
+            window.addEventListener('auth:signout', handleSignout);
+            return ({
+                "AuthProvider.useEffect": ()=>window.removeEventListener('auth:signout', handleSignout)
+            })["AuthProvider.useEffect"];
+        }
+    }["AuthProvider.useEffect"], [
+        logout
+    ]);
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(AuthContext.Provider, {
         value: {
             user,
@@ -239,11 +278,15 @@ function AuthProvider({ children }) {
         children: children
     }, void 0, false, {
         fileName: "[project]/src/utils/AuthContext.tsx",
-        lineNumber: 145,
+        lineNumber: 177,
         columnNumber: 9
     }, this);
 }
-_s(AuthProvider, "GURz+hyyg54jWcAMnBdqycOZOq0=");
+_s(AuthProvider, "j8FMDVmFL1FpTwecyKfDggYUU3o=", false, function() {
+    return [
+        __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f40$tanstack$2f$react$2d$query$2f$build$2f$modern$2f$QueryClientProvider$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useQueryClient"]
+    ];
+});
 _c = AuthProvider;
 function useAuth() {
     _s1();

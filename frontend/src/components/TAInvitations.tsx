@@ -4,10 +4,7 @@ import { useState, useEffect } from 'react';
 import { BookOpen, Check, X, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { taService } from '@/services/api/taService';
-<<<<<<< HEAD
-=======
 import { useAuth } from '@/utils/AuthContext';
->>>>>>> origin/ree_update
 
 interface TAInvitation {
   id: number;
@@ -23,22 +20,14 @@ interface TAInvitationsProps {
   onAccepted?: () => void;
 }
 
-<<<<<<< HEAD
-export function TAInvitations({ onAccepted }: TAInvitationsProps) {
-=======
 export function TAInvitations({ onAccepted }: Readonly<TAInvitationsProps>) {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
->>>>>>> origin/ree_update
   const [invitations, setInvitations] = useState<TAInvitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [respondingId, setRespondingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-<<<<<<< HEAD
-    loadInvitations();
-  }, []);
-=======
     // Only load invitations if authentication is ready and user is authenticated
     if (!authLoading && isAuthenticated) {
       loadInvitations();
@@ -47,22 +36,15 @@ export function TAInvitations({ onAccepted }: Readonly<TAInvitationsProps>) {
       setLoading(false);
     }
   }, [authLoading, isAuthenticated]);
->>>>>>> origin/ree_update
 
   const loadInvitations = async () => {
     try {
       setLoading(true);
-<<<<<<< HEAD
-=======
       setError(null);
->>>>>>> origin/ree_update
       const data = await taService.getMyInvitations();
       setInvitations(data);
     } catch (err) {
       console.error('Failed to load TA invitations:', err);
-<<<<<<< HEAD
-      setError('Failed to load invitations');
-=======
       // Don't show error message for authentication issues - just silently fail
       if (err instanceof Error && err.message.includes('authenticated')) {
         // Silent fail for auth issues
@@ -70,7 +52,6 @@ export function TAInvitations({ onAccepted }: Readonly<TAInvitationsProps>) {
       } else {
         setError('Failed to load invitations');
       }
->>>>>>> origin/ree_update
     } finally {
       setLoading(false);
     }

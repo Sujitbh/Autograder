@@ -13,16 +13,11 @@ router = APIRouter(prefix="/student-dashboard", tags=["student-dashboard"])
 @router.get("/stats")
 def student_dashboard_stats(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     require_role(user.role, {"student"})
-<<<<<<< HEAD
     # Get enrolled courses — only where role is "student" (not TA/instructor)
     enrollments = db.query(Enrollment).filter(
         Enrollment.user_id == user.id,
         Enrollment.role == "student",
     ).all()
-=======
-    # Get enrolled courses
-    enrollments = db.query(Enrollment).filter(Enrollment.user_id == user.id).all()
->>>>>>> origin/ree_update
     course_ids = [e.course_id for e in enrollments]
     courses = db.query(Course).filter(Course.id.in_(course_ids)).all()
 
@@ -77,15 +72,11 @@ def student_assignment_results(
 ):
     """List student assignments with latest submission status + score."""
     require_role(user.role, {"student"})
-<<<<<<< HEAD
     # Only include courses where user is enrolled as a student (not TA/instructor)
     enrollments = db.query(Enrollment).filter(
         Enrollment.user_id == user.id,
         Enrollment.role == "student",
     ).all()
-=======
-    enrollments = db.query(Enrollment).filter(Enrollment.user_id == user.id).all()
->>>>>>> origin/ree_update
     course_ids = [e.course_id for e in enrollments]
     if not course_ids:
         return {"results": []}
