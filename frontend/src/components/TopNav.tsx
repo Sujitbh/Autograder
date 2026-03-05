@@ -118,6 +118,7 @@ export function TopNav({
 
   const getSettingsRoute = () => {
     if (currentUser?.role === 'admin') return '/admin/account';
+    if (isInTAView) return '/ta/settings';
     if (currentUser?.role === 'student') return '/student/settings';
     return '/faculty/settings';
   };
