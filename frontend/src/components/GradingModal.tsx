@@ -1,0 +1,481 @@
+import { X, CheckCircle, ChevronLeft, ChevronRight, Save, Send, Users, Download, FileText, Eye } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { submissionService } from '@/services/api';
+import { useOverrideSubmissionScore } from '@/hooks/queries';
+import { FilePreview } from './FilePreview';
+
+interface RubricItem {
+  name: string;
+  description?: string;
+  maxPoints: number;
+}
+
+interface GradingModalProps {
+  onClose: () => void;
+  studentName?: string;
+  assignmentName?: string;
+  submittedAt?: string;
+  autoScore?: number | null;
+  maxPoints?: number;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  onPrev?: () => void;
+  onNext?: () => void;
+  /* Rubric from assignment meta */
+  rubric?: RubricItem[];
+  /* Callbacks */
+  onSubmitGrade?: (grade: number, feedback: string) => void;
+  onSaveDraft?: (grade: number, feedback: string) => void;
+  /* Group grading */
+  isGroupAssignment?: boolean;
+  groupName?: string;
+  groupMemberNames?: string[];
+  onApplyToGroup?: (grade: number) => void;
+  /* Submission details for backend integration */
+  submissionId?: string;
+}
+
+export function GradingModal({
+  onClose,
+  studentName = 'John Smith',
+  assignmentName = 'Variables and Data Types',
+  submittedAt = '2026-02-18T14:30:00',
+  autoScore = 85,
+  maxPoints = 100,
+  hasPrev = false,
+  hasNext = false,
+  onPrev,
+  onNext,
+  rubric,
+  onSubmitGrade,
+  onSaveDraft,
+  isGroupAssignment = false,
+  groupName,
+  submissionId,
+}: GradingModalProps) {
+  const overrideScoreMutation = useOverrideSubmissionScore();
+
+
+  const [files, setFiles] = useState<Array<{id: number; filename: string; file_size: number | null}>>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedFileForPreview, setSelectedFileForPreview] = useState<{id: number; filename: string} | null>(null);
+
+  // Helper function to check if file can be previewed (text/code files only)
+  const canPreviewFile = (filename: string): boolean => {
+    const ext = filename.toLowerCase().match(/\.[^.]+$/);
+    if (!ext) return false;
+    
+    const textExtensions = [
+      '.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.cpp', '.c', '.h', '.hpp',
+      '.cs', '.rb', '.go', '.rs', '.php', '.swift', '.kt', '.scala', '.r', '.m',
+      '.html', '.htm', '.xml', '.css', '.scss', '.sass', '.less', '.sql',
+      '.sh', '.bash', '.zsh', '.yml', '.yaml', '.json', '.md', '.txt', '.log',
+      '.ini', '.cfg', '.conf', '.dockerfile', '.gitignore', '.env'
+    ];
+    
+    return textExtensions.includes(ext[0]);
+  };
+
+
+
+  const defaultRubric: RubricItem[] = [
+    { name: 'Code Correctness', maxPoints: 50 },
+    { name: 'Code Style', maxPoints: 20 },
+    { name: 'Documentation', maxPoints: 30 },
+  ];
+  const rubricCriteria = rubric && rubric.length > 0 ? rubric : defaultRubric;
+
+  // Stateful scores per rubric criterion — initialise from autoScore proportionally, or 0
+  const [rubricScores, setRubricScores] = useState<number[]>(() => {
+    const totalMax = rubricCriteria.reduce((s, c) => s + c.maxPoints, 0);
+    if (autoScore != null && totalMax > 0) {
+      return rubricCriteria.map(c => Math.round((autoScore / totalMax) * c.maxPoints));
+    }
+    return rubricCriteria.map(() => 0);
+  });
+
+  const [feedback, setFeedback] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [savedDraft, setSavedDraft] = useState(false);
+
+  const getTotalScore = () => rubricScores.reduce((sum, s) => sum + s, 0);
+  const getTotalMaxPoints = () => rubricCriteria.reduce((sum, c) => sum + c.maxPoints, 0);
+
+  const updateRubricScore = (idx: number, value: number) => {
+    setRubricScores(prev => {
+      const next = [...prev];
+      next[idx] = Math.max(0, Math.min(value, rubricCriteria[idx].maxPoints));
+      return next;
+    });
+  };
+
+  /* ─── Load submitted files ─── */
+  useEffect(() => {
+    if (submissionId) {
+      setIsLoadingFiles(true);
+      submissionService.getSubmissionFiles(submissionId)
+        .then(setFiles)
+        .catch(err => console.error('Failed to load files:', err))
+        .finally(() => setIsLoadingFiles(false));
+    }
+  }, [submissionId]);
+
+  /* ─── Handle file download ─── */
+  const handleDownloadFile = async (fileId: number, filename: string) => {
+    try {
+      const blob = await submissionService.downloadFile(fileId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download file:', err);
+      alert('Failed to download file');
+    }
+  };
+
+  /* ─── Save grade to backend ─── */
+  const handleSaveGradeToBackend = async () => {
+    if (!submissionId) {
+      // Fallback to callback if no submission ID
+      onSubmitGrade?.(getTotalScore(), feedback);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await overrideScoreMutation.mutateAsync({
+        submissionId,
+        score: getTotalScore(),
+        maxScore: getTotalMaxPoints(),
+        feedback: feedback || undefined,
+      });
+      setSubmitted(true);
+      setTimeout(() => {
+        setSubmitted(false);
+        onClose();
+        // Call the callback to refresh data
+        onSubmitGrade?.(getTotalScore(), feedback);
+      }, 1200);
+    } catch (err) {
+      console.error('Failed to save grade:', err);
+      alert('Failed to save grade: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /* ─── Keyboard shortcuts ─── */
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') { onClose(); return; }
+    if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); onSaveDraft?.(getTotalScore(), feedback); setSavedDraft(true); setTimeout(() => setSavedDraft(false), 1500); return; }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); handleSaveGradeToBackend(); return; }
+    if (e.key === 'ArrowLeft' && hasPrev && onPrev) { onPrev(); return; }
+    if (e.key === 'ArrowRight' && hasNext && onNext) { onNext(); return; }
+  }, [onClose, hasPrev, hasNext, onPrev, onNext, submissionId, feedback]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  const formattedDate = submittedAt
+    ? new Date(submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
+
+  const autoScorePct = autoScore !== null && autoScore !== undefined && maxPoints ? Math.round((autoScore / maxPoints) * 100) : null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
+      <div
+        className="bg-white rounded-2xl overflow-hidden flex flex-col"
+        style={{
+          width: '90vw',
+          height: '90vh',
+          maxWidth: '1600px',
+          boxShadow: '0 8px 24px rgba(107, 0, 0, 0.15)'
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--color-border)' }}>
+          <div className="flex items-center gap-4">
+            {/* Prev / Next navigation */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={onPrev}
+                disabled={!hasPrev}
+                className="p-1.5 rounded hover:bg-[var(--color-primary-bg)] transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                aria-label="Previous student"
+                title="Previous student (←)"
+              >
+                <ChevronLeft className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
+              </button>
+              <button
+                onClick={onNext}
+                disabled={!hasNext}
+                className="p-1.5 rounded hover:bg-[var(--color-primary-bg)] transition-colors disabled:opacity-30 disabled:hover:bg-transparent"
+                aria-label="Next student"
+                title="Next student (→)"
+              >
+                <ChevronRight className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
+              </button>
+            </div>
+            <div>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#6B0000' }}>
+                {studentName}
+              </h2>
+              <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
+                {assignmentName}{formattedDate ? ` — Submitted ${formattedDate}` : ''}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-[var(--color-primary-bg)] rounded transition-colors"
+            aria-label="Close modal (Esc)"
+          >
+            <X className="w-6 h-6 text-[var(--color-text-mid)]" />
+          </button>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left Panel: Code & Test Results (60%) */}
+          <div className="w-[60%] border-r overflow-auto" style={{ borderColor: 'var(--color-border)' }}>
+            {/* Submitted Files Section */}
+            {submissionId && (
+              <div className="p-6 border-b" style={{ borderColor: 'var(--color-border)' }}>
+                <h3 className="flex items-center gap-2 mb-3" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                  <FileText className="w-5 h-5" />
+                  Submitted Files
+                </h3>
+                {isLoadingFiles ? (
+                  <p className="text-sm text-gray-500">Loading files...</p>
+                ) : files.length === 0 ? (
+                  <p className="text-sm text-gray-500">No files submitted</p>
+                ) : (
+                  <div className="space-y-2">
+                    {files.map((file) => (
+                      <div
+                        key={file.id}
+                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50"
+                        style={{ borderColor: 'var(--color-border)' }}
+                      >
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <FileText className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-primary)' }} />
+                          <span className="text-sm font-medium truncate" style={{ color: 'var(--color-text-dark)' }}>
+                            {file.filename}
+                          </span>
+                          {file.file_size && (
+                            <span className="text-xs text-gray-400 flex-shrink-0">
+                              ({Math.round(file.file_size / 1024)}KB)
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                          {canPreviewFile(file.filename) && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedFileForPreview({ id: file.id, filename: file.filename })}
+                              className="flex items-center gap-1"
+                              title="Preview file"
+                            >
+                              <Eye className="w-4 h-4" />
+                              <span className="text-xs">Preview</span>
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleDownloadFile(file.id, file.filename)}
+                            title="Download file"
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* File Preview Section */}
+                {selectedFileForPreview && (
+                  <div className="mt-4">
+                    <FilePreview
+                      fileId={selectedFileForPreview.id}
+                      filename={selectedFileForPreview.filename}
+                      onClose={() => setSelectedFileForPreview(null)}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+
+          </div>
+
+          {/* Right Panel: Rubric & Feedback (40%) */}
+          <div className="w-[40%] flex flex-col">
+            <div className="flex-1 overflow-auto p-6">
+              {/* Auto Score Card */}
+              <div className="mb-6 p-4 rounded-lg" style={{ backgroundColor: '#E8F0FF' }}>
+                <p style={{ fontSize: '13px', fontWeight: 500, color: '#1A4D7A', marginBottom: '4px' }}>Auto Score</p>
+                <div className="flex items-baseline gap-2">
+                  <span style={{ fontSize: '28px', fontWeight: 700, color: '#6B0000' }}>
+                    {autoScore !== null && autoScore !== undefined ? autoScore : '—'} / {maxPoints}
+                  </span>
+                  {autoScorePct !== null && (
+                    <span style={{ fontSize: '14px', color: '#595959' }}>({autoScorePct}%)</span>
+                  )}
+                </div>
+
+              </div>
+
+              {/* Rubric Grading */}
+              <div className="mb-6">
+                <h3 className="mb-4" style={{ fontSize: '16px', fontWeight: 600, color: '#2D2D2D' }}>
+                  Rubric Grading
+                </h3>
+                <div className="space-y-3">
+                  {rubricCriteria.map((criterion, index) => (
+                    <div key={index} className="p-4 border rounded-lg" style={{ borderColor: 'var(--color-border)' }}>
+                      <div className="flex justify-between items-center mb-2">
+                        <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                          {criterion.name}
+                        </span>
+                        <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>
+                          {rubricScores[index]} / {criterion.maxPoints}
+                        </span>
+                      </div>
+                      <Input
+                        type="number"
+                        value={rubricScores[index]}
+                        onChange={(e) => updateRubricScore(index, parseInt(e.target.value) || 0)}
+                        max={criterion.maxPoints}
+                        min={0}
+                        className="border-[var(--color-border)]"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Total Score */}
+              <div className="mb-6 p-4 rounded-lg" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
+                <div className="flex justify-between items-center">
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                    TOTAL
+                  </span>
+                  <span style={{
+                    fontSize: '24px',
+                    fontWeight: 700,
+                    color: (getTotalScore() / getTotalMaxPoints()) >= 0.9 ? '#2D6A2D'
+                      : (getTotalScore() / getTotalMaxPoints()) >= 0.7 ? '#6B0000' : '#8B0000',
+                  }}>
+                    {getTotalScore()} / {getTotalMaxPoints()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Feedback */}
+              <div>
+                <label className="block mb-2" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                  Overall Feedback
+                </label>
+                <Textarea
+                  value={feedback}
+                  onChange={(e) => { if (e.target.value.length <= 500) setFeedback(e.target.value); }}
+                  placeholder="Provide feedback on the student's work..."
+                  rows={8}
+                  className="border-[var(--color-border)]"
+                  maxLength={500}
+                />
+                <p className="text-right mt-1" style={{ fontSize: '11px', color: feedback.length >= 450 ? '#8B0000' : '#8A8A8A' }}>
+                  {feedback.length} / 500
+                </p>
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="border-t p-6" style={{ borderColor: 'var(--color-border)' }}>
+              {/* Group Assignment Banner */}
+              {isGroupAssignment && groupName && groupMemberNames.length > 0 && (
+                <div className="mb-4 p-3 rounded-lg flex items-start gap-3" style={{ backgroundColor: '#F5EDED', border: '1px solid #6B0000' }}>
+                  <Users className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#6B0000' }} />
+                  <div className="flex-1">
+                    <p style={{ fontSize: '13px', fontWeight: 600, color: '#6B0000' }}>
+                      Group Assignment — {groupName}
+                    </p>
+                    <p style={{ fontSize: '12px', color: '#595959', marginTop: '2px' }}>
+                      Other members: {groupMemberNames.join(', ')}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between mb-3">
+                <button className="hover:underline" style={{ fontSize: '13px', color: '#6B0000' }}>
+                  Request Resubmission
+                </button>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    onSaveDraft?.(getTotalScore(), feedback);
+                    setSavedDraft(true);
+                    setTimeout(() => setSavedDraft(false), 1500);
+                  }}
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {savedDraft ? 'Saved!' : 'Save Draft'}
+                </Button>
+                <Button
+                  type="submit"
+                  className="flex-1 text-white"
+                  style={{ backgroundColor: submitted ? '#2D6A2D' : 'var(--color-primary)' }}
+                  disabled={isSaving}
+                  onClick={() => {
+                    handleSaveGradeToBackend();
+                  }}
+                >
+                  {submitted ? (
+                    <><CheckCircle className="w-4 h-4 mr-2" /> Submitted!</>
+                  ) : isSaving ? (
+                    <>Saving...</>
+                  ) : (
+                    <><Send className="w-4 h-4 mr-2" /> Submit Grade</>
+                  )}
+                </Button>
+              </div>
+
+              {/* Apply to Group button - only for group assignments */}
+              {isGroupAssignment && groupName && groupMemberNames.length > 0 && onApplyToGroup && (
+                <Button
+                  type="button"
+                  className="w-full mt-3 text-white"
+                  style={{ backgroundColor: '#2D6A2D' }}
+                  onClick={() => onApplyToGroup(getTotalScore())}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Apply Grade ({getTotalScore()}/{getTotalMaxPoints()}) to All Group Members
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

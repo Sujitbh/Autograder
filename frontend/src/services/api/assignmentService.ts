@@ -1,0 +1,127 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Assignment Service — CRUD + test-case management
+   ═══════════════════════════════════════════════════════════════════ */
+
+import api, { withRetry } from './client';
+import type {
+    Assignment,
+    CreateAssignmentDto,
+    UpdateAssignmentDto,
+} from '@/types';
+
+/** Shape returned by the FastAPI backend for an assignment */
+interface BackendAssignment {
+    id: number;
+    title: string;
+    description: string | null;
+    course_id: number | null;
+    created_by: number | null;
+    due_date: string | null;
+    max_submissions: number | null;
+    allowed_languages: string | null;
+    is_active: boolean;
+    created_at: string;
+    updated_at?: string | null;
+}
+
+/** Map a backend assignment to the frontend Assignment type */
+function mapAssignment(a: BackendAssignment): Assignment {
+    return {
+        id: String(a.id),
+        courseId: String(a.course_id ?? ''),
+        name: a.title,
+        shortName: a.title.slice(0, 20),
+        description: a.description ?? '',
+        language: (a.allowed_languages?.split(',')[0] as 'python' | 'java') ?? 'python',
+        category: 'Homework',
+        dueDate: a.due_date ?? '',
+        maxPoints: 100,
+        status: a.is_active ? 'published' : 'draft',
+        isGroup: false,
+        allowLateSubmissions: false,
+        publicTests: [],
+        privateTests: [],
+        rubric: [],
+        createdAt: a.created_at ?? '',
+        updatedAt: a.updated_at ?? '',
+    };
+}
+
+export const assignmentService = {
+    /** List all assignments (optionally filtered by course). */
+    async getAssignments(courseId?: string): Promise<Assignment[]> {
+        // Backend uses /assignments/ with optional course filtering
+        const url = courseId
+            ? `/assignments/?course_id=${courseId}`
+            : '/assignments/';
+        
+        const { data } = await withRetry(() =>
+            api.get<BackendAssignment[]>(url)
+        );
+        return data.map(mapAssignment);
+    },
+
+    /** Get a single assignment by ID. */
+    async getAssignment(_courseId: string, assignmentId: string): Promise<Assignment> {
+        const { data } = await withRetry(() =>
+            api.get<BackendAssignment>(`/assignments/${assignmentId}`)
+        );
+        return mapAssignment(data);
+    },
+
+    /** Create a new assignment. */
+    async createAssignment(dto: CreateAssignmentDto): Promise<Assignment> {
+        const payload = {
+            title: dto.name ?? (dto as any).title ?? 'Untitled',
+            description: dto.description ?? '',
+            course_id: Number(dto.courseId) || null,
+            allowed_languages: dto.language ?? 'python',
+            publicTests: (dto.publicTests ?? []).map((test: any) => ({
+                name: test.name,
+                input_data: test.input_data || test.input,
+                expected_output: test.expected_output || test.expectedOutput,
+                is_public: true,
+                points: test.points || 1,
+            })),
+            privateTests: (dto.privateTests ?? []).map((test: any) => ({
+                name: test.name,
+                input_data: test.input_data || test.input,
+                expected_output: test.expected_output || test.expectedOutput,
+                is_public: false,
+                points: test.points || 1,
+            })),
+        };
+        const { data } = await api.post<BackendAssignment>('/assignments/', payload);
+        return mapAssignment(data);
+    },
+
+    /** Update an existing assignment. */
+    async updateAssignment(
+        _courseId: string,
+        assignmentId: string,
+        dto: UpdateAssignmentDto
+    ): Promise<Assignment> {
+        const { data } = await api.put<BackendAssignment>(
+            `/assignments/${assignmentId}`,
+            dto
+        );
+        return mapAssignment(data);
+    },
+
+    /** Delete an assignment. */
+    async deleteAssignment(_courseId: string, assignmentId: string): Promise<void> {
+        await api.delete(`/assignments/${assignmentId}`);
+    },
+
+    /** Publish a draft assignment (toggle is_active). */
+    async publishAssignment(
+        _courseId: string,
+        assignmentId: string
+    ): Promise<Assignment> {
+        const { data } = await api.put<BackendAssignment>(
+            `/assignments/${assignmentId}`,
+            { is_active: true }
+        );
+        return mapAssignment(data);
+    },
+};
