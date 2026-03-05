@@ -7,12 +7,8 @@ Adds:
 """
 
 import sys
-<<<<<<< HEAD
-sys.path.insert(0, '/Users/sujitbhattarai/Desktop/Autograder/autograder/backend')
-=======
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
->>>>>>> origin/ree_update
 
 from sqlalchemy import text
 from app.core.database import engine

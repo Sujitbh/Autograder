@@ -1,10 +1,6 @@
 import { useState, useMemo } from 'react';
-<<<<<<< HEAD
-import { Search, Filter, CheckCircle2, Clock, AlertTriangle, ChevronDown, Eye, ArrowUpDown, BarChart3 } from 'lucide-react';
-=======
 import { useQueries } from '@tanstack/react-query';
 import { Search, Filter, CheckCircle2, Clock, AlertTriangle, ChevronDown, Eye, ArrowUpDown, BarChart3, Loader2 } from 'lucide-react';
->>>>>>> origin/ree_update
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
 import { Sidebar } from './Sidebar';
@@ -19,83 +15,23 @@ import {
     SelectTrigger,
     SelectValue,
 } from './ui/select';
-<<<<<<< HEAD
-import { getStudentsForCourse, hashStr } from '../utils/studentData';
-import type { RubricCriterion, TestCaseResult } from '@/types';
-
-interface Submission {
-=======
 import { useAssignments } from '@/hooks/queries';
 import { submissionService } from '@/services/api';
 import type { Submission as ApiSubmission, Assignment, RubricCriterion, TestCaseResult } from '@/types';
 
 /** Local UI row — derived from API Submission + Assignment metadata */
 interface QueueSubmission {
->>>>>>> origin/ree_update
     id: string;
     studentName: string;
     studentId: string;
     assignmentName: string;
-<<<<<<< HEAD
-=======
     assignmentId: string;
->>>>>>> origin/ree_update
     submittedAt: string;
     status: 'pending' | 'graded' | 'in-review' | 'resubmitted';
     score: number | null;
     maxScore: number;
     aiFlag: boolean;
     lateSubmission: boolean;
-<<<<<<< HEAD
-}
-
-const QUEUE_ASSIGNMENTS = [
-    'Variables and Data Types',
-    'Control Flow: Loops',
-    'Functions and Modules',
-];
-
-function buildMockSubmissions(courseId: string): Submission[] {
-    const students = getStudentsForCourse(courseId);
-    const subs: Submission[] = [];
-    let idx = 0;
-
-    // Pick ~10 submissions from the first several students across assignments
-    students.slice(0, Math.min(students.length, 12)).forEach(s => {
-        QUEUE_ASSIGNMENTS.forEach(aName => {
-            const h = hashStr(s.id + ':queue:' + aName);
-            // ~40% chance of appearing in the queue for each assignment
-            if (h % 100 >= 40) return;
-            idx++;
-            const statusRoll = hashStr(s.id + ':qs:' + aName) % 100;
-            let status: Submission['status'];
-            let score: number | null = null;
-            if (statusRoll < 40) { status = 'pending'; }
-            else if (statusRoll < 60) { status = 'in-review'; }
-            else if (statusRoll < 80) { status = 'graded'; score = 60 + hashStr(s.id + ':qscore:' + aName) % 41; }
-            else { status = 'resubmitted'; }
-
-            const dayOff = 1 + hashStr(s.id + aName + 'qd') % 18;
-            const hourOff = hashStr(s.id + aName + 'qh') % 24;
-            const minOff = hashStr(s.id + aName + 'qm') % 60;
-
-            subs.push({
-                id: `s${idx}`,
-                studentName: s.name,
-                studentId: s.studentId,
-                assignmentName: aName,
-                submittedAt: `2026-03-${String(dayOff).padStart(2, '0')}T${String(hourOff).padStart(2, '0')}:${String(minOff).padStart(2, '0')}:00`,
-                status,
-                score,
-                maxScore: 100,
-                aiFlag: hashStr(s.id + ':ai:' + aName) % 8 === 0,
-                lateSubmission: hashStr(s.id + ':qlate:' + aName) % 6 === 0,
-            });
-        });
-    });
-
-    return subs;
-=======
     /** Raw API submission kept for the grading panel */
     _raw: ApiSubmission;
 }
@@ -121,7 +57,6 @@ function toQueueSubmission(sub: ApiSubmission, assignment: Assignment): QueueSub
         lateSubmission: sub.isLate,
         _raw: sub,
     };
->>>>>>> origin/ree_update
 }
 
 function lookupCourseCode(id: string) {
@@ -131,9 +66,6 @@ function lookupCourseCode(id: string) {
 export function GradingQueue() {
     const { courseId } = useParams() as { courseId: string };
     const courseCode = lookupCourseCode(courseId ?? '');
-<<<<<<< HEAD
-    const mockSubmissions = useMemo(() => buildMockSubmissions(courseId ?? 'cs-1001'), [courseId]);
-=======
 
     /* ── Fetch assignments for the course ── */
     const {
@@ -166,7 +98,6 @@ export function GradingQueue() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [assignments, submissionQueries.map((q) => q.dataUpdatedAt).join(',')]);
 
->>>>>>> origin/ree_update
     const [activeTab, setActiveTab] = useState('pending');
     const [searchQuery, setSearchQuery] = useState('');
     const [assignmentFilter, setAssignmentFilter] = useState('all');
@@ -176,18 +107,6 @@ export function GradingQueue() {
     const [selectedSubmissions, setSelectedSubmissions] = useState<string[]>([]);
 
     const tabs = [
-<<<<<<< HEAD
-        { id: 'pending', label: 'Pending', count: mockSubmissions.filter(s => s.status === 'pending').length },
-        { id: 'in-review', label: 'In Review', count: mockSubmissions.filter(s => s.status === 'in-review').length },
-        { id: 'resubmitted', label: 'Resubmitted', count: mockSubmissions.filter(s => s.status === 'resubmitted').length },
-        { id: 'graded', label: 'Graded', count: mockSubmissions.filter(s => s.status === 'graded').length },
-        { id: 'all', label: 'All', count: mockSubmissions.length },
-    ];
-
-    const uniqueAssignments = [...new Set(mockSubmissions.map(s => s.assignmentName))];
-
-    const filteredSubmissions = mockSubmissions
-=======
         { id: 'pending', label: 'Pending', count: allSubmissions.filter(s => s.status === 'pending').length },
         { id: 'in-review', label: 'In Review', count: allSubmissions.filter(s => s.status === 'in-review').length },
         { id: 'resubmitted', label: 'Resubmitted', count: allSubmissions.filter(s => s.status === 'resubmitted').length },
@@ -198,7 +117,6 @@ export function GradingQueue() {
     const uniqueAssignments = [...new Set(allSubmissions.map(s => s.assignmentName))];
 
     const filteredSubmissions = allSubmissions
->>>>>>> origin/ree_update
         .filter(s => {
             if (activeTab !== 'all' && s.status !== activeTab) return false;
             if (assignmentFilter !== 'all' && s.assignmentName !== assignmentFilter) return false;
@@ -218,11 +136,7 @@ export function GradingQueue() {
             return sortOrder === 'asc' ? cmp : -cmp;
         });
 
-<<<<<<< HEAD
-    const getStatusBadge = (status: Submission['status']) => {
-=======
     const getStatusBadge = (status: QueueSubmission['status']) => {
->>>>>>> origin/ree_update
         const styles: Record<string, { bg: string; text: string; label: string }> = {
             pending: { bg: 'var(--color-warning)', text: 'var(--color-surface)', label: 'Pending' },
             graded: { bg: 'var(--color-success)', text: 'var(--color-surface)', label: 'Graded' },
@@ -269,114 +183,9 @@ export function GradingQueue() {
         }
     };
 
-<<<<<<< HEAD
-    /* ── Mock code snippets for grading view ── */
-    const MOCK_CODE: Record<string, string> = {
-        'Variables and Data Types': `# Variables and Data Types
-name = "Alice"
-age = 21
-gpa = 3.85
-is_enrolled = True
-
-def convert_types():
-    str_num = "42"
-    int_val = int(str_num)
-    float_val = float(str_num)
-    return int_val, float_val
-
-def describe_student(name, age, gpa):
-    return f"{name} is {age} years old with a GPA of {gpa:.2f}"
-
-if __name__ == "__main__":
-    print(describe_student(name, age, gpa))
-    print(convert_types())`,
-        'Control Flow: Loops': `# Control Flow: Loops
-def fizzbuzz(n):
-    results = []
-    for i in range(1, n + 1):
-        if i % 15 == 0:
-            results.append("FizzBuzz")
-        elif i % 3 == 0:
-            results.append("Fizz")
-        elif i % 5 == 0:
-            results.append("Buzz")
-        else:
-            results.append(str(i))
-    return results
-
-def sum_even(numbers):
-    total = 0
-    for num in numbers:
-        if num % 2 == 0:
-            total += num
-    return total
-
-if __name__ == "__main__":
-    print(fizzbuzz(20))
-    print(sum_even([1, 2, 3, 4, 5, 6]))`,
-        'Functions and Modules': `# Functions and Modules
-import math
-
-def factorial(n):
-    if n <= 1:
-        return 1
-    return n * factorial(n - 1)
-
-def is_prime(n):
-    if n < 2:
-        return False
-    for i in range(2, int(math.sqrt(n)) + 1):
-        if n % i == 0:
-            return False
-    return True
-
-def fibonacci(n):
-    a, b = 0, 1
-    sequence = []
-    while len(sequence) < n:
-        sequence.append(a)
-        a, b = b, a + b
-    return sequence
-
-if __name__ == "__main__":
-    print(f"5! = {factorial(5)}")
-    print(f"Primes under 20: {[x for x in range(20) if is_prime(x)]}")
-    print(f"First 10 Fibonacci: {fibonacci(10)}")`,
-    };
-
-    const MOCK_RUBRIC: RubricCriterion[] = [
-        { id: 'r1', name: 'Code Correctness', description: 'All functions return expected results and pass test cases', maxPoints: 40, gradingMethod: 'auto' },
-        { id: 'r2', name: 'Code Style', description: 'Clean code, proper naming, PEP8 compliance', maxPoints: 20, gradingMethod: 'manual' },
-        { id: 'r3', name: 'Documentation', description: 'Docstrings for functions, inline comments where needed', maxPoints: 20, gradingMethod: 'manual' },
-        { id: 'r4', name: 'Error Handling', description: 'Proper handling of edge cases and invalid input', maxPoints: 20, gradingMethod: 'hybrid' },
-    ];
-
-    const buildMockTestResults = (sub: Submission): TestCaseResult[] => {
-        const h = hashStr(sub.id + ':test');
-        return [
-            {
-                testCase: { id: 't1', assignmentId: 'a1', name: 'Basic Output', input: 'print("Hello")', expectedOutput: 'Hello World', isPublic: true, points: 40 },
-                passed: true, actualOutput: 'Hello World', expectedOutput: 'Hello World', executionTime: 42 + (h % 30),
-            },
-            {
-                testCase: { id: 't2', assignmentId: 'a1', name: 'Edge Case', input: 'convert(42)', expectedOutput: '42', isPublic: true, points: 30 },
-                passed: h % 3 !== 0, actualOutput: h % 3 !== 0 ? '42' : '41', expectedOutput: '42', executionTime: 55 + (h % 20),
-            },
-            {
-                testCase: { id: 't3', assignmentId: 'a1', name: 'Performance Test', input: 'large_input()', expectedOutput: 'OK', isPublic: false, points: 30 },
-                passed: h % 5 !== 0, actualOutput: h % 5 !== 0 ? 'OK' : 'Timeout', expectedOutput: 'OK', executionTime: h % 5 !== 0 ? 120 : 5000,
-            },
-        ];
-    };
-
-    /* ── Grading panel helpers ── */
-    const gradingSubmission = gradingSubmissionId
-        ? filteredSubmissions.find(s => s.id === gradingSubmissionId) ?? mockSubmissions.find(s => s.id === gradingSubmissionId) ?? null
-=======
     /* ── Grading panel helpers ── */
     const gradingSubmission = gradingSubmissionId
         ? filteredSubmissions.find(s => s.id === gradingSubmissionId) ?? allSubmissions.find(s => s.id === gradingSubmissionId) ?? null
->>>>>>> origin/ree_update
         : null;
 
     const gradingIndex = gradingSubmission
@@ -399,21 +208,11 @@ if __name__ == "__main__":
         }
     };
 
-<<<<<<< HEAD
-    const handleSaveDraft = (data: GradingPayload) => {
-        console.log('Draft saved:', data);
-        // In production, call gradeSubmission API
-    };
-
-    const handleSubmitGrade = (data: GradingPayload) => {
-        console.log('Grade submitted:', data);
-=======
     const handleSaveDraft = (_data: GradingPayload) => {
         // TODO: call gradeSubmission API with draft status
     };
 
     const handleSubmitGrade = (_data: GradingPayload) => {
->>>>>>> origin/ree_update
         // Move to next or close
         if (gradingIndex < filteredSubmissions.length - 1) {
             setGradingSubmissionId(filteredSubmissions[gradingIndex + 1].id);
@@ -422,8 +221,6 @@ if __name__ == "__main__":
         }
     };
 
-<<<<<<< HEAD
-=======
     /** Resolve the assignment's rubric for the grading panel */
     const gradingAssignment = gradingSubmission
         ? assignments.find(a => a.id === gradingSubmission.assignmentId)
@@ -433,7 +230,6 @@ if __name__ == "__main__":
 
     const isLoading = assignmentsLoading || submissionsLoading;
 
->>>>>>> origin/ree_update
     return (
         <PageLayout>
             <TopNav breadcrumbs={[
@@ -532,207 +328,6 @@ if __name__ == "__main__":
                         </Select>
                     </div>
 
-<<<<<<< HEAD
-                    {/* Submissions Table */}
-                    <div className="bg-white rounded-lg overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
-                        <table className="w-full">
-                            <thead style={{ backgroundColor: 'var(--color-primary-bg)', borderBottom: '1px solid var(--color-border)' }}>
-                                <tr>
-                                    <th className="text-left px-4 py-4 w-12">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedSubmissions.length === filteredSubmissions.length && filteredSubmissions.length > 0}
-                                            onChange={toggleSelectAll}
-                                            className="rounded border-[var(--color-border)]"
-                                            style={{ accentColor: 'var(--color-primary)' }}
-                                        />
-                                    </th>
-                                    <th className="text-left px-4 py-4">
-                                        <button onClick={() => handleSort('name')} className="flex items-center gap-1" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                            Student
-                                            <ArrowUpDown className="w-3 h-3" />
-                                        </button>
-                                    </th>
-                                    <th className="text-left px-4 py-4">
-                                        <button onClick={() => handleSort('assignment')} className="flex items-center gap-1" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                            Assignment
-                                            <ArrowUpDown className="w-3 h-3" />
-                                        </button>
-                                    </th>
-                                    <th className="text-left px-4 py-4">
-                                        <button onClick={() => handleSort('date')} className="flex items-center gap-1" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                            Submitted
-                                            <ArrowUpDown className="w-3 h-3" />
-                                        </button>
-                                    </th>
-                                    <th className="text-left px-4 py-4" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                        Score
-                                    </th>
-                                    <th className="text-left px-4 py-4" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                        Flags
-                                    </th>
-                                    <th className="text-left px-4 py-4" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                        Status
-                                    </th>
-                                    <th className="text-left px-4 py-4" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                        Action
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredSubmissions.map((submission) => (
-                                    <tr
-                                        key={submission.id}
-                                        className="border-b hover:bg-[var(--color-primary-bg)]/50 transition-colors"
-                                        style={{ borderColor: 'var(--color-border)' }}
-                                    >
-                                        <td className="px-4 py-4">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedSubmissions.includes(submission.id)}
-                                                onChange={() => toggleSubmissionSelect(submission.id)}
-                                                className="rounded border-[var(--color-border)]"
-                                                style={{ accentColor: 'var(--color-primary)' }}
-                                            />
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="flex items-center gap-3">
-                                                <div
-                                                    className="w-8 h-8 rounded-full flex items-center justify-center text-white flex-shrink-0"
-                                                    style={{ backgroundColor: 'var(--color-primary)', fontSize: '12px', fontWeight: 600 }}
-                                                >
-                                                    {submission.studentName.split(' ').map(n => n[0]).join('')}
-                                                </div>
-                                                <div>
-                                                    <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                        {submission.studentName}
-                                                    </p>
-                                                    <p style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>
-                                                        {submission.studentId}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4" style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>
-                                            {submission.assignmentName}
-                                        </td>
-                                        <td className="px-4 py-4" style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>
-                                            {new Date(submission.submittedAt).toLocaleDateString('en-US', {
-                                                month: 'short',
-                                                day: 'numeric',
-                                                year: 'numeric'
-                                            })}
-                                            <p style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>
-                                                {new Date(submission.submittedAt).toLocaleTimeString('en-US', {
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                })}
-                                            </p>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            {submission.score !== null ? (
-                                                <span style={{
-                                                    fontSize: '14px',
-                                                    fontWeight: 600,
-                                                    color: submission.score >= 90 ? 'var(--color-success)' :
-                                                        submission.score >= 80 ? 'var(--color-info)' :
-                                                            submission.score >= 70 ? 'var(--color-warning)' : 'var(--color-error)'
-                                                }}>
-                                                    {submission.score}/{submission.maxScore}
-                                                </span>
-                                            ) : (
-                                                <span style={{ fontSize: '14px', color: 'var(--color-text-light)' }}>—</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <div className="flex items-center gap-2">
-                                                {submission.aiFlag && (
-                                                    <span
-                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded"
-                                                        style={{ backgroundColor: 'var(--color-warning-bg, #FFF8E1)', fontSize: '11px', fontWeight: 600, color: 'var(--color-warning)' }}
-                                                    >
-                                                        <AlertTriangle className="w-3 h-3" />
-                                                        AI
-                                                    </span>
-                                                )}
-                                                {submission.lateSubmission && (
-                                                    <span
-                                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded"
-                                                        style={{ backgroundColor: 'var(--color-error-bg, #FFEBEE)', fontSize: '11px', fontWeight: 600, color: 'var(--color-error)' }}
-                                                    >
-                                                        <Clock className="w-3 h-3" />
-                                                        Late
-                                                    </span>
-                                                )}
-                                                {!submission.aiFlag && !submission.lateSubmission && (
-                                                    <span style={{ fontSize: '14px', color: 'var(--color-text-light)' }}>—</span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            {getStatusBadge(submission.status)}
-                                        </td>
-                                        <td className="px-4 py-4">
-                                            <Button
-                                                size="sm"
-                                                variant={submission.status === 'graded' ? 'outline' : 'default'}
-                                                onClick={() => handleOpenGrading(submission.id)}
-                                                className={submission.status === 'graded' ? 'border-[var(--color-border)]' : 'text-white'}
-                                                style={submission.status !== 'graded' ? { backgroundColor: 'var(--color-primary)' } : undefined}
-                                            >
-                                                {submission.status === 'graded' ? (
-                                                    <>
-                                                        <Eye className="w-3.5 h-3.5 mr-1" />
-                                                        Review
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                                                        Grade
-                                                    </>
-                                                )}
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-
-                        {filteredSubmissions.length === 0 && (
-                            <div className="text-center py-16">
-                                <CheckCircle2 className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-success)' }} />
-                                <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '4px' }}>
-                                    All caught up!
-                                </p>
-                                <p style={{ fontSize: '14px', color: 'var(--color-text-light)' }}>
-                                    No submissions match your current filters.
-                                </p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Pagination */}
-                    <div className="flex items-center justify-between mt-4">
-                        <p style={{ fontSize: '13px', color: 'var(--color-text-light)' }}>
-                            Showing {filteredSubmissions.length} of {mockSubmissions.length} submissions
-                        </p>
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" className="border-[var(--color-border)]" disabled>
-                                Previous
-                            </Button>
-                            <Button
-                                size="sm"
-                                className="text-white"
-                                style={{ backgroundColor: 'var(--color-primary)', minWidth: '32px' }}
-                            >
-                                1
-                            </Button>
-                            <Button variant="outline" size="sm" className="border-[var(--color-border)]" disabled>
-                                Next
-                            </Button>
-                        </div>
-                    </div>
-=======
                     {/* Loading state */}
                     {isLoading && (
                         <div className="flex items-center justify-center py-16">
@@ -954,7 +549,6 @@ if __name__ == "__main__":
                             </div>
                         </div>
                     )}
->>>>>>> origin/ree_update
                 </main>
             </div>
 
@@ -968,17 +562,10 @@ if __name__ == "__main__":
                             className="flex items-center gap-1 text-sm hover:underline"
                             style={{ color: 'var(--color-primary)' }}
                         >
-<<<<<<< HEAD
-                            ← Back to Grading Queue
-                        </button>
-                        <span className="text-sm" style={{ color: 'var(--color-text-mid)' }}>
-                            Grading: {gradingSubmission.assignmentName} — {gradingSubmission.studentName}
-=======
                             &larr; Back to Grading Queue
                         </button>
                         <span className="text-sm" style={{ color: 'var(--color-text-mid)' }}>
                             Grading: {gradingSubmission.assignmentName} &mdash; {gradingSubmission.studentName}
->>>>>>> origin/ree_update
                         </span>
                     </div>
                     {/* GradingInterface */}
@@ -988,15 +575,6 @@ if __name__ == "__main__":
                                 id: gradingSubmission.id,
                                 studentName: gradingSubmission.studentName,
                                 studentId: gradingSubmission.studentId,
-<<<<<<< HEAD
-                                code: MOCK_CODE[gradingSubmission.assignmentName] || '# No code available\nprint("Hello World")',
-                                language: 'python',
-                                submittedAt: gradingSubmission.submittedAt,
-                                isLate: gradingSubmission.lateSubmission,
-                                testResults: buildMockTestResults(gradingSubmission),
-                            }}
-                            rubricCriteria={MOCK_RUBRIC}
-=======
                                 code: gradingSubmission._raw.code || '# No code available',
                                 language: gradingSubmission._raw.language ?? 'python',
                                 submittedAt: gradingSubmission.submittedAt,
@@ -1004,7 +582,6 @@ if __name__ == "__main__":
                                 testResults: gradingSubmission._raw.testResults,
                             }}
                             rubricCriteria={gradingRubric}
->>>>>>> origin/ree_update
                             autoScore={gradingSubmission.score ?? undefined}
                             maxPoints={gradingSubmission.maxScore}
                             totalSubmissions={filteredSubmissions.length}

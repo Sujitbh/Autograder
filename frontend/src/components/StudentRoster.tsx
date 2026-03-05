@@ -175,11 +175,7 @@ export function StudentRoster() {
             </div>
           )}
 
-<<<<<<< HEAD
-          <div className="bg-white rounded-lg overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
-=======
           <div className="rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
->>>>>>> origin/ree_update
             {isLoading ? (
               <div className="p-10 flex items-center justify-center gap-2" style={{ color: 'var(--color-text-mid)' }}>
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading roster...

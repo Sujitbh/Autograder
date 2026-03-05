@@ -1,11 +1,7 @@
 'use client';
 
 /* ═══════════════════════════════════════════════════════════════════
-<<<<<<< HEAD
-    CreateAssignmentForm — Multi-step wizard (8 steps)
-=======
    CreateAssignmentForm — Multi-step wizard (9 steps)
->>>>>>> origin/ree_update
    Features:
    - Rubric templates (save / load / preloaded)
    - PDF rubric upload & parsing
@@ -28,10 +24,7 @@ import {
     Trash2,
     GripVertical,
     Check,
-<<<<<<< HEAD
-=======
     Code2,
->>>>>>> origin/ree_update
     FileText,
     TestTube,
     Lock,
@@ -68,11 +61,7 @@ import {
     DialogFooter,
     DialogDescription,
 } from '@/components/ui/dialog';
-<<<<<<< HEAD
-import { COURSE_STUDENT_COUNTS } from '@/utils/studentData';
-=======
 
->>>>>>> origin/ree_update
 
 // ── Rubric Template types ───────────────────────────────────────────
 
@@ -158,11 +147,7 @@ const formSchema = z.object({
     shortName: z.string().min(1, 'Short name is required').max(10),
     language: z.enum(['python', 'java']),
     category: z.enum(['Homework', 'Quiz', 'Exam', 'Lab', 'Project']),
-<<<<<<< HEAD
-    dueDate: z.string().min(1, 'Due date is required'),
-=======
     dueDate: z.string(),  // Optional for drafts; validated on publish
->>>>>>> origin/ree_update
     maxPoints: z.number().min(1, 'Must be at least 1 point'),
     isGroup: z.boolean(),
     allowLateSubmissions: z.boolean(),
@@ -199,10 +184,7 @@ export type AssignmentFormData = z.infer<typeof formSchema>;
 const STEPS = [
     { label: 'Basic Info', icon: FileText },
     { label: 'Description', icon: FileText },
-<<<<<<< HEAD
-=======
     { label: 'Starter Code', icon: Code2 },
->>>>>>> origin/ree_update
     { label: 'Public Tests', icon: TestTube },
     { label: 'Private Tests', icon: Lock },
     { label: 'Rubric', icon: ClipboardList },
@@ -330,10 +312,7 @@ export function CreateAssignmentForm({
     const watchPlagiarism = watch('plagiarismEnabled');
     const watchAiDetection = watch('aiDetectionEnabled');
     const watchAutoFlag = watch('autoFlagEnabled');
-<<<<<<< HEAD
-=======
     const watchLanguage = watch('language');
->>>>>>> origin/ree_update
 
     // ── Auto-save to localStorage every 30 seconds ────────────────
 
@@ -363,14 +342,9 @@ export function CreateAssignmentForm({
     // ── Step validation map ───────────────────────────────────────
 
     const stepFields: (keyof AssignmentFormData)[][] = [
-<<<<<<< HEAD
-        ['name', 'shortName', 'category', 'dueDate', 'maxPoints'],
-        ['description'],
-=======
         ['name', 'shortName', 'language', 'category', 'dueDate', 'maxPoints'],
         ['description'],
         ['starterCode'],
->>>>>>> origin/ree_update
         ['publicTests'],
         ['privateTests'],
         ['rubric'],
@@ -574,17 +548,10 @@ export function CreateAssignmentForm({
                                     onClick={() => idx <= currentStep && setCurrentStep(idx)}
                                     disabled={idx > currentStep}
                                     className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors ${isActive
-<<<<<<< HEAD
-                                            ? 'border-[#6B0000] bg-[#6B0000] text-white'
-                                            : isCompleted
-                                                ? 'border-green-500 bg-green-50 text-green-600 cursor-pointer'
-                                                : 'border-gray-200 bg-white text-gray-400 dark:border-gray-700 dark:bg-gray-800'
-=======
                                         ? 'border-[#6B0000] bg-[#6B0000] text-white'
                                         : isCompleted
                                             ? 'border-green-500 bg-green-50 text-green-600 cursor-pointer'
                                             : 'border-gray-200 bg-white text-gray-400 dark:border-gray-700 dark:bg-gray-800'
->>>>>>> origin/ree_update
                                         }`}
                                     aria-label={`Step ${idx + 1}: ${step.label}`}
                                     aria-current={isActive ? 'step' : undefined}
@@ -641,8 +608,6 @@ export function CreateAssignmentForm({
                     </div>
 
                     <div>
-<<<<<<< HEAD
-=======
                         <Label>Language *</Label>
                         <Controller
                             control={control}
@@ -660,7 +625,6 @@ export function CreateAssignmentForm({
                     </div>
 
                     <div>
->>>>>>> origin/ree_update
                         <Label>Category *</Label>
                         <Controller
                             control={control}
@@ -679,11 +643,7 @@ export function CreateAssignmentForm({
                     </div>
 
                     <div>
-<<<<<<< HEAD
-                        <Label htmlFor="dueDate">Due Date *</Label>
-=======
                         <Label htmlFor="dueDate">Due Date <span className="text-xs text-gray-400">(required to publish)</span></Label>
->>>>>>> origin/ree_update
                         <Input id="dueDate" type="datetime-local" {...register('dueDate')} />
                         {errors.dueDate && <p className="mt-1 text-xs text-red-600">{errors.dueDate.message}</p>}
                     </div>
@@ -787,9 +747,6 @@ export function CreateAssignmentForm({
         );
     }
 
-<<<<<<< HEAD
-    // ── Step 2 & 3: Test Cases (shared renderer) ──────────────────
-=======
     // ── Step 2: Starter Code ──────────────────────────────────────
 
     function renderStarterCode() {
@@ -829,7 +786,6 @@ export function CreateAssignmentForm({
     }
 
     // ── Step 3 & 4: Test Cases (shared renderer) ──────────────────
->>>>>>> origin/ree_update
 
     function renderTestCases(
         fields: Array<Record<string, unknown> & { id: string }>,
@@ -864,11 +820,7 @@ export function CreateAssignmentForm({
                             size="sm"
                             variant="outline"
                             onClick={() =>
-<<<<<<< HEAD
-                                append({ name: `Test ${fields.length + 1}`, input: '', expectedOutput: '', points: 10 })
-=======
                                 append({ name: `${isPrivate ? 'Private' : 'Public'} Test ${fields.length + 1}`, input: '', expectedOutput: '', points: 10 })
->>>>>>> origin/ree_update
                             }
                         >
                             <Plus className="mr-1 h-3.5 w-3.5" /> Add Test
@@ -1476,10 +1428,7 @@ export function CreateAssignmentForm({
                 items: [
                     { label: 'Name', value: values.name || '—' },
                     { label: 'Short Name', value: values.shortName || '—' },
-<<<<<<< HEAD
-=======
                     { label: 'Language', value: values.language === 'python' ? 'Python 3.10' : 'Java 17' },
->>>>>>> origin/ree_update
                     { label: 'Category', value: values.category },
                     { label: 'Due Date', value: values.dueDate ? new Date(values.dueDate).toLocaleString() : '—' },
                     { label: 'Max Points', value: String(values.maxPoints) },
@@ -1496,10 +1445,6 @@ export function CreateAssignmentForm({
                 ],
             },
             {
-<<<<<<< HEAD
-                title: 'Test Cases',
-                step: 2,
-=======
                 title: 'Starter Code',
                 step: 2,
                 icon: Code2,
@@ -1510,7 +1455,6 @@ export function CreateAssignmentForm({
             {
                 title: 'Test Cases',
                 step: 3,
->>>>>>> origin/ree_update
                 icon: TestTube,
                 items: [
                     { label: 'Public Tests', value: `${values.publicTests.length} test(s)` },
@@ -1520,11 +1464,7 @@ export function CreateAssignmentForm({
             },
             {
                 title: 'Rubric',
-<<<<<<< HEAD
-                step: 4,
-=======
                 step: 5,
->>>>>>> origin/ree_update
                 icon: ClipboardList,
                 items: [
                     { label: 'Criteria', value: `${values.rubric.length} criterion/criteria` },
@@ -1534,11 +1474,7 @@ export function CreateAssignmentForm({
             },
             {
                 title: 'Submission Settings',
-<<<<<<< HEAD
-                step: 5,
-=======
                 step: 6,
->>>>>>> origin/ree_update
                 icon: Settings2,
                 items: [
                     { label: 'Max Attempts', value: String(values.maxAttempts) },
@@ -1551,11 +1487,7 @@ export function CreateAssignmentForm({
             },
             {
                 title: 'AI Detection',
-<<<<<<< HEAD
-                step: 6,
-=======
                 step: 7,
->>>>>>> origin/ree_update
                 icon: ShieldAlert,
                 items: [
                     { label: 'Plagiarism', value: values.plagiarismEnabled ? `Enabled (${getSensitivityLabel(values.plagiarismSensitivity)})` : 'Disabled' },
@@ -1660,10 +1592,7 @@ export function CreateAssignmentForm({
     const stepRenderers = [
         renderBasicInfo,
         renderDescription,
-<<<<<<< HEAD
-=======
         renderStarterCode,
->>>>>>> origin/ree_update
         () => renderTestCases(publicTestFields, appendPublicTest, removePublicTest, 'publicTests', false),
         () => renderTestCases(privateTestFields, appendPrivateTest, removePrivateTest, 'privateTests', true),
         renderRubric,
@@ -1786,13 +1715,10 @@ export function CreateAssignmentForm({
                     <div className="mt-3 rounded-lg p-4" style={{ backgroundColor: '#F5EDED' }}>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-<<<<<<< HEAD
-=======
                                 <p className="text-[11px] text-gray-400">Language</p>
                                 <p className="text-xs font-medium text-gray-700">{getValues('language') === 'python' ? 'Python' : 'Java'}</p>
                             </div>
                             <div>
->>>>>>> origin/ree_update
                                 <p className="text-[11px] text-gray-400">Due Date</p>
                                 <p className="text-xs font-medium text-gray-700">{getValues('dueDate') ? new Date(getValues('dueDate')).toLocaleDateString() : '—'}</p>
                             </div>
@@ -1810,8 +1736,6 @@ export function CreateAssignmentForm({
                         <Button variant="outline" onClick={() => setShowPublishDialog(false)}>Cancel</Button>
                         <Button
                             onClick={() => {
-<<<<<<< HEAD
-=======
                                 // Validate due date is set before publishing
                                 if (!getValues('dueDate')) {
                                     setShowPublishDialog(false);
@@ -1819,7 +1743,6 @@ export function CreateAssignmentForm({
                                     alert('Due date is required to publish an assignment. Please set a due date.');
                                     return;
                                 }
->>>>>>> origin/ree_update
                                 setShowPublishDialog(false);
                                 handleSubmit(onPublish)();
                             }}
