@@ -27,6 +27,9 @@ class CourseOut(CourseBase):
     is_active: bool = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    student_count: int = 0
+    assignment_count: int = 0
+    pending_grades: int = 0
 
     class Config:
         from_attributes = True
@@ -66,3 +69,23 @@ class EnrollmentOut(BaseModel):
 
 class CourseEnrollRequest(BaseModel):
     enrollmentCode: str
+
+
+class EnrollmentImportRowOut(BaseModel):
+    row_number: int
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    sis_login_id: Optional[str] = None
+    sis_user_id: Optional[str] = None
+    external_id: Optional[str] = None
+    status: Literal["enrolled", "already_enrolled", "created_and_enrolled", "skipped", "error"]
+    message: Optional[str] = None
+
+
+class EnrollmentImportResult(BaseModel):
+    total_rows: int
+    enrolled_count: int
+    already_enrolled_count: int
+    created_users_count: int
+    skipped_count: int
+    rows: list[EnrollmentImportRowOut]

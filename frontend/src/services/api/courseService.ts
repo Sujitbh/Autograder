@@ -20,6 +20,9 @@ interface BackendCourse {
     is_active: boolean;
     created_at?: string | null;
     updated_at?: string | null;
+    student_count?: number;
+    assignment_count?: number;
+    pending_grades?: number;
 }
 
 interface BackendEnrollmentUser {
@@ -29,19 +32,41 @@ interface BackendEnrollmentUser {
     role: string;
 }
 
+export type EnrollmentRole = 'student' | 'ta' | 'instructor';
+
 export interface CourseEnrollment {
     id: number;
     course_id: number;
     user_id: number;
-    role: 'student' | 'ta' | 'instructor';
+    role: EnrollmentRole;
     created_at?: string | null;
     user?: BackendEnrollmentUser;
+}
+
+export interface EnrollmentImportRow {
+    row_number: number;
+    name: string | null;
+    email: string | null;
+    sis_login_id: string | null;
+    sis_user_id: string | null;
+    external_id: string | null;
+    status: 'enrolled' | 'already_enrolled' | 'created_and_enrolled' | 'skipped' | 'error';
+    message: string | null;
+}
+
+export interface EnrollmentImportResult {
+    total_rows: number;
+    enrolled_count: number;
+    already_enrolled_count: number;
+    created_users_count: number;
+    skipped_count: number;
+    rows: EnrollmentImportRow[];
 }
 
 interface CreateEnrollmentPayload {
     user_id?: number;
     email?: string;
-    role: 'student' | 'ta' | 'instructor';
+    role: EnrollmentRole;
 }
 
 /** Map a backend course to the frontend Course type */
@@ -56,9 +81,9 @@ function mapCourse(c: BackendCourse): Course {
         enrollmentCode: c.enrollment_code ?? '',
         enrollmentCodeActive: c.enrollment_code_active,
         status: c.is_active ? 'active' : 'archived',
-        studentCount: 0,
-        assignmentCount: 0,
-        pendingGrades: 0,
+        studentCount: c.student_count ?? 0,
+        assignmentCount: c.assignment_count ?? 0,
+        pendingGrades: c.pending_grades ?? 0,
         createdAt: c.created_at ?? '',
         updatedAt: c.updated_at ?? '',
     };
@@ -147,6 +172,34 @@ export const courseService = {
         const { data } = await api.post<CourseEnrollment>(
             '/courses/enroll',
             { enrollmentCode }
+        );
+        return data;
+    },
+
+    /** Import a roster file and bulk-enroll members. */
+    async importEnrollmentsFromFile(
+        courseId: string,
+        payload: {
+            file: File;
+            role?: EnrollmentRole;
+            createMissingUsers?: boolean;
+            defaultDomain?: string;
+        }
+    ): Promise<EnrollmentImportResult> {
+        const formData = new FormData();
+        formData.append('file', payload.file);
+        formData.append('role', payload.role ?? 'student');
+        formData.append('create_missing_users', String(payload.createMissingUsers ?? true));
+        formData.append('default_domain', payload.defaultDomain ?? 'warhawks.ulm.edu');
+
+        const { data } = await api.post<EnrollmentImportResult>(
+            `/courses/${courseId}/enrollments/import`,
+            formData,
+            {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            }
         );
         return data;
     },

@@ -533,10 +533,16 @@ def ta_run_tests(
             raise HTTPException(status_code=400, detail="No files in submission")
 
         main_file = files[0]
-        if not main_file.path or not os.path.exists(main_file.path):
+        actual_path = main_file.path
+        if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
+            from app.settings import settings
+            from pathlib import Path
+            actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
+
+        if not actual_path or not os.path.exists(actual_path):
             raise HTTPException(status_code=400, detail="Submission file not found on disk")
 
-        with open(main_file.path, "r", errors="replace") as fh:
+        with open(actual_path, "r", errors="replace") as fh:
             code = fh.read()
 
         language = ExecutionService.detect_language(main_file.filename) or "python"

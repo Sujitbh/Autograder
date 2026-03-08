@@ -162,6 +162,10 @@ export const adminService = {
     return data;
   },
 
+  async deleteCourse(id: number): Promise<void> {
+    await api.delete(`/admin/courses/${id}`);
+  },
+
   // Semesters
   async getSemesters(): Promise<AdminSemester[]> {
     const { data } = await withRetry(() => api.get<AdminSemester[]>('/admin/semesters'));

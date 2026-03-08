@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
-import { codeExecutionApiService } from '@/services/api/codeExecutionApiService';
+import { codeExecutionApiService, type ExecuteCodeResponse } from '@/services/api/codeExecutionApiService';
 import type { BackendTestCase } from '@/services/api/testcaseService';
 import type { TestCaseRunResult } from '@/components/TestResultsPanel';
+import { runClientPython, runClientJavaScript } from '@/utils/clientExecution';
 
 export function useTestCaseRunner() {
   const [isRunning, setIsRunning] = useState(false);
@@ -23,11 +24,19 @@ export function useTestCaseRunner() {
       const tc = testCases[i];
       const testName = tc.name || `Test ${i + 1}`;
       try {
-        const execResult = await codeExecutionApiService.execute({
-          code,
-          language,
-          stdin_input: tc.input_data ?? '',
-        });
+        let execResult: ExecuteCodeResponse;
+
+        if (language === 'python') {
+          execResult = await runClientPython(code, tc.input_data ?? '');
+        } else if (language === 'javascript') {
+          execResult = await runClientJavaScript(code, tc.input_data ?? '');
+        } else {
+          execResult = await codeExecutionApiService.execute({
+            code,
+            language,
+            stdin_input: tc.input_data ?? '',
+          });
+        }
 
         const actual = execResult.stdout.trim();
         const expected = (tc.expected_output ?? '').trim();

@@ -20,6 +20,7 @@ from app.api.routes import (
     ta,
     ta_dashboard,
     admin,
+    messages,
 )
 from app.settings import settings
 import logging
@@ -84,6 +85,7 @@ app.include_router(student_dashboard.router, prefix="/api")
 app.include_router(ta.router, prefix="/api")
 app.include_router(ta_dashboard.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(messages.router, prefix="/api")
 
 @app.get("/health")
 def health():

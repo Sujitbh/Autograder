@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronDown, GraduationCap, LogOut, User, Bell, BookOpen, Moon, Sun, StickyNote, CalendarDays, ArrowLeftRight } from 'lucide-react';
+import { ChevronRight, ChevronDown, GraduationCap, LogOut, User, MessageSquare, BookOpen, Moon, Sun, StickyNote, CalendarDays, ArrowLeftRight } from 'lucide-react';
 import { LiveClock } from './LiveClock';
 import {
   DropdownMenu,
@@ -13,6 +13,8 @@ import { useTheme } from '../utils/ThemeContext';
 import { useNotesPanel } from './PageLayout';
 import { useTAStatus } from '@/hooks/queries/useTADashboard';
 import { useAuth } from '@/utils/AuthContext';
+import { useUnreadMessageCount } from '@/hooks/queries/useMessages';
+import { useAllAssignments } from '@/hooks/queries';
 
 interface TopNavProps {
   breadcrumbs?: { label: string; href?: string }[];
@@ -33,7 +35,7 @@ interface TopNavProps {
  * 
  * Left Zone:
  * - ULM Shield Logo: 32×32px SVG, white fill, margin-right 12px
- * - App Name: "Autograder" — Inter Bold 18px, white, letter-spacing 0.5px
+ * - App Name: "Axiom" — Inter Bold 18px, white, letter-spacing 0.5px
  * 
  * Center Zone:
  * - Breadcrumb trail: "Courses > CSCI 3020 > Assignments" (dynamic based on current route)
@@ -77,6 +79,27 @@ export function TopNav({
   const { data: taStatus } = useTAStatus();
   const isTA = isStudent && taStatus?.is_ta;
   const isInTAView = pathname?.startsWith('/ta');
+
+  const { data: unreadCount = 0 } = useUnreadMessageCount();
+  const { data: apiAssignments = [] } = useAllAssignments();
+
+  // Highlight assignments due today
+  const dueTodayCount = apiAssignments.filter(a => {
+    if (!a.dueDate) return false;
+    const isIsoString = a.dueDate.includes('T');
+    const d = isIsoString ? new Date(a.dueDate) : new Date(a.dueDate + 'T00:00:00');
+    const today = new Date();
+    return (
+      d.getFullYear() === today.getFullYear() &&
+      d.getMonth() === today.getMonth() &&
+      d.getDate() === today.getDate()
+    );
+  }).length;
+
+
+  const navFg = 'var(--color-nav-fg)';
+  const navFgMuted = 'var(--color-nav-fg-muted)';
+  const navFgSubtle = 'var(--color-nav-fg-subtle)';
 
   const handleSwitchView = () => {
     if (isInTAView) {
@@ -147,7 +170,8 @@ export function TopNav({
           style={{
             width: '32px',
             height: '32px',
-            marginRight: '12px'
+            marginRight: '12px',
+            color: navFg,
           }}
         />
         <span
@@ -155,10 +179,11 @@ export function TopNav({
           style={{
             fontSize: '18px',
             fontWeight: 700,
-            letterSpacing: '0.5px'
+            letterSpacing: '0.5px',
+            color: navFg,
           }}
         >
-          Autograder
+          Axiom
         </span>
       </button>
 
@@ -173,7 +198,7 @@ export function TopNav({
                   style={{
                     width: '12px',
                     height: '12px',
-                    opacity: 0.5
+                    color: navFgSubtle,
                   }}
                 />
               )}
@@ -183,7 +208,7 @@ export function TopNav({
                   className="hover:opacity-100 transition-opacity"
                   style={{
                     fontSize: '13px',
-                    color: 'rgba(255, 255, 255, 0.75)'
+                    color: navFgMuted,
                   }}
                 >
                   {crumb.label}
@@ -192,7 +217,7 @@ export function TopNav({
                 <span
                   style={{
                     fontSize: '13px',
-                    color: 'rgba(255, 255, 255, 0.75)'
+                    color: navFgMuted,
                   }}
                 >
                   {crumb.label}
@@ -215,7 +240,7 @@ export function TopNav({
               border: '1px solid rgba(255,255,255,0.25)',
               fontSize: '12px',
               fontWeight: 600,
-              color: 'white',
+              color: navFg,
             }}
             title={isInTAView ? 'Switch to Student view' : 'Switch to TA view'}
           >
@@ -231,33 +256,38 @@ export function TopNav({
           aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {isDark ? (
-            <Sun className="text-white" style={{ width: '22px', height: '22px' }} />
+            <Sun className="text-white" style={{ width: '22px', height: '22px', color: navFg }} />
           ) : (
-            <Moon className="text-white" style={{ width: '22px', height: '22px' }} />
+            <Moon className="text-white" style={{ width: '22px', height: '22px', color: navFg }} />
           )}
         </button>
 
-        {/* Notification Bell with Red Dot Badge */}
+        {/* Messaging Icon with Red Dot Badge */}
         <button
           className="relative hover:opacity-80 transition-opacity"
-          aria-label="Notifications"
-          onClick={() => router.push(currentUser?.role === 'student' ? '/student/notifications' : '/faculty/notifications')}
+          aria-label="Messages"
+          onClick={() => router.push(currentUser?.role === 'student' ? '/student/messages' : '/faculty/messages')}
         >
-          <Bell
+          <MessageSquare
             className="text-white"
-            style={{ width: '24px', height: '24px' }}
+            style={{ width: '22px', height: '22px', color: navFg }}
           />
-          {hasUnreadNotifications && (
+          {unreadCount > 0 && (
             <div
-              className="absolute rounded-full"
+              className="absolute rounded-full flex items-center justify-center font-bold"
               style={{
-                width: '8px',
-                height: '8px',
-                backgroundColor: 'var(--color-error)',
-                top: '0',
-                right: '0'
+                width: '16px',
+                height: '16px',
+                backgroundColor: '#FACC15', // yellow-400
+                top: '-6px',
+                right: '-6px',
+                fontSize: '10px',
+                color: '#6B0000',
+                border: '2px solid var(--color-nav-bg)'
               }}
-            />
+            >
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </div>
           )}
         </button>
 
@@ -276,7 +306,7 @@ export function TopNav({
         >
           <StickyNote
             className="text-white"
-            style={{ width: '22px', height: '22px' }}
+            style={{ width: '22px', height: '22px', color: navFg }}
           />
         </button>
 
@@ -295,8 +325,25 @@ export function TopNav({
         >
           <CalendarDays
             className="text-white"
-            style={{ width: '22px', height: '22px' }}
+            style={{ width: '22px', height: '22px', color: navFg }}
           />
+          {dueTodayCount > 0 && (
+            <div
+              className="absolute rounded-full flex items-center justify-center font-bold"
+              style={{
+                width: '16px',
+                height: '16px',
+                backgroundColor: '#FACC15', // yellow-400
+                top: '-2px',
+                right: '-2px',
+                fontSize: '10px',
+                color: '#6B0000',
+                border: '2px solid var(--color-nav-bg)'
+              }}
+            >
+              {dueTodayCount > 9 ? '9+' : dueTodayCount}
+            </div>
+          )}
         </button>
 
         {/* Live Date & Time */}
@@ -307,7 +354,7 @@ export function TopNav({
           style={{
             width: '1px',
             height: '24px',
-            backgroundColor: 'rgba(255, 255, 255, 0.25)'
+            backgroundColor: navFgSubtle,
           }}
         />
 
@@ -334,7 +381,8 @@ export function TopNav({
               style={{
                 fontSize: '14px',
                 fontWeight: 500,
-                maxWidth: '160px'
+                maxWidth: '160px',
+                color: navFg,
               }}
             >
               {userName}
@@ -346,7 +394,7 @@ export function TopNav({
               style={{
                 width: '16px',
                 height: '16px',
-                opacity: 0.75
+                color: navFgSubtle,
               }}
             />
           </DropdownMenuTrigger>

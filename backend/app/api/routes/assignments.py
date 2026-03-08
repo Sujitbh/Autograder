@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from typing import List, Optional
 
 from app.api.deps import get_db, get_current_user, get_current_user_optional
@@ -19,7 +19,7 @@ def list_assignments(
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional),
 ):
-    q = db.query(Assignment)
+    q = db.query(Assignment).options(selectinload(Assignment.rubrics))
     if course_id is not None:
         q = q.filter(Assignment.course_id == course_id)
 
@@ -92,7 +92,12 @@ def create_assignment(
 
 @router.get("/{assignment_id}", response_model=AssignmentOut)
 def get_assignment(assignment_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    assignment = (
+        db.query(Assignment)
+        .options(selectinload(Assignment.rubrics))
+        .filter(Assignment.id == assignment_id)
+        .first()
+    )
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     return assignment

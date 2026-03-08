@@ -149,16 +149,16 @@ export function SignupPage({ onSignup }: SignupPageProps) {
           <div className="text-center z-10 px-8">
             <div className="mb-8 flex justify-center">
               <div className="w-32 h-32 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                <GraduationCap className="w-20 h-20 text-white" />
+                <GraduationCap className="w-20 h-20 text-[#FFFFFF]" />
               </div>
             </div>
-            <h1 className="text-white mb-4" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px' }}>
-              Autograder
+            <h1 className="text-[#FFFFFF] mb-4" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px' }}>
+              Axiom
             </h1>
-            <p className="text-white/80" style={{ fontSize: '18px', lineHeight: '26px' }}>
+            <p className="text-[#FFFFFF]/80" style={{ fontSize: '18px', lineHeight: '26px' }}>
               University of Louisiana Monroe
             </p>
-            <p className="text-white/70 mt-2" style={{ fontSize: '14px', lineHeight: '22px' }}>
+            <p className="text-[#FFFFFF]/70 mt-2" style={{ fontSize: '14px', lineHeight: '22px' }}>
               Automated Grading System
             </p>
 
@@ -171,7 +171,7 @@ export function SignupPage({ onSignup }: SignupPageProps) {
               ].map((feature, index) => (
                 <div key={index} className="flex items-start gap-3">
                   <CheckCircle className="w-5 h-5 text-[var(--color-gold-accent)] flex-shrink-0 mt-0.5" />
-                  <p className="text-white/80" style={{ fontSize: '14px', lineHeight: '22px' }}>
+                  <p className="text-[#FFFFFF]/80" style={{ fontSize: '14px', lineHeight: '22px' }}>
                     {feature}
                   </p>
                 </div>
@@ -184,10 +184,10 @@ export function SignupPage({ onSignup }: SignupPageProps) {
           <div className="w-full max-w-md py-8">
             <div className="lg:hidden mb-8 text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ backgroundColor: 'var(--color-primary)' }}>
-                <GraduationCap className="w-10 h-10 text-white" />
+                <GraduationCap className="w-10 h-10 text-[#FFFFFF]" />
               </div>
               <h2 style={{ fontSize: '22px', fontWeight: 600, lineHeight: '30px', color: 'var(--color-text-dark)' }}>
-                Autograder
+                Axiom
               </h2>
             </div>
 
@@ -278,16 +278,16 @@ export function SignupPage({ onSignup }: SignupPageProps) {
         <div className="text-center z-10 px-8">
           <div className="mb-8 flex justify-center">
             <div className="w-32 h-32 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-              <GraduationCap className="w-20 h-20 text-white" />
+              <GraduationCap className="w-20 h-20 text-[#FFFFFF]" />
             </div>
           </div>
-          <h1 className="text-white mb-4" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px' }}>
-            Autograder
+          <h1 className="text-[#FFFFFF] mb-4" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px' }}>
+            Axiom
           </h1>
-          <p className="text-white/80" style={{ fontSize: '18px', lineHeight: '26px' }}>
+          <p className="text-[#FFFFFF]/80" style={{ fontSize: '18px', lineHeight: '26px' }}>
             University of Louisiana Monroe
           </p>
-          <p className="text-white/70 mt-2" style={{ fontSize: '14px', lineHeight: '22px' }}>
+          <p className="text-[#FFFFFF]/70 mt-2" style={{ fontSize: '14px', lineHeight: '22px' }}>
             Automated Grading System
           </p>
 
@@ -300,7 +300,7 @@ export function SignupPage({ onSignup }: SignupPageProps) {
             ].map((feature, index) => (
               <div key={index} className="flex items-start gap-3">
                 <CheckCircle className="w-5 h-5 text-[var(--color-gold-accent)] flex-shrink-0 mt-0.5" />
-                <p className="text-white/80" style={{ fontSize: '14px', lineHeight: '22px' }}>
+                <p className="text-[#FFFFFF]/80" style={{ fontSize: '14px', lineHeight: '22px' }}>
                   {feature}
                 </p>
               </div>
@@ -313,10 +313,10 @@ export function SignupPage({ onSignup }: SignupPageProps) {
         <div className="w-full max-w-md py-8">
           <div className="lg:hidden mb-8 text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ backgroundColor: 'var(--color-primary)' }}>
-              <GraduationCap className="w-10 h-10 text-white" />
+              <GraduationCap className="w-10 h-10 text-[#FFFFFF]" />
             </div>
             <h2 style={{ fontSize: '22px', fontWeight: 600, lineHeight: '30px', color: 'var(--color-text-dark)' }}>
-              Autograder
+              Axiom
             </h2>
           </div>
 

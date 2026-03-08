@@ -1,4 +1,5 @@
 from .user import User
+from .message import Message
 from .assignment import Assignment
 from .submission import Submission
 from .submission_file import SubmissionFile
@@ -20,6 +21,7 @@ from .ta_permission import TAPermission
 # Expose symbols for convenience
 __all__ = [
 	"User",
+	"Message",
 	"Assignment",
 	"Submission",
 	"SubmissionFile",

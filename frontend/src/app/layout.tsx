@@ -3,8 +3,8 @@ import '@/styles/index.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-    title: 'Axiom Autograder',
-    description: 'Axiom Autograder – Automated Grading Platform',
+    title: 'Axiom',
+    description: 'Axiom – Automated Grading Platform',
 };
 
 export default function RootLayout({

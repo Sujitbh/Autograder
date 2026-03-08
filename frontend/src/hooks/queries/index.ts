@@ -35,6 +35,12 @@ export {
 } from './useGrades';
 
 export {
+    useSendMessage,
+    useMarkThreadRead,
+    useContacts,
+} from './useMessages';
+
+export {
     useAdminStats,
     useAdminActivity,
     useAdminUsers,

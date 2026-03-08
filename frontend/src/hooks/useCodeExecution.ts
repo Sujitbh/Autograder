@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { codeExecutionApiService, type ExecuteCodeResponse } from '@/services/api/codeExecutionApiService';
+import { runClientPython, runClientJavaScript } from '@/utils/clientExecution';
 
 export function useCodeExecution() {
   const [isRunning, setIsRunning] = useState(false);
@@ -10,11 +11,20 @@ export function useCodeExecution() {
     setIsRunning(true);
     setError(null);
     try {
-      const res = await codeExecutionApiService.execute({
-        code,
-        language,
-        stdin_input: stdin || '',
-      });
+      let res: ExecuteCodeResponse;
+
+      if (language === 'python') {
+        res = await runClientPython(code, stdin || '');
+      } else if (language === 'javascript') {
+        res = await runClientJavaScript(code, stdin || '');
+      } else {
+        res = await codeExecutionApiService.execute({
+          code,
+          language,
+          stdin_input: stdin || '',
+        });
+      }
+
       setResult(res);
       return res;
     } catch (e) {

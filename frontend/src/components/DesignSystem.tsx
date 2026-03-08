@@ -54,7 +54,7 @@ export function DesignSystem() {
       <main className="p-8 max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px', color: 'var(--color-text-dark)', marginBottom: '8px' }}>
-            AutoGrade Design System
+            Axiom Design System
           </h1>
           <p style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>
             Complete reference for colors, typography, spacing, and components
@@ -66,11 +66,11 @@ export function DesignSystem() {
           <h2 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '24px' }}>
             1.1 Color Palette
           </h2>
-          
+
           <div className="space-y-4">
             {colorTokens.map((token) => (
               <div key={token.name} className="flex items-center gap-4 p-4 border rounded-lg" style={{ borderColor: 'var(--color-border)' }}>
-                <div 
+                <div
                   className="w-16 h-16 rounded-lg border flex-shrink-0"
                   style={{ backgroundColor: token.value, borderColor: 'var(--color-border)' }}
                 />
@@ -97,7 +97,7 @@ export function DesignSystem() {
           <h2 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '24px' }}>
             1.2 Typography Scale
           </h2>
-          
+
           <div className="space-y-6">
             {typographyScale.map((type, index) => (
               <div key={index} className="p-4 border rounded-lg" style={{ borderColor: 'var(--color-border)' }}>
@@ -124,7 +124,7 @@ export function DesignSystem() {
           <h2 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '24px' }}>
             1.3 Spacing Scale (8px Grid)
           </h2>
-          
+
           <div className="space-y-3">
             {spacingScale.map((space) => (
               <div key={space.token} className="flex items-center gap-4">
@@ -134,7 +134,7 @@ export function DesignSystem() {
                 <span style={{ fontSize: '13px', color: 'var(--color-text-mid)', width: '60px' }}>
                   {space.value}
                 </span>
-                <div 
+                <div
                   className="bg-[var(--color-primary)]"
                   style={{ width: space.value, height: '32px' }}
                 />
@@ -153,7 +153,7 @@ export function DesignSystem() {
           <h2 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '24px' }}>
             1.4 Shadows
           </h2>
-          
+
           <div className="grid grid-cols-3 gap-6">
             <div className="text-center">
               <div className="bg-white rounded-lg p-6 mb-2" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
@@ -189,7 +189,7 @@ export function DesignSystem() {
           <h2 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '24px' }}>
             1.5 Border Radius
           </h2>
-          
+
           <div className="grid grid-cols-4 gap-6">
             {[
               { token: '--radius-sm', value: '4px' },
@@ -198,7 +198,7 @@ export function DesignSystem() {
               { token: '--radius-xl', value: '16px' },
             ].map((radius) => (
               <div key={radius.token} className="text-center">
-                <div 
+                <div
                   className="bg-[var(--color-primary)] w-24 h-24 mb-2 mx-auto"
                   style={{ borderRadius: radius.value }}
                 />
