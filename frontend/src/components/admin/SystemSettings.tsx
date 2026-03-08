@@ -12,7 +12,7 @@ const SETTING_CATEGORIES = [
     key: 'general',
     label: 'General',
     fields: [
-      { key: 'site_name', label: 'Site Name', placeholder: 'Autograder' },
+      { key: 'site_name', label: 'Site Name', placeholder: 'Axiom' },
       { key: 'institution_name', label: 'Institution', placeholder: 'University of Louisiana Monroe' },
       { key: 'support_email', label: 'Support Email', placeholder: 'support@ulm.edu' },
     ],

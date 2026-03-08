@@ -675,7 +675,7 @@ export function SettingsPage() {
                                                     Course Enrollment Code
                                                 </h2>
                                                 <p style={{ fontSize: '13px', color: 'var(--color-text-mid)', marginTop: '4px' }}>
-                                                    Students use this code to join your course on AutoGrade
+                                                    Students use this code to join your course on Axiom
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-2">
@@ -839,7 +839,7 @@ export function SettingsPage() {
                                                         Students join your course by:
                                                     </p>
                                                     <ol className="mt-2 space-y-1" style={{ fontSize: '12px', color: '#1A4D7A', paddingLeft: '16px', listStyle: 'decimal' }}>
-                                                        <li>Logging in to AutoGrade</li>
+                                                        <li>Logging in to Axiom</li>
                                                         <li>Clicking "Join Course" in their dashboard</li>
                                                         <li>Entering the 7-character code: <strong style={{ fontFamily: 'monospace', letterSpacing: '1px' }}>{enrollmentCode}</strong></li>
                                                     </ol>
@@ -905,8 +905,8 @@ export function SettingsPage() {
                                     </div>
 
                                     <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                                        <TAManagement 
-                                            courseId={Number(courseId)} 
+                                        <TAManagement
+                                            courseId={Number(courseId)}
                                             enrolledStudents={enrolledStudents}
                                             onInvitationSent={() => {
                                                 if (courseId) {

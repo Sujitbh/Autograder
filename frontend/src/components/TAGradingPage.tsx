@@ -238,14 +238,14 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                     </div>
 
                     {/* Code content */}
-                    <div className="flex-1 overflow-auto" style={{ backgroundColor: '#1e1e1e' }}>
+                    <div className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--color-surface)' }}>
                         {activeFile?.content ? (
                             <pre
                                 className="p-4"
                                 style={{
                                     fontSize: '13px',
                                     fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-                                    color: '#d4d4d4',
+                                    color: 'var(--color-text-dark)',
                                     lineHeight: 1.6,
                                     margin: 0,
                                     whiteSpace: 'pre',
@@ -253,11 +253,11 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                 }}
                             >
                                 {activeFile.content.split('\n').map((line, i) => (
-                                    <div key={`line-${i}-${line.length}`} className="flex hover:bg-[rgba(255,255,255,0.05)]">
+                                    <div key={`line-${i}-${line.length}`} className="flex hover:bg-gray-100 dark:hover:bg-gray-800">
                                         <span
                                             className="select-none text-right pr-4 flex-shrink-0"
                                             style={{
-                                                color: '#858585',
+                                                color: 'var(--color-text-light)',
                                                 width: '50px',
                                                 fontSize: '12px',
                                                 lineHeight: 1.6,
@@ -271,7 +271,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                             </pre>
                         ) : (
                             <div className="flex items-center justify-center h-full">
-                                <p style={{ color: '#858585', fontSize: '14px' }}>No file content available</p>
+                                <p style={{ color: 'var(--color-text-mid)', fontSize: '14px' }}>No file content available</p>
                             </div>
                         )}
                     </div>
@@ -354,10 +354,11 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                             <button
                                 onClick={handleRunTests}
                                 disabled={runTestsMutation.isPending || autoGradeMutation.isPending}
-                                className="flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-lg transition-all hover:-translate-y-0.5 shadow-sm hover:shadow-md disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-none"
                                 style={{
-                                    backgroundColor: '#1e40af',
-                                    color: 'white',
+                                    backgroundColor: 'var(--color-primary-light)',
+                                    color: 'var(--color-primary)',
+                                    border: '1px solid var(--color-primary)',
                                     fontSize: '13px',
                                     fontWeight: 600,
                                 }}
@@ -374,9 +375,9 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                             <button
                                 onClick={handleAutoGrade}
                                 disabled={runTestsMutation.isPending || autoGradeMutation.isPending}
-                                className="flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-lg transition-all hover:-translate-y-0.5 shadow-sm hover:shadow-md disabled:opacity-50 disabled:hover:translate-y-0 disabled:shadow-none"
                                 style={{
-                                    backgroundColor: '#7c3aed',
+                                    backgroundColor: 'var(--color-primary)',
                                     color: 'white',
                                     fontSize: '13px',
                                     fontWeight: 600,
@@ -603,9 +604,9 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                         value={score}
                                         onChange={(e) => setScore(e.target.value)}
                                         placeholder="0"
-                                        className="w-full px-3 py-2.5 rounded-lg"
+                                        className="w-full px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none transition-shadow"
                                         style={{
-                                            backgroundColor: 'var(--color-primary-bg)',
+                                            backgroundColor: 'var(--color-surface)',
                                             border: '1px solid var(--color-border)',
                                             fontSize: '14px',
                                             color: 'var(--color-text-dark)',
@@ -625,9 +626,9 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                         value={maxScore}
                                         onChange={(e) => setMaxScore(e.target.value)}
                                         placeholder="100"
-                                        className="w-full px-3 py-2.5 rounded-lg"
+                                        className="w-full px-3 py-2.5 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none transition-shadow"
                                         style={{
-                                            backgroundColor: 'var(--color-primary-bg)',
+                                            backgroundColor: 'var(--color-surface)',
                                             border: '1px solid var(--color-border)',
                                             fontSize: '14px',
                                             color: 'var(--color-text-dark)',

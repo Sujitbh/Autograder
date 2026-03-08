@@ -10,6 +10,7 @@ This service provides:
 
 from typing import Optional, List
 from datetime import datetime
+import os
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -77,13 +78,25 @@ class GradingService:
 
         # Read main code file
         main_file = files[0]  # TODO: Better logic to identify main file
+        actual_path = main_file.path
+        if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
+            from app.settings import settings
+            from pathlib import Path
+            actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
+
+        if not actual_path or not __import__("os").path.exists(actual_path):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error reading submission file: [Errno 2] No such file or directory: '{actual_path or main_file.path}'",
+            )
+
         try:
-            with open(main_file.path, "r") as f:
+            with open(actual_path, "r", errors="replace") as f:
                 code = f.read()
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error reading submission file: {str(e)}",
+                detail=f"Error reading submission file {actual_path}: {str(e)}",
             )
 
         # Detect language

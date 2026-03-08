@@ -25,6 +25,12 @@ interface BackendAssignment {
     is_active: boolean;
     created_at: string;
     updated_at?: string | null;
+    rubrics?: Array<{
+        id: number;
+        name: string;
+        description: string | null;
+        max_points: number | null;
+    }>;
 }
 
 /** Map a backend assignment to the frontend Assignment type */
@@ -45,7 +51,13 @@ function mapAssignment(a: BackendAssignment): Assignment {
         allowLateSubmissions: false,
         publicTests: [],
         privateTests: [],
-        rubric: [],
+        rubric: (a.rubrics ?? []).map((r) => ({
+            id: String(r.id),
+            name: r.name,
+            description: r.description ?? '',
+            maxPoints: r.max_points ?? 0,
+            gradingMethod: 'manual' as const,
+        })),
         createdAt: a.created_at ?? '',
         updatedAt: a.updated_at ?? '',
     };
@@ -63,6 +75,11 @@ export const assignmentService = {
             api.get<BackendAssignment[]>(url)
         );
         return data.map(mapAssignment);
+    },
+
+    /** Get all assignments for a course (alias for getAssignments for convenience). */
+    async getCourseAssignments(courseId: string): Promise<Assignment[]> {
+        return this.getAssignments(courseId);
     },
 
     /** Get a single assignment by ID. */

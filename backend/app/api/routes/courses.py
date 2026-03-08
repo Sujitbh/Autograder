@@ -1,4 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+import csv
+import io
+import re
+import pandas as pd
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from app.services.email_service import EmailService
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Annotated, List, Optional
@@ -12,6 +17,7 @@ from app.models.user import User
 from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.group import Group, GroupMembership
+from app.core.security import hash_password
 from app.schemas.course import (
     CourseCreate,
     CourseOut,
@@ -20,6 +26,8 @@ from app.schemas.course import (
     EnrollmentOut,
     EnrollmentUpdate,
     CourseEnrollRequest,
+    EnrollmentImportResult,
+    EnrollmentImportRowOut,
 )
 
 router = APIRouter(prefix="/courses", tags=["courses"])
@@ -32,6 +40,102 @@ COURSE_NOT_FOUND = "Course not found"
 # ── Annotated dependency aliases ──
 DbSession = Annotated[Session, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def _normalize_name(raw_name: str) -> str:
+    name = (raw_name or "").strip()
+    if not name:
+        return ""
+    if "," in name:
+        last, first = [p.strip() for p in name.split(",", 1)]
+        if first and last:
+            return f"{first} {last}"
+    return name
+
+
+def _build_email_from_row(row: dict, default_domain: str) -> Optional[str]:
+    email_candidates = [
+        row.get("email"),
+        row.get("email address"),
+        row.get("student email"),
+    ]
+    for candidate in email_candidates:
+        val = (candidate or "").strip().lower()
+        if "@" in val:
+            return val
+
+    login_candidates = [
+        row.get("sis login id"),
+        row.get("sis_login_id"),
+        row.get("login"),
+        row.get("username"),
+        row.get("user"),
+    ]
+    for candidate in login_candidates:
+        login = (candidate or "").strip().lower()
+        if login:
+            return f"{login}@{default_domain}"
+
+    return None
+
+
+def _parse_dict_rows(decoded_text: str) -> list[dict]:
+    sample = decoded_text[:4096]
+    delimiter = ","
+    try:
+        sniffed = csv.Sniffer().sniff(sample, delimiters=",\t;")
+        delimiter = sniffed.delimiter
+    except Exception:
+        delimiter = ","
+
+    reader = csv.DictReader(io.StringIO(decoded_text), delimiter=delimiter)
+    if not reader.fieldnames:
+        return []
+
+    normalized_rows: list[dict] = []
+    for raw_row in reader:
+        normalized = {str(k).strip().lower(): (v or "").strip() for k, v in raw_row.items() if k is not None}
+        if any(normalized.values()):
+            normalized_rows.append(normalized)
+    return normalized_rows
+
+
+def _parse_fixed_width_rows(decoded_text: str) -> list[dict]:
+    rows: list[dict] = []
+    pattern = re.compile(
+        r"^(?P<name>.+?)\s+(?P<external_id>\d{3,})\s+(?P<sis_user_id>\d{5,})\s+(?P<sis_login_id>[A-Za-z0-9._-]+)\s+.+$"
+    )
+
+    for line in decoded_text.splitlines():
+        text = line.strip()
+        if not text:
+            continue
+        lowered = text.lower()
+        if "student" in lowered and "sis" in lowered:
+            continue
+        if "points possible" in lowered:
+            continue
+
+        match = pattern.match(text)
+        if not match:
+            continue
+
+        rows.append(
+            {
+                "student": match.group("name").strip(),
+                "external_id": match.group("external_id").strip(),
+                "sis_user_id": match.group("sis_user_id").strip(),
+                "sis_login_id": match.group("sis_login_id").strip(),
+            }
+        )
+    return rows
+
+
+def _parse_roster_rows(decoded_text: str) -> list[dict]:
+    dict_rows = _parse_dict_rows(decoded_text)
+    if dict_rows:
+        return dict_rows
+    return _parse_fixed_width_rows(decoded_text)
 
 
 def generate_enrollment_code(db: Session) -> str:
@@ -193,6 +297,234 @@ def add_course_enrollment(
     db.commit()
     db.refresh(enrollment)
     return enrollment
+
+
+@router.post(
+    "/{course_id}/enrollments/import",
+    response_model=EnrollmentImportResult,
+    responses={400: {"description": "Bad request"}, 404: {"description": "Resource not found"}},
+)
+async def import_course_enrollments(
+    course_id: int,
+    db: DbSession,
+    user: CurrentUser,
+    file: Annotated[UploadFile, File()],
+    role: str = Form("student"),
+    create_missing_users: bool = Form(True),
+    default_domain: str = Form("warhawks.ulm.edu"),
+):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail=COURSE_NOT_FOUND)
+    require_course_role(db=db, user=user, course_id=course_id, allowed_roles=["instructor"])
+
+    allowed_roles = {"student", "ta", "instructor"}
+    if role not in allowed_roles:
+        raise HTTPException(status_code=400, detail="Invalid role for import")
+
+    if "@" in default_domain or not default_domain.strip():
+        raise HTTPException(status_code=400, detail="default_domain must be a domain like warhawks.ulm.edu")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    filename = file.filename.lower() if file.filename else ""
+    try:
+        if filename.endswith(".xlsx") or filename.endswith(".xls"):
+            df = pd.read_excel(io.BytesIO(content))
+        else:
+            df = pd.read_csv(io.BytesIO(content))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse file: {str(e)}")
+
+    df = df.fillna("")
+    raw_rows = df.to_dict(orient="records")
+
+    parsed_rows = []
+    for row in raw_rows:
+        n_row = {str(k).strip().lower(): str(v).strip() for k, v in row.items() if k is not None}
+        if any(v for k, v in n_row.items() if k != "unnamed: 0"): # Ignore empty rows
+            parsed_rows.append(n_row)
+
+    if not parsed_rows:
+        raise HTTPException(status_code=400, detail="No usable roster rows could be parsed from file")
+
+    results: list[EnrollmentImportRowOut] = []
+    enrolled_count = 0
+    already_enrolled_count = 0
+    created_users_count = 0
+    skipped_count = 0
+
+    for idx, row in enumerate(parsed_rows, start=1):
+        # Course Code Validation
+        row_course_code = (row.get("course code") or row.get("course") or "").strip()
+        
+        if course.code and row_course_code:
+            if course.code.lower() != row_course_code.lower():
+                skipped_count += 1
+                results.append(
+                    EnrollmentImportRowOut(
+                        row_number=idx,
+                        name=row.get("student") or row.get("name"),
+                        email=None,
+                        sis_login_id=None,
+                        sis_user_id=None,
+                        external_id=None,
+                        status="skipped",
+                        message=f"Course code mismatch: expected '{course.code}', got '{row_course_code}'",
+                    )
+                )
+                continue
+
+        name_raw = (
+            row.get("student")
+            or row.get("name")
+            or row.get("student name")
+            or row.get("full name")
+            or ""
+        )
+        normalized_name = _normalize_name(name_raw)
+        email = _build_email_from_row(row, default_domain.strip().lower())
+        sis_login_id = (row.get("sis login id") or row.get("sis_login_id") or "").strip() or None
+        sis_user_id = (row.get("sis user id") or row.get("sis_user_id") or "").strip() or None
+        external_id = (row.get("id") or row.get("external_id") or "").strip() or None
+
+        if not email:
+            skipped_count += 1
+            results.append(
+                EnrollmentImportRowOut(
+                    row_number=idx,
+                    name=normalized_name or None,
+                    email=None,
+                    sis_login_id=sis_login_id,
+                    sis_user_id=sis_user_id,
+                    external_id=external_id,
+                    status="skipped",
+                    message="No email or SIS login ID found",
+                )
+            )
+            continue
+
+        target_user = db.query(User).filter(User.email == email).first()
+        row_status = "enrolled"
+        row_message = None
+
+        if not target_user:
+            if not create_missing_users:
+                skipped_count += 1
+                results.append(
+                    EnrollmentImportRowOut(
+                        row_number=idx,
+                        name=normalized_name or None,
+                        email=email,
+                        sis_login_id=sis_login_id,
+                        sis_user_id=sis_user_id,
+                        external_id=external_id,
+                        status="skipped",
+                        message="User not found",
+                    )
+                )
+                continue
+
+            display_name = normalized_name or email.split("@", 1)[0]
+            target_user = User(
+                name=display_name,
+                email=email,
+                password_hash=hash_password("ChangeMe123!"),
+                role="student",
+            )
+            db.add(target_user)
+            db.flush()
+            created_users_count += 1
+            row_status = "created_and_enrolled"
+            row_message = "Created new student user with temporary password: ChangeMe123!"
+
+        if role in {"student", "ta"} and target_user.role != "student":
+            skipped_count += 1
+            results.append(
+                EnrollmentImportRowOut(
+                    row_number=idx,
+                    name=normalized_name or target_user.name,
+                    email=email,
+                    sis_login_id=sis_login_id,
+                    sis_user_id=sis_user_id,
+                    external_id=external_id,
+                    status="skipped",
+                    message="Target user role is not student",
+                )
+            )
+            continue
+        if role == "instructor" and target_user.role not in {"faculty", "admin"}:
+            skipped_count += 1
+            results.append(
+                EnrollmentImportRowOut(
+                    row_number=idx,
+                    name=normalized_name or target_user.name,
+                    email=email,
+                    sis_login_id=sis_login_id,
+                    sis_user_id=sis_user_id,
+                    external_id=external_id,
+                    status="skipped",
+                    message="Target user role is not faculty/admin",
+                )
+            )
+            continue
+
+        existing = db.query(Enrollment).filter(
+            Enrollment.course_id == course_id,
+            Enrollment.user_id == target_user.id,
+        ).first()
+        if existing:
+            already_enrolled_count += 1
+            results.append(
+                EnrollmentImportRowOut(
+                    row_number=idx,
+                    name=normalized_name or target_user.name,
+                    email=email,
+                    sis_login_id=sis_login_id,
+                    sis_user_id=sis_user_id,
+                    external_id=external_id,
+                    status="already_enrolled",
+                    message="User already enrolled",
+                )
+            )
+            continue
+
+        enrollment = Enrollment(course_id=course_id, user_id=target_user.id, role=role)
+        db.add(enrollment)
+        
+        # Send confirmation email
+        EmailService.send_enrollment_email(
+            to_email=email,
+            course_name=course.name,
+            course_code=course.code
+        )
+        
+        enrolled_count += 1
+        results.append(
+            EnrollmentImportRowOut(
+                row_number=idx,
+                name=normalized_name or target_user.name,
+                email=email,
+                sis_login_id=sis_login_id,
+                sis_user_id=sis_user_id,
+                external_id=external_id,
+                status=row_status,
+                message=row_message,
+            )
+        )
+
+    db.commit()
+
+    return EnrollmentImportResult(
+        total_rows=len(parsed_rows),
+        enrolled_count=enrolled_count,
+        already_enrolled_count=already_enrolled_count,
+        created_users_count=created_users_count,
+        skipped_count=skipped_count,
+        rows=results,
+    )
 
 
 @router.patch("/{course_id}/enrollments/{enrollment_id}", response_model=EnrollmentOut, responses={400: {"description": "Bad request"}, 404: {"description": "Resource not found"}})

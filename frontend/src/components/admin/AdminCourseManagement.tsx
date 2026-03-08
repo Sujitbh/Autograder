@@ -5,7 +5,7 @@ import { Search, Loader2, BookOpen, Users, FileText, AlertTriangle } from 'lucid
 import { AdminLayout } from '../AdminLayout';
 import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { useAdminCourses } from '@/hooks/queries/useAdmin';
+import { useAdminCourses, useDeleteAdminCourse } from '@/hooks/queries/useAdmin';
 
 export function AdminCourseManagement() {
   const [search, setSearch] = useState('');
@@ -17,6 +17,13 @@ export function AdminCourseManagement() {
   };
 
   const { data: courses, isLoading } = useAdminCourses(params);
+  const { mutate: deleteCourse, isPending: isDeleting } = useDeleteAdminCourse();
+
+  const handleDelete = (courseId: number, courseName: string) => {
+    if (confirm(`Are you sure you want to delete the course "${courseName}"? This action cannot be undone and will delete all associated enrollments, assignments, and submissions.`)) {
+      deleteCourse(courseId);
+    }
+  };
 
   return (
     <AdminLayout activeItem="courses" breadcrumbs={[{ label: 'Courses' }]}>
@@ -83,15 +90,25 @@ export function AdminCourseManagement() {
                   >
                     {course.code || 'N/A'}
                   </span>
-                  <span
-                    className="inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase"
-                    style={{
-                      backgroundColor: course.is_active ? 'var(--color-success, #2D6A2D)' : 'var(--color-text-light)',
-                      color: '#fff',
-                    }}
-                  >
-                    {course.is_active ? 'Active' : 'Archived'}
-                  </span>
+                  <div className="flex gap-2">
+                    <span
+                      className="inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase"
+                      style={{
+                        backgroundColor: course.is_active ? 'var(--color-success, #2D6A2D)' : 'var(--color-text-light)',
+                        color: '#fff',
+                      }}
+                    >
+                      {course.is_active ? 'Active' : 'Archived'}
+                    </span>
+                    <button
+                      onClick={() => handleDelete(course.id, course.name)}
+                      disabled={isDeleting}
+                      className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded px-2 py-0.5 text-xs font-semibold transition-colors disabled:opacity-50"
+                      title="Delete Course"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
 
                 {/* Title */}

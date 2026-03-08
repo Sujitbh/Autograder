@@ -102,9 +102,15 @@ def get_submission_detail(
     files_out = []
     for f in files:
         content = None
-        if os.path.exists(f.path):
+        actual_path = f.path
+        if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
+            from app.settings import settings
+            from pathlib import Path
+            actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
+
+        if actual_path and os.path.exists(actual_path):
             try:
-                with open(f.path, "r", encoding="utf-8", errors="replace") as fh:
+                with open(actual_path, "r", encoding="utf-8", errors="replace") as fh:
                     content = fh.read()
             except Exception:
                 content = None
@@ -298,11 +304,17 @@ def download_submission_file(
         )
     
     # Check if file exists on disk
-    if not os.path.exists(file_record.path):
+    actual_path = file_record.path
+    if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
+        from app.settings import settings
+        from pathlib import Path
+        actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
+
+    if not actual_path or not os.path.exists(actual_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
     
     return FileResponse(
-        path=file_record.path,
+        path=actual_path,
         filename=file_record.filename,
         media_type="application/octet-stream"
     )
@@ -320,7 +332,7 @@ async def upload_submission_files(
     logger.info(f"Upload request received for assignment {assignment_id} by user {user.email}")
     logger.info(f"Number of files: {len(files) if files else 0}")
     
-    require_role(user.role, {"student"})
+    require_role(user.role, {"student", "ta"})
 
     assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
     if not assignment:

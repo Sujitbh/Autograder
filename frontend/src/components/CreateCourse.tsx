@@ -564,7 +564,7 @@ export function CreateCourse() {
                         </p>
                         <ul className="space-y-1" style={{ fontSize: '13px', color: '#1A4D7A', lineHeight: '20px' }}>
                             <li>• A unique 7-character alphanumeric code is generated when you create the course</li>
-                            <li>• Students enter the code in their AutoGrade dashboard to join instantly</li>
+                            <li>• Students enter the code in their Axiom dashboard to join instantly</li>
                             <li>• You can disable, regenerate, or share the code anytime from Course Settings</li>
                             <li>• You can still manually add students even with code enrollment enabled</li>
                         </ul>
@@ -784,9 +784,9 @@ export function CreateCourse() {
                             </button>
                             <button
                                 onClick={() => {
-                                    const subject = encodeURIComponent(`Join ${createdCourse.title} on AutoGrade`);
+                                    const subject = encodeURIComponent(`Join ${createdCourse.title} on Axiom`);
                                     const body = encodeURIComponent(
-                                        `Hello,\n\nYou are invited to join ${createdCourse.title} (${createdCourse.code}) for ${createdCourse.semester} on AutoGrade.\n\nTo join:\n1. Log in to AutoGrade\n2. Click 'Join Course' in your dashboard\n3. Enter this course code: ${createdCourse.enrollmentCode}\n\nBest regards`
+                                        `Hello,\n\nYou are invited to join ${createdCourse.title} (${createdCourse.code}) for ${createdCourse.semester} on Axiom.\n\nTo join:\n1. Log in to Axiom\n2. Click 'Join Course' in your dashboard\n3. Enter this course code: ${createdCourse.enrollmentCode}\n\nBest regards`
                                     );
                                     window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
                                 }}
@@ -811,7 +811,7 @@ export function CreateCourse() {
                       <h1>${createdCourse.code} — ${createdCourse.title}</h1>
                       <p class="sub">${createdCourse.semester}${createdCourse.section ? ` · Section ${createdCourse.section}` : ''}</p>
                       <div class="code">${createdCourse.enrollmentCode}</div>
-                      <p class="help">To join this course on AutoGrade:<br>
+                      <p class="help">To join this course on Axiom:<br>
                       1. Go to autograde.app and log in<br>
                       2. Click "Join Course" in your dashboard<br>
                       3. Enter the code above</p>

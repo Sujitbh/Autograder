@@ -77,6 +77,17 @@ export function useAdminCourses(params?: { search?: string; is_active?: boolean 
   });
 }
 
+export function useDeleteAdminCourse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => adminService.deleteCourse(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admin', 'courses'] });
+      qc.invalidateQueries({ queryKey: ['admin', 'stats'] });
+    },
+  });
+}
+
 // ── Semesters ─────────────────────────────────────────────────────
 
 export function useAdminSemesters() {

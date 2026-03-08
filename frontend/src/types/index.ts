@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   AutoGrade — Comprehensive TypeScript Type Definitions
+   Axiom — Comprehensive TypeScript Type Definitions
    ═══════════════════════════════════════════════════════════════════ */
 
 // ── User Types ──────────────────────────────────────────────────────

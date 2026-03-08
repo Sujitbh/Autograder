@@ -146,6 +146,25 @@ def list_all_courses(
     return result
 
 
+@router.delete("/courses/{course_id}", status_code=204)
+def delete_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _require_admin(user)
+    
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+        
+    # The SQLAlchemy relationships with cascade="all, delete-orphan" on the Course model 
+    # should automatically handle deleting associated Enrollments, Assignments, etc., 
+    # assuming the backend models are configured correctly.
+    db.delete(course)
+    db.commit()
+
+
 # ==================== Admin Users (enhanced) ====================
 
 @router.get("/users")
