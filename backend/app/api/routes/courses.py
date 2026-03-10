@@ -180,6 +180,25 @@ def list_courses(db: DbSession, user: CurrentUser):
 @router.post("/", response_model=CourseOut, responses={500: {"description": "Internal server error"}})
 def create_course(payload: CourseCreate, db: DbSession, user: CurrentUser):
     require_role(user.role, {"faculty", "admin"})
+    # Find existing course with same code and (no section or same section)
+    existing_course = db.query(Course).filter(
+        Course.code == payload.code,
+        (Course.section == None) | (Course.section == payload.section)
+    ).first()
+
+    if existing_course:
+        # If section is provided, update the existing course's section and details
+        existing_course.name = payload.name
+        existing_course.description = payload.description
+        existing_course.enrollment_code_active = payload.enrollment_code_active
+        if payload.section:
+            existing_course.section = payload.section
+        db.add(existing_course)
+        db.commit()
+        db.refresh(existing_course)
+        return existing_course
+
+    # Otherwise, create a new course (for new section or new code)
     course = Course(
         name=payload.name,
         code=payload.code,
