@@ -70,6 +70,11 @@ const STEPS = [
     { id: 3, label: 'Review & Create', icon: ClipboardList },
 ];
 
+const ADMIN_STEPS = [
+    { id: 1, label: 'Course Info', icon: BookOpen },
+    { id: 3, label: 'Review & Create', icon: ClipboardList },
+];
+
 /* ═══════════════════════════════════════════
    Component
    ═══════════════════════════════════════════ */
@@ -190,8 +195,10 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                 errors.courseCode = 'Use letters, numbers, spaces, or hyphens (e.g., CSCI 2000)';
             if (!courseName.trim()) errors.courseName = 'Course name is required';
             if (!semester) errors.semester = 'Semester is required';
-            if (!section.trim()) errors.section = 'Section number is required';
-            else if (!/^\d{5}$/.test(section.trim())) errors.section = 'Section number must be exactly 5 digits';
+            if (!isAdmin) {
+                if (!section.trim()) errors.section = 'Section number is required';
+                else if (!/^\d{5}$/.test(section.trim())) errors.section = 'Section number must be exactly 5 digits';
+            }
         }
 
         setFormErrors(errors);
@@ -200,12 +207,17 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
 
     const goNext = () => {
         if (!validateStep(currentStep)) return;
-        if (currentStep < 3) setCurrentStep(currentStep + 1);
+        if (isAdmin && currentStep === 1) {
+            setCurrentStep(3);
+        } else if (currentStep < 3) {
+            setCurrentStep(currentStep + 1);
+        }
     };
 
     const goBack = () => {
         if (currentStep > 1) {
-            setCurrentStep(currentStep - 1);
+            const prevStep = isAdmin && currentStep === 3 ? 1 : currentStep - 1;
+            setCurrentStep(prevStep);
             setFormErrors({});
         }
     };
@@ -300,60 +312,63 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
     /* ═══════════════════════════════════════════
        Step Indicator
        ═══════════════════════════════════════════ */
-    const renderStepIndicator = () => (
-        <div className="flex items-center justify-center gap-0 mb-10">
-            {STEPS.map((step, idx) => {
-                const Icon = step.icon;
-                const isActive = currentStep === step.id;
-                const isComplete = currentStep > step.id || currentStep === 4;
+    const renderStepIndicator = () => {
+        const activeSteps = isAdmin ? ADMIN_STEPS : STEPS;
+        return (
+            <div className="flex items-center justify-center gap-0 mb-10">
+                {activeSteps.map((step, idx) => {
+                    const Icon = step.icon;
+                    const isActive = currentStep === step.id;
+                    const isComplete = currentStep > step.id || currentStep === 4;
 
-                return (
-                    <div key={step.id} className="flex items-center">
-                        <div className="flex flex-col items-center" style={{ minWidth: '120px' }}>
-                            <div
-                                className="w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300"
-                                style={{
-                                    backgroundColor: (() => {
-                                        if (isComplete) return '#2D6A2D';
-                                        if (isActive) return '#6B0000';
-                                        return '#F1F1F1';
-                                    })(),
-                                    color: isComplete || isActive ? '#fff' : '#8A8A8A',
-                                    boxShadow: isActive ? '0 0 0 4px rgba(107,0,0,0.15)' : 'none',
-                                }}
-                            >
-                                {isComplete ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                    return (
+                        <div key={step.id} className="flex items-center">
+                            <div className="flex flex-col items-center" style={{ minWidth: '120px' }}>
+                                <div
+                                    className="w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300"
+                                    style={{
+                                        backgroundColor: (() => {
+                                            if (isComplete) return '#2D6A2D';
+                                            if (isActive) return '#6B0000';
+                                            return '#F1F1F1';
+                                        })(),
+                                        color: isComplete || isActive ? '#fff' : '#8A8A8A',
+                                        boxShadow: isActive ? '0 0 0 4px rgba(107,0,0,0.15)' : 'none',
+                                    }}
+                                >
+                                    {isComplete ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                                </div>
+                                <span
+                                    className="mt-2 text-center"
+                                    style={{
+                                        fontSize: '12px',
+                                        fontWeight: isActive ? 600 : 400,
+                                        color: (() => {
+                                            if (isActive) return '#6B0000';
+                                            if (isComplete) return '#2D6A2D';
+                                            return '#8A8A8A';
+                                        })(),
+                                    }}
+                                >
+                                    {step.label}
+                                </span>
                             </div>
-                            <span
-                                className="mt-2 text-center"
-                                style={{
-                                    fontSize: '12px',
-                                    fontWeight: isActive ? 600 : 400,
-                                    color: (() => {
-                                        if (isActive) return '#6B0000';
-                                        if (isComplete) return '#2D6A2D';
-                                        return '#8A8A8A';
-                                    })(),
-                                }}
-                            >
-                                {step.label}
-                            </span>
+                            {idx < activeSteps.length - 1 && (
+                                <div
+                                    className="h-[2px] transition-colors duration-300"
+                                    style={{
+                                        width: '80px',
+                                        backgroundColor: currentStep > step.id || currentStep === 4 ? '#2D6A2D' : '#E5E5E5',
+                                        marginBottom: '20px',
+                                    }}
+                                />
+                            )}
                         </div>
-                        {idx < STEPS.length - 1 && (
-                            <div
-                                className="h-[2px] transition-colors duration-300"
-                                style={{
-                                    width: '80px',
-                                    backgroundColor: currentStep > step.id || currentStep === 4 ? '#2D6A2D' : '#E5E5E5',
-                                    marginBottom: '20px',
-                                }}
-                            />
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-    );
+                    );
+                })}
+            </div>
+        );
+    };
 
     /* ═══════════════════════════════════════════
        STEP 1: Course Information
@@ -479,7 +494,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
             </div>
 
             {/* Semester + Section */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className={isAdmin ? '' : 'grid grid-cols-2 gap-6'}>
                 <div>
                     <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
                         <Calendar className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
@@ -497,24 +512,26 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                     </Select>
                     {renderFieldError(formErrors.semester)}
                 </div>
-                <div>
-                    <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
-                        <FileText className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
-                        Section Number <span style={{ color: '#B91C1C' }}>*</span>
-                    </label>
-                    <Input
-                        value={section}
-                        onChange={e => setSection(e.target.value.replace(/\D/g, '').slice(0, 5))}
-                        placeholder="12345"
-                        maxLength={5}
-                        className="border-[var(--color-border)] h-11"
-                        style={{ fontSize: '15px' }}
-                    />
-                    <p style={{ fontSize: '11px', color: '#8A8A8A', marginTop: '6px' }}>
-                        Uniquely identifies this section of the course
-                    </p>
-                    {renderFieldError(formErrors.section)}
-                </div>
+                {!isAdmin && (
+                    <div>
+                        <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
+                            <FileText className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
+                            Section Number <span style={{ color: '#B91C1C' }}>*</span>
+                        </label>
+                        <Input
+                            value={section}
+                            onChange={e => setSection(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                            placeholder="12345"
+                            maxLength={5}
+                            className="border-[var(--color-border)] h-11"
+                            style={{ fontSize: '15px' }}
+                        />
+                        <p style={{ fontSize: '11px', color: '#8A8A8A', marginTop: '6px' }}>
+                            Uniquely identifies this section of the course
+                        </p>
+                        {renderFieldError(formErrors.section)}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -776,25 +793,27 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
             </div>
 
             {/* What happens next */}
-            <div className="p-5 rounded-xl" style={{ backgroundColor: '#F9FAFB', border: '1px solid var(--color-border)' }}>
-                <p style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D', marginBottom: '10px' }}>What happens next?</p>
-                <div className="space-y-3">
-                    {[
-                        { text: 'Your course will be created and set to Active status', color: '#2D6A2D', order: 1 },
-                        enrollmentMethod === 'code'
-                            ? { text: 'A unique 7-character enrollment code will be generated for students', color: '#1A4D7A', order: 2 }
-                            : { text: 'You can add students manually from the Students page', color: '#8A5700', order: 2 },
-                        { text: 'You can start creating assignments right away', color: '#6B0000', order: 3 },
-                    ].map((item) => (
-                        <div key={item.text} className="flex items-center gap-3">
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: item.color, color: '#fff' }}>
-                                <span style={{ fontSize: '11px', fontWeight: 700 }}>{item.order}</span>
+            {!isAdmin && (
+                <div className="p-5 rounded-xl" style={{ backgroundColor: '#F9FAFB', border: '1px solid var(--color-border)' }}>
+                    <p style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D', marginBottom: '10px' }}>What happens next?</p>
+                    <div className="space-y-3">
+                        {[
+                            { text: 'Your course will be created and set to Active status', color: '#2D6A2D', order: 1 },
+                            enrollmentMethod === 'code'
+                                ? { text: 'A unique 7-character enrollment code will be generated for students', color: '#1A4D7A', order: 2 }
+                                : { text: 'You can add students manually from the Students page', color: '#8A5700', order: 2 },
+                            { text: 'You can start creating assignments right away', color: '#6B0000', order: 3 },
+                        ].map((item) => (
+                            <div key={item.text} className="flex items-center gap-3">
+                                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: item.color, color: '#fff' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: 700 }}>{item.order}</span>
+                                </div>
+                                <p style={{ fontSize: '13px', color: '#595959' }}>{item.text}</p>
                             </div>
-                            <p style={{ fontSize: '13px', color: '#595959' }}>{item.text}</p>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 
@@ -1003,7 +1022,10 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
 
                             <div className="flex items-center gap-2">
                                 <span style={{ fontSize: '13px', color: '#8A8A8A' }}>
-                                    Step {currentStep} of 3
+                                    {isAdmin
+                                        ? `Step ${currentStep === 1 ? 1 : 2} of 2`
+                                        : `Step ${currentStep} of 3`
+                                    }
                                 </span>
                             </div>
 

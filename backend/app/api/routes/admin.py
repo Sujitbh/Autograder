@@ -145,13 +145,13 @@ def list_all_courses(
         student_count = c.student_count
         assignment_count = c.assignment_count
 
-        # Use direct faculty relationship; fall back to instructor enrollment
+        # Use direct faculty relationship; fall back to instructor enrollment (faculty only, not admin)
         faculty_name = None
-        if c.faculty:
+        if c.faculty and c.faculty.role == "faculty":
             faculty_name = c.faculty.name
         else:
             for e in c.enrollments:
-                if e.role == "instructor" and e.user:
+                if e.role == "instructor" and e.user and e.user.role == "faculty":
                     faculty_name = e.user.name
                     break
 
