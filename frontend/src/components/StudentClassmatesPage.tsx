@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useCourses } from '@/hooks/queries/useCourses';
-import { Users } from 'lucide-react';
+import { Users, Search } from 'lucide-react';
 import { StudentLayout } from './StudentLayout';
 import api from '@/services/api/client';
 
@@ -13,6 +14,7 @@ interface StudentClassmatesPageProps {
 export function StudentClassmatesPage({ courseId }: StudentClassmatesPageProps) {
   const { data: courses } = useCourses();
   const course = courses?.find((c) => c.id === courseId);
+  const [search, setSearch] = useState('');
 
   const { data: classmates = [], isLoading } = useQuery({
     queryKey: ['classmates', courseId],
@@ -21,6 +23,11 @@ export function StudentClassmatesPage({ courseId }: StudentClassmatesPageProps) 
       return data;
     },
   });
+
+  const filtered = classmates.filter((c: any) =>
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.email.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <StudentLayout
@@ -31,17 +38,38 @@ export function StudentClassmatesPage({ courseId }: StudentClassmatesPageProps) 
         { label: 'Classmates' },
       ]}
     >
-      <div className="max-w-5xl">
-        <div className="mb-6">
-          <h2 className="text-2xl font-bold" style={{ color: 'var(--color-text-dark)' }}>Classmates</h2>
-          <p className="text-sm mt-1" style={{ color: 'var(--color-text-mid)' }}>
-            {classmates.length} student{classmates.length !== 1 ? 's' : ''} in {course?.name ?? 'this course'}
-          </p>
+      <div className="max-w-4xl">
+        {/* Header */}
+        <div className="mb-6 flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-2xl font-bold" style={{ color: 'var(--color-text-dark)' }}>Classmates</h2>
+            <p className="text-sm mt-1" style={{ color: 'var(--color-text-mid)' }}>
+              {classmates.length} student{classmates.length !== 1 ? 's' : ''} in {course?.name ?? 'this course'}
+            </p>
+          </div>
+          {/* Search */}
+          {classmates.length > 0 && (
+            <div className="relative" style={{ minWidth: '220px' }}>
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
+              <input
+                type="text"
+                placeholder="Search by name or email…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 rounded-lg border text-sm outline-none transition"
+                style={{
+                  backgroundColor: 'var(--color-surface)',
+                  borderColor: 'var(--color-border)',
+                  color: 'var(--color-text-dark)',
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {isLoading ? (
           <div className="text-center py-20">
-            <div className="animate-spin h-8 w-8 border-4 border-t-transparent rounded-full mx-auto" style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
+            <div className="animate-spin h-8 w-8 border-4 rounded-full mx-auto" style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
             <p className="mt-4" style={{ color: 'var(--color-text-mid)' }}>Loading classmates...</p>
           </div>
         ) : classmates.length === 0 ? (
@@ -53,30 +81,70 @@ export function StudentClassmatesPage({ courseId }: StudentClassmatesPageProps) 
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {classmates.map((classmate: any) => (
-              <div
-                key={classmate.id}
-                className="rounded-xl border p-4 hover:shadow-md transition-all duration-200"
-                style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-              >
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                    style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))' }}
-                  >
-                    {classmate.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-sm truncate" style={{ color: 'var(--color-text-dark)' }}>{classmate.name}</p>
-                    <p className="text-xs truncate" style={{ color: 'var(--color-text-mid)' }}>{classmate.email}</p>
-                  </div>
-                </div>
-                <div className="h-px mt-3 pt-3" style={{ backgroundColor: 'var(--color-border)' }}>
-                  <p className="text-xs text-center" style={{ color: 'var(--color-text-light)' }}>Student in this course</p>
-                </div>
+          <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
+            {/* Table header */}
+            <div
+              className="grid text-xs font-semibold uppercase tracking-wide px-5 py-3"
+              style={{
+                gridTemplateColumns: '2.5rem 1fr 1fr 1fr',
+                backgroundColor: 'var(--color-surface-elevated)',
+                borderBottom: '1px solid var(--color-border)',
+                color: 'var(--color-text-mid)',
+              }}
+            >
+              <span>#</span>
+              <span>Name</span>
+              <span>Email</span>
+              <span>Role</span>
+            </div>
+
+            {/* Rows */}
+            {filtered.length === 0 ? (
+              <div className="py-10 text-center text-sm" style={{ color: 'var(--color-text-mid)' }}>
+                No results match "{search}"
               </div>
-            ))}
+            ) : (
+              filtered.map((classmate: any, idx: number) => (
+                <div
+                  key={classmate.id}
+                  className="grid items-center px-5 py-3 transition-colors"
+                  style={{
+                    gridTemplateColumns: '2.5rem 1fr 1fr 1fr',
+                    borderBottom: idx < filtered.length - 1 ? '1px solid var(--color-border)' : 'none',
+                    backgroundColor: 'var(--color-surface)',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)')}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'var(--color-surface)')}
+                >
+                  {/* Index */}
+                  <span className="text-xs font-medium" style={{ color: 'var(--color-text-light)' }}>{idx + 1}</span>
+
+                  {/* Name + avatar */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
+                      style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-hover))' }}
+                    >
+                      {classmate.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium truncate" style={{ color: 'var(--color-text-dark)' }}>{classmate.name}</span>
+                  </div>
+
+                  {/* Email */}
+                  <span className="text-sm truncate" style={{ color: 'var(--color-text-mid)' }}>{classmate.email}</span>
+
+                  {/* Role badge */}
+                  <span>
+                    <span
+                      className="inline-block text-xs font-medium px-2 py-0.5 rounded-full"
+                      style={{ backgroundColor: 'rgba(var(--color-primary-rgb, 107,0,0), 0.08)', color: 'var(--color-primary)' }}
+                    >
+                      Student
+                    </span>
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         )}
       </div>

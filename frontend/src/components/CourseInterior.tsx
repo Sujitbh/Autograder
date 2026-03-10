@@ -151,18 +151,25 @@ export function CourseInterior() {
   // Derived counts for tabs
   const tabCounts = useMemo(() => {
     const all = assignments.length;
-    const open = assignments.filter(a => getStatus(a) === 'open').length;
-    const totalNeedsGrade = assignments.reduce((s, a) => s + getNeedsGrade(a), 0);
-    const graded = assignments.filter(a => getStatus(a) === 'graded').length;
+    const recent = assignments.filter(a => {
+      if (getStatus(a) === 'draft') return false;
+      if (!a.dueDate) return true;
+      const due = new Date(a.dueDate);
+      return due >= NOW;
+    }).length;
+    const pastDeadline = assignments.filter(a => {
+      if (getStatus(a) === 'draft') return false;
+      if (!a.dueDate) return false;
+      return new Date(a.dueDate) < NOW;
+    }).length;
     const draft = assignments.filter(a => getStatus(a) === 'draft').length;
-    return { all, open, totalNeedsGrade, graded, draft };
+    return { all, recent, pastDeadline, draft };
   }, [assignments]);
 
   const tabs = [
     { id: 'all', label: 'All', count: tabCounts.all },
-    { id: 'open', label: 'Open', count: tabCounts.open },
-    { id: 'pending', label: 'Pending Grading', count: tabCounts.totalNeedsGrade },
-    { id: 'graded', label: 'Graded', count: tabCounts.graded },
+    { id: 'recent', label: 'Recent', count: tabCounts.recent },
+    { id: 'pastDeadline', label: 'Past Deadline', count: tabCounts.pastDeadline },
     { id: 'draft', label: 'Drafts', count: tabCounts.draft },
   ];
 
@@ -170,9 +177,14 @@ export function CourseInterior() {
   const filtered = useMemo(() => {
     return assignments.filter(a => {
       const status = getStatus(a);
-      if (activeTab === 'open' && status !== 'open') return false;
-      if (activeTab === 'pending' && getNeedsGrade(a) === 0) return false;
-      if (activeTab === 'graded' && status !== 'graded') return false;
+      if (activeTab === 'recent') {
+        if (status === 'draft') return false;
+        if (a.dueDate && new Date(a.dueDate) < NOW) return false;
+      }
+      if (activeTab === 'pastDeadline') {
+        if (status === 'draft') return false;
+        if (!a.dueDate || new Date(a.dueDate) >= NOW) return false;
+      }
       if (activeTab === 'draft' && status !== 'draft') return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();

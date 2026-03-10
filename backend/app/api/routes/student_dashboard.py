@@ -26,7 +26,7 @@ def student_dashboard_stats(db: Session = Depends(get_db), user: User = Depends(
     submissions = db.query(Submission).filter(Submission.student_id == user.id, Submission.assignment_id.in_(assignment_ids)).all()
 
     total_assignments = len(assignments)
-    completed = sum(1 for s in submissions if s.status == "graded")
+    completed = len({s.assignment_id for s in submissions})
     pending = sum(1 for s in submissions if s.status in ["pending", "grading"])
 
     # Calculate per-course progress
@@ -36,7 +36,8 @@ def student_dashboard_stats(db: Session = Depends(get_db), user: User = Depends(
         course_assignment_ids = [a.id for a in course_assignments]
         course_submissions = [s for s in submissions if s.assignment_id in course_assignment_ids]
         
-        completed_for_course = sum(1 for s in course_submissions if s.status == "graded")
+        submitted_assignment_ids = {s.assignment_id for s in course_submissions}
+        completed_for_course = len(submitted_assignment_ids)
         graded_submissions_with_score = [s for s in course_submissions if s.status == "graded" and s.score is not None and s.max_score is not None and s.max_score > 0]
         
         average_score = None

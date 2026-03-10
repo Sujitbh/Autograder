@@ -8,6 +8,6 @@ export function useStudentDashboardStats() {
       const { data } = await api.get('/student-dashboard/stats');
       return data;
     },
-    staleTime: 60 * 1000,
+    staleTime: 0,
   });
 }

@@ -44,6 +44,7 @@ export interface Course {
     facultyId: string;
     enrollmentCode: string;
     enrollmentCodeActive: boolean;
+    enrollmentPolicy: 'invite' | 'code' | 'both';
     status: CourseStatus;
     studentCount: number;
     assignmentCount: number;
@@ -103,6 +104,7 @@ export interface Submission {
     id: string;
     assignmentId: string;
     studentId: string;
+    studentName?: string;
     code: string;
     language: ProgrammingLanguage;
     submittedAt: string;
@@ -219,6 +221,7 @@ export interface CreateCourseDto {
 export interface UpdateCourseDto extends Partial<CreateCourseDto> {
     status?: CourseStatus;
     enrollmentCodeActive?: boolean;
+    enrollmentPolicy?: 'invite' | 'code' | 'both';
 }
 
 export interface CreateAssignmentDto {

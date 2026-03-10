@@ -12,7 +12,6 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { useRouter, useParams } from 'next/navigation';
-import { GradingModal } from './GradingModal';
 import {
     Dialog,
     DialogContent,
@@ -157,7 +156,21 @@ export function AssignmentGrading() {
                 .toUpperCase()
                 .slice(0, 2);
 
-        return (apiSubmissions as any[]).map((sub: any) => {
+        // Keep only the latest submission per student
+        const latestByStudent = new Map<string, any>();
+        for (const sub of apiSubmissions as any[]) {
+            const uid = String(sub.student?.id ?? sub.studentId ?? sub.student_id ?? '');
+            const existing = latestByStudent.get(uid);
+            if (!existing) {
+                latestByStudent.set(uid, sub);
+            } else {
+                const existingTime = new Date(existing.created_at ?? existing.submittedAt ?? 0).getTime();
+                const newTime = new Date(sub.created_at ?? sub.submittedAt ?? 0).getTime();
+                if (newTime > existingTime) latestByStudent.set(uid, sub);
+            }
+        }
+
+        return Array.from(latestByStudent.values()).map((sub: any) => {
             const studentName = sub.student?.name ?? 'Student';
             const studentIdentifier = sub.student?.student_id ?? String(sub.studentId ?? sub.student_id ?? sub.student?.id ?? '');
             const submittedAt = sub.created_at ?? sub.submittedAt ?? null;
@@ -202,7 +215,6 @@ export function AssignmentGrading() {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortField, setSortField] = useState<SortField>('studentName');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
-    const [gradingStudentIdx, setGradingStudentIdx] = useState<number | null>(null);
     const [showBulkGradeDialog, setShowBulkGradeDialog] = useState(false);
     const [pageSection, setPageSection] = useState<'overview' | 'rubric' | 'submissions'>('overview');
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -314,7 +326,6 @@ export function AssignmentGrading() {
 
     /* ─── Grading modal student list (for prev/next navigation) ─── */
     const gradableStudents = sorted.filter(s => s.status !== 'not-submitted');
-    const currentGradingStudent = gradingStudentIdx !== null ? gradableStudents[gradingStudentIdx] : null;
 
     if (!courseId || !assignmentId || (!meta && !isLoadingAssignment)) {
         return (
@@ -429,18 +440,6 @@ export function AssignmentGrading() {
                             >
                                 <Download className="w-4 h-4 mr-2" />
                                 {isDownloadingZip ? 'Downloading...' : 'Download submissions (ZIP)'}
-                            </Button>
-                            <Button
-                                className="h-9 text-white"
-                                style={{ backgroundColor: 'var(--color-primary)' }}
-                                onClick={handleGradeAll}
-                                disabled={isGradingAll}
-                            >
-                                {isGradingAll ? (
-                                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Grading...</>
-                                ) : (
-                                    <><Zap className="w-4 h-4 mr-2" /> Grade All Pending</>
-                                )}
                             </Button>
                         </div>
                     </div>
@@ -774,8 +773,7 @@ export function AssignmentGrading() {
                                                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = rowFlagged ? '#FFF9F5' : ''; }}
                                                         onClick={() => {
                                                             if (sub.status === 'not-submitted') return;
-                                                            const idx = gradableStudents.findIndex(g => g.id === sub.id);
-                                                            if (idx >= 0) setGradingStudentIdx(idx);
+                                                            router.push(`/courses/${courseId}/submissions/${sub.id}/grade`);
                                                         }}
                                                     >
                                                         <td className="px-6 py-4">
@@ -833,9 +831,9 @@ export function AssignmentGrading() {
                                                             {sub.status === 'not-submitted' ? (
                                                                 <button disabled style={{ fontSize: '13px', color: '#8A8A8A', padding: '6px 16px', height: '32px' }}>—</button>
                                                             ) : sub.status === 'graded' ? (
-                                                                <Button variant="outline" className="border-[var(--color-border)] h-8 px-4 text-xs" onClick={() => { const idx = gradableStudents.findIndex(g => g.id === sub.id); if (idx >= 0) setGradingStudentIdx(idx); }}>View</Button>
+                                                                <Button variant="outline" className="border-[var(--color-border)] h-8 px-4 text-xs" onClick={() => router.push(`/courses/${courseId}/submissions/${sub.id}/grade`)}>View</Button>
                                                             ) : (
-                                                                <Button className="text-white h-8 px-4 text-xs" style={{ backgroundColor: '#6B0000' }} onClick={() => { const idx = gradableStudents.findIndex(g => g.id === sub.id); if (idx >= 0) setGradingStudentIdx(idx); }}>Grade</Button>
+                                                                <Button className="text-white h-8 px-4 text-xs" style={{ backgroundColor: '#6B0000' }} onClick={() => router.push(`/courses/${courseId}/submissions/${sub.id}/grade`)}>Grade</Button>
                                                             )}
                                                         </td>
                                                     </tr>
@@ -960,33 +958,6 @@ export function AssignmentGrading() {
                 </DialogContent>
             </Dialog>
 
-            {/* Grading Modal */}
-            {currentGradingStudent && gradingStudentIdx !== null && (
-                <GradingModal
-                    studentName={currentGradingStudent.studentName}
-                    assignmentName={meta.name}
-                    submittedAt={currentGradingStudent.submittedAt ?? ''}
-                    autoScore={currentGradingStudent.autoScore}
-                    maxPoints={currentGradingStudent.maxPoints}
-                    rubric={meta.rubric}
-                    hasPrev={gradingStudentIdx > 0}
-                    hasNext={gradingStudentIdx < gradableStudents.length - 1}
-                    onPrev={() => setGradingStudentIdx(prev => (prev !== null && prev > 0 ? prev - 1 : prev))}
-                    onNext={() => setGradingStudentIdx(prev => (prev !== null && prev < gradableStudents.length - 1 ? prev + 1 : prev))}
-                    onClose={() => setGradingStudentIdx(null)}
-                    onSubmitGrade={(grade, fb) => {
-                        handleSubmitGrade(currentGradingStudent.id, grade, fb);
-                        refetchSubmissions();
-                    }}
-                    onSaveDraft={(grade, fb) => handleSubmitGrade(currentGradingStudent.id, grade, fb)}
-                    isGroupAssignment={meta.isGroupAssignment}
-                    groupName={undefined}
-                    groupMemberNames={[]}
-                    submissionId={currentGradingStudent.id}
-                    onApplyToGroup={undefined}
-                />
-            )}
-
             {/* Apply Grade to Group Dialog */}
             <Dialog open={showApplyGroupDialog} onOpenChange={setShowApplyGroupDialog}>
                 <DialogContent className="max-w-lg" style={{ boxShadow: '0 8px 24px rgba(107,0,0,.15)' }}>
@@ -1037,7 +1008,6 @@ export function AssignmentGrading() {
                                 setTimeout(() => {
                                     setShowApplyGroupDialog(false);
                                     setGroupGradeApplied(false);
-                                    setGradingStudentIdx(null);
                                 }, 1500);
                             }}
                             className="text-white"

@@ -47,18 +47,17 @@ function toDto(data: AssignmentFormData, courseId: string): CreateAssignmentDto 
         dueDate: isoDate,
         maxPoints: data.maxPoints ?? 100,
         isGroup: data.isGroup ?? false,
-        allowLateSubmissions: data.allowLateSubmissions ?? false,
-        latePenalty: data.allowLateSubmissions
-            ? { type: 'percentage', amount: data.latePenaltyAmount ?? 10, maxDaysLate: 7 }
-            : undefined,
-        publicTests: (data.publicTests ?? []).map((t) => ({
+        starterCode: data.starterCode || undefined,
+        allowLateSubmissions: false,
+        latePenalty: undefined,
+        publicTests: (data.publicTests ?? []).map(({ inputType: _it, ...t }) => ({
             name: t.name,
             input: t.input,
             expectedOutput: t.expectedOutput,
             isPublic: true,
             points: t.points,
         })),
-        privateTests: (data.privateTests ?? []).map((t) => ({
+        privateTests: (data.privateTests ?? []).map(({ inputType: _it, ...t }) => ({
             name: t.name,
             input: t.input,
             expectedOutput: t.expectedOutput,

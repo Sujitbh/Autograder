@@ -1,11 +1,12 @@
 from datetime import datetime
 from typing import Optional, Literal
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 class CourseBase(BaseModel):
     name: str
     code: Optional[str] = None
+    section: Optional[str] = None
     description: Optional[str] = None
 
 
@@ -16,14 +17,17 @@ class CourseCreate(CourseBase):
 class CourseUpdate(BaseModel):
     name: Optional[str] = None
     code: Optional[str] = None
+    section: Optional[str] = None
     description: Optional[str] = None
     enrollment_code_active: Optional[bool] = None
+    enrollment_policy: Optional[Literal['invite', 'code', 'both']] = None
 
 
 class CourseOut(CourseBase):
     id: int
     enrollment_code: Optional[str] = None
     enrollment_code_active: bool = True
+    enrollment_policy: str = 'invite'
     is_active: bool = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -40,6 +44,14 @@ class EnrollmentUserOut(BaseModel):
     name: str
     email: EmailStr
     role: str
+    sis_user_id: Optional[str] = None
+
+    @field_validator('sis_user_id', mode='before')
+    @classmethod
+    def strip_float_suffix(cls, v: object) -> object:
+        if isinstance(v, str) and v.endswith('.0') and v[:-2].lstrip('-').isdigit():
+            return v[:-2]
+        return v
 
     class Config:
         from_attributes = True

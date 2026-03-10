@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Save, Shield, Bell, Clock, Globe, Palette, Users, FileText, AlertTriangle, Check, Eye, EyeOff, Upload, Edit, Plus, Copy, RefreshCw, Info, Link2 } from 'lucide-react';
+import { Save, Shield, Bell, Clock, Users, FileText, Check, Copy, RefreshCw, Info, Link2, AlertTriangle } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
 import { Sidebar } from './Sidebar';
@@ -26,7 +26,7 @@ import {
     DialogTitle,
 } from './ui/dialog';
 
-/* ── Course code generator (same as CoursesLanding) ── */
+/* ── Course code generator ── */
 const CODE_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function generateCourseCode(): string {
     let code = '';
@@ -36,25 +36,11 @@ function generateCourseCode(): string {
     return code;
 }
 
-function lookupCourseCode(id: string) {
-    try { const s = JSON.parse(localStorage.getItem('autograde_courses') || '[]'); const f = s.find((c: any) => c.id === id); if (f) return f.code; } catch { } return id;
-}
-
-function lookupCourseData(id: string) {
-    try {
-        const s = JSON.parse(localStorage.getItem('autograde_courses') || '[]');
-        const f = s.find((c: any) => c.id === id);
-        if (f) return f;
-    } catch { }
-    return null;
-}
-
 export function SettingsPage() {
     const { courseId } = useParams() as { courseId: string };
-    const courseData = lookupCourseData(courseId ?? '');
-    const courseCode = courseData?.code ?? courseId ?? '';
     const [activeSection, setActiveSection] = useState('general');
     const [saved, setSaved] = useState(false);
+    const [saveError, setSaveError] = useState('');
     const [latePolicy, setLatePolicy] = useState(true);
     const [notifications, setNotifications] = useState({
         newSubmission: true,
@@ -64,9 +50,19 @@ export function SettingsPage() {
         courseUpdates: true,
     });
 
+    /* ── Course general fields ── */
+    const [courseName, setCourseName] = useState('');
+    const [courseCode, setCourseCode] = useState('');
+    const [section, setSection] = useState('');
+    const [semester, setSemester] = useState('');
+    const [description, setDescription] = useState('');
+    const [semesters, setSemesters] = useState<{ value: string; label: string }[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
     /* ── Enrollment code state ── */
-    const [enrollmentCode, setEnrollmentCode] = useState(courseData?.enrollmentCode || generateCourseCode());
-    const [codeActive, setCodeActive] = useState(courseData?.enrollmentCodeActive ?? true);
+    const [enrollmentCode, setEnrollmentCode] = useState('');
+    const [enrollmentPolicy, setEnrollmentPolicy] = useState<'invite' | 'code' | 'both'>('invite');
+    const [codeActive, setCodeActive] = useState(true);
     const [codeCopied, setCodeCopied] = useState(false);
     const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
     const [isRegenerating, setIsRegenerating] = useState(false);
@@ -74,11 +70,30 @@ export function SettingsPage() {
     /* ── Enrolled students state for TA management ── */
     const [enrolledStudents, setEnrolledStudents] = useState<Array<{ student_id: number; student_name: string; email: string }>>([]);
 
-    /* ── Fetch enrolled students on mount ── */
+    /* ── Fetch course data and semesters on mount ── */
     useEffect(() => {
-        const fetchEnrolledStudents = async () => {
+        if (!courseId) return;
+        const fetchAll = async () => {
+            setIsLoading(true);
             try {
-                const enrollments = await courseService.getEnrollments(courseId);
+                const [course, semesterList, enrollments] = await Promise.all([
+                    courseService.getCourse(courseId),
+                    courseService.getSemesters(),
+                    courseService.getEnrollments(courseId),
+                ]);
+
+                setCourseName(course.name ?? '');
+                setCourseCode(course.code ?? '');
+                setSection(course.section ?? '');
+                setSemester(course.semester ?? '');
+                setDescription(course.description ?? '');
+                setEnrollmentCode(course.enrollmentCode || generateCourseCode());
+                setCodeActive(course.enrollmentCodeActive ?? true);
+                setEnrollmentPolicy((course.enrollmentPolicy as 'invite' | 'code' | 'both') ?? 'invite');
+
+                const mapped = semesterList.map(s => ({ value: s.name, label: s.name }));
+                setSemesters(mapped);
+
                 const students = enrollments
                     .filter((e: CourseEnrollment) => e.role === 'student' && e.user)
                     .map((e: CourseEnrollment) => ({
@@ -88,13 +103,12 @@ export function SettingsPage() {
                     }));
                 setEnrolledStudents(students);
             } catch (error) {
-                console.error('Failed to fetch enrolled students:', error);
+                console.error('Failed to fetch course settings:', error);
+            } finally {
+                setIsLoading(false);
             }
         };
-
-        if (courseId) {
-            fetchEnrolledStudents();
-        }
+        fetchAll();
     }, [courseId]);
 
     const sections = [
@@ -106,9 +120,23 @@ export function SettingsPage() {
         { id: 'access', icon: Users, label: 'Access & Permissions' },
     ];
 
-    const handleSave = () => {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+    const handleSave = async () => {
+        setSaveError('');
+        try {
+            await courseService.updateCourse(courseId, {
+                name: courseName.trim(),
+                code: courseCode.trim().toUpperCase(),
+                section: section.trim() || undefined,
+                semester: semester,
+                description: description.trim() || undefined,
+                enrollmentCodeActive: codeActive,
+                enrollmentPolicy: enrollmentPolicy as 'invite' | 'code' | 'both',
+            });
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+        } catch (e) {
+            setSaveError('Failed to save changes. Please try again.');
+        }
     };
 
     const copyEnrollmentCode = () => {
@@ -131,7 +159,7 @@ export function SettingsPage() {
         <PageLayout>
             <TopNav breadcrumbs={[
                 { label: 'Courses', href: '/courses' },
-                { label: courseCode },
+                { label: courseCode || courseId },
                 { label: 'Settings' }
             ]} />
 
@@ -205,112 +233,66 @@ export function SettingsPage() {
                                             Course Information
                                         </h2>
 
-                                        <div className="space-y-5">
-                                            <div>
-                                                <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                    Course Name
-                                                </label>
-                                                <Input
-                                                    defaultValue={courseData?.title || 'Introduction to Computer Science'}
-                                                    className="border-[var(--color-border)]"
-                                                />
-                                            </div>
+                                        {saveError && (
+                                            <p style={{ fontSize: '13px', color: '#B91C1C', marginBottom: '12px' }}>{saveError}</p>
+                                        )}
 
-                                            <div className="grid grid-cols-2 gap-4">
+                                        {isLoading ? (
+                                            <p style={{ fontSize: '14px', color: 'var(--color-text-light)' }}>Loading…</p>
+                                        ) : (
+                                            <div className="space-y-5">
                                                 <div>
                                                     <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                        Course Code
+                                                        Course Name
                                                     </label>
                                                     <Input
-                                                        defaultValue={courseData?.code || 'CS-1001'}
+                                                        value={courseName}
+                                                        onChange={e => setCourseName(e.target.value)}
                                                         className="border-[var(--color-border)]"
                                                     />
                                                 </div>
-                                                <div>
-                                                    <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                        Section
-                                                    </label>
-                                                    <Input
-                                                        defaultValue={courseData?.section || '001'}
-                                                        className="border-[var(--color-border)]"
-                                                    />
-                                                </div>
-                                            </div>
 
-                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                                                            Course Code
+                                                        </label>
+                                                        <Input
+                                                            value={courseCode}
+                                                            onChange={e => setCourseCode(e.target.value)}
+                                                            className="border-[var(--color-border)]"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                                                            Section
+                                                        </label>
+                                                        <Input
+                                                            value={section}
+                                                            onChange={e => setSection(e.target.value)}
+                                                            className="border-[var(--color-border)]"
+                                                        />
+                                                    </div>
+                                                </div>
+
                                                 <div>
                                                     <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
                                                         Semester
                                                     </label>
-                                                    <Select defaultValue={courseData?.semester ? courseData.semester.toLowerCase().replace(' ', '-') : 'spring-2026'}>
+                                                    <Select value={semester} onValueChange={setSemester}>
                                                         <SelectTrigger className="w-full border-[var(--color-border)]">
-                                                            <SelectValue />
+                                                            <SelectValue placeholder="Select semester" />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="spring-2026">Spring 2026</SelectItem>
-                                                            <SelectItem value="fall-2025">Fall 2025</SelectItem>
-                                                            <SelectItem value="summer-2025">Summer 2025</SelectItem>
+                                                            {semesters.map(s => (
+                                                                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                                            ))}
                                                         </SelectContent>
                                                     </Select>
                                                 </div>
-                                                <div>
-                                                    <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                        Programming Language
-                                                    </label>
-                                                    <Select defaultValue="python">
-                                                        <SelectTrigger className="w-full border-[var(--color-border)]">
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="python">Python</SelectItem>
-                                                            <SelectItem value="java">Java</SelectItem>
-                                                            <SelectItem value="cpp">C++</SelectItem>
-                                                            <SelectItem value="javascript">JavaScript</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            </div>
 
-                                            <div>
-                                                <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                    Course Description
-                                                </label>
-                                                <Textarea
-                                                    defaultValue={courseData?.description || 'An introductory course covering fundamental programming concepts using Python. Topics include variables, control flow, functions, object-oriented programming, and basic data structures.'}
-                                                    rows={4}
-                                                    className="border-[var(--color-border)]"
-                                                />
                                             </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                                        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '24px' }}>
-                                            Course Schedule
-                                        </h2>
-
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                    Start Date
-                                                </label>
-                                                <Input
-                                                    type="date"
-                                                    defaultValue="2026-01-12"
-                                                    className="border-[var(--color-border)]"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                    End Date
-                                                </label>
-                                                <Input
-                                                    type="date"
-                                                    defaultValue="2026-05-08"
-                                                    className="border-[var(--color-border)]"
-                                                />
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -667,87 +649,102 @@ export function SettingsPage() {
                             {/* ═══════════ Enrollment ═══════════ */}
                             {activeSection === 'enrollment' && (
                                 <div className="space-y-6">
-                                    {/* Course Code Card */}
+                                    {/* Course Enrollment Type */}
                                     <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                                        <div className="flex items-start justify-between mb-6">
+                                        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '16px' }}>
+                                            Course Access
+                                        </h2>
+                                        <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
                                             <div>
-                                                <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                                                    Course Enrollment Code
-                                                </h2>
-                                                <p style={{ fontSize: '13px', color: 'var(--color-text-mid)', marginTop: '4px' }}>
-                                                    Students use this code to join your course on Axiom
+                                                <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                                                    Course Enrollment
+                                                </p>
+                                                <p style={{ fontSize: '12px', color: 'var(--color-text-light)', marginTop: '4px' }}>
+                                                    Control how students can join this course
                                                 </p>
                                             </div>
-                                            <div className="flex items-center gap-2">
-                                                <span style={{ fontSize: '12px', fontWeight: 500, color: codeActive ? '#2D6A2D' : '#B91C1C' }}>
-                                                    {codeActive ? 'Active' : 'Disabled'}
-                                                </span>
-                                                <Switch
-                                                    checked={codeActive}
-                                                    onCheckedChange={setCodeActive}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* Large Code Display */}
-                                        <div
-                                            className="relative rounded-xl text-center p-8 mb-6"
-                                            style={{
-                                                backgroundColor: codeActive ? '#F5EDED' : '#F5F5F5',
-                                                border: `2px solid ${codeActive ? '#6B0000' : '#D1D5DB'}`,
-                                                opacity: codeActive ? 1 : 0.6,
-                                            }}
-                                        >
-                                            {!codeActive && (
-                                                <div className="absolute inset-0 flex items-center justify-center rounded-xl" style={{ backgroundColor: 'rgba(255,255,255,0.7)', zIndex: 1 }}>
-                                                    <p style={{ fontSize: '14px', fontWeight: 600, color: '#B91C1C' }}>Code is currently disabled — students cannot use it to join</p>
-                                                </div>
-                                            )}
-                                            <p style={{ fontSize: '12px', fontWeight: 500, color: '#6B0000', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-                                                Course Code
-                                            </p>
-                                            <p style={{
-                                                fontSize: '48px',
-                                                fontWeight: 700,
-                                                color: '#6B0000',
-                                                letterSpacing: '8px',
-                                                fontFamily: 'monospace',
-                                            }}>
-                                                {enrollmentCode}
-                                            </p>
-                                        </div>
-
-                                        {/* Action Buttons */}
-                                        <div className="flex gap-3">
-                                            <Button
-                                                variant="outline"
-                                                onClick={copyEnrollmentCode}
-                                                className="flex-1"
-                                                style={{ borderColor: '#6B0000', color: '#6B0000' }}
-                                            >
-                                                {codeCopied ? (
-                                                    <><Check className="w-4 h-4 mr-2" /> Copied!</>
-                                                ) : (
-                                                    <><Copy className="w-4 h-4 mr-2" /> Copy Code</>
-                                                )}
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => setShowRegenerateDialog(true)}
-                                                className="flex-1 border-[var(--color-border)]"
-                                            >
-                                                <RefreshCw className="w-4 h-4 mr-2" /> Regenerate Code
-                                            </Button>
-                                        </div>
-
-                                        {/* Warning */}
-                                        <div className="flex items-start gap-3 mt-4 p-3 rounded-lg" style={{ backgroundColor: '#FFF3E0' }}>
-                                            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#8A5700' }} />
-                                            <p style={{ fontSize: '12px', color: '#8A5700' }}>
-                                                Regenerating the code will invalidate the previous one. Students who haven't joined yet will need the new code.
-                                            </p>
+                                            <Select value={enrollmentPolicy} onValueChange={(v) => setEnrollmentPolicy(v as 'invite' | 'code' | 'both')}>
+                                                <SelectTrigger className="w-48 border-[var(--color-border)]">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="invite">Invite only</SelectItem>
+                                                    <SelectItem value="code">Access code</SelectItem>
+                                                    <SelectItem value="both">Invite + Access code</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                     </div>
+
+                                    {/* Course Code Card — only shown when policy uses a code */}
+                                    {(enrollmentPolicy === 'code' || enrollmentPolicy === 'both') && (
+                                        <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                            <div className="flex items-start justify-between mb-6">
+                                                <div>
+                                                    <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                                                        Course Enrollment Code
+                                                    </h2>
+                                                    <p style={{ fontSize: '13px', color: 'var(--color-text-mid)', marginTop: '4px' }}>
+                                                        Students use this code to join your course on Axiom
+                                                    </p>
+                                                </div>
+                                                <span style={{ fontSize: '12px', fontWeight: 500, color: '#2D6A2D' }}>Active</span>
+                                            </div>
+
+                                            {/* Large Code Display */}
+                                            <div
+                                                className="relative rounded-xl text-center p-8 mb-6"
+                                                style={{
+                                                    backgroundColor: '#F5EDED',
+                                                    border: '2px solid #6B0000',
+                                                }}
+                                            >
+                                                <p style={{ fontSize: '12px', fontWeight: 500, color: '#6B0000', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                                    Course Code
+                                                </p>
+                                                <p style={{
+                                                    fontSize: '48px',
+                                                    fontWeight: 700,
+                                                    color: '#6B0000',
+                                                    letterSpacing: '8px',
+                                                    fontFamily: 'monospace',
+                                                }}>
+                                                    {enrollmentCode}
+                                                </p>
+                                            </div>
+
+                                            {/* Action Buttons */}
+                                            <div className="flex gap-3">
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={copyEnrollmentCode}
+                                                    className="flex-1"
+                                                    style={{ borderColor: '#6B0000', color: '#6B0000' }}
+                                                >
+                                                    {codeCopied ? (
+                                                        <><Check className="w-4 h-4 mr-2" /> Copied!</>
+                                                    ) : (
+                                                        <><Copy className="w-4 h-4 mr-2" /> Copy Code</>
+                                                    )}
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() => setShowRegenerateDialog(true)}
+                                                    className="flex-1 border-[var(--color-border)]"
+                                                >
+                                                    <RefreshCw className="w-4 h-4 mr-2" /> Regenerate Code
+                                                </Button>
+                                            </div>
+
+                                            {/* Warning */}
+                                            <div className="flex items-start gap-3 mt-4 p-3 rounded-lg" style={{ backgroundColor: '#FFF3E0' }}>
+                                                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#8A5700' }} />
+                                                <p style={{ fontSize: '12px', color: '#8A5700' }}>
+                                                    Regenerating the code will invalidate the previous one. Students who haven't joined yet will need the new code.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Enrollment Statistics */}
                                     <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -755,75 +752,12 @@ export function SettingsPage() {
                                             Enrollment Statistics
                                         </h2>
 
-                                        <div className="grid grid-cols-3 gap-4 mb-6">
-                                            {[
-                                                { label: 'Total Enrolled', value: 32, color: '#6B0000' },
-                                                { label: 'Joined via Code', value: 28, color: '#2D6A2D' },
-                                                { label: 'Manually Added', value: 4, color: '#1A4D7A' },
-                                            ].map((stat) => (
-                                                <div
-                                                    key={stat.label}
-                                                    className="text-center p-4 rounded-lg"
-                                                    style={{ backgroundColor: 'var(--color-primary-bg)' }}
-                                                >
-                                                    <p style={{ fontSize: '28px', fontWeight: 700, color: stat.color }}>
-                                                        {stat.value}
-                                                    </p>
-                                                    <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-mid)', marginTop: '4px' }}>
-                                                        {stat.label}
-                                                    </p>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        {/* Recent Enrollments */}
-                                        <div>
-                                            <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '12px' }}>
-                                                Recent Enrollments
-                                            </h3>
-                                            <div className="space-y-2">
-                                                {[
-                                                    { name: 'Sarah Chen', method: 'Code', time: '2 hours ago' },
-                                                    { name: 'Marcus Johnson', method: 'Code', time: '5 hours ago' },
-                                                    { name: 'Emily Rodriguez', method: 'Manual', time: '1 day ago' },
-                                                    { name: 'David Kim', method: 'Code', time: '1 day ago' },
-                                                ].map((enrollment, i) => (
-                                                    <div
-                                                        key={i}
-                                                        className="flex items-center justify-between p-3 rounded-lg"
-                                                        style={{ backgroundColor: 'var(--color-primary-bg)' }}
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            <div
-                                                                className="w-8 h-8 rounded-full flex items-center justify-center text-white"
-                                                                style={{ backgroundColor: 'var(--color-primary)', fontSize: '11px', fontWeight: 600 }}
-                                                            >
-                                                                {enrollment.name.split(' ').map(n => n[0]).join('')}
-                                                            </div>
-                                                            <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                                {enrollment.name}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex items-center gap-3">
-                                                            <span
-                                                                className="px-2 py-0.5 rounded"
-                                                                style={{
-                                                                    fontSize: '11px',
-                                                                    fontWeight: 600,
-                                                                    backgroundColor: enrollment.method === 'Code' ? '#E8F0FF' : '#FFF3E0',
-                                                                    color: enrollment.method === 'Code' ? '#1A4D7A' : '#8A5700',
-                                                                }}
-                                                            >
-                                                                {enrollment.method}
-                                                            </span>
-                                                            <span style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>
-                                                                {enrollment.time}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
+                                        <ul className="divide-y divide-[var(--color-border)]">
+                                            <li className="flex items-center justify-between py-3">
+                                                <span style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>Total Enrolled</span>
+                                                <span style={{ fontSize: '20px', fontWeight: 700, color: '#6B0000' }}>{enrolledStudents.length}</span>
+                                            </li>
+                                        </ul>
                                     </div>
 
                                     {/* Share Instructions */}
@@ -856,54 +790,6 @@ export function SettingsPage() {
                             {/* Access & Permissions */}
                             {activeSection === 'access' && (
                                 <div className="space-y-6">
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-                                        <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '24px' }}>
-                                            Course Access
-                                        </h2>
-
-                                        <div className="space-y-4">
-                                            <div className="flex items-center justify-between p-4 rounded-lg" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
-                                                <div>
-                                                    <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                        Course Enrollment
-                                                    </p>
-                                                    <p style={{ fontSize: '12px', color: 'var(--color-text-light)', marginTop: '4px' }}>
-                                                        Control how students can join this course
-                                                    </p>
-                                                </div>
-                                                <Select defaultValue="invite">
-                                                    <SelectTrigger className="w-48 border-[var(--color-border)]">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="open">Open enrollment</SelectItem>
-                                                        <SelectItem value="invite">Invite only</SelectItem>
-                                                        <SelectItem value="code">Access code</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-
-                                            <div>
-                                                <label className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                    Course Access Code
-                                                </label>
-                                                <div className="flex gap-2">
-                                                    <Input
-                                                        defaultValue="CS1001-SPR26"
-                                                        className="border-[var(--color-border)] font-mono"
-                                                        readOnly
-                                                    />
-                                                    <Button variant="outline" className="border-[var(--color-border)]">
-                                                        Regenerate
-                                                    </Button>
-                                                </div>
-                                                <p style={{ fontSize: '12px', color: 'var(--color-text-light)', marginTop: '4px' }}>
-                                                    Share this code with students to allow them to join the course
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-
                                     <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <TAManagement
                                             courseId={Number(courseId)}

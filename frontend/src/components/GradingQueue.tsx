@@ -4,7 +4,7 @@ import { Search, Filter, CheckCircle2, Clock, AlertTriangle, ChevronDown, Eye, A
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
 import { Sidebar } from './Sidebar';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { GradingInterface, type GradingPayload } from './GradingInterface';
@@ -45,7 +45,7 @@ function toQueueSubmission(sub: ApiSubmission, assignment: Assignment): QueueSub
 
     return {
         id: sub.id,
-        studentName: `Student ${sub.studentId}`,
+        studentName: sub.studentName ?? `Student ${sub.studentId}`,
         studentId: sub.studentId,
         assignmentName: assignment.name,
         assignmentId: assignment.id,
@@ -65,6 +65,7 @@ function lookupCourseCode(id: string) {
 
 export function GradingQueue() {
     const { courseId } = useParams() as { courseId: string };
+    const router = useRouter();
     const courseCode = lookupCourseCode(courseId ?? '');
 
     /* ── Fetch assignments for the course ── */
@@ -84,21 +85,31 @@ export function GradingQueue() {
 
     const submissionsLoading = submissionQueries.some((q) => q.isLoading);
 
-    /** Flatten all per-assignment submission lists into a single queue */
+    /** Flatten all per-assignment submission lists into a single queue,
+     *  keeping only the latest submission per (student, assignment) pair. */
     const allSubmissions: QueueSubmission[] = useMemo(() => {
-        const rows: QueueSubmission[] = [];
+        const latestMap = new Map<string, QueueSubmission>();
         assignments.forEach((assignment, idx) => {
             const queryResult = submissionQueries[idx];
             if (!queryResult?.data) return;
             for (const sub of queryResult.data) {
-                rows.push(toQueueSubmission(sub, assignment));
+                const key = `${sub.studentId}__${assignment.id}`;
+                const row = toQueueSubmission(sub, assignment);
+                const existing = latestMap.get(key);
+                if (!existing) {
+                    latestMap.set(key, row);
+                } else {
+                    const existingTime = new Date(existing.submittedAt ?? 0).getTime();
+                    const newTime = new Date(row.submittedAt ?? 0).getTime();
+                    if (newTime > existingTime) latestMap.set(key, row);
+                }
             }
         });
-        return rows;
+        return Array.from(latestMap.values());
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [assignments, submissionQueries.map((q) => q.dataUpdatedAt).join(',')]);
 
-    const [activeTab, setActiveTab] = useState('pending');
+    const [activeTab, setActiveTab] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [assignmentFilter, setAssignmentFilter] = useState('all');
     const [sortBy, setSortBy] = useState<'date' | 'name' | 'assignment'>('date');
@@ -107,11 +118,11 @@ export function GradingQueue() {
     const [selectedSubmissions, setSelectedSubmissions] = useState<string[]>([]);
 
     const tabs = [
+        { id: 'all', label: 'All', count: allSubmissions.length },
         { id: 'pending', label: 'Pending', count: allSubmissions.filter(s => s.status === 'pending').length },
         { id: 'in-review', label: 'In Review', count: allSubmissions.filter(s => s.status === 'in-review').length },
         { id: 'resubmitted', label: 'Resubmitted', count: allSubmissions.filter(s => s.status === 'resubmitted').length },
         { id: 'graded', label: 'Graded', count: allSubmissions.filter(s => s.status === 'graded').length },
-        { id: 'all', label: 'All', count: allSubmissions.length },
     ];
 
     const uniqueAssignments = [...new Set(allSubmissions.map(s => s.assignmentName))];
@@ -193,7 +204,7 @@ export function GradingQueue() {
         : -1;
 
     const handleOpenGrading = (submissionId: string) => {
-        setGradingSubmissionId(submissionId);
+        router.push(`/courses/${courseId}/submissions/${submissionId}/grade`);
     };
 
     const handleGradingPrev = () => {
@@ -252,20 +263,31 @@ export function GradingQueue() {
                                 Review and grade student submissions
                             </p>
                         </div>
-                        {selectedSubmissions.length > 0 && (
-                            <div className="flex items-center gap-3">
-                                <span style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>
-                                    {selectedSubmissions.length} selected
-                                </span>
-                                <Button
-                                    variant="outline"
-                                    className="border-[var(--color-border)] text-[var(--color-text-mid)]"
-                                    onClick={() => setSelectedSubmissions([])}
-                                >
-                                    Clear
-                                </Button>
-                            </div>
-                        )}
+                        <div className="flex items-center gap-3">
+                            <Button
+                                variant="outline"
+                                className="border-[var(--color-border)] flex items-center gap-2"
+                                style={{ color: 'var(--color-text-mid)' }}
+                                onClick={() => router.push(`/courses/${courseId}/reports`)}
+                            >
+                                <BarChart3 className="w-4 h-4" />
+                                Reports
+                            </Button>
+                            {selectedSubmissions.length > 0 && (
+                                <div className="flex items-center gap-3">
+                                    <span style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>
+                                        {selectedSubmissions.length} selected
+                                    </span>
+                                    <Button
+                                        variant="outline"
+                                        className="border-[var(--color-border)] text-[var(--color-text-mid)]"
+                                        onClick={() => setSelectedSubmissions([])}
+                                    >
+                                        Clear
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     {/* Filter Tabs */}

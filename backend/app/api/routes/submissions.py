@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_user
 from app.core.permissions import require_role, require_course_role
 from app.models.assignment import Assignment
+from app.models.rubric import Rubric
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
 from app.models.submission_result import SubmissionResult
@@ -166,9 +167,37 @@ def get_submission_detail(
         "status": s.status,
         "score": s.score,
         "max_score": s.max_score,
+        "feedback": s.feedback,
         "submitted_at": s.created_at.isoformat() if s.created_at else None,
         "files": files_out,
         "results": results_out,
+        "student": {
+            "id": s.student_id,
+            "name": student_obj.name if (student_obj := db.query(User).filter(User.id == s.student_id).first()) else "Unknown",
+            "email": student_obj.email if (student_obj := db.query(User).filter(User.id == s.student_id).first()) else None,
+        },
+        "assignment": {
+            "id": assignment.id,
+            "title": assignment.name,
+            "due_date": assignment.due_date.isoformat() if getattr(assignment, "due_date", None) else None,
+            "language": getattr(assignment, "language", "python") or "python",
+        },
+        "rubrics": [
+            {
+                "id": r.id,
+                "name": r.name,
+                "description": r.description,
+                "max_points": r.max_points or 0,
+                "weight": r.weight,
+                "order": r.order or 0,
+            }
+            for r in db.query(Rubric).filter(Rubric.assignment_id == s.assignment_id).order_by(Rubric.order).all()
+        ],
+        "attempt_number": db.query(Submission).filter(
+            Submission.assignment_id == s.assignment_id,
+            Submission.student_id == s.student_id,
+            Submission.id <= s.id,
+        ).count(),
     }
 
 

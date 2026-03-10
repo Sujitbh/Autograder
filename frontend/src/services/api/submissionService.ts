@@ -16,6 +16,7 @@ interface BackendSubmission {
   feedback?: string | null;
   graded_at?: string | null;
   created_at?: string | null;
+  student?: { id: number; name: string; email?: string | null } | null;
 }
 
 interface BackendUploadResponse {
@@ -40,6 +41,7 @@ function mapSubmission(s: BackendSubmission): Submission {
     id: String(s.id),
     assignmentId: String(s.assignment_id),
     studentId: String(s.student_id),
+    studentName: s.student?.name,
     code: '',
     language: 'python',
     submittedAt: s.created_at ?? '',
@@ -121,7 +123,12 @@ export const submissionService = {
     status: string;
     score: number | null;
     max_score: number | null;
+    feedback: string | null;
     submitted_at: string | null;
+    attempt_number: number;
+    student: { id: number; name: string; email: string | null };
+    assignment: { id: number; title: string; due_date: string | null; language: string };
+    rubrics: Array<{ id: number; name: string; description: string | null; max_points: number; weight: number | null; order: number }>;
     files: Array<{ id: number; filename: string; content: string | null }>;
     results: Array<{
       testcase_id: number;

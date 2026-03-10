@@ -12,6 +12,7 @@ import random
 from app.api.deps import get_db, get_current_user
 from app.core.permissions import require_role, require_course_role
 from app.models.course import Course
+from app.models.semester import Semester
 from app.models.enrollment import Enrollment
 from app.models.user import User
 from app.models.assignment import Assignment
@@ -148,6 +149,15 @@ def generate_enrollment_code(db: Session) -> str:
     raise HTTPException(status_code=500, detail="Unable to generate unique enrollment code")
 
 
+@router.get("/semesters")
+def list_semesters_for_faculty(db: DbSession, user: CurrentUser):
+    """Return all semesters, accessible to any authenticated faculty or admin (used in course creation form)."""
+    require_role(user.role, {"faculty", "admin"})
+    from sqlalchemy import desc as _desc
+    semesters = db.query(Semester).order_by(_desc(Semester.start_date)).all()
+    return [{"id": s.id, "name": s.name, "is_current": s.is_current} for s in semesters]
+
+
 @router.get("/", response_model=List[CourseOut])
 def list_courses(db: DbSession, user: CurrentUser):
     """
@@ -173,6 +183,7 @@ def create_course(payload: CourseCreate, db: DbSession, user: CurrentUser):
     course = Course(
         name=payload.name,
         code=payload.code,
+        section=payload.section,
         description=payload.description,
         enrollment_code=generate_enrollment_code(db),
         enrollment_code_active=payload.enrollment_code_active,
@@ -194,6 +205,27 @@ def create_course(payload: CourseCreate, db: DbSession, user: CurrentUser):
     if not persisted:
         raise HTTPException(status_code=500, detail="Course was not persisted")
     return persisted
+
+
+@router.get("/catalog")
+def get_course_catalog(db: DbSession, user: CurrentUser):
+    """Return distinct (code, name) pairs for autocomplete. Accessible to any authenticated faculty or admin."""
+    require_role(user.role, {"faculty", "admin"})
+    results = (
+        db.query(Course.code, Course.name)
+        .filter(Course.code.isnot(None), Course.code != "")
+        .distinct()
+        .all()
+    )
+    seen: set = set()
+    catalog = []
+    for code, name in results:
+        key = (code.strip().upper(), name.strip())
+        if key not in seen:
+            seen.add(key)
+            catalog.append({"code": code.strip().upper(), "name": name.strip()})
+    catalog.sort(key=lambda x: x["code"])
+    return catalog
 
 
 @router.get("/{course_id}", response_model=CourseOut, responses={404: {"description": "Resource not found"}})
@@ -343,8 +375,16 @@ async def import_course_enrollments(
 
     parsed_rows = []
     for row in raw_rows:
-        n_row = {str(k).strip().lower(): str(v).strip() for k, v in row.items() if k is not None}
-        if any(v for k, v in n_row.items() if k != "unnamed: 0"): # Ignore empty rows
+        n_row = {}
+        for k, v in row.items():
+            if k is None:
+                continue
+            # pandas reads integer-like columns as float (e.g. 30154740.0).
+            # Convert whole-number floats to int before stringifying.
+            if isinstance(v, float) and v == int(v):
+                v = int(v)
+            n_row[str(k).strip().lower()] = str(v).strip()
+        if any(v for k, v in n_row.items() if k != "unnamed: 0"):
             parsed_rows.append(n_row)
 
     if not parsed_rows:
@@ -386,9 +426,16 @@ async def import_course_enrollments(
         )
         normalized_name = _normalize_name(name_raw)
         email = _build_email_from_row(row, default_domain.strip().lower())
-        sis_login_id = (row.get("sis login id") or row.get("sis_login_id") or "").strip() or None
-        sis_user_id = (row.get("sis user id") or row.get("sis_user_id") or "").strip() or None
-        external_id = (row.get("id") or row.get("external_id") or "").strip() or None
+        def _clean_id(val: object) -> str | None:
+            """Strip whitespace and trailing '.0' that Excel adds to numeric cells."""
+            s = str(val).strip() if val not in (None, "", "nan") else ""
+            if s.endswith(".0") and s[:-2].lstrip("-").isdigit():
+                s = s[:-2]
+            return s or None
+
+        sis_login_id = _clean_id(row.get("sis login id") or row.get("sis_login_id"))
+        sis_user_id = _clean_id(row.get("sis user id") or row.get("sis_user_id"))
+        external_id = _clean_id(row.get("id") or row.get("external_id"))
 
         if not email:
             skipped_count += 1
@@ -433,6 +480,7 @@ async def import_course_enrollments(
                 email=email,
                 password_hash=hash_password("ChangeMe123!"),
                 role="student",
+                sis_user_id=sis_user_id,
             )
             db.add(target_user)
             db.flush()
@@ -493,6 +541,10 @@ async def import_course_enrollments(
 
         enrollment = Enrollment(course_id=course_id, user_id=target_user.id, role=role)
         db.add(enrollment)
+
+        # Store/update SIS User ID on the user if provided
+        if sis_user_id and not target_user.sis_user_id:
+            target_user.sis_user_id = sis_user_id
         
         # Send confirmation email
         EmailService.send_enrollment_email(
@@ -656,16 +708,94 @@ def get_course_grades(
     db: DbSession,
     user: CurrentUser,
 ):
-    """Get student's grades and assignment performance in a course."""
-    require_role(user.role, {"student"})
-    
+    """Get grades for a course. Faculty/instructor get all-student gradebook; students get their own grades."""
+    require_role(user.role, {"student", "faculty", "instructor", "admin"})
+
+    # ── Faculty / instructor / admin: return enriched gradebook with all students ──
+    if user.role in ("faculty", "instructor", "admin"):
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        # Verify faculty is associated with this course
+        faculty_enrollment = db.query(Enrollment).filter(
+            Enrollment.course_id == course_id,
+            Enrollment.user_id == user.id,
+        ).first()
+        if not faculty_enrollment and user.role != "admin":
+            raise HTTPException(status_code=403, detail="Not associated with this course")
+
+        assignments = db.query(Assignment).filter(
+            Assignment.course_id == course_id,
+        ).order_by(Assignment.due_date).all()
+
+        student_enrollments = db.query(Enrollment).filter(
+            Enrollment.course_id == course_id,
+            Enrollment.role == "student",
+        ).all()
+
+        assignments_data = [{
+            "id": a.id,
+            "title": a.title,
+            "max_points": a.max_points or 100,
+            "due_date": a.due_date.isoformat() if a.due_date else None,
+        } for a in assignments]
+
+        students_data = []
+        for se in student_enrollments:
+            student = db.query(User).filter(User.id == se.user_id).first()
+            if not student:
+                continue
+
+            grades = {}
+            total_earned = 0.0
+            total_possible = 0.0
+
+            for a in assignments:
+                sub = db.query(Submission).filter(
+                    Submission.student_id == student.id,
+                    Submission.assignment_id == a.id,
+                    Submission.status == "graded",
+                ).order_by(Submission.created_at.desc()).first()
+
+                if sub and sub.score is not None:
+                    grades[str(a.id)] = {
+                        "score": float(sub.score),
+                        "max_score": float(sub.max_score) if sub.max_score else float(a.max_points or 100),
+                        "submission_id": sub.id,
+                        "is_late": False,
+                    }
+                    total_earned += float(sub.score)
+                    total_possible += float(sub.max_score) if sub.max_score else float(a.max_points or 100)
+                else:
+                    grades[str(a.id)] = None
+
+            students_data.append({
+                "student_id": student.id,
+                "id": student.id,
+                "name": student.name,
+                "email": student.email,
+                "sis_user_id": student.sis_user_id.rstrip(".0") if student.sis_user_id and student.sis_user_id.endswith(".0") else student.sis_user_id,
+                "grades": grades,
+                "total_earned": total_earned,
+                "total_possible": total_possible,
+            })
+
+        return {
+            "students": students_data,
+            "assignments": assignments_data,
+            "graded_count": sum(1 for s in students_data if s["total_possible"] > 0),
+            "total_count": len(students_data),
+        }
+
+    # ── Student: return their own grades ──
     # Check if user is enrolled in the course
     user_enrollment = db.query(Enrollment).filter(
         Enrollment.course_id == course_id,
         Enrollment.user_id == user.id,
         Enrollment.role == "student"
     ).first()
-    
+
     if not user_enrollment:
         raise HTTPException(status_code=403, detail="Not enrolled in this course")
     

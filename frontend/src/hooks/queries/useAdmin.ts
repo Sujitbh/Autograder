@@ -13,6 +13,7 @@ export function useAdminStats() {
     queryKey: ['admin', 'stats'],
     queryFn: () => adminService.getStats(),
     staleTime: 30_000,
+    retry: 1,
   });
 }
 
@@ -21,6 +22,7 @@ export function useAdminActivity(limit = 20) {
     queryKey: ['admin', 'activity', limit],
     queryFn: () => adminService.getActivity(limit),
     staleTime: 30_000,
+    retry: 1,
   });
 }
 
@@ -32,6 +34,7 @@ export function useAdminUsers(params?: { skip?: number; limit?: number; role?: s
     queryFn: () => adminService.getUsers(params),
     staleTime: 0,
     refetchOnMount: 'always' as const,
+    retry: 1,
   });
 }
 
@@ -74,6 +77,7 @@ export function useAdminCourses(params?: { search?: string; is_active?: boolean 
     queryFn: () => adminService.getCourses(params),
     staleTime: 0,
     refetchOnMount: 'always' as const,
+    retry: 1,
   });
 }
 
@@ -94,6 +98,7 @@ export function useAdminSemesters() {
   return useQuery({
     queryKey: ['admin', 'semesters'],
     queryFn: () => adminService.getSemesters(),
+    retry: 1,
   });
 }
 
@@ -129,6 +134,7 @@ export function useAdminLanguages() {
   return useQuery({
     queryKey: ['admin', 'languages'],
     queryFn: () => adminService.getLanguages(),
+    retry: 1,
   });
 }
 
@@ -164,6 +170,7 @@ export function useAdminTAAssignments() {
   return useQuery({
     queryKey: ['admin', 'ta', 'assignments'],
     queryFn: () => adminService.getTAAssignments(),
+    retry: 1,
   });
 }
 
@@ -203,6 +210,7 @@ export function useAdminTAInvitations() {
   return useQuery({
     queryKey: ['admin', 'ta', 'invitations'],
     queryFn: () => adminService.getTAInvitations(),
+    retry: 1,
   });
 }
 
@@ -212,6 +220,7 @@ export function useAdminAuditLogs(params?: { skip?: number; limit?: number; acti
   return useQuery({
     queryKey: ['admin', 'audit-logs', params],
     queryFn: () => adminService.getAuditLogs(params),
+    retry: 1,
   });
 }
 
@@ -221,6 +230,7 @@ export function useAdminSettings() {
   return useQuery({
     queryKey: ['admin', 'settings'],
     queryFn: () => adminService.getSettings(),
+    retry: 1,
   });
 }
 
