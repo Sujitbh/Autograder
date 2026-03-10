@@ -50,6 +50,7 @@ export function StudentRoster() {
   const [importDomain, setImportDomain] = useState('warhawks.ulm.edu');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingRemoveId, setPendingRemoveId] = useState<number | null>(null);
 
   const downloadImportRowsAsCsv = (rows: Array<{
     row_number: number;
@@ -202,6 +203,7 @@ export function StudentRoster() {
 
   const handleRemove = async (enrollmentId: number) => {
     setError(null);
+    setPendingRemoveId(null);
     try {
       await courseService.removeEnrollment(cid, enrollmentId);
       setMembers((prev) => prev.filter((m) => m.id !== enrollmentId));
@@ -234,6 +236,7 @@ export function StudentRoster() {
           <tr>
             <th className="text-left px-4 py-4" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)', width: '40px' }}>#</th>
             <th className="text-left px-4 py-4" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>Name</th>
+            <th className="text-left px-4 py-4" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>CWID</th>
             <th className="text-left px-4 py-4" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>Email</th>
             <th className="text-left px-4 py-4" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>Class Role</th>
             <th className="text-left px-4 py-4" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>Actions</th>
@@ -247,6 +250,9 @@ export function StudentRoster() {
               </td>
               <td className="px-4 py-4" style={{ fontSize: '14px', color: 'var(--color-text-dark)' }}>
                 {member.user?.name ?? `User #${member.user_id}`}
+              </td>
+              <td className="px-4 py-4" style={{ fontSize: '14px', color: 'var(--color-text-mid)', fontVariantNumeric: 'tabular-nums' }}>
+                {member.user?.sis_user_id ?? '—'}
               </td>
               <td className="px-4 py-4" style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>
                 {member.user?.email ?? '—'}
@@ -272,7 +278,7 @@ export function StudentRoster() {
                 <Button
                   variant="outline"
                   className="border-[var(--color-error)] text-[var(--color-error)]"
-                  onClick={() => handleRemove(member.id)}
+                  onClick={() => setPendingRemoveId(member.id)}
                 >
                   <Trash2 className="w-4 h-4 mr-2" /> Remove
                 </Button>
@@ -405,6 +411,44 @@ export function StudentRoster() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Remove confirmation dialog ── */}
+      {(() => {
+        const pending = members.find((m) => m.id === pendingRemoveId);
+        const isFaculty = pending?.role === 'instructor' || pending?.role === 'ta';
+        const displayName = pending?.user?.name ?? `User #${pending?.user_id}`;
+        const roleDisplay = pending?.role === 'instructor' ? 'Instructor' : pending?.role === 'ta' ? 'Grading Assistant' : 'Student';
+        return (
+          <Dialog open={pendingRemoveId !== null} onOpenChange={(open) => { if (!open) setPendingRemoveId(null); }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Remove {roleDisplay}?</DialogTitle>
+              </DialogHeader>
+              <div className="py-2 space-y-3">
+                <p style={{ fontSize: '14px', color: 'var(--color-text-dark)' }}>
+                  Are you sure you want to remove <strong>{displayName}</strong> from this course?
+                </p>
+                {isFaculty && (
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--color-error-bg)', border: '1px solid var(--color-error)' }}>
+                    <p style={{ fontSize: '13px', color: 'var(--color-error)', fontWeight: 500 }}>
+                      Warning: This person is a {roleDisplay}. Removing them will revoke their access to all course submissions and grading tools.
+                    </p>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setPendingRemoveId(null)}>Cancel</Button>
+                <Button
+                  onClick={() => pending && handleRemove(pending.id)}
+                  style={{ backgroundColor: 'var(--color-error)', color: '#fff' }}
+                >
+                  Remove {roleDisplay}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
 
       <Dialog open={showImportModal} onOpenChange={setShowImportModal}>
         <DialogContent>

@@ -14,9 +14,11 @@ interface BackendCourse {
     id: number;
     name: string;
     code: string | null;
+    section: string | null;
     description: string | null;
     enrollment_code: string | null;
     enrollment_code_active: boolean;
+    enrollment_policy: 'open' | 'invite' | 'code';
     is_active: boolean;
     created_at?: string | null;
     updated_at?: string | null;
@@ -30,6 +32,7 @@ interface BackendEnrollmentUser {
     name: string;
     email: string;
     role: string;
+    sis_user_id: string | null;
 }
 
 export type EnrollmentRole = 'student' | 'ta' | 'instructor';
@@ -76,10 +79,12 @@ function mapCourse(c: BackendCourse): Course {
         code: c.code ?? '',
         name: c.name,
         semester: 'Spring 2026',
+        section: c.section ?? undefined,
         description: c.description ?? '',
         facultyId: '',
         enrollmentCode: c.enrollment_code ?? '',
         enrollmentCodeActive: c.enrollment_code_active,
+        enrollmentPolicy: c.enrollment_policy ?? 'invite',
         status: c.is_active ? 'active' : 'archived',
         studentCount: c.student_count ?? 0,
         assignmentCount: c.assignment_count ?? 0,
@@ -90,6 +95,20 @@ function mapCourse(c: BackendCourse): Course {
 }
 
 export const courseService = {
+    /** Return all semesters from the database. For faculty/admin use in course creation. */
+    async getSemesters(): Promise<{ id: number; name: string; is_current: boolean }[]> {
+        const { data } = await withRetry(() =>
+            api.get<{ id: number; name: string; is_current: boolean }[]>('/courses/semesters')
+        );
+        return data;
+    },
+
+    /** Return distinct (code, name) pairs from all courses for autocomplete. */
+    async getCatalog(): Promise<{ code: string; name: string }[]> {
+        const { data } = await withRetry(() => api.get<{ code: string; name: string }[]>('/courses/catalog'));
+        return data;
+    },
+
     /** List all courses for the authenticated user. */
     async getCourses(): Promise<Course[]> {
         const { data } = await withRetry(() =>
@@ -111,6 +130,7 @@ export const courseService = {
         const payload = {
             name: dto.name,
             code: dto.code,
+            section: dto.section,
             description: dto.description ?? '',
             enrollment_code_active: dto.enrollmentCodeActive ?? true,
         };
@@ -120,9 +140,17 @@ export const courseService = {
 
     /** Update an existing course. */
     async updateCourse(courseId: string, dto: UpdateCourseDto): Promise<Course> {
+        const payload: Record<string, unknown> = {
+            ...(dto.name !== undefined && { name: dto.name }),
+            ...(dto.code !== undefined && { code: dto.code }),
+            ...(dto.section !== undefined && { section: dto.section }),
+            ...(dto.description !== undefined && { description: dto.description }),
+            ...(dto.enrollmentCodeActive !== undefined && { enrollment_code_active: dto.enrollmentCodeActive }),
+            ...(dto.enrollmentPolicy !== undefined && { enrollment_policy: dto.enrollmentPolicy }),
+        };
         const { data } = await api.put<BackendCourse>(
             `/courses/${courseId}`,
-            dto
+            payload
         );
         return mapCourse(data);
     },

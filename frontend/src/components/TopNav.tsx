@@ -262,89 +262,95 @@ export function TopNav({
           )}
         </button>
 
-        {/* Messaging Icon with Red Dot Badge */}
-        <button
-          className="relative hover:opacity-80 transition-opacity"
-          aria-label="Messages"
-          onClick={() => router.push(currentUser?.role === 'student' ? '/student/messages' : '/faculty/messages')}
-        >
-          <MessageSquare
-            className="text-white"
-            style={{ width: '22px', height: '22px', color: navFg }}
-          />
-          {unreadCount > 0 && (
-            <div
-              className="absolute rounded-full flex items-center justify-center font-bold"
-              style={{
-                width: '16px',
-                height: '16px',
-                backgroundColor: '#FACC15', // yellow-400
-                top: '-6px',
-                right: '-6px',
-                fontSize: '10px',
-                color: '#6B0000',
-                border: '2px solid var(--color-nav-bg)'
-              }}
-            >
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </div>
-          )}
-        </button>
+        {/* Messaging Icon with Red Dot Badge (hidden for admin) */}
+        {currentUser?.role !== 'admin' && (
+          <button
+            className="relative hover:opacity-80 transition-opacity"
+            aria-label="Messages"
+            onClick={() => router.push(currentUser?.role === 'student' ? '/student/messages' : '/faculty/messages')}
+          >
+            <MessageSquare
+              className="text-white"
+              style={{ width: '22px', height: '22px', color: navFg }}
+            />
+            {unreadCount > 0 && (
+              <div
+                className="absolute rounded-full flex items-center justify-center font-bold"
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  backgroundColor: '#FACC15', // yellow-400
+                  top: '-6px',
+                  right: '-6px',
+                  fontSize: '10px',
+                  color: '#6B0000',
+                  border: '2px solid var(--color-nav-bg)'
+                }}
+              >
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </div>
+            )}
+          </button>
+        )}
 
-        {/* Notes & Todos Toggle */}
-        <button
-          onClick={toggleNotesPanel}
-          className="relative hover:opacity-80 transition-opacity"
-          aria-label="Toggle notes panel"
-          style={{
-            background: notesPanelOpen ? 'rgba(255,255,255,0.15)' : 'none',
-            border: 'none',
-            cursor: 'pointer',
-            borderRadius: '6px',
-            padding: '4px',
-          }}
-        >
-          <StickyNote
-            className="text-white"
-            style={{ width: '22px', height: '22px', color: navFg }}
-          />
-        </button>
+        {/* Notes & Todos Toggle (hidden for admin) */}
+        {currentUser?.role !== 'admin' && (
+          <button
+            onClick={toggleNotesPanel}
+            className="relative hover:opacity-80 transition-opacity"
+            aria-label="Toggle notes panel"
+            style={{
+              background: notesPanelOpen ? 'rgba(255,255,255,0.15)' : 'none',
+              border: 'none',
+              cursor: 'pointer',
+              borderRadius: '6px',
+              padding: '4px',
+            }}
+          >
+            <StickyNote
+              className="text-white"
+              style={{ width: '22px', height: '22px', color: navFg }}
+            />
+          </button>
+        )}
 
-        {/* Calendar Page */}
-        <button
-          onClick={() => router.push('/faculty/calendar')}
-          className="relative hover:opacity-80 transition-opacity"
-          aria-label="Assignment Calendar"
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            borderRadius: '6px',
-            padding: '4px',
-          }}
-        >
-          <CalendarDays
-            className="text-white"
-            style={{ width: '22px', height: '22px', color: navFg }}
-          />
-          {dueTodayCount > 0 && (
-            <div
-              className="absolute rounded-full flex items-center justify-center font-bold"
-              style={{
-                width: '16px',
-                height: '16px',
-                backgroundColor: '#FACC15', // yellow-400
-                top: '-2px',
-                right: '-2px',
-                fontSize: '10px',
-                color: '#6B0000',
-                border: '2px solid var(--color-nav-bg)'
-              }}
-            >
-              {dueTodayCount > 9 ? '9+' : dueTodayCount}
-            </div>
-          )}
-        </button>
+        {/* Calendar Page (hidden for admin) */}
+        {currentUser?.role !== 'admin' && (
+          <button
+            onClick={() => router.push('/faculty/calendar')}
+            className="relative hover:opacity-80 transition-opacity"
+            aria-label="Assignment Calendar"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              borderRadius: '6px',
+              padding: '4px',
+            }}
+          >
+            <CalendarDays
+              className="text-white"
+              style={{ width: '22px', height: '22px', color: navFg }}
+            />
+            {dueTodayCount > 0 && (
+              <div
+                className="absolute rounded-full flex items-center justify-center font-bold"
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  backgroundColor: '#FACC15', // yellow-400
+                  top: '-2px',
+                  right: '-2px',
+                  fontSize: '10px',
+                  color: '#6B0000',
+                  border: '2px solid var(--color-nav-bg)'
+                }}
+              >
+                {dueTodayCount > 9 ? '9+' : dueTodayCount}
+              </div>
+            )}
+          </button>
+        )}
 
         {/* Live Date & Time */}
         <LiveClock variant="light" />
