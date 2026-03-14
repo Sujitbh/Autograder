@@ -16,6 +16,7 @@ import { useCourses } from '@/hooks/queries/useCourses';
 import { useAssignmentTestCases } from '@/hooks/queries/useTestCases';
 import { useCodeExecution } from '@/hooks/useCodeExecution';
 import { useTestCaseRunner } from '@/hooks/useTestCaseRunner';
+import { useAuth } from '@/utils/AuthContext';
 import { submissionService } from '@/services/api';
 import {
   Play,
@@ -127,6 +128,7 @@ function launchConfetti() {
 export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssignmentDetailProps) {
   const router = useRouter();
   const { isDark } = useTheme();
+  const { user } = useAuth();
   const { data: courses } = useCourses();
   const { data: assignment, isLoading: assignmentLoading } = useAssignment(courseId, assignmentId);
   const { data: submissions, isLoading: submissionsLoading, refetch: refetchSubmissions } = useSubmissions(assignmentId);
@@ -177,7 +179,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const { runTests, isRunning: isTestsRunning, results: testResults, progress: testProgress } = useTestCaseRunner();
 
   // Auto-save
-  const autoSaveKey = `autograder_code_${assignmentId}`;
+  const autoSaveKey = `autograder_code_${user?.id ?? 'anon'}_${courseId}_${assignmentId}`;
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
@@ -703,12 +705,33 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                           {latestSubmission.status === 'graded' ? '✅' : '⏳'} {latestSubmission.status.charAt(0).toUpperCase() + latestSubmission.status.slice(1)}
                         </div>
                         {latestSubmission.grade && (
-                          <p style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-dark)', marginTop: 8 }}>
-                            {latestSubmission.grade.totalScore} / {latestSubmission.grade.maxScore}
-                            <span style={{ fontSize: 13, fontWeight: 400, marginLeft: 8, color: 'var(--color-text-mid)' }}>
-                              ({latestSubmission.grade.percentage}%)
-                            </span>
-                          </p>
+                          <>
+                            <p style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-dark)', marginTop: 8 }}>
+                              {latestSubmission.grade.totalScore} / {latestSubmission.grade.maxScore}
+                              <span style={{ fontSize: 13, fontWeight: 400, marginLeft: 8, color: 'var(--color-text-mid)' }}>
+                                ({latestSubmission.grade.percentage}%)
+                              </span>
+                            </p>
+
+                            {latestSubmission.grade.feedback && latestSubmission.grade.feedback.trim() && (
+                              <div
+                                style={{
+                                  marginTop: 10,
+                                  padding: '10px 12px',
+                                  borderRadius: 6,
+                                  border: '1px solid var(--color-border)',
+                                  background: 'var(--color-surface-elevated)',
+                                }}
+                              >
+                                <p style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.4px', color: 'var(--color-text-light)', marginBottom: 5 }}>
+                                  Faculty Feedback
+                                </p>
+                                <p style={{ fontSize: 13, color: 'var(--color-text-dark)', whiteSpace: 'pre-wrap' }}>
+                                  {latestSubmission.grade.feedback}
+                                </p>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     )}

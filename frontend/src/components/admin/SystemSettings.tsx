@@ -5,7 +5,7 @@ import { Settings, Loader2, Save } from 'lucide-react';
 import { AdminLayout } from '../AdminLayout';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import { useAdminSettings, useUpdateAdminSettings } from '@/hooks/queries/useAdmin';
+import { useAdminSettings, useUpdateAdminSettings, useIntegrityDetectorStatus } from '@/hooks/queries/useAdmin';
 
 const SETTING_CATEGORIES = [
   {
@@ -49,6 +49,7 @@ const SETTING_CATEGORIES = [
 
 export function SystemSettings() {
   const { data: settings, isLoading } = useAdminSettings();
+  const { data: detector, isLoading: detectorLoading } = useIntegrityDetectorStatus();
   const updateMutation = useUpdateAdminSettings();
   const [activeTab, setActiveTab] = useState('general');
   const [form, setForm] = useState<Record<string, string>>({});
@@ -99,6 +100,69 @@ export function SystemSettings() {
           )}
           {saved ? 'Saved!' : 'Save Changes'}
         </Button>
+      </div>
+
+      <div className="rounded-xl p-5 mb-6" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-card)' }}>
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h3 style={{ fontSize: '17px', fontWeight: 700, color: 'var(--color-text-dark)' }}>Integrity Detector</h3>
+            <p style={{ fontSize: '13px', color: 'var(--color-text-mid)', marginTop: 2 }}>
+              AI-generated vs human-written classifier status and latest training metrics.
+            </p>
+          </div>
+          {detectorLoading ? (
+            <span className="inline-flex items-center gap-2" style={{ fontSize: '12px', color: 'var(--color-text-mid)' }}>
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading...
+            </span>
+          ) : (
+            <span
+              style={{
+                fontSize: '12px',
+                fontWeight: 700,
+                padding: '4px 10px',
+                borderRadius: 999,
+                backgroundColor: detector?.model_available ? '#DCFCE7' : '#FEE2E2',
+                color: detector?.model_available ? '#166534' : '#991B1B',
+                border: detector?.model_available ? '1px solid #86EFAC' : '1px solid #FCA5A5',
+              }}
+            >
+              {detector?.model_available ? 'Model Ready' : 'Model Missing'}
+            </span>
+          )}
+        </div>
+
+        {!detectorLoading && detector && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4">
+            <div className="rounded-lg p-3" style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-primary-bg)' }}>
+              <p style={{ fontSize: '11px', color: 'var(--color-text-light)', textTransform: 'uppercase', fontWeight: 700 }}>Accuracy</p>
+              <p style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text-dark)' }}>
+                {detector.metrics?.accuracy != null ? `${(detector.metrics.accuracy * 100).toFixed(1)}%` : '--'}
+              </p>
+            </div>
+            <div className="rounded-lg p-3" style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-primary-bg)' }}>
+              <p style={{ fontSize: '11px', color: 'var(--color-text-light)', textTransform: 'uppercase', fontWeight: 700 }}>Macro F1</p>
+              <p style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text-dark)' }}>
+                {detector.metrics?.macro_f1 != null ? detector.metrics.macro_f1.toFixed(4) : '--'}
+              </p>
+            </div>
+            <div className="rounded-lg p-3" style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-primary-bg)' }}>
+              <p style={{ fontSize: '11px', color: 'var(--color-text-light)', textTransform: 'uppercase', fontWeight: 700 }}>Train/Test</p>
+              <p style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text-dark)' }}>
+                {detector.metrics?.train_size != null && detector.metrics?.test_size != null
+                  ? `${detector.metrics.train_size}/${detector.metrics.test_size}`
+                  : '--'}
+              </p>
+            </div>
+            <div className="rounded-lg p-3" style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-primary-bg)' }}>
+              <p style={{ fontSize: '11px', color: 'var(--color-text-light)', textTransform: 'uppercase', fontWeight: 700 }}>Last Trained</p>
+              <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-dark)', marginTop: 4 }}>
+                {detector.model_last_modified
+                  ? new Date(detector.model_last_modified * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                  : '--'}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {isLoading ? (

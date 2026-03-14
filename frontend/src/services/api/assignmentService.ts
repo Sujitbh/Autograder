@@ -30,6 +30,7 @@ interface BackendAssignment {
         name: string;
         description: string | null;
         max_points: number | null;
+        weight?: number | null;
     }>;
 }
 
@@ -56,6 +57,7 @@ function mapAssignment(a: BackendAssignment): Assignment {
             name: r.name,
             description: r.description ?? '',
             maxPoints: r.max_points ?? 0,
+            weight: r.weight ?? 1,
             gradingMethod: 'manual' as const,
         })),
         createdAt: a.created_at ?? '',
@@ -136,6 +138,7 @@ export const assignmentService = {
                 name: r.name,
                 description: r.description,
                 maxPoints: r.maxPoints,
+                weight: r.weight ?? 1,
                 gradingMethod: r.gradingMethod,
             }));
         }

@@ -35,6 +35,29 @@ interface BackendEnrollmentUser {
     sis_user_id: string | null;
 }
 
+function defaultSemesters(): { id: number; name: string; is_current: boolean }[] {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+
+    let currentTerm: 'Spring' | 'Summer' | 'Fall';
+    if (month <= 4) currentTerm = 'Spring';
+    else if (month <= 7) currentTerm = 'Summer';
+    else currentTerm = 'Fall';
+
+    const currentName = `${currentTerm} ${year}`;
+
+    let nextName = '';
+    if (currentTerm === 'Spring') nextName = `Summer ${year}`;
+    if (currentTerm === 'Summer') nextName = `Fall ${year}`;
+    if (currentTerm === 'Fall') nextName = `Spring ${year + 1}`;
+
+    return [
+        { id: -1, name: currentName, is_current: true },
+        { id: -2, name: nextName, is_current: false },
+    ];
+}
+
 export type EnrollmentRole = 'student' | 'ta' | 'instructor';
 
 export interface CourseEnrollment {
@@ -74,6 +97,7 @@ interface CreateEnrollmentPayload {
 
 /** Map a backend course to the frontend Course type */
 function mapCourse(c: BackendCourse): Course {
+    const normalizedPolicy = (c.enrollment_policy === 'open' ? 'both' : c.enrollment_policy) ?? 'invite';
     return {
         id: String(c.id),
         code: c.code ?? '',
@@ -84,7 +108,7 @@ function mapCourse(c: BackendCourse): Course {
         facultyId: '',
         enrollmentCode: c.enrollment_code ?? '',
         enrollmentCodeActive: c.enrollment_code_active,
-        enrollmentPolicy: c.enrollment_policy ?? 'invite',
+        enrollmentPolicy: normalizedPolicy,
         status: c.is_active ? 'active' : 'archived',
         studentCount: c.student_count ?? 0,
         assignmentCount: c.assignment_count ?? 0,
@@ -97,10 +121,15 @@ function mapCourse(c: BackendCourse): Course {
 export const courseService = {
     /** Return all semesters from the database. For faculty/admin use in course creation. */
     async getSemesters(): Promise<{ id: number; name: string; is_current: boolean }[]> {
-        const { data } = await withRetry(() =>
-            api.get<{ id: number; name: string; is_current: boolean }[]>('/courses/semesters')
-        );
-        return data;
+        try {
+            const { data } = await withRetry(() =>
+                api.get<{ id: number; name: string; is_current: boolean }[]>('/courses/semesters')
+            );
+            if (Array.isArray(data) && data.length > 0) return data;
+            return defaultSemesters();
+        } catch {
+            return defaultSemesters();
+        }
     },
 
     /** Return distinct (code, name) pairs from all courses for autocomplete. */

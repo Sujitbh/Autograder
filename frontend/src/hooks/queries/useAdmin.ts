@@ -241,3 +241,12 @@ export function useUpdateAdminSettings() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin', 'settings'] }),
   });
 }
+
+export function useIntegrityDetectorStatus() {
+  return useQuery({
+    queryKey: ['admin', 'integrity-detector'],
+    queryFn: () => adminService.getIntegrityDetectorStatus(),
+    staleTime: 30_000,
+    retry: 1,
+  });
+}

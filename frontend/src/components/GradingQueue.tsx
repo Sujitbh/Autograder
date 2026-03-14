@@ -24,6 +24,7 @@ interface QueueSubmission {
     id: string;
     studentName: string;
     studentId: string;
+    studentEmail: string | null;
     assignmentName: string;
     assignmentId: string;
     submittedAt: string;
@@ -47,6 +48,7 @@ function toQueueSubmission(sub: ApiSubmission, assignment: Assignment): QueueSub
         id: sub.id,
         studentName: sub.studentName ?? `Student ${sub.studentId}`,
         studentId: sub.studentId,
+        studentEmail: sub.studentEmail ?? null,
         assignmentName: assignment.name,
         assignmentId: assignment.id,
         submittedAt: sub.submittedAt,
@@ -436,7 +438,7 @@ export function GradingQueue() {
                                                             {submission.studentName}
                                                         </p>
                                                         <p style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>
-                                                            {submission.studentId}
+                                                            {submission.studentEmail ?? submission.studentId}
                                                         </p>
                                                     </div>
                                                 </div>

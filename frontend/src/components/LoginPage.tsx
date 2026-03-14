@@ -26,6 +26,13 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [showNotRegisteredPrompt, setShowNotRegisteredPrompt] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
 
+  const createAccountPath =
+    selectedRole === 'student'
+      ? '/signup/student'
+      : selectedRole === 'admin'
+        ? '/signup/admin'
+        : '/signup/faculty';
+
   const validateULMEmail = (emailVal: string) => {
     const emailLower = emailVal.toLowerCase().trim();
     if (selectedRole === 'student') {
@@ -226,7 +233,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                       {showNotRegisteredPrompt && (
                         <Button
                           type="button"
-                          onClick={() => router.push('/signup')}
+                          onClick={() => router.push(createAccountPath)}
                           className="mt-2 h-9 text-white hover:opacity-90"
                           style={{ backgroundColor: 'var(--color-warning)', fontSize: '13px' }}
                         >
@@ -343,7 +350,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 {/* Sign Up Link */}
                 <p className="text-center" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-text-light)' }}>
                   Don't have an account?{' '}
-                  <button type="button" onClick={() => router.push('/signup')} className="hover:underline" style={{ color: 'var(--color-primary)', fontWeight: 500 }}>
+                  <button type="button" onClick={() => router.push(createAccountPath)} className="hover:underline" style={{ color: 'var(--color-primary)', fontWeight: 500 }}>
                     Create Account
                   </button>
                 </p>

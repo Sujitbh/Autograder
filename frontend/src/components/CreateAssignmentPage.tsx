@@ -68,6 +68,7 @@ function toDto(data: AssignmentFormData, courseId: string): CreateAssignmentDto 
             name: c.name,
             description: c.description,
             maxPoints: c.maxPoints,
+            weight: (c as any).weight ?? 1,
             gradingMethod: c.gradingMethod,
         })),
     };

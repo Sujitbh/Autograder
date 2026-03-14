@@ -105,6 +105,7 @@ export interface Submission {
     assignmentId: string;
     studentId: string;
     studentName?: string;
+    studentEmail?: string;
     code: string;
     language: ProgrammingLanguage;
     submittedAt: string;
@@ -144,6 +145,7 @@ export interface RubricCriterion {
     name: string;
     description: string;
     maxPoints: number;
+    weight?: number;
     gradingMethod: GradingMethod;
 }
 

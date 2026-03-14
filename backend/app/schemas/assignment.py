@@ -22,6 +22,7 @@ class RubricInline(BaseModel):
     name: str
     description: Optional[str] = None
     maxPoints: Optional[int] = 10
+    weight: Optional[float] = 1.0
     gradingMethod: Optional[str] = None  # auto | manual | hybrid
 
 

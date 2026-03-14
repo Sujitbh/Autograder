@@ -81,7 +81,7 @@ def create_assignment(
             name=rc.name,
             description=rc.description,
             max_points=rc.maxPoints or 10,
-            weight=1.0,
+            weight=rc.weight if rc.weight is not None else 1.0,
             order=idx,
         ))
 
