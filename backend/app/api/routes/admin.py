@@ -3,6 +3,8 @@ Admin-only API routes for system management.
 """
 
 from typing import Optional
+from pathlib import Path
+import json
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import func, desc
@@ -22,6 +24,7 @@ from app.models.system_setting import SystemSetting
 from app.models.ta_invitation import TAInvitation
 from app.models.ta_permission import TAPermission
 from app.schemas.admin import SemesterCreate, SemesterUpdate, LanguageCreate, LanguageUpdate
+from app.settings import settings
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -739,6 +742,31 @@ def update_system_settings(
 
     db.commit()
     return {"message": "Settings updated"}
+
+
+@router.get("/integrity-detector")
+def get_integrity_detector_status(user: User = Depends(get_current_user)):
+    _require_admin(user)
+
+    model_path = Path(settings.DATA_ROOT) / "models" / "ai_code_detector.joblib"
+    metrics_path = Path(settings.DATA_ROOT) / "models" / "ai_code_detector_metrics.json"
+
+    metrics_payload = None
+    if metrics_path.exists():
+        try:
+            with open(metrics_path, "r", encoding="utf-8") as fh:
+                metrics_payload = json.load(fh)
+        except Exception:
+            metrics_payload = None
+
+    return {
+        "model_available": model_path.exists(),
+        "model_path": str(model_path),
+        "model_size_bytes": model_path.stat().st_size if model_path.exists() else None,
+        "model_last_modified": model_path.stat().st_mtime if model_path.exists() else None,
+        "metrics_available": metrics_payload is not None,
+        "metrics": metrics_payload,
+    }
 
 
 # ==================== Password Management ====================

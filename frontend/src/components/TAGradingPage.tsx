@@ -119,6 +119,13 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         feedback: string | null;
         percentage: number;
         message: string;
+        rubric_results?: {
+            evaluations?: Array<{
+                rubric_id: number;
+                earned_points: number;
+                feedback?: string;
+            }>;
+        };
     } | null>(null);
 
     // Populate form when detail loads
@@ -232,7 +239,10 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         );
     }
 
-    const language = (detail.assignment.language || 'python').toLowerCase();
+    const language = (
+        detail.assignment.allowed_languages?.split(',')[0]
+        || 'python'
+    ).toLowerCase();
     const activeFile = detail.files[activeFileIndex];
     const code = activeFile?.content || '';
 

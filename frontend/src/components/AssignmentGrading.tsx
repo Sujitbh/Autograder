@@ -665,10 +665,7 @@ export function AssignmentGrading() {
                                                             marginLeft: '6px',
                                                             fontSize: '11px',
                                                             fontWeight: 600,
-                                                            backgroundColor: active ? 'rgba(255,255,255,0.25)' : 'var(--color-border)',
-                                                            color: active ? '#fff' : '#595959',
-                                                            padding: '1px 7px',
-                                                            borderRadius: '10px',
+                                                            color: active ? '#fff' : '#9A6A6A',
                                                         }}
                                                     >
                                                         {tab.count}
@@ -678,6 +675,14 @@ export function AssignmentGrading() {
                                         );
                                     })}
                                 </div>
+                                <Button
+                                    variant="outline"
+                                    className="border-[var(--color-border)] h-9"
+                                    onClick={() => router.push(`/courses/${courseId}/assignments/${assignmentId}/performance`)}
+                                >
+                                    <BarChart3 className="w-4 h-4 mr-2" />
+                                    Class Performance
+                                </Button>
                                 <Button
                                     className="text-white h-9"
                                     style={{ backgroundColor: 'var(--color-primary)' }}

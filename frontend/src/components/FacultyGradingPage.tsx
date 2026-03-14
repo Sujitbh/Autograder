@@ -54,6 +54,20 @@ function getFileIcon(name: string) {
     return FILE_ICONS[ext] ?? '📄';
 }
 
+function getRiskTagStyle(risk: 'low' | 'medium' | 'high') {
+    if (risk === 'high') {
+        return { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' };
+    }
+    if (risk === 'medium') {
+        return { background: '#FEF3C7', color: '#92400E', border: '1px solid #FCD34D' };
+    }
+    return { background: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC' };
+}
+
+function getBandLabel(scoreBand: 'low' | 'medium' | 'high') {
+    return scoreBand.charAt(0).toUpperCase() + scoreBand.slice(1);
+}
+
 export default function FacultyGradingPage({ courseId, submissionId }: Readonly<FacultyGradingPageProps>) {
     const router = useRouter();
     const { isDark } = useTheme();
@@ -85,7 +99,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const [showExplorer, setShowExplorer] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
     const [outputOpen, setOutputOpen] = useState(false);
-    const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading'>('grading');
+    const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading' | 'integrity'>('grading');
     const [stdinDialogOpen, setStdinDialogOpen] = useState(false);
     const [stdinValue, setStdinValue] = useState('');
     const [autoGradeResult, setAutoGradeResult] = useState<any>(null);
@@ -355,12 +369,12 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                             style={{ width: 380, minWidth: 380, background: 'var(--color-surface)', borderLeft: '1px solid var(--color-border)' }}>
                             {/* Tabs */}
                             <div style={{ display: 'flex', padding: '8px 10px 0', gap: 4, flexShrink: 0 }}>
-                                {(['desc', 'tests', 'grading'] as const).map(tab => (
+                                {(['desc', 'tests', 'grading', 'integrity'] as const).map(tab => (
                                     <button key={tab} onClick={() => setInfoTab(tab)}
                                         style={{ padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' as const, transition: 'all .2s', background: infoTab === tab ? '#7f1d1d' : 'transparent', color: infoTab === tab ? '#fff' : 'var(--color-text-light)', border: 'none', cursor: 'pointer' }}
                                         onMouseEnter={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'var(--color-surface-elevated)'; e.currentTarget.style.color = 'var(--color-text-mid)'; } }}
                                         onMouseLeave={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-light)'; } }}>
-                                        {tab === 'desc' ? '📋 Info' : tab === 'tests' ? '🧪 Tests' : '📊 Grading'}
+                                        {tab === 'desc' ? '📋 Info' : tab === 'tests' ? '🧪 Tests' : tab === 'grading' ? '📊 Grading' : '🛡 Integrity'}
                                     </button>
                                 ))}
                             </div>
@@ -476,6 +490,111 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                 </div>
                                             );
                                         })()}
+                                    </div>
+                                )}
+
+                                {/* ── Integrity Tab ── */}
+                                {infoTab === 'integrity' && (
+                                    <div>
+                                        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: 12 }}>🛡 Integrity Check</h2>
+
+                                        {detail.integrity ? (
+                                            <div className="mb-5 rounded-lg p-3" style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface-elevated)' }}>
+                                                <div className="mb-3 p-2 rounded" style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}>
+                                                    <div className="flex items-center justify-between">
+                                                        <span style={{ fontSize: '12px', color: 'var(--color-text-dark)', fontWeight: 600 }}>AI-generated likelihood</span>
+                                                        <span
+                                                            style={{
+                                                                ...getRiskTagStyle(detail.integrity.ai_detection.band),
+                                                                fontSize: '11px',
+                                                                fontWeight: 700,
+                                                                padding: '2px 8px',
+                                                                borderRadius: 999,
+                                                            }}
+                                                        >
+                                                            {detail.integrity.ai_detection.score}% {getBandLabel(detail.integrity.ai_detection.band)}
+                                                        </span>
+                                                    </div>
+                                                    {detail.integrity.ai_detection.signals.length > 0 && (
+                                                        <ul style={{ marginTop: 6, paddingLeft: 16, fontSize: '11px', color: 'var(--color-text-mid)' }}>
+                                                            {detail.integrity.ai_detection.signals.slice(0, 3).map((sig, i) => (
+                                                                <li key={`${sig}-${i}`}>{sig}</li>
+                                                            ))}
+                                                        </ul>
+                                                    )}
+                                                    <p style={{ marginTop: 6, fontSize: '10px', color: 'var(--color-text-light)' }}>
+                                                        {detail.integrity.ai_detection.disclaimer}
+                                                    </p>
+                                                </div>
+
+                                                <div>
+                                                    <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: 6 }}>
+                                                        Similarity with other student submissions
+                                                    </p>
+                                                    <p style={{ fontSize: '10px', color: 'var(--color-text-light)', marginBottom: 8 }}>
+                                                        Compared against {detail.integrity.plagiarism.checked_against} latest submissions from classmates.
+                                                    </p>
+
+                                                    {detail.integrity.plagiarism.top_matches.length === 0 ? (
+                                                        <p style={{ fontSize: '11px', color: 'var(--color-text-mid)' }}>No comparable submissions found yet.</p>
+                                                    ) : (
+                                                        <div className="space-y-2">
+                                                            {detail.integrity.plagiarism.top_matches.map((m) => (
+                                                                <div
+                                                                    key={m.submission_id}
+                                                                    className="rounded-md px-2 py-2"
+                                                                    style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)' }}
+                                                                >
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span style={{ fontSize: '12px', color: 'var(--color-text-dark)', fontWeight: 600 }}>{m.student_name}</span>
+                                                                        <span
+                                                                            style={{
+                                                                                ...getRiskTagStyle(m.risk),
+                                                                                fontSize: '11px',
+                                                                                fontWeight: 700,
+                                                                                padding: '2px 8px',
+                                                                                borderRadius: 999,
+                                                                            }}
+                                                                        >
+                                                                            {m.similarity_percent}% {getBandLabel(m.risk)}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p style={{ fontSize: '10px', color: 'var(--color-text-light)' }}>
+                                                                        {m.student_email ?? 'No email'} • submission #{m.submission_id}
+                                                                    </p>
+                                                                    {m.submitted_at && (
+                                                                        <p style={{ fontSize: '10px', color: 'var(--color-text-light)' }}>
+                                                                            Submitted {new Date(m.submitted_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                                                                        </p>
+                                                                    )}
+                                                                    <button
+                                                                        onClick={() => router.push(`/courses/${courseId}/submissions/${m.submission_id}/grade`)}
+                                                                        style={{
+                                                                            marginTop: 6,
+                                                                            fontSize: '11px',
+                                                                            fontWeight: 600,
+                                                                            color: 'var(--color-primary)',
+                                                                            background: 'transparent',
+                                                                            border: 'none',
+                                                                            padding: 0,
+                                                                            cursor: 'pointer',
+                                                                        }}
+                                                                    >
+                                                                        Open matched submission
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    <p style={{ marginTop: 8, fontSize: '10px', color: 'var(--color-text-light)' }}>
+                                                        {detail.integrity.plagiarism.note}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <p style={{ fontSize: 13, color: 'var(--color-text-mid)' }}>Integrity insights are not available for this submission.</p>
+                                        )}
                                     </div>
                                 )}
 

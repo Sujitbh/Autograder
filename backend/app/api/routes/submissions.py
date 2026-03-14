@@ -1,4 +1,7 @@
 import os
+import re
+import difflib
+from collections import Counter
 from pathlib import Path
 from typing import List
 
@@ -16,9 +19,196 @@ from app.models.submission_result import SubmissionResult
 from app.models.testcase import TestCase
 from app.models.user import User
 from app.schemas.submission import SubmissionCreate, SubmissionOut, SubmissionWithStudent
+from app.services.ai_detector_service import predict_ai_likelihood
 from app.settings import settings
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
+
+
+SOURCE_EXTENSIONS = {".py", ".java", ".cpp", ".c", ".js", ".ts", ".go", ".rs", ".kt", ".swift"}
+
+
+def _extract_primary_source_file(files: list[SubmissionFile]) -> tuple[str | None, str | None]:
+    """Return (filename, content) for the best candidate source file in a submission."""
+    candidates: list[tuple[str, str]] = []
+    for f in files:
+        actual_path = f.path
+        if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
+            actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
+        if not actual_path or not os.path.exists(actual_path):
+            continue
+        try:
+            with open(actual_path, "r", encoding="utf-8", errors="replace") as fh:
+                content = fh.read()
+            if content.strip():
+                candidates.append((f.filename, content))
+        except Exception:
+            continue
+
+    if not candidates:
+        return None, None
+
+    # Prefer source-like extensions, then longest file.
+    candidates.sort(key=lambda item: ((Path(item[0]).suffix.lower() not in SOURCE_EXTENSIONS), -len(item[1])))
+    return candidates[0]
+
+
+def _strip_comments(code: str) -> str:
+    # Remove Python/JS/C style line comments.
+    no_line_comments = re.sub(r"(^|\s)#.*$|//.*$", "", code, flags=re.MULTILINE)
+    # Remove block comments and docstrings.
+    no_block_comments = re.sub(r"/\*.*?\*/|'''[\s\S]*?'''|\"\"\"[\s\S]*?\"\"\"", "", no_line_comments, flags=re.MULTILINE)
+    return no_block_comments
+
+
+def _normalize_code(code: str) -> str:
+    code = _strip_comments(code)
+    # Keep identifiers/keywords, remove punctuation to reduce superficial differences.
+    tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*|\d+", code.lower())
+    return " ".join(tokens)
+
+
+def _token_jaccard(a: str, b: str) -> float:
+    a_tokens = set(a.split())
+    b_tokens = set(b.split())
+    if not a_tokens or not b_tokens:
+        return 0.0
+    inter = len(a_tokens & b_tokens)
+    union = len(a_tokens | b_tokens)
+    return inter / union if union else 0.0
+
+
+def _similarity_percent(code_a: str, code_b: str) -> float:
+    norm_a = _normalize_code(code_a)
+    norm_b = _normalize_code(code_b)
+    char_ratio = difflib.SequenceMatcher(None, norm_a, norm_b).ratio()
+    token_ratio = _token_jaccard(norm_a, norm_b)
+    score = (0.65 * char_ratio) + (0.35 * token_ratio)
+    return round(score * 100, 2)
+
+
+def _heuristic_ai_likelihood(code: str) -> dict:
+    """Heuristic AI-likelihood estimator (advisory only, not a definitive detector)."""
+    lowered = code.lower()
+    lines = [ln for ln in code.splitlines() if ln.strip()]
+    words = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", code)
+
+    comment_lines = sum(1 for ln in code.splitlines() if ln.strip().startswith(("#", "//", "*")))
+    comment_ratio = (comment_lines / len(lines)) if lines else 0.0
+
+    avg_identifier_len = (sum(len(w) for w in words) / len(words)) if words else 0.0
+    avg_line_len = (sum(len(ln) for ln in lines) / len(lines)) if lines else 0.0
+
+    phrase_markers = [
+        "edge case", "time complexity", "space complexity", "robust", "optimize",
+        "readability", "best practice", "input validation", "error handling",
+    ]
+    marker_hits = sum(1 for p in phrase_markers if p in lowered)
+
+    generic_name_markers = [
+        "processdata", "calculateresult", "handleinput", "mainlogic", "performoperation",
+    ]
+    joined_identifiers = " ".join(w.lower() for w in words)
+    generic_hits = sum(1 for p in generic_name_markers if p in joined_identifiers)
+
+    score = 18.0
+    signals: list[str] = []
+
+    if comment_ratio > 0.22:
+        score += 16
+        signals.append("High explanatory-comment ratio")
+    if marker_hits >= 2:
+        score += 18
+        signals.append("Contains multiple polished explanatory phrases")
+    if "/**" in code or "@param" in lowered or "@return" in lowered:
+        score += 10
+        signals.append("Uses formal documentation style")
+    if 35 <= avg_line_len <= 80:
+        score += 8
+        signals.append("Consistent medium-length lines")
+    if avg_identifier_len > 8.5:
+        score += 8
+        signals.append("Long descriptive identifier naming")
+    if generic_hits > 0:
+        score += 8
+        signals.append("Uses generic helper-style naming")
+
+    score = max(5.0, min(95.0, score))
+    band = "low"
+    if score >= 65:
+        band = "high"
+    elif score >= 40:
+        band = "medium"
+
+    return {
+        "score": round(score, 1),
+        "band": band,
+        "signals": signals,
+        "disclaimer": "AI detection is advisory only; use instructor judgement and corroborating evidence.",
+    }
+
+
+def _estimate_ai_likelihood(code: str) -> dict:
+    model_result = predict_ai_likelihood(code)
+    if model_result is not None:
+        return model_result
+    return _heuristic_ai_likelihood(code)
+
+
+def _build_integrity_report(db: Session, submission: Submission) -> dict:
+    files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == submission.id).all()
+    _, current_code = _extract_primary_source_file(files)
+    if not current_code:
+        return {
+            "plagiarism": {
+                "checked_against": 0,
+                "top_matches": [],
+                "note": "No source code found for current submission.",
+            },
+            "ai_detection": _estimate_ai_likelihood(""),
+        }
+
+    # Compare against latest submission from each *other* student in the same assignment.
+    all_subs = db.query(Submission).filter(Submission.assignment_id == submission.assignment_id).order_by(Submission.created_at.desc()).all()
+    latest_by_student: dict[int, Submission] = {}
+    for sub in all_subs:
+        if sub.student_id == submission.student_id:
+            continue
+        if sub.student_id not in latest_by_student:
+            latest_by_student[sub.student_id] = sub
+
+    matches = []
+    for other in latest_by_student.values():
+        other_files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == other.id).all()
+        other_filename, other_code = _extract_primary_source_file(other_files)
+        if not other_code:
+            continue
+
+        similarity = _similarity_percent(current_code, other_code)
+        other_student = db.query(User).filter(User.id == other.student_id).first()
+        matches.append({
+            "submission_id": other.id,
+            "student_id": other.student_id,
+            "student_name": other_student.name if other_student else f"Student {other.student_id}",
+            "student_email": other_student.email if other_student else None,
+            "status": other.status,
+            "submitted_at": other.created_at.isoformat() if other.created_at else None,
+            "filename": other_filename,
+            "similarity_percent": similarity,
+            "risk": "high" if similarity >= 75 else "medium" if similarity >= 55 else "low",
+        })
+
+    matches.sort(key=lambda m: m["similarity_percent"], reverse=True)
+    top = matches[:5]
+
+    return {
+        "plagiarism": {
+            "checked_against": len(matches),
+            "top_matches": top,
+            "note": "Similarity is based on normalized code/token overlap and should be reviewed manually.",
+        },
+        "ai_detection": _estimate_ai_likelihood(current_code),
+    }
 
 
 def safe_folder_name(s: str) -> str:
@@ -162,6 +352,13 @@ def get_submission_detail(
                 "error": r.error_output,
             })
 
+    student_obj = db.query(User).filter(User.id == s.student_id).first()
+
+    integrity_report = None
+    # Only instructors/TAs/admin should see integrity diagnostics.
+    if user.role != "student":
+        integrity_report = _build_integrity_report(db, s)
+
     return {
         "id": s.id,
         "status": s.status,
@@ -173,14 +370,14 @@ def get_submission_detail(
         "results": results_out,
         "student": {
             "id": s.student_id,
-            "name": student_obj.name if (student_obj := db.query(User).filter(User.id == s.student_id).first()) else "Unknown",
-            "email": student_obj.email if (student_obj := db.query(User).filter(User.id == s.student_id).first()) else None,
+            "name": student_obj.name if student_obj else "Unknown",
+            "email": student_obj.email if student_obj else None,
         },
         "assignment": {
             "id": assignment.id,
-            "title": assignment.name,
+            "title": assignment.title,
             "due_date": assignment.due_date.isoformat() if getattr(assignment, "due_date", None) else None,
-            "language": getattr(assignment, "language", "python") or "python",
+            "language": (assignment.allowed_languages.split(",")[0].strip().lower() if assignment.allowed_languages else "python"),
         },
         "rubrics": [
             {
@@ -198,6 +395,7 @@ def get_submission_detail(
             Submission.student_id == s.student_id,
             Submission.id <= s.id,
         ).count(),
+        "integrity": integrity_report,
     }
 
 

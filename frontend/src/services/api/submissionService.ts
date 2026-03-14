@@ -42,6 +42,7 @@ function mapSubmission(s: BackendSubmission): Submission {
     assignmentId: String(s.assignment_id),
     studentId: String(s.student_id),
     studentName: s.student?.name,
+    studentEmail: s.student?.email ?? undefined,
     code: '',
     language: 'python',
     submittedAt: s.created_at ?? '',
@@ -141,6 +142,29 @@ export const submissionService = {
       points_earned: number;
       error: string | null;
     }>;
+    integrity?: {
+      plagiarism: {
+        checked_against: number;
+        top_matches: Array<{
+          submission_id: number;
+          student_id: number;
+          student_name: string;
+          student_email: string | null;
+          status: string;
+          submitted_at: string | null;
+          filename: string | null;
+          similarity_percent: number;
+          risk: 'low' | 'medium' | 'high';
+        }>;
+        note: string;
+      };
+      ai_detection: {
+        score: number;
+        band: 'low' | 'medium' | 'high';
+        signals: string[];
+        disclaimer: string;
+      };
+    } | null;
   }> {
     const { data } = await withRetry(() =>
       api.get(`/submissions/${submissionId}/detail`)

@@ -73,6 +73,7 @@ interface RubricTemplate {
         name: string;
         description: string;
         maxPoints: number;
+        weight?: number;
         gradingMethod: 'auto' | 'manual' | 'hybrid';
     }>;
 }
@@ -129,7 +130,7 @@ function saveSavedRubricTemplates(templates: RubricTemplate[]) {
 
 const testCaseSchema = z.object({
     name: z.string().min(1, 'Name is required'),
-    inputType: z.enum(['text', 'number', 'numbers']).default('text'),
+    inputType: z.enum(['text', 'number', 'numbers']),
     input: z.string(),
     expectedOutput: z.string().min(1, 'Expected output is required'),
     points: z.number().min(0),
@@ -139,6 +140,7 @@ const rubricSchema = z.object({
     name: z.string().min(1, 'Criterion name is required'),
     description: z.string(),
     maxPoints: z.number().min(-1000, 'Value out of range').max(1000, 'Value out of range'),
+    weight: z.number().min(0.1, 'Weight must be at least 0.1').max(100, 'Weight too large'),
     gradingMethod: z.enum(['auto', 'manual', 'hybrid']),
 });
 
@@ -149,12 +151,14 @@ const formSchema = z.object({
     language: z.enum(['python', 'java']),
     category: z.enum(['Homework', 'Quiz', 'Exam', 'Lab', 'Project']),
     dueDate: z.string(),  // Optional for drafts; validated on publish
+    maxPoints: z.number().min(1).max(1000),
     isGroup: z.boolean(),
     description: z.string(),
     starterCode: z.string(),
     // Tests & Rubric
     publicTests: z.array(testCaseSchema),
     privateTests: z.array(testCaseSchema),
+    rubricMode: z.enum(['weighted', 'unweighted']),
     rubric: z.array(rubricSchema),
     // Submission Settings
     maxAttempts: z.number().min(1).max(100),
@@ -241,11 +245,13 @@ export function CreateAssignmentForm({
             language: 'python' as const,
             category: 'Homework' as const,
             dueDate: '',
+            maxPoints: 100,
             isGroup: false,
             description: '',
             starterCode: '',
             publicTests: [],
             privateTests: [],
+            rubricMode: 'unweighted' as const,
             rubric: [],
             // Submission settings
             maxAttempts: 5,
@@ -306,6 +312,14 @@ export function CreateAssignmentForm({
     const watchAiDetection = watch('aiDetectionEnabled');
     const watchAutoFlag = watch('autoFlagEnabled');
     const watchLanguage = watch('language');
+    const watchRubricMode = watch('rubricMode');
+
+    useEffect(() => {
+        if (watchRubricMode === 'unweighted') {
+            const current = getValues('rubric');
+            current.forEach((_, idx) => setValue(`rubric.${idx}.weight`, 1));
+        }
+    }, [watchRubricMode, getValues, setValue]);
 
     // ── Auto-save to localStorage every 30 seconds ────────────────
 
@@ -368,7 +382,7 @@ export function CreateAssignmentForm({
     const handleLoadTemplate = (templateId: string) => {
         const template = allTemplates.find((t) => t.id === templateId);
         if (template) {
-            replaceRubric(template.criteria);
+            replaceRubric(template.criteria.map((c) => ({ ...c, weight: c.weight ?? 1 })));
         }
     };
 
@@ -426,7 +440,7 @@ export function CreateAssignmentForm({
      * This avoids text-based pattern matching and handles run-together words correctly.
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    function parseRubricFromWordPositions(words: any[], totalMaxPoints: number): Array<{ name: string; description: string; maxPoints: number; gradingMethod: 'auto' | 'manual' | 'hybrid' }> {
+    function parseRubricFromWordPositions(words: any[], totalMaxPoints: number): Array<{ name: string; description: string; maxPoints: number; weight: number; gradingMethod: 'auto' | 'manual' | 'hybrid' }> {
         if (!words?.length) return [];
 
         // Filter noise words (empty, single punctuation marks)
@@ -453,7 +467,7 @@ export function CreateAssignmentForm({
             else grouped.push([word]);
         }
 
-        type Criterion = { name: string; description: string; maxPoints: number; gradingMethod: 'auto' | 'manual' | 'hybrid' };
+        type Criterion = { name: string; description: string; maxPoints: number; weight: number; gradingMethod: 'auto' | 'manual' | 'hybrid' };
         const results: Criterion[] = [];
         const seen = new Set<string>();
 
@@ -496,7 +510,7 @@ export function CreateAssignmentForm({
             if (seen.has(key)) continue;
             seen.add(key);
 
-            results.push({ name, description: pts < 0 ? 'Penalty' : '', maxPoints: pts, gradingMethod: 'manual' });
+            results.push({ name, description: pts < 0 ? 'Penalty' : '', maxPoints: pts, weight: 1, gradingMethod: 'manual' });
         }
 
         // Scale positive criteria to match totalMaxPoints if needed
@@ -642,8 +656,8 @@ export function CreateAssignmentForm({
     function parseRubricText(
         text: string,
         totalMaxPoints: number,
-    ): Array<{ name: string; description: string; maxPoints: number; gradingMethod: 'auto' | 'manual' | 'hybrid' }> {
-        type Criterion = { name: string; description: string; maxPoints: number; gradingMethod: 'auto' | 'manual' | 'hybrid' };
+    ): Array<{ name: string; description: string; maxPoints: number; weight: number; gradingMethod: 'auto' | 'manual' | 'hybrid' }> {
+        type Criterion = { name: string; description: string; maxPoints: number; weight: number; gradingMethod: 'auto' | 'manual' | 'hybrid' };
         const results: Criterion[] = [];
         const seen = new Set<string>();
 
@@ -675,7 +689,7 @@ export function CreateAssignmentForm({
             const key = name.toLowerCase();
             if (seen.has(key)) return;
             seen.add(key);
-            results.push({ name, description: pts < 0 ? 'Penalty' : '', maxPoints: pts, gradingMethod: 'manual' });
+            results.push({ name, description: pts < 0 ? 'Penalty' : '', maxPoints: pts, weight: 1, gradingMethod: 'manual' });
         };
 
         // ── Strategy 1: Pipe-delimited OCR table format ───────────────
@@ -1213,6 +1227,31 @@ export function CreateAssignmentForm({
                     <p className="text-xs text-gray-500 mt-1">Configure grading criteria and point allocation.</p>
                 </div>
 
+                <div className="rounded-lg border p-4 bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
+                    <Label className="text-xs">Rubric Mode</Label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        <Button
+                            type="button"
+                            variant={watchRubricMode === 'unweighted' ? 'default' : 'outline'}
+                            className="h-8"
+                            onClick={() => setValue('rubricMode', 'unweighted')}
+                        >
+                            Unweighted (equal weights)
+                        </Button>
+                        <Button
+                            type="button"
+                            variant={watchRubricMode === 'weighted' ? 'default' : 'outline'}
+                            className="h-8"
+                            onClick={() => setValue('rubricMode', 'weighted')}
+                        >
+                            Weighted (custom weights)
+                        </Button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                        Weighted mode lets you set a weight multiplier for each criterion.
+                    </p>
+                </div>
+
                 {/* Template controls */}
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border p-4 bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -1343,6 +1382,7 @@ export function CreateAssignmentForm({
                                 name: '',
                                 description: '',
                                 maxPoints: 10,
+                                weight: 1,
                                 gradingMethod: 'manual',
                             })
                         }
@@ -1419,6 +1459,17 @@ export function CreateAssignmentForm({
                                     )}
                                 />
                             </div>
+                            {watchRubricMode === 'weighted' && (
+                                <div>
+                                    <Label className="text-xs">Weight</Label>
+                                    <Input
+                                        type="number"
+                                        step="0.1"
+                                        min={0.1}
+                                        {...register(`rubric.${idx}.weight`, { valueAsNumber: true })}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -1429,6 +1480,12 @@ export function CreateAssignmentForm({
                         <div className="flex justify-between items-center">
                             <span className="text-sm font-semibold text-gray-700">Total Rubric Points:</span>
                             <span className="text-xl font-bold text-[#6B0000]">{totalRubricPoints}</span>
+                        </div>
+                        <div className="flex justify-between items-center mt-2">
+                            <span className="text-sm font-semibold text-gray-700">Rubric Mode:</span>
+                            <span className="text-sm font-bold text-[#6B0000]">
+                                {watchRubricMode === 'weighted' ? 'Weighted' : 'Unweighted'}
+                            </span>
                         </div>
                     </div>
                 )}
@@ -1762,6 +1819,7 @@ export function CreateAssignmentForm({
                 items: [
                     { label: 'Criteria', value: `${values.rubric.length} criterion/criteria` },
                     { label: 'Total Rubric Points', value: String(totalRubricPoints) },
+                    { label: 'Rubric Mode', value: values.rubricMode === 'weighted' ? 'Weighted' : 'Unweighted' },
                     { label: 'Grading Methods', value: [...new Set(values.rubric.map((c) => c.gradingMethod))].join(', ') || '—' },
                 ],
             },

@@ -2,18 +2,39 @@
 
 import { SignupPage } from '@/components/SignupPage';
 import { useAuth } from '@/utils/AuthContext';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect } from 'react';
 
-export default function Signup() {
-    const { isAuthenticated, signup } = useAuth();
+type SignupRole = 'student' | 'faculty' | 'admin';
+
+function dashboardForRole(role: string): string {
+    switch (role) {
+        case 'student':
+            return '/student';
+        case 'admin':
+            return '/admin';
+        case 'faculty':
+        default:
+            return '/courses';
+    }
+}
+
+function roleFromQuery(value: string | null): SignupRole {
+    if (value === 'admin') return 'admin';
+    return value === 'faculty' ? 'faculty' : 'student';
+}
+
+function SignupInner() {
+    const { isAuthenticated, role: currentRole, signup } = useAuth();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const role = roleFromQuery(searchParams.get('role'));
 
     useEffect(() => {
-        if (isAuthenticated) router.replace('/courses');
-    }, [isAuthenticated, router]);
+        if (isAuthenticated) router.replace(dashboardForRole(currentRole ?? role));
+    }, [isAuthenticated, currentRole, role, router]);
 
-    return <SignupPage onSignup={() => {
+    return <SignupPage role={role} onSignup={() => {
         try {
             const stored = localStorage.getItem('autograde_current_user');
             if (stored) {
@@ -25,6 +46,13 @@ export default function Signup() {
         } catch {
             signup();
         }
-        router.push('/courses');
     }} />;
+}
+
+export default function Signup() {
+    return (
+        <Suspense fallback={null}>
+            <SignupInner />
+        </Suspense>
+    );
 }

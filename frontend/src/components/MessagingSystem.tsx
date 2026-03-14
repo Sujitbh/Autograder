@@ -53,6 +53,7 @@ export function MessagingSystem({ currentUserRole }: MessagingSystemProps) {
     const allContacts = useMemo(() => {
         return contactsData.map(c => ({
             ...c,
+            role: (c as { role?: 'student' | 'faculty' | 'admin' | 'ta' }).role ?? 'student',
             initials: getInitials(c.name)
         }));
     }, [contactsData]);
@@ -99,7 +100,10 @@ export function MessagingSystem({ currentUserRole }: MessagingSystemProps) {
         if (c) return c.interlocutor;
 
         const contact = allContacts.find(c => c.id === selectedThread);
-        if (contact) return { id: contact.id, name: contact.name, email: '', role: contact.role };
+        if (contact) {
+            const role = (contact as { role?: 'student' | 'faculty' | 'admin' | 'ta' }).role ?? 'student';
+            return { id: contact.id, name: contact.name, email: '', role };
+        }
 
         return null;
     }, [selectedThread, conversations, allContacts]);

@@ -834,7 +834,7 @@ def get_course_grades(
     submissions = db.query(Submission).filter(
         Submission.student_id == user.id,
         Submission.assignment_id.in_(assignment_ids)
-    ).all()
+    ).order_by(Submission.created_at.desc(), Submission.id.desc()).all()
     
     # Build submission map by assignment_id
     latest_submissions = {}
@@ -857,7 +857,9 @@ def get_course_grades(
                 "score": sub.score,
                 "max_score": sub.max_score,
                 "percentage": round(percentage, 1),
-                "submitted": True
+                "submitted": True,
+                "feedback": sub.feedback,
+                "graded_at": sub.graded_at.isoformat() if sub.graded_at else None,
             })
         else:
             assignment_grades.append({
@@ -866,7 +868,9 @@ def get_course_grades(
                 "score": None,
                 "max_score": assignment.max_points,
                 "percentage": None,
-                "submitted": sub is not None
+                "submitted": sub is not None,
+                "feedback": sub.feedback if sub is not None else None,
+                "graded_at": sub.graded_at.isoformat() if sub and sub.graded_at else None,
             })
     
     average_score = None
