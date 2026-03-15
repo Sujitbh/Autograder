@@ -116,6 +116,21 @@ export interface AuditLogsResponse {
   total: number;
 }
 
+export interface IntegrityDetectorStatus {
+  model_available: boolean;
+  model_path: string;
+  model_size_bytes: number | null;
+  model_last_modified: number | null;
+  metrics_available: boolean;
+  metrics: {
+    accuracy?: number;
+    macro_f1?: number;
+    train_size?: number;
+    test_size?: number;
+    classes?: string[];
+  } | null;
+}
+
 // ── Service ────────────────────────────────────────────────────────
 
 export const adminService = {
@@ -160,6 +175,10 @@ export const adminService = {
   async getCourses(params?: { search?: string; is_active?: boolean }): Promise<AdminCourse[]> {
     const { data } = await withRetry(() => api.get<AdminCourse[]>('/admin/courses', { params }));
     return data;
+  },
+
+  async deleteCourse(id: number): Promise<void> {
+    await api.delete(`/admin/courses/${id}`);
   },
 
   // Semesters
@@ -246,5 +265,11 @@ export const adminService = {
 
   async updateSettings(payload: Record<string, string>): Promise<void> {
     await api.put('/admin/settings', payload);
+  },
+
+  // Integrity detector
+  async getIntegrityDetectorStatus(): Promise<IntegrityDetectorStatus> {
+    const { data } = await withRetry(() => api.get<IntegrityDetectorStatus>('/admin/integrity-detector'));
+    return data;
   },
 };

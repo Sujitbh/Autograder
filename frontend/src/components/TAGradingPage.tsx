@@ -1,19 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from '@/utils/ThemeContext';
 import { PageLayout } from './PageLayout';
 import { TopNav } from './TopNav';
+import { CodeEditor } from './CodeEditor';
+import { OutputPanel } from './OutputPanel';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Textarea } from './ui/textarea';
+import { Button } from './ui/button';
+import { useCodeExecution } from '@/hooks/useCodeExecution';
 import {
     useTASubmissionDetail,
     useTAGradeSubmission,
     useTACoursePermissions,
+    useTACourseSubmissions,
     useTARunTests,
     useTAAutoGrade,
 } from '@/hooks/queries/useTADashboard';
 import {
     ArrowLeft,
-    FileCode,
     CheckCircle2,
     XCircle,
     Clock,
@@ -36,22 +43,63 @@ interface TAGradingPageProps {
     submissionId: string;
 }
 
+const LANGUAGE_EXTENSION_MAP: Record<string, string> = {
+    python: '.py',
+    java: '.java',
+    cpp: '.cpp',
+    c: '.c',
+    javascript: '.js',
+};
+
+const FILE_ICONS: Record<string, string> = {
+    java: '☕', cpp: '⚙️', c: '⚙️', js: '🟨', ts: '🔷',
+    html: '🌐', css: '🎨', json: '{}', md: '📝', txt: '📄',
+};
+
+function getFileIcon(name: string) {
+    const ext = name.split('.').pop()?.toLowerCase() ?? '';
+    if (ext === 'py') return (
+        <svg viewBox="0 0 256 255" width="14" height="14" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#3776ab" d="M126.916.072c-64.832 0-60.784 28.115-60.784 28.115l.072 29.128h61.868v8.745H41.631S.145 61.355.145 126.77c0 65.417 36.21 63.097 36.21 63.097h21.61v-30.356s-1.165-36.21 35.632-36.21h61.362s34.475.557 34.475-33.319V33.97S194.67.072 126.916.072zM92.802 19.66a11.12 11.12 0 0 1 11.13 11.13 11.12 11.12 0 0 1-11.13 11.13 11.12 11.12 0 0 1-11.13-11.13 11.12 11.12 0 0 1 11.13-11.13z" />
+            <path fill="#ffd343" d="M128.757 254.126c64.832 0 60.784-28.115 60.784-28.115l-.072-29.127H127.6v-8.745h86.441s41.486 4.705 41.486-60.712c0-65.416-36.21-63.096-36.21-63.096h-21.61v30.355s1.165 36.21-35.632 36.21h-61.362s-34.475-.557-34.475 33.32v56.013s-5.235 33.897 62.518 33.897zm34.114-19.586a11.12 11.12 0 0 1-11.13-11.13 11.12 11.12 0 0 1 11.13-11.13 11.12 11.12 0 0 1 11.13 11.13 11.12 11.12 0 0 1-11.13 11.13z" />
+        </svg>
+    );
+    return FILE_ICONS[ext] ?? '📄';
+}
+
 export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGradingPageProps>) {
     const router = useRouter();
+    const { isDark } = useTheme();
     const courseIdNum = Number.parseInt(courseId);
     const submissionIdNum = Number.parseInt(submissionId);
 
     const { data: permissions } = useTACoursePermissions(courseIdNum);
     const { data: detail, isLoading, error } = useTASubmissionDetail(courseIdNum, submissionIdNum);
+    const { data: assignmentSubmissionsData } = useTACourseSubmissions(
+        courseIdNum,
+        detail?.assignment?.id ? { assignment_id: detail.assignment.id, limit: 200 } : { limit: 200 }
+    );
     const gradeMutation = useTAGradeSubmission(courseIdNum);
     const runTestsMutation = useTARunTests(courseIdNum);
     const autoGradeMutation = useTAAutoGrade(courseIdNum);
+
+    // Code execution hook (for ad-hoc run)
+    const { execute, isRunning: isExecutingCode, result: execResult, error: execError } = useCodeExecution();
 
     const [activeFileIndex, setActiveFileIndex] = useState(0);
     const [score, setScore] = useState<string>('');
     const [maxScore, setMaxScore] = useState<string>('');
     const [feedback, setFeedback] = useState('');
     const [expandedTests, setExpandedTests] = useState<Set<number>>(new Set());
+
+    // UI Layout state
+    const [showExplorer, setShowExplorer] = useState(true);
+    const [showInfoPanel, setShowInfoPanel] = useState(true);
+    const [outputOpen, setOutputOpen] = useState(false);
+    const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading'>('grading');
+    const [stdinDialogOpen, setStdinDialogOpen] = useState(false);
+    const [stdinValue, setStdinValue] = useState('');
+
     const [runTestsResult, setRunTestsResult] = useState<{
         total_testcases: number;
         passed_testcases: number;
@@ -76,6 +124,13 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         feedback: string | null;
         percentage: number;
         message: string;
+        rubric_results?: {
+            evaluations?: Array<{
+                rubric_id: number;
+                earned_points: number;
+                feedback?: string;
+            }>;
+        };
     } | null>(null);
 
     // Populate form when detail loads
@@ -96,20 +151,38 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         });
     };
 
-    const handleGrade = (isDraft: boolean) => {
+    const sortedSubmissionIds = (assignmentSubmissionsData?.submissions ?? [])
+        .slice()
+        .sort(
+            (a, b) =>
+                new Date(b.created_at ?? 0).getTime() -
+                new Date(a.created_at ?? 0).getTime()
+        );
+    const currentSubmissionIndex = sortedSubmissionIds.findIndex((s) => s.id === submissionIdNum);
+    const nextSubmissionId =
+        currentSubmissionIndex >= 0 && currentSubmissionIndex < sortedSubmissionIds.length - 1
+            ? sortedSubmissionIds[currentSubmissionIndex + 1].id
+            : null;
+
+    const handleGrade = (isDraft: boolean, moveToNext: boolean = false) => {
+        const feedbackToSave = feedback.trim() || 'Reviewed by TA.';
         gradeMutation.mutate(
             {
                 submissionId: submissionIdNum,
                 payload: {
                     score: score ? Number.parseFloat(score) : undefined,
                     max_score: maxScore ? Number.parseFloat(maxScore) : undefined,
-                    feedback: feedback || undefined,
+                    feedback: feedbackToSave,
                     is_draft: isDraft,
                 },
             },
             {
                 onSuccess: () => {
                     if (!isDraft) {
+                        if (moveToNext && nextSubmissionId) {
+                            router.push(`/ta/courses/${courseId}/submissions/${nextSubmissionId}/grade`);
+                            return;
+                        }
                         router.push(`/ta/courses/${courseId}/submissions`);
                     }
                 },
@@ -117,17 +190,11 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         );
     };
 
-    const handleRunTests = () => {
-        setRunTestsResult(null);
-        runTestsMutation.mutate(submissionIdNum, {
-            onSuccess: (data) => {
-                setRunTestsResult(data);
-            },
-        });
-    };
-
-    const handleAutoGrade = () => {
-        setAutoGradeResult(null);
+    const handleAutoGrade = useCallback((silent: boolean = false) => {
+        if (!silent) {
+            setAutoGradeResult(null);
+            setInfoTab('grading');
+        }
         autoGradeMutation.mutate(submissionIdNum, {
             onSuccess: (data) => {
                 setAutoGradeResult(data);
@@ -146,6 +213,16 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                         results: data.stored_results,
                     });
                 }
+            },
+        });
+    }, [submissionIdNum, autoGradeMutation]);
+
+    const handleRunTests = () => {
+        setRunTestsResult(null);
+        setInfoTab('tests');
+        runTestsMutation.mutate(submissionIdNum, {
+            onSuccess: (data) => {
+                setRunTestsResult(data);
             },
         });
     };
@@ -187,540 +264,816 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         );
     }
 
+    const language = (
+        detail.assignment.allowed_languages?.split(',')[0]
+        || 'python'
+    ).toLowerCase();
     const activeFile = detail.files[activeFileIndex];
+    const code = activeFile?.content || '';
+
+    // Ad-hoc execution helpers (similar to StudentAssignmentDetail)
+    const codeUsesInput = (codeStr: string, lang: string) => {
+        const lines = codeStr.split('\n');
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('#')) continue;
+            if (lang === 'python' && trimmed.includes('input(')) return true;
+            if (
+                lang === 'java' && (
+                    trimmed.includes('Scanner')
+                    || trimmed.includes('System.in')
+                    || /\bnext(Line|Int|Double|Float|Long|Short|Byte|Boolean)?\s*\(/.test(trimmed)
+                )
+            ) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    const handleRunCode = async () => {
+        if (codeUsesInput(code, language)) {
+            setStdinDialogOpen(true);
+            return;
+        }
+        setOutputOpen(true);
+        await execute(code, language);
+    };
+
+    const handleOpenStdinDialog = () => {
+        setStdinDialogOpen(true);
+    };
+
+    const handleRunWithStdin = async () => {
+        setStdinDialogOpen(false);
+        setOutputOpen(true);
+        await execute(code, language, stdinValue);
+    };
 
     return (
         <PageLayout>
             <TopNav breadcrumbs={[{ label: 'TA Dashboard', href: '/ta' }, ...breadcrumbs]} />
 
-            <div className="flex" style={{ height: 'calc(100vh - 64px)' }}>
-                {/* ═══════════════════════════════════════════════════════════════
-           LEFT PANEL — Code Viewer
-           ═══════════════════════════════════════════════════════════════ */}
-                <div
-                    className="flex flex-col border-r"
-                    style={{
-                        width: '55%',
-                        minWidth: '400px',
-                        borderColor: 'var(--color-border)',
-                    }}
-                >
-                    {/* File tabs */}
-                    <div
-                        className="flex items-center gap-1 px-4 py-2 border-b overflow-x-auto"
-                        style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}
-                    >
-                        <button
-                            onClick={() => router.push(`/ta/courses/${courseId}/submissions`)}
-                            className="flex items-center gap-1 px-2 py-1 rounded mr-2 hover:bg-[var(--color-primary-bg)] transition-colors"
-                            style={{ color: 'var(--color-text-mid)', fontSize: '13px' }}
-                        >
-                            <ArrowLeft className="w-3.5 h-3.5" />
-                            Back
-                        </button>
-                        <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--color-border)', marginRight: '8px' }} />
-                        {detail.files.map((file, idx) => (
-                            <button
-                                key={file.id}
-                                onClick={() => setActiveFileIndex(idx)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all whitespace-nowrap"
-                                style={{
-                                    backgroundColor: idx === activeFileIndex ? 'var(--color-primary-light)' : 'transparent',
-                                    color: idx === activeFileIndex ? 'var(--color-primary)' : 'var(--color-text-mid)',
-                                    fontSize: '13px',
-                                    fontWeight: idx === activeFileIndex ? 600 : 400,
-                                }}
-                            >
-                                <FileCode className="w-3.5 h-3.5" />
-                                {file.filename}
-                            </button>
-                        ))}
-                    </div>
+            <div className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
+                <div className="flex flex-1 overflow-hidden relative">
 
-                    {/* Code content */}
-                    <div className="flex-1 overflow-auto" style={{ backgroundColor: '#1e1e1e' }}>
-                        {activeFile?.content ? (
-                            <pre
-                                className="p-4"
-                                style={{
-                                    fontSize: '13px',
-                                    fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
-                                    color: '#d4d4d4',
-                                    lineHeight: 1.6,
-                                    margin: 0,
-                                    whiteSpace: 'pre',
-                                    tabSize: 4,
-                                }}
-                            >
-                                {activeFile.content.split('\n').map((line, i) => (
-                                    <div key={`line-${i}-${line.length}`} className="flex hover:bg-[rgba(255,255,255,0.05)]">
-                                        <span
-                                            className="select-none text-right pr-4 flex-shrink-0"
-                                            style={{
-                                                color: '#858585',
-                                                width: '50px',
-                                                fontSize: '12px',
-                                                lineHeight: 1.6,
-                                            }}
-                                        >
-                                            {i + 1}
-                                        </span>
-                                        <code>{line}</code>
-                                    </div>
-                                ))}
-                            </pre>
-                        ) : (
-                            <div className="flex items-center justify-center h-full">
-                                <p style={{ color: '#858585', fontSize: '14px' }}>No file content available</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* ═══════════════════════════════════════════════════════════════
-           RIGHT PANEL — Student Info + Tests + Grading Form
-           ═══════════════════════════════════════════════════════════════ */}
-                <div
-                    className="flex flex-col overflow-y-auto"
-                    style={{
-                        width: '45%',
-                        backgroundColor: 'var(--color-surface)',
-                    }}
-                >
-                    {/* Student Info Card */}
-                    <div
-                        className="p-6 border-b"
-                        style={{ borderColor: 'var(--color-border)' }}
-                    >
-                        <div className="flex items-center gap-4 mb-4">
-                            <div
-                                className="w-10 h-10 rounded-full flex items-center justify-center"
-                                style={{ backgroundColor: 'var(--color-primary-light)' }}
-                            >
-                                <User className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
-                            </div>
-                            <div>
-                                <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                                    {detail.student.name}
-                                </p>
-                                <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
-                                    {detail.student.email}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="flex items-center gap-2">
-                                <FileText className="w-3.5 h-3.5" style={{ color: 'var(--color-text-light)' }} />
-                                <span style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
-                                    {detail.assignment.title}
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Hash className="w-3.5 h-3.5" style={{ color: 'var(--color-text-light)' }} />
-                                <span style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
-                                    Attempt #{detail.attempt_number}
-                                </span>
-                            </div>
-                            {detail.created_at && (
-                                <div className="flex items-center gap-2">
-                                    <Calendar className="w-3.5 h-3.5" style={{ color: 'var(--color-text-light)' }} />
-                                    <span style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
-                                        {new Date(detail.created_at).toLocaleString('en-US', {
-                                            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
-                                        })}
-                                    </span>
-                                </div>
-                            )}
-                            {detail.assignment.due_date && (
-                                <div className="flex items-center gap-2">
-                                    <Clock className="w-3.5 h-3.5" style={{ color: 'var(--color-text-light)' }} />
-                                    <span style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
-                                        Due: {new Date(detail.assignment.due_date).toLocaleDateString('en-US', {
-                                            month: 'short', day: 'numeric',
-                                        })}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* ── Action Buttons: Run Tests & Auto-Grade ── */}
-                    <div
-                        className="p-4 border-b flex items-center gap-3"
-                        style={{ borderColor: 'var(--color-border)' }}
-                    >
-                        {permissions?.can_run_tests !== false && (
-                            <button
-                                onClick={handleRunTests}
-                                disabled={runTestsMutation.isPending || autoGradeMutation.isPending}
-                                className="flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
-                                style={{
-                                    backgroundColor: '#1e40af',
-                                    color: 'white',
-                                    fontSize: '13px',
-                                    fontWeight: 600,
-                                }}
-                            >
-                                {runTestsMutation.isPending ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Play className="w-4 h-4" />
-                                )}
-                                Run Tests
-                            </button>
-                        )}
-                        {permissions?.can_grade !== false && (
-                            <button
-                                onClick={handleAutoGrade}
-                                disabled={runTestsMutation.isPending || autoGradeMutation.isPending}
-                                className="flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
-                                style={{
-                                    backgroundColor: '#7c3aed',
-                                    color: 'white',
-                                    fontSize: '13px',
-                                    fontWeight: 600,
-                                }}
-                            >
-                                {autoGradeMutation.isPending ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Zap className="w-4 h-4" />
-                                )}
-                                Auto Grade
-                            </button>
-                        )}
-                        {(runTestsMutation.isError || autoGradeMutation.isError) && (
-                            <span style={{ fontSize: '12px', color: '#DC2626' }}>
-                                {(runTestsMutation.error as Error)?.message || (autoGradeMutation.error as Error)?.message || 'Action failed'}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Auto-Grade Result Banner */}
-                    {autoGradeResult && (
+                    {/* ── LEFT: Explorer ── */}
+                    {showExplorer && (
                         <div
-                            className="mx-4 mt-3 px-4 py-3 rounded-lg"
-                            style={{ backgroundColor: '#D1FAE5', border: '1px solid #6EE7B7' }}
+                            className="flex flex-col shrink-0 overflow-hidden"
+                            style={{
+                                width: 220, minWidth: 220,
+                                background: 'var(--color-surface)',
+                                borderRight: '1px solid var(--color-border)',
+                                transition: 'margin-left .25s ease, opacity .25s ease',
+                            }}
                         >
-                            <p style={{ fontSize: '13px', fontWeight: 600, color: '#065F46', marginBottom: '4px' }}>
-                                {autoGradeResult.message}
-                            </p>
-                            <p style={{ fontSize: '12px', color: '#065F46' }}>
-                                Score: {autoGradeResult.score ?? '—'} / {autoGradeResult.max_score ?? '—'} ({autoGradeResult.percentage.toFixed(1)}%)
-                            </p>
-                            {autoGradeResult.feedback && (
-                                <p style={{ fontSize: '12px', color: '#065F46', marginTop: '4px' }}>
-                                    {autoGradeResult.feedback}
-                                </p>
-                            )}
+                            <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
+                                Explorer
+                            </div>
+                            <div className="flex-1 overflow-y-auto" style={{ padding: '4px 0' }}>
+                                {detail.files.map((file, idx) => {
+                                    const isActive = idx === activeFileIndex;
+                                    return (
+                                        <div
+                                            key={file.id}
+                                            onClick={() => setActiveFileIndex(idx)}
+                                            className="group"
+                                            style={{
+                                                display: 'flex', alignItems: 'center',
+                                                padding: '5px 14px', cursor: 'pointer',
+                                                fontSize: 13, color: isActive ? 'var(--color-text-dark)' : 'var(--color-text-mid)',
+                                                borderLeft: isActive ? '3px solid var(--color-primary)' : '3px solid transparent',
+                                                background: isActive ? 'var(--color-surface-elevated)' : 'transparent',
+                                                gap: 6, transition: 'background .15s',
+                                            }}
+                                            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
+                                            onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = isActive ? 'var(--color-surface-elevated)' : 'transparent'; }}
+                                        >
+                                            <span style={{ fontSize: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', width: 16, height: 16 }}>{getFileIcon(file.filename)}</span>
+                                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{file.filename}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column' as const, gap: 4, borderTop: '1px solid var(--color-border)' }}>
+                                <button
+                                    onClick={() => router.push(`/ta/courses/${courseId}/submissions`)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--color-text-mid)', transition: 'background .15s', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-elevated)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                                >
+                                    <ArrowLeft style={{ width: 15, height: 15 }} /> Back to Submissions
+                                </button>
+                                {/* Removed New File / Upload Files for TA/Faculty */}
+                            </div>
                         </div>
                     )}
 
-                    {/* Test Results Section */}
-                    {(() => {
-                        const displayTests = runTestsResult?.results ?? (detail.test_results.length > 0 ? detail.test_results : null);
-                        if (!displayTests || displayTests.length === 0) return null;
-                        const passed = displayTests.filter((t) => t.passed).length;
-                        return (
-                            <div className="p-6 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                                <div className="flex items-center justify-between mb-4">
-                                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                                        Test Results
-                                    </h3>
-                                    <span
-                                        className="px-2.5 py-1 rounded-full"
-                                        style={{
-                                            fontSize: '12px',
-                                            fontWeight: 600,
-                                            color: passed === displayTests.length ? '#059669' : '#D97706',
-                                            backgroundColor: passed === displayTests.length ? '#D1FAE5' : '#FEF3C7',
-                                        }}
-                                    >
-                                        {passed}/{displayTests.length} passed
-                                    </span>
-                                </div>
+                    {/* ── CENTER: Editor ── */}
+                    <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
+                        {/* Editor Topbar */}
+                        <div style={{
+                            height: 38, background: 'var(--color-surface)',
+                            borderBottom: '1px solid var(--color-border)',
+                            display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, flexShrink: 0,
+                        }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                                {activeFile?.filename ?? 'No file open'}
+                            </span>
+                            <span style={{
+                                fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const,
+                                letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10,
+                                background: isDark ? '#3b1a1a' : '#fef3c7',
+                                color: isDark ? '#fca5a5' : '#92400e',
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                            }}>
+                                {language.charAt(0).toUpperCase() + language.slice(1)}
+                            </span>
+                            <div style={{ flex: 1 }} />
 
-                                <div className="space-y-2">
-                                    {displayTests.map((test) => (
-                                        <div
-                                            key={test.id}
-                                            className="rounded-lg overflow-hidden"
-                                            style={{ border: '1px solid var(--color-border)' }}
-                                        >
-                                            <button
-                                                onClick={() => toggleTest(test.id)}
-                                                className="w-full flex items-center justify-between px-4 py-3 transition-colors hover:bg-[var(--color-primary-bg)]"
+                            {/* Ad-hoc Run button (similar to student) */}
+                            <button
+                                onClick={handleRunCode}
+                                disabled={isExecutingCode || runTestsMutation.isPending || autoGradeMutation.isPending}
+                                style={{
+                                    padding: '5px 16px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                                    background: '#16a34a', color: '#fff', letterSpacing: '.3px',
+                                    transition: 'background .15s, box-shadow .2s',
+                                    opacity: isExecutingCode ? 0.7 : 1,
+                                    cursor: isExecutingCode ? 'not-allowed' : 'pointer',
+                                    border: 'none',
+                                }}
+                                onMouseEnter={e => { if (!isExecutingCode) { e.currentTarget.style.background = '#15803d'; e.currentTarget.style.boxShadow = '0 0 10px rgba(22,163,74,.5)'; } }}
+                                onMouseLeave={e => { e.currentTarget.style.background = '#16a34a'; e.currentTarget.style.boxShadow = 'none'; }}
+                            >
+                                {isExecutingCode ? '⏳ Running...' : '▶ Run Code'}
+                            </button>
+
+                            <button
+                                onClick={handleOpenStdinDialog}
+                                disabled={isExecutingCode || runTestsMutation.isPending || autoGradeMutation.isPending}
+                                style={{
+                                    padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                                    background: 'var(--color-surface-elevated)', color: 'var(--color-text-dark)', letterSpacing: '.3px',
+                                    transition: 'background .15s',
+                                    opacity: isExecutingCode ? 0.7 : 1,
+                                    cursor: isExecutingCode ? 'not-allowed' : 'pointer',
+                                    border: '1px solid var(--color-border)',
+                                }}
+                                onMouseEnter={e => { if (!isExecutingCode) { e.currentTarget.style.background = 'var(--color-border)'; } }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
+                            >
+                                ⌨ Input
+                            </button>
+
+                            <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 6px' }} />
+
+                            {/* Auto Grade button also in top bar for convenience */}
+                            {permissions?.can_grade !== false && (
+                                <button
+                                    onClick={() => handleAutoGrade(false)}
+                                    disabled={autoGradeMutation.isPending || runTestsMutation.isPending}
+                                    style={{
+                                        padding: '5px 16px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                                        background: isDark ? '#7f1d1d' : '#991b1b', color: '#fff', letterSpacing: '.3px',
+                                        transition: 'background .15s, box-shadow .2s',
+                                        opacity: autoGradeMutation.isPending ? 0.7 : 1,
+                                        cursor: autoGradeMutation.isPending ? 'not-allowed' : 'pointer',
+                                        border: 'none', display: 'flex', alignItems: 'center', gap: 6,
+                                    }}
+                                    onMouseEnter={e => { if (!autoGradeMutation.isPending) { e.currentTarget.style.background = '#b91c1c'; e.currentTarget.style.boxShadow = '0 0 10px rgba(153,27,27,.5)'; } }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = isDark ? '#7f1d1d' : '#991b1b'; e.currentTarget.style.boxShadow = 'none'; }}
+                                >
+                                    {autoGradeMutation.isPending ? '⏳ Grading...' : <><Zap style={{ width: 14, height: 14 }} /> Auto Grade</>}
+                                </button>
+                            )}
+
+                            <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 6px' }} />
+
+                            {/* Layout toggles */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <button
+                                    onClick={() => setShowExplorer(v => !v)}
+                                    title="Toggle Explorer"
+                                    style={{
+                                        background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                                        borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        color: showExplorer ? 'var(--color-text-dark)' : 'var(--color-text-light)',
+                                        transition: 'background .12s, color .12s',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-elevated)'; e.currentTarget.style.color = 'var(--color-text-dark)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = showExplorer ? 'var(--color-text-dark)' : 'var(--color-text-light)'; }}
+                                >
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.2} width={16} height={16}>
+                                        <rect x="1" y="1" width="4.5" height="14" rx="1" fill="currentColor" opacity=".35" />
+                                        <rect x="1" y="1" width="14" height="14" rx="1.5" />
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={() => setOutputOpen(v => !v)}
+                                    title="Toggle Output Panel"
+                                    style={{
+                                        background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                                        borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        color: outputOpen ? 'var(--color-text-dark)' : 'var(--color-text-light)',
+                                        transition: 'background .12s, color .12s',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-elevated)'; e.currentTarget.style.color = 'var(--color-text-dark)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = outputOpen ? 'var(--color-text-dark)' : 'var(--color-text-light)'; }}
+                                >
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.2} width={16} height={16}>
+                                        <rect x="1" y="9.5" width="14" height="5.5" rx="1" fill="currentColor" opacity=".35" />
+                                        <rect x="1" y="1" width="14" height="14" rx="1.5" />
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={() => setShowInfoPanel(v => !v)}
+                                    title="Toggle Info Panel"
+                                    style={{
+                                        background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                                        borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        color: showInfoPanel ? 'var(--color-text-dark)' : 'var(--color-text-light)',
+                                        transition: 'background .12s, color .12s',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-elevated)'; e.currentTarget.style.color = 'var(--color-text-dark)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = showInfoPanel ? 'var(--color-text-dark)' : 'var(--color-text-light)'; }}
+                                >
+                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.2} width={16} height={16}>
+                                        <rect x="10.5" y="1" width="4.5" height="14" rx="1" fill="currentColor" opacity=".35" />
+                                        <rect x="1" y="1" width="14" height="14" rx="1.5" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Editor area */}
+                        <div className="flex-1 overflow-hidden relative" style={{ background: 'var(--color-surface)' }}>
+                            {activeFile ? (
+                                <CodeEditor
+                                    language={language}
+                                    value={code}
+                                    onChange={() => { }} // Read-only for TAs
+                                />
+                            ) : (
+                                <div className="flex items-center justify-center h-full">
+                                    <p style={{ color: 'var(--color-text-mid)', fontSize: '14px' }}>No file content available</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Output Panel (collapsible, matching student) */}
+                        <div style={{
+                            height: outputOpen ? 280 : 0,
+                            background: 'var(--color-surface)',
+                            borderTop: outputOpen ? '1px solid var(--color-border)' : 'none',
+                            overflow: 'hidden',
+                            transition: 'height .3s ease',
+                            flexShrink: 0,
+                            display: 'flex',
+                            flexDirection: 'column' as const,
+                        }}>
+                            <div style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                padding: '6px 14px', background: 'var(--color-surface-elevated)',
+                                borderBottom: '1px solid var(--color-border)',
+                                fontSize: 11, fontWeight: 600, color: 'var(--color-text-light)', flexShrink: 0,
+                            }}>
+                                <span>⬤ TERMINAL OUTPUT</span>
+                                <button
+                                    onClick={() => setOutputOpen(false)}
+                                    style={{
+                                        fontSize: 14, color: 'var(--color-text-light)', padding: '2px 6px', borderRadius: 3,
+                                        background: 'transparent', border: 'none', cursor: 'pointer',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-border)'; e.currentTarget.style.color = 'var(--color-text-dark)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-light)'; }}
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                            <div className="flex-1 min-h-0">
+                                <OutputPanel result={execResult} isRunning={isExecutingCode} error={execError} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ── RIGHT: Info Panel (tabbed) ── */}
+                    {showInfoPanel && (
+                        <div
+                            className="flex flex-col overflow-hidden shrink-0"
+                            style={{
+                                width: 360, minWidth: 360,
+                                background: 'var(--color-surface)',
+                                borderLeft: '1px solid var(--color-border)',
+                                transition: 'width .3s ease, min-width .3s ease, opacity .25s ease',
+                            }}
+                        >
+                            {/* Tabs */}
+                            <div style={{ display: 'flex', padding: '8px 10px 0', gap: 4, flexShrink: 0, flexWrap: 'wrap' as const }}>
+                                {(['desc', 'tests', 'grading'] as const).map(tab => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setInfoTab(tab)}
+                                        style={{
+                                            padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600,
+                                            whiteSpace: 'nowrap' as const, transition: 'all .2s',
+                                            background: infoTab === tab ? '#7f1d1d' : 'transparent',
+                                            color: infoTab === tab ? '#fff' : 'var(--color-text-light)',
+                                            border: 'none', cursor: 'pointer',
+                                        }}
+                                        onMouseEnter={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'var(--color-surface-elevated)'; e.currentTarget.style.color = 'var(--color-text-mid)'; } }}
+                                        onMouseLeave={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-light)'; } }}
+                                    >
+                                        {tab === 'desc' ? '📋 Info' : tab === 'tests' ? '🧪 Tests' : tab === 'grading' ? '📊 Grading' : 'Submit'}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Tab Content */}
+                            <div className="flex-1 overflow-y-auto" style={{ padding: 16 }}>
+
+                                {/* ── Desc Tab ── */}
+                                {infoTab === 'desc' && (
+                                    <div>
+                                        <div className="flex items-center gap-4 mb-6">
+                                            <div
+                                                className="w-10 h-10 rounded-full flex items-center justify-center"
+                                                style={{ backgroundColor: 'var(--color-primary-light)' }}
                                             >
-                                                <div className="flex items-center gap-3">
-                                                    {test.passed ? (
-                                                        <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#059669' }} />
-                                                    ) : (
-                                                        <XCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#DC2626' }} />
-                                                    )}
-                                                    <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                        {test.testcase_name || `Test #${test.testcase_id}`}
+                                                <User className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
+                                            </div>
+                                            <div>
+                                                <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                                                    {detail.student.name}
+                                                </p>
+                                                <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
+                                                    {detail.student.email}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-3 mb-6">
+                                            <div className="flex items-center gap-2">
+                                                <FileText className="w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
+                                                <span style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
+                                                    {detail.assignment.title}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Hash className="w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
+                                                <span style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
+                                                    Attempt #{detail.attempt_number}
+                                                </span>
+                                            </div>
+                                            {detail.created_at && (
+                                                <div className="flex items-center gap-2">
+                                                    <Calendar className="w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
+                                                    <span style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
+                                                        Submitted: {new Date(detail.created_at).toLocaleString('en-US', {
+                                                            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                                                        })}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-3">
-                                                    {test.points_awarded != null && (
-                                                        <span style={{ fontSize: '12px', color: 'var(--color-text-mid)' }}>
-                                                            {test.points_awarded} pts
-                                                        </span>
-                                                    )}
-                                                    {test.execution_time_ms != null && (
-                                                        <span style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>
-                                                            {test.execution_time_ms}ms
-                                                        </span>
-                                                    )}
-                                                    {expandedTests.has(test.id) ? (
-                                                        <ChevronDown className="w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
-                                                    ) : (
-                                                        <ChevronRight className="w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
-                                                    )}
-                                                </div>
-                                            </button>
-                                            {expandedTests.has(test.id) && (
-                                                <div
-                                                    className="px-4 py-3 border-t"
-                                                    style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-primary-bg)' }}
-                                                >
-                                                    {test.output && (
-                                                        <div className="mb-2">
-                                                            <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>
-                                                                Output:
-                                                            </p>
-                                                            <pre
-                                                                className="p-2 rounded text-xs overflow-x-auto"
-                                                                style={{
-                                                                    backgroundColor: '#1e1e1e',
-                                                                    color: '#d4d4d4',
-                                                                    fontFamily: 'monospace',
-                                                                    maxHeight: '120px',
-                                                                    overflowY: 'auto',
-                                                                }}
-                                                            >
-                                                                {test.output}
-                                                            </pre>
-                                                        </div>
-                                                    )}
-                                                    {test.error_output && (
-                                                        <div>
-                                                            <p style={{ fontSize: '11px', fontWeight: 600, color: '#DC2626', marginBottom: '4px' }}>
-                                                                Error:
-                                                            </p>
-                                                            <pre
-                                                                className="p-2 rounded text-xs overflow-x-auto"
-                                                                style={{
-                                                                    backgroundColor: '#FEF2F2',
-                                                                    color: '#991B1B',
-                                                                    fontFamily: 'monospace',
-                                                                    maxHeight: '120px',
-                                                                    overflowY: 'auto',
-                                                                }}
-                                                            >
-                                                                {test.error_output}
-                                                            </pre>
-                                                        </div>
-                                                    )}
-                                                    {!test.output && !test.error_output && (
-                                                        <p style={{ fontSize: '12px', color: 'var(--color-text-light)', fontStyle: 'italic' }}>
-                                                            No output recorded
-                                                        </p>
-                                                    )}
+                                            )}
+                                            {detail.assignment.due_date && (
+                                                <div className="flex items-center gap-2">
+                                                    <Clock className="w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
+                                                    <span style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
+                                                        Due: {new Date(detail.assignment.due_date).toLocaleDateString('en-US', {
+                                                            month: 'short', day: 'numeric',
+                                                        })}
+                                                    </span>
                                                 </div>
                                             )}
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
-                        );
-                    })()}
-
-                    {/* Rubric Section */}
-                    {detail.rubrics.length > 0 && (
-                        <div className="p-6 border-b" style={{ borderColor: 'var(--color-border)' }}>
-                            <h3
-                                style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '12px' }}
-                            >
-                                Rubric
-                            </h3>
-                            <div className="space-y-3">
-                                {detail.rubrics.map((rubric) => (
-                                    <div
-                                        key={rubric.id}
-                                        className="flex items-center justify-between px-4 py-3 rounded-lg"
-                                        style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}
-                                    >
-                                        <div>
-                                            <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                {rubric.name}
-                                            </p>
-                                            {rubric.description && (
-                                                <p style={{ fontSize: '12px', color: 'var(--color-text-mid)' }}>
-                                                    {rubric.description}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <span
-                                            className="px-2 py-1 rounded-md"
-                                            style={{
-                                                fontSize: '12px',
-                                                fontWeight: 600,
-                                                color: 'var(--color-text-dark)',
-                                                backgroundColor: 'var(--color-surface)',
-                                                border: '1px solid var(--color-border)',
-                                            }}
-                                        >
-                                            {rubric.max_points || 0} pts
-                                        </span>
                                     </div>
-                                ))}
+                                )}
+
+                                {/* ── Tests Tab ── */}
+                                {infoTab === 'tests' && (
+                                    <div>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)' }}>
+                                                🧪 Test Results
+                                            </h2>
+                                            {permissions?.can_run_tests !== false && (
+                                                <button
+                                                    onClick={handleRunTests}
+                                                    disabled={runTestsMutation.isPending || autoGradeMutation.isPending}
+                                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-50"
+                                                    style={{
+                                                        backgroundColor: 'var(--color-primary-light)',
+                                                        color: 'var(--color-primary)',
+                                                        border: '1px solid var(--color-primary)',
+                                                        fontSize: '11px',
+                                                        fontWeight: 600,
+                                                        textTransform: 'uppercase',
+                                                    }}
+                                                >
+                                                    {runTestsMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                                                    Run All Tests
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {(() => {
+                                            const displayTests = runTestsResult?.results ?? (detail.test_results.length > 0 ? detail.test_results : null);
+                                            if (!displayTests || displayTests.length === 0) {
+                                                if (runTestsMutation.isPending) {
+                                                    return <div className="flex flex-col items-center justify-center p-8 gap-3">
+                                                        <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--color-primary)' }} />
+                                                        <p style={{ fontSize: 12, color: 'var(--color-text-mid)' }}>Running tests...</p>
+                                                    </div>;
+                                                }
+                                                return <p style={{ fontSize: 13, color: 'var(--color-text-mid)' }}>No test results yet. Run tests to see output.</p>;
+                                            }
+                                            const passed = displayTests.filter((t: any) => t.passed).length;
+                                            return (
+                                                <div>
+                                                    <span
+                                                        className="px-2.5 py-1 rounded-full mb-4 inline-block"
+                                                        style={{
+                                                            fontSize: '12px',
+                                                            fontWeight: 600,
+                                                            color: passed === displayTests.length ? '#059669' : '#D97706',
+                                                            backgroundColor: passed === displayTests.length ? '#D1FAE5' : '#FEF3C7',
+                                                        }}
+                                                    >
+                                                        {passed}/{displayTests.length} passed
+                                                    </span>
+
+                                                    <div className="space-y-2">
+                                                        {displayTests.map((test: any) => (
+                                                            <div
+                                                                key={test.id}
+                                                                className="rounded-lg overflow-hidden"
+                                                                style={{ border: '1px solid var(--color-border)' }}
+                                                            >
+                                                                <button
+                                                                    onClick={() => toggleTest(test.id)}
+                                                                    className="w-full flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-[var(--color-primary-bg)]"
+                                                                >
+                                                                    <div className="flex items-center gap-2">
+                                                                        {test.passed ? (
+                                                                            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#059669' }} />
+                                                                        ) : (
+                                                                            <XCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#DC2626' }} />
+                                                                        )}
+                                                                        <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                                                                            {test.testcase_name || `Test #${test.testcase_id}`}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        {test.points_awarded != null && (
+                                                                            <span style={{ fontSize: '11px', color: 'var(--color-text-mid)' }}>
+                                                                                {test.points_awarded} pts
+                                                                            </span>
+                                                                        )}
+                                                                        {expandedTests.has(test.id) ? (
+                                                                            <ChevronDown className="w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
+                                                                        ) : (
+                                                                            <ChevronRight className="w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
+                                                                        )}
+                                                                    </div>
+                                                                </button>
+                                                                {expandedTests.has(test.id) && (
+                                                                    <div
+                                                                        className="px-3 py-2 border-t"
+                                                                        style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-primary-bg)' }}
+                                                                    >
+                                                                        {test.output && (
+                                                                            <div className="mb-2">
+                                                                                <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>
+                                                                                    Output:
+                                                                                </p>
+                                                                                <pre
+                                                                                    className="p-2 rounded text-xs overflow-x-auto"
+                                                                                    style={{
+                                                                                        backgroundColor: '#1e1e1e',
+                                                                                        color: '#d4d4d4',
+                                                                                        fontFamily: 'monospace',
+                                                                                        maxHeight: '120px',
+                                                                                    }}
+                                                                                >
+                                                                                    {test.output}
+                                                                                </pre>
+                                                                            </div>
+                                                                        )}
+                                                                        {test.error_output && (
+                                                                            <div>
+                                                                                <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: '#DC2626', marginBottom: '4px' }}>
+                                                                                    Error:
+                                                                                </p>
+                                                                                <pre
+                                                                                    className="p-2 rounded text-xs overflow-x-auto"
+                                                                                    style={{
+                                                                                        backgroundColor: '#FEF2F2',
+                                                                                        color: '#991B1B',
+                                                                                        fontFamily: 'monospace',
+                                                                                        maxHeight: '120px',
+                                                                                    }}
+                                                                                >
+                                                                                    {test.error_output}
+                                                                                </pre>
+                                                                            </div>
+                                                                        )}
+                                                                        {!test.output && !test.error_output && (
+                                                                            <p style={{ fontSize: '11px', color: 'var(--color-text-light)', fontStyle: 'italic' }}>
+                                                                                No output recorded
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+
+                                {/* ── Grading Tab ── */}
+                                {infoTab === 'grading' && (
+                                    <div>
+                                        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: 12 }}>
+                                            📊 Assess &amp; Grade
+                                        </h2>
+
+                                        {/* Auto-Grade Result Banner */}
+                                        {autoGradeResult && (
+                                            <div
+                                                className="mb-6 px-4 py-3 rounded-lg"
+                                                style={{ backgroundColor: '#D1FAE5', border: '1px solid #6EE7B7' }}
+                                            >
+                                                <p style={{ fontSize: '13px', fontWeight: 600, color: '#065F46', marginBottom: '4px' }}>
+                                                    {autoGradeResult.message}
+                                                </p>
+                                                <p style={{ fontSize: '12px', color: '#065F46' }}>
+                                                    Auto-score: {autoGradeResult.score ?? '—'} / {autoGradeResult.max_score ?? '—'} ({autoGradeResult.percentage.toFixed(1)}%)
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Rubric Section */}
+                                        {detail.rubrics.length > 0 && (
+                                            <div className="mb-6">
+                                                <h3 style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '8px' }}>
+                                                    Rubric Reference
+                                                </h3>
+                                                <div className="space-y-2">
+                                                    {detail.rubrics.map((rubric) => {
+                                                        // Find if we have auto-grade results for this rubric
+                                                        const autoEval = autoGradeResult?.rubric_results?.evaluations?.find(
+                                                            (e: any) => e.rubric_id === rubric.id
+                                                        );
+                                                        const earned = autoEval ? autoEval.earned_points : null;
+                                                        const max = rubric.max_points || 0;
+
+                                                        return (
+                                                            <div
+                                                                key={rubric.id}
+                                                                className="flex items-center justify-between px-3 py-2 rounded-lg"
+                                                                style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}
+                                                            >
+                                                                <div className="flex-1 pr-2">
+                                                                    <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                                                                        {rubric.name}
+                                                                    </p>
+                                                                    {autoEval?.feedback && (
+                                                                        <p style={{ fontSize: '10px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
+                                                                            {autoEval.feedback}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <span
+                                                                    className="px-2 py-0.5 rounded-md shrink-0"
+                                                                    style={{
+                                                                        fontSize: '11px',
+                                                                        fontWeight: 600,
+                                                                        color: earned !== null ? (earned === max ? '#059669' : '#D97706') : 'var(--color-text-mid)',
+                                                                        backgroundColor: 'var(--color-surface)',
+                                                                        border: '1px solid var(--color-border)',
+                                                                    }}
+                                                                >
+                                                                    {earned !== null ? `${earned} / ` : ''}{max} pts
+                                                                </span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Grading Form */}
+                                        {permissions?.can_grade !== false && (
+                                            <div>
+                                                <h3 style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '12px' }}>
+                                                    Grading Form
+                                                </h3>
+                                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                                    <div>
+                                                        <label
+                                                            htmlFor="grade-score"
+                                                            style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-mid)', display: 'block', marginBottom: '6px' }}
+                                                        >
+                                                            Score Earned
+                                                        </label>
+                                                        <input
+                                                            id="grade-score"
+                                                            type="number"
+                                                            value={score}
+                                                            onChange={(e) => setScore(e.target.value)}
+                                                            className="w-full px-3 py-2 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none transition-shadow"
+                                                            style={{
+                                                                backgroundColor: 'var(--color-surface)',
+                                                                border: '1px solid var(--color-border)',
+                                                                fontSize: '14px',
+                                                                color: 'var(--color-text-dark)',
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label
+                                                            htmlFor="grade-max-score"
+                                                            style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-mid)', display: 'block', marginBottom: '6px' }}
+                                                        >
+                                                            Max Points
+                                                        </label>
+                                                        <input
+                                                            id="grade-max-score"
+                                                            type="number"
+                                                            value={maxScore}
+                                                            onChange={(e) => setMaxScore(e.target.value)}
+                                                            className="w-full px-3 py-2 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none transition-shadow"
+                                                            style={{
+                                                                backgroundColor: 'var(--color-surface)',
+                                                                border: '1px solid var(--color-border)',
+                                                                fontSize: '14px',
+                                                                color: 'var(--color-text-dark)',
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="mb-6">
+                                                    <label
+                                                        htmlFor="grade-feedback"
+                                                        style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-mid)', display: 'block', marginBottom: '6px' }}
+                                                    >
+                                                        Feedback for Student
+                                                    </label>
+                                                    <textarea
+                                                        id="grade-feedback"
+                                                        value={feedback}
+                                                        onChange={(e) => setFeedback(e.target.value)}
+                                                        rows={5}
+                                                        placeholder="Add comments on their submission..."
+                                                        className="w-full px-3 py-2 rounded-lg resize-none"
+                                                        style={{
+                                                            backgroundColor: 'var(--color-primary-bg)',
+                                                            border: '1px solid var(--color-border)',
+                                                            fontSize: '13px',
+                                                            color: 'var(--color-text-dark)',
+                                                            lineHeight: 1.5,
+                                                        }}
+                                                    />
+                                                </div>
+
+                                                <div className="flex flex-col gap-3">
+                                                    <button
+                                                        onClick={() => handleGrade(false)}
+                                                        disabled={gradeMutation.isPending || !score}
+                                                        style={{
+                                                            width: '100%', padding: '12px', borderRadius: 6,
+                                                            fontSize: 13, fontWeight: 700, border: 'none',
+                                                            background: isDark ? 'linear-gradient(135deg, #16a34a, #15803d)' : 'linear-gradient(135deg, #15803d, #16a34a)',
+                                                            color: '#fff', transition: 'all .2s',
+                                                            textTransform: 'uppercase' as const, letterSpacing: '.5px',
+                                                            cursor: (gradeMutation.isPending || !score) ? 'not-allowed' : 'pointer',
+                                                            opacity: (gradeMutation.isPending || !score) ? 0.7 : 1,
+                                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                                        }}
+                                                        onMouseEnter={e => {
+                                                            if (!gradeMutation.isPending && score) {
+                                                                e.currentTarget.style.transform = 'translateY(-1px)';
+                                                                e.currentTarget.style.boxShadow = isDark ? '0 4px 12px rgba(22,163,74,.4)' : '0 4px 12px rgba(21,128,61,.35)';
+                                                            }
+                                                        }}
+                                                        onMouseLeave={e => {
+                                                            e.currentTarget.style.transform = 'none';
+                                                            e.currentTarget.style.boxShadow = 'none';
+                                                        }}
+                                                    >
+                                                        {gradeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                                        Submit Final Grade
+                                                    </button>
+
+                                                    {nextSubmissionId && (
+                                                        <button
+                                                            onClick={() => handleGrade(false, true)}
+                                                            disabled={gradeMutation.isPending || !score}
+                                                            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
+                                                            style={{
+                                                                backgroundColor: 'var(--color-surface-elevated)',
+                                                                border: '1px solid var(--color-border)',
+                                                                color: 'var(--color-text-dark)',
+                                                                fontSize: '13px',
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            <Send className="w-4 h-4" /> Save &amp; Next
+                                                        </button>
+                                                    )}
+
+                                                    <button
+                                                        onClick={() => handleGrade(true)}
+                                                        disabled={gradeMutation.isPending}
+                                                        className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
+                                                        style={{
+                                                            backgroundColor: 'var(--color-primary-bg)',
+                                                            border: '1px solid var(--color-border)',
+                                                            color: 'var(--color-text-dark)',
+                                                            fontSize: '13px',
+                                                            fontWeight: 600,
+                                                        }}
+                                                    >
+                                                        <Save className="w-4 h-4" /> Save Draft
+                                                    </button>
+                                                </div>
+
+                                                {gradeMutation.isSuccess && (
+                                                    <div
+                                                        className="mt-4 px-4 py-2 rounded-lg"
+                                                        style={{ backgroundColor: '#D1FAE5', border: '1px solid #6EE7B7' }}
+                                                    >
+                                                        <p style={{ fontSize: '12px', fontWeight: 500, color: '#065F46' }}>
+                                                            Grade recorded successfully
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                        </div>
-                    )}
-
-                    {/* Grading Form */}
-                    {permissions?.can_grade !== false && (
-                        <div className="p-6">
-                            <h3
-                                style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '16px' }}
-                            >
-                                Grade Submission
-                            </h3>
-
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div>
-                                    <label
-                                        htmlFor="grade-score"
-                                        style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-mid)', display: 'block', marginBottom: '6px' }}
-                                    >
-                                        Score
-                                    </label>
-                                    <input
-                                        id="grade-score"
-                                        type="number"
-                                        value={score}
-                                        onChange={(e) => setScore(e.target.value)}
-                                        placeholder="0"
-                                        className="w-full px-3 py-2.5 rounded-lg"
-                                        style={{
-                                            backgroundColor: 'var(--color-primary-bg)',
-                                            border: '1px solid var(--color-border)',
-                                            fontSize: '14px',
-                                            color: 'var(--color-text-dark)',
-                                        }}
-                                    />
-                                </div>
-                                <div>
-                                    <label
-                                        htmlFor="grade-max-score"
-                                        style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-mid)', display: 'block', marginBottom: '6px' }}
-                                    >
-                                        Max Score
-                                    </label>
-                                    <input
-                                        id="grade-max-score"
-                                        type="number"
-                                        value={maxScore}
-                                        onChange={(e) => setMaxScore(e.target.value)}
-                                        placeholder="100"
-                                        className="w-full px-3 py-2.5 rounded-lg"
-                                        style={{
-                                            backgroundColor: 'var(--color-primary-bg)',
-                                            border: '1px solid var(--color-border)',
-                                            fontSize: '14px',
-                                            color: 'var(--color-text-dark)',
-                                        }}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="mb-6">
-                                <label
-                                    htmlFor="grade-feedback"
-                                    style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-mid)', display: 'block', marginBottom: '6px' }}
-                                >
-                                    Feedback
-                                </label>
-                                <textarea
-                                    id="grade-feedback"
-                                    value={feedback}
-                                    onChange={(e) => setFeedback(e.target.value)}
-                                    rows={5}
-                                    placeholder="Write feedback for the student..."
-                                    className="w-full px-3 py-2.5 rounded-lg resize-none"
-                                    style={{
-                                        backgroundColor: 'var(--color-primary-bg)',
-                                        border: '1px solid var(--color-border)',
-                                        fontSize: '14px',
-                                        color: 'var(--color-text-dark)',
-                                        lineHeight: 1.5,
-                                    }}
-                                />
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                <button
-                                    onClick={() => handleGrade(true)}
-                                    disabled={gradeMutation.isPending}
-                                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
-                                    style={{
-                                        backgroundColor: 'var(--color-primary-bg)',
-                                        border: '1px solid var(--color-border)',
-                                        color: 'var(--color-text-dark)',
-                                        fontSize: '14px',
-                                        fontWeight: 500,
-                                    }}
-                                >
-                                    <Save className="w-4 h-4" />
-                                    Save Draft
-                                </button>
-                                <button
-                                    onClick={() => handleGrade(false)}
-                                    disabled={gradeMutation.isPending || !score}
-                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
-                                    style={{
-                                        backgroundColor: 'var(--color-primary)',
-                                        color: 'white',
-                                        fontSize: '14px',
-                                        fontWeight: 600,
-                                    }}
-                                >
-                                    {gradeMutation.isPending ? (
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                    ) : (
-                                        <Send className="w-4 h-4" />
-                                    )}
-                                    Submit Grade
-                                </button>
-                            </div>
-
-                            {gradeMutation.isSuccess && (
-                                <div
-                                    className="mt-4 px-4 py-3 rounded-lg"
-                                    style={{ backgroundColor: '#D1FAE5', border: '1px solid #6EE7B7' }}
-                                >
-                                    <p style={{ fontSize: '13px', fontWeight: 500, color: '#065F46' }}>
-                                        Grade saved successfully!
-                                    </p>
-                                </div>
-                            )}
-
-                            {gradeMutation.isError && (
-                                <div
-                                    className="mt-4 px-4 py-3 rounded-lg"
-                                    style={{ backgroundColor: '#FEE2E2', border: '1px solid #FECACA' }}
-                                >
-                                    <p style={{ fontSize: '13px', fontWeight: 500, color: '#991B1B' }}>
-                                        Failed to save grade. Please try again.
-                                    </p>
-                                </div>
-                            )}
                         </div>
                     )}
                 </div>
+
+                {/* ═══ STATUS BAR ═══ */}
+                <div style={{
+                    height: 28, background: '#1e4a7a', color: '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '0 12px', fontSize: 11, fontWeight: 500, flexShrink: 0,
+                    borderTop: '1px solid rgba(255,255,255,0.1)',
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, letterSpacing: '.4px' }}>
+                            <span style={{ opacity: .7 }}>ROLE:</span> TA/FACULTY
+                        </span>
+                        <div style={{ width: 1, height: 12, background: 'rgba(255,255,255,0.2)' }} />
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, letterSpacing: '.4px' }}>
+                            <span style={{ opacity: .7 }}>LANG:</span> {language.toUpperCase()}
+                        </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: .9 }}>
+                            {detail.status === 'graded' ? '✓ SUBMISSION GRADED' : '● NEEDS GRADING'}
+                        </span>
+                    </div>
+                </div>
+
             </div>
+
+            {/* Stdin Dialog */}
+            <Dialog open={stdinDialogOpen} onOpenChange={setStdinDialogOpen}>
+                <DialogContent style={{ maxWidth: '500px' }}>
+                    <DialogHeader>
+                        <DialogTitle>Run with Input</DialogTitle>
+                    </DialogHeader>
+                    <div className="mt-4">
+                        <label className="text-sm font-medium" style={{ color: 'var(--color-text-dark)' }}>
+                            Enter program input (stdin):
+                        </label>
+                        <Textarea
+                            value={stdinValue}
+                            onChange={(e) => setStdinValue(e.target.value)}
+                            placeholder="Type your input here..."
+                            className="mt-2 font-mono text-sm"
+                            rows={6}
+                        />
+                    </div>
+                    <DialogFooter className="mt-4">
+                        <Button variant="outline" onClick={() => setStdinDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleRunWithStdin} className="text-white" style={{ backgroundColor: 'var(--color-success)' }}>
+                            <Play className="w-4 h-4 mr-2" /> Run
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </PageLayout>
     );
 }

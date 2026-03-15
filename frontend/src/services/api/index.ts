@@ -11,5 +11,7 @@ export { submissionService } from './submissionService';
 export { gradeService, reportService } from './gradeService';
 export { adminService } from './adminService';
 export { testcaseService } from './testcaseService';
+export { rubricService } from './rubricService';
 export { codeExecutionApiService } from './codeExecutionApiService';
 export { taDashboardService } from './taDashboardService';
+export * from './messageService';

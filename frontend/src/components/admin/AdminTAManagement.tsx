@@ -118,7 +118,7 @@ function AssignTADialog({
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Select a course..." />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-64 overflow-y-auto">
                 {(courses ?? []).map((c) => (
                   <SelectItem key={c.id} value={String(c.id)}>
                     {c.code ? `${c.code} — ${c.name}` : c.name}

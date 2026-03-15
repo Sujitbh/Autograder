@@ -34,7 +34,7 @@ const menuItems = [
 ];
 
 export function AdminSidebar({ activeItem = 'dashboard' }: AdminSidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const router = useRouter();
 
   return (

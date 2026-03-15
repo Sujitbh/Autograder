@@ -1,7 +1,6 @@
 import {
   FileText,
   GraduationCap,
-  BarChart3,
   Users,
   UsersRound,
   Settings,
@@ -29,7 +28,6 @@ export function Sidebar({ activeItem = 'assignments' }: SidebarProps) {
   const menuItems = [
     { id: 'assignments', icon: FileText, label: 'Assignments', path: `/courses/${courseId}` },
     { id: 'grading', icon: GraduationCap, label: 'Grading', path: `/courses/${courseId}/grading` },
-    { id: 'reports', icon: BarChart3, label: 'Reports', path: `/courses/${courseId}/reports` },
     { id: 'students', icon: Users, label: 'Students', path: `/courses/${courseId}/students` },
     { id: 'groups', icon: UsersRound, label: 'Groups', path: `/courses/${courseId}/groups` },
     { id: 'settings', icon: Settings, label: 'Settings', path: `/courses/${courseId}/settings` },

@@ -14,12 +14,17 @@ interface BackendCourse {
     id: number;
     name: string;
     code: string | null;
+    section: string | null;
     description: string | null;
     enrollment_code: string | null;
     enrollment_code_active: boolean;
+    enrollment_policy: 'open' | 'invite' | 'code';
     is_active: boolean;
     created_at?: string | null;
     updated_at?: string | null;
+    student_count?: number;
+    assignment_count?: number;
+    pending_grades?: number;
 }
 
 interface BackendEnrollmentUser {
@@ -27,44 +32,112 @@ interface BackendEnrollmentUser {
     name: string;
     email: string;
     role: string;
+    sis_user_id: string | null;
 }
+
+function defaultSemesters(): { id: number; name: string; is_current: boolean }[] {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+
+    let currentTerm: 'Spring' | 'Summer' | 'Fall';
+    if (month <= 4) currentTerm = 'Spring';
+    else if (month <= 7) currentTerm = 'Summer';
+    else currentTerm = 'Fall';
+
+    const currentName = `${currentTerm} ${year}`;
+
+    let nextName = '';
+    if (currentTerm === 'Spring') nextName = `Summer ${year}`;
+    if (currentTerm === 'Summer') nextName = `Fall ${year}`;
+    if (currentTerm === 'Fall') nextName = `Spring ${year + 1}`;
+
+    return [
+        { id: -1, name: currentName, is_current: true },
+        { id: -2, name: nextName, is_current: false },
+    ];
+}
+
+export type EnrollmentRole = 'student' | 'ta' | 'instructor';
 
 export interface CourseEnrollment {
     id: number;
     course_id: number;
     user_id: number;
-    role: 'student' | 'ta' | 'instructor';
+    role: EnrollmentRole;
     created_at?: string | null;
     user?: BackendEnrollmentUser;
+}
+
+export interface EnrollmentImportRow {
+    row_number: number;
+    name: string | null;
+    email: string | null;
+    sis_login_id: string | null;
+    sis_user_id: string | null;
+    external_id: string | null;
+    status: 'enrolled' | 'already_enrolled' | 'created_and_enrolled' | 'skipped' | 'error';
+    message: string | null;
+}
+
+export interface EnrollmentImportResult {
+    total_rows: number;
+    enrolled_count: number;
+    already_enrolled_count: number;
+    created_users_count: number;
+    skipped_count: number;
+    rows: EnrollmentImportRow[];
 }
 
 interface CreateEnrollmentPayload {
     user_id?: number;
     email?: string;
-    role: 'student' | 'ta' | 'instructor';
+    role: EnrollmentRole;
 }
 
 /** Map a backend course to the frontend Course type */
 function mapCourse(c: BackendCourse): Course {
+    const normalizedPolicy = (c.enrollment_policy === 'open' ? 'both' : c.enrollment_policy) ?? 'invite';
     return {
         id: String(c.id),
         code: c.code ?? '',
         name: c.name,
         semester: 'Spring 2026',
+        section: c.section ?? undefined,
         description: c.description ?? '',
         facultyId: '',
         enrollmentCode: c.enrollment_code ?? '',
         enrollmentCodeActive: c.enrollment_code_active,
+        enrollmentPolicy: normalizedPolicy,
         status: c.is_active ? 'active' : 'archived',
-        studentCount: 0,
-        assignmentCount: 0,
-        pendingGrades: 0,
+        studentCount: c.student_count ?? 0,
+        assignmentCount: c.assignment_count ?? 0,
+        pendingGrades: c.pending_grades ?? 0,
         createdAt: c.created_at ?? '',
         updatedAt: c.updated_at ?? '',
     };
 }
 
 export const courseService = {
+    /** Return all semesters from the database. For faculty/admin use in course creation. */
+    async getSemesters(): Promise<{ id: number; name: string; is_current: boolean }[]> {
+        try {
+            const { data } = await withRetry(() =>
+                api.get<{ id: number; name: string; is_current: boolean }[]>('/courses/semesters')
+            );
+            if (Array.isArray(data) && data.length > 0) return data;
+            return defaultSemesters();
+        } catch {
+            return defaultSemesters();
+        }
+    },
+
+    /** Return distinct (code, name) pairs from all courses for autocomplete. */
+    async getCatalog(): Promise<{ code: string; name: string }[]> {
+        const { data } = await withRetry(() => api.get<{ code: string; name: string }[]>('/courses/catalog'));
+        return data;
+    },
+
     /** List all courses for the authenticated user. */
     async getCourses(): Promise<Course[]> {
         const { data } = await withRetry(() =>
@@ -86,6 +159,7 @@ export const courseService = {
         const payload = {
             name: dto.name,
             code: dto.code,
+            section: dto.section,
             description: dto.description ?? '',
             enrollment_code_active: dto.enrollmentCodeActive ?? true,
         };
@@ -95,9 +169,17 @@ export const courseService = {
 
     /** Update an existing course. */
     async updateCourse(courseId: string, dto: UpdateCourseDto): Promise<Course> {
+        const payload: Record<string, unknown> = {
+            ...(dto.name !== undefined && { name: dto.name }),
+            ...(dto.code !== undefined && { code: dto.code }),
+            ...(dto.section !== undefined && { section: dto.section }),
+            ...(dto.description !== undefined && { description: dto.description }),
+            ...(dto.enrollmentCodeActive !== undefined && { enrollment_code_active: dto.enrollmentCodeActive }),
+            ...(dto.enrollmentPolicy !== undefined && { enrollment_policy: dto.enrollmentPolicy }),
+        };
         const { data } = await api.put<BackendCourse>(
             `/courses/${courseId}`,
-            dto
+            payload
         );
         return mapCourse(data);
     },
@@ -147,6 +229,34 @@ export const courseService = {
         const { data } = await api.post<CourseEnrollment>(
             '/courses/enroll',
             { enrollmentCode }
+        );
+        return data;
+    },
+
+    /** Import a roster file and bulk-enroll members. */
+    async importEnrollmentsFromFile(
+        courseId: string,
+        payload: {
+            file: File;
+            role?: EnrollmentRole;
+            createMissingUsers?: boolean;
+            defaultDomain?: string;
+        }
+    ): Promise<EnrollmentImportResult> {
+        const formData = new FormData();
+        formData.append('file', payload.file);
+        formData.append('role', payload.role ?? 'student');
+        formData.append('create_missing_users', String(payload.createMissingUsers ?? true));
+        formData.append('default_domain', payload.defaultDomain ?? 'warhawks.ulm.edu');
+
+        const { data } = await api.post<EnrollmentImportResult>(
+            `/courses/${courseId}/enrollments/import`,
+            formData,
+            {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
+            }
         );
         return data;
     },

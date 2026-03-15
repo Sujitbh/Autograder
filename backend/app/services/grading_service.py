@@ -10,6 +10,7 @@ This service provides:
 
 from typing import Optional, List
 from datetime import datetime
+import os
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -77,13 +78,25 @@ class GradingService:
 
         # Read main code file
         main_file = files[0]  # TODO: Better logic to identify main file
+        actual_path = main_file.path
+        if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
+            from app.settings import settings
+            from pathlib import Path
+            actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
+
+        if not actual_path or not __import__("os").path.exists(actual_path):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error reading submission file: [Errno 2] No such file or directory: '{actual_path or main_file.path}'",
+            )
+
         try:
-            with open(main_file.path, "r") as f:
+            with open(actual_path, "r", errors="replace") as f:
                 code = f.read()
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error reading submission file: {str(e)}",
+                detail=f"Error reading submission file {actual_path}: {str(e)}",
             )
 
         # Detect language
@@ -91,23 +104,36 @@ class GradingService:
         if not language:
             language = "python"  # Default fallback
 
+        test_results = None
         # Run test cases
         if run_tests:
             test_results = GradingService._run_tests(
                 db, submission, code, language
             )
             results["test_results"] = test_results
-            results["total_score"] += test_results["earned_points"]
-            results["max_score"] += test_results["total_points"]
+            # We only add test_results["earned_points"] to total_score ONLY IF 
+            # there's no rubric item covering it. We'll handle this inside _evaluate_rubric
+            # or by adjusting the final score logic.
+            # To preserve legacy behavior while shifting to rubric-centric scoring:
+            # results["total_score"] += test_results["earned_points"]
+            # results["max_score"] += test_results["total_points"]
 
         # Apply rubric evaluation
         if apply_rubric:
             rubric_results = GradingService._evaluate_rubric(
-                db, submission, code
+                db, submission, code, test_results
             )
             results["rubric_results"] = rubric_results
             results["total_score"] += rubric_results["earned_points"]
             results["max_score"] += rubric_results["total_points"]
+            
+            # If no rubric item was "Test Cases", we add the test results independently
+            if not rubric_results.get("has_test_rubric") and test_results:
+                results["total_score"] += test_results["earned_points"]
+                results["max_score"] += test_results["total_points"]
+        elif test_results:
+            results["total_score"] += test_results["earned_points"]
+            results["max_score"] += test_results["total_points"]
 
         # Calculate percentage
         if results["max_score"] > 0:
@@ -169,12 +195,10 @@ class GradingService:
         db: Session,
         submission: Submission,
         code: str,
+        test_results: Optional[dict] = None,
     ) -> dict:
         """
         Evaluate submission against rubric criteria.
-        
-        This is a simplified implementation. In production, this would
-        integrate with an AI service for more sophisticated evaluation.
         """
         rubrics = db.query(Rubric).filter(
             Rubric.assignment_id == submission.assignment_id
@@ -186,21 +210,34 @@ class GradingService:
                 "total_points": 0,
                 "earned_points": 0,
                 "evaluations": [],
+                "has_test_rubric": False,
             }
 
         evaluations = []
         total_points = 0
         earned_points = 0
+        has_test_rubric = False
 
         for rubric in rubrics:
             max_pts = rubric.max_points or 10
+            name_lower = rubric.name.lower()
+            
+            # Check if this rubric item is for automated tests
+            is_automated_test = any(x in name_lower for x in ["test case", "automated test", "correctness"])
+            
+            if is_automated_test and test_results and test_results.get("total_points", 0) > 0:
+                has_test_rubric = True
+                # Scale test results to rubric max points
+                ratio = test_results["earned_points"] / test_results["total_points"]
+                earned = round(max_pts * ratio)
+                feedback = f"Automated evaluation based on test cases: {test_results['passed_testcases']}/{test_results['total_testcases']} passed."
+            else:
+                # Simple heuristic evaluation (placeholder for AI)
+                score, feedback = GradingService._simple_rubric_check(
+                    code, rubric
+                )
+                earned = int(max_pts * score)
 
-            # Simple heuristic evaluation (placeholder for AI)
-            score, feedback = GradingService._simple_rubric_check(
-                code, rubric
-            )
-
-            earned = int(max_pts * score)
             total_points += max_pts
             earned_points += earned
 
@@ -209,7 +246,6 @@ class GradingService:
                 "rubric_name": rubric.name,
                 "max_points": max_pts,
                 "earned_points": earned,
-                "score_ratio": score,
                 "feedback": feedback,
             })
 
@@ -218,6 +254,7 @@ class GradingService:
             "total_points": total_points,
             "earned_points": earned_points,
             "evaluations": evaluations,
+            "has_test_rubric": has_test_rubric,
         }
 
     @staticmethod

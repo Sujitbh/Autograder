@@ -1,5 +1,5 @@
 /**
- * AutoGrade Design System Tokens
+ * Axiom Design System Tokens
  * Centralized access to CSS variables defined in theme.css
  * Use these constants instead of hardcoded values for consistency
  */
@@ -10,19 +10,19 @@ export const colors = {
   primaryHover: 'var(--color-primary-hover)', // #8B1A1A
   primaryBg: 'var(--color-primary-bg)',       // #F5EDED
   primaryLight: 'var(--color-primary-light)', // #FCEAEA
-  
+
   // Gold Accent
   goldAccent: 'var(--color-gold-accent)',     // #C9A84C
-  
+
   // Text Colors
   textDark: 'var(--color-text-dark)',         // #2D2D2D
   textMid: 'var(--color-text-mid)',           // #595959
   textLight: 'var(--color-text-light)',       // #8A8A8A
-  
+
   // Border & Backgrounds
   border: 'var(--color-border)',              // #D9D9D9
   white: 'var(--color-white)',                // #FFFFFF
-  
+
   // Status Colors
   success: 'var(--color-success)',            // #2D6A2D
   warning: 'var(--color-warning)',            // #8A5700
