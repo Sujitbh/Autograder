@@ -1,8 +1,7 @@
 'use client';
 
 /* ═══════════════════════════════════════════════════════════════════
-   ReportsTable — Spreadsheet-style grade report for faculty
-   Features: sticky columns, color-coded cells, sortable, exportable
+   ReportsTable — Clean professional gradebook for faculty
    ═══════════════════════════════════════════════════════════════════ */
 
 import { useState, useMemo, useCallback } from 'react';
@@ -32,7 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getGradeColor, getLetterGrade, calculatePercentage } from '@/utils/helpers';
+import { getLetterGrade, calculatePercentage } from '@/utils/helpers';
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -63,19 +62,9 @@ interface ReportsTableProps {
   onExport?: (format: 'csv' | 'excel' | 'pdf' | 'canvas') => void;
 }
 
-type SortField = 'name' | 'studentId' | 'total' | string; // string = assignmentId
+type SortField = 'name' | 'studentId' | 'total' | string;
 type SortDir = 'asc' | 'desc';
-
 type FilterPerformance = 'all' | 'high' | 'mid' | 'low' | 'failing';
-
-// ── Helper: grade cell styling ──────────────────────────────────────
-
-function gradeCellClass(earned: number | null, max: number, isLate: boolean): string {
-  if (earned === null) return 'text-gray-300';
-  const pct = max > 0 ? (earned / max) * 100 : 0;
-  const color = getGradeColor(pct);
-  return `${color} ${isLate ? 'italic' : ''}`;
-}
 
 // ── Component ───────────────────────────────────────────────────────
 
@@ -92,13 +81,11 @@ export function ReportsTable({
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [perfFilter, setPerfFilter] = useState<FilterPerformance>('all');
 
-  // Total possible points
   const totalMaxPoints = useMemo(
     () => assignments.reduce((s, a) => s + a.maxPoints, 0),
     [assignments]
   );
 
-  // Compute per-student totals
   const studentTotals = useMemo(() => {
     const map: Record<string, { earned: number; percentage: number }> = {};
     students.forEach((s) => {
@@ -115,11 +102,9 @@ export function ReportsTable({
     return map;
   }, [students, assignments, grades, totalMaxPoints]);
 
-  // Filter + sort
   const filteredStudents = useMemo(() => {
     let list = [...students];
 
-    // Text search
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -130,7 +115,6 @@ export function ReportsTable({
       );
     }
 
-    // Performance filter
     if (perfFilter !== 'all') {
       list = list.filter((s) => {
         const pct = studentTotals[s.id]?.percentage ?? 0;
@@ -143,7 +127,6 @@ export function ReportsTable({
       });
     }
 
-    // Sort
     list.sort((a, b) => {
       let cmp = 0;
       if (sortField === 'name') {
@@ -153,7 +136,6 @@ export function ReportsTable({
       } else if (sortField === 'total') {
         cmp = (studentTotals[a.id]?.percentage ?? 0) - (studentTotals[b.id]?.percentage ?? 0);
       } else {
-        // Sort by assignment grade
         const ga = grades[a.id]?.[sortField] ?? -1;
         const gb = grades[b.id]?.[sortField] ?? -1;
         cmp = ga - gb;
@@ -164,7 +146,6 @@ export function ReportsTable({
     return list;
   }, [students, search, perfFilter, sortField, sortDir, grades, studentTotals]);
 
-  // Toggle sort
   const toggleSort = useCallback(
     (field: SortField) => {
       if (sortField === field) {
@@ -178,33 +159,35 @@ export function ReportsTable({
   );
 
   function SortIcon({ field }: { field: SortField }) {
-    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
-    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
+    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 opacity-25 inline-block ml-1" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="h-3 w-3 inline-block ml-1" />
+      : <ArrowDown className="h-3 w-3 inline-block ml-1" />;
   }
 
   return (
     <div className="flex flex-col gap-4">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--color-text-light)' }} />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search students..."
-            className="pl-9"
+            className="pl-9 border-[var(--color-border)]"
           />
         </div>
 
         <Select value={perfFilter} onValueChange={(v) => setPerfFilter(v as FilterPerformance)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="All students" />
+          <SelectTrigger className="w-[180px] border-[var(--color-border)]">
+            <SelectValue placeholder="All Students" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Students</SelectItem>
             <SelectItem value="high">High Performers (≥90%)</SelectItem>
-            <SelectItem value="mid">Mid Range (70-89%)</SelectItem>
-            <SelectItem value="low">Low Range (60-69%)</SelectItem>
+            <SelectItem value="mid">Mid Range (70–89%)</SelectItem>
+            <SelectItem value="low">Low Range (60–69%)</SelectItem>
             <SelectItem value="failing">Failing (&lt;60%)</SelectItem>
           </SelectContent>
         </Select>
@@ -212,8 +195,8 @@ export function ReportsTable({
         {onExport && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Download className="mr-1 h-4 w-4" /> Export
+              <Button variant="outline" size="sm" className="border-[var(--color-border)]">
+                <Download className="mr-1.5 h-4 w-4" /> Export
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
@@ -233,77 +216,80 @@ export function ReportsTable({
           </DropdownMenu>
         )}
 
-        <span className="text-xs text-gray-400">
+        <span style={{ fontSize: '13px', color: 'var(--color-text-light)' }}>
           {filteredStudents.length} of {students.length} students
         </span>
       </div>
 
-      {/* Table container with horizontal scroll */}
-      <div className="relative overflow-x-auto rounded-lg border dark:border-gray-700">
-        <table className="w-full text-sm">
-          {/* Header */}
-          <thead className="bg-gray-50 text-xs uppercase text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-            <tr>
-              {/* Sticky columns */}
+      {/* Table */}
+      <div
+        className="overflow-x-auto rounded-lg border"
+        style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}
+      >
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
               <th
-                className="sticky left-0 z-20 cursor-pointer bg-gray-50 px-4 py-3 text-left dark:bg-gray-800"
+                className="sticky left-0 z-20 cursor-pointer px-4 py-3 text-left"
+                style={{ backgroundColor: 'var(--color-surface)', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase', minWidth: 180 }}
                 onClick={() => toggleSort('name')}
               >
-                <span className="flex items-center gap-1">
-                  Student Name <SortIcon field="name" />
-                </span>
+                Student Name <SortIcon field="name" />
               </th>
-              <th className="hidden px-3 py-3 text-left md:table-cell">CWID</th>
-              <th className="hidden px-3 py-3 text-left md:table-cell">Username</th>
-              <th className="hidden px-3 py-3 text-left lg:table-cell">Section</th>
+              <th className="hidden px-3 py-3 text-left md:table-cell" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
+                CWID
+              </th>
+              <th className="hidden px-3 py-3 text-left md:table-cell" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                Username
+              </th>
 
-              {/* Assignment columns */}
               {assignments.map((a) => (
                 <th
                   key={a.id}
                   className="cursor-pointer whitespace-nowrap px-3 py-3 text-center"
+                  style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase' }}
                   onClick={() => toggleSort(a.id)}
                   title={a.fullName}
                 >
-                  <span className="flex items-center justify-center gap-1">
-                    {a.shortName} <SortIcon field={a.id} />
-                  </span>
+                  {a.shortName} <SortIcon field={a.id} />
                 </th>
               ))}
 
-              {/* Totals */}
               <th
                 className="cursor-pointer px-3 py-3 text-center"
+                style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}
                 onClick={() => toggleSort('total')}
               >
-                <span className="flex items-center justify-center gap-1">
-                  Total <SortIcon field="total" />
-                </span>
+                Total <SortIcon field="total" />
               </th>
-              <th className="px-3 py-3 text-center">%</th>
-              <th className="px-3 py-3 text-center">Grade</th>
-              {onViewStudentReport && <th className="px-3 py-3 text-center">Action</th>}
+              <th className="px-3 py-3 text-center" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>%</th>
+              <th className="px-3 py-3 text-center" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Grade</th>
+              {onViewStudentReport && (
+                <th className="px-3 py-3 text-center" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Action</th>
+              )}
             </tr>
           </thead>
 
-          <tbody className="divide-y dark:divide-gray-700">
+          <tbody>
             {/* Points Possible row */}
-            <tr className="bg-gray-100 font-medium text-gray-500 dark:bg-gray-800/60">
-              <td className="sticky left-0 z-10 bg-gray-100 px-4 py-2 dark:bg-gray-800/60">
+            <tr style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: '#F9F9F9' }}>
+              <td
+                className="sticky left-0 z-10 px-4 py-2.5"
+                style={{ backgroundColor: '#F9F9F9', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-mid)' }}
+              >
                 Points Possible
               </td>
-              <td className="hidden px-3 py-2 md:table-cell" />
-              <td className="hidden px-3 py-2 md:table-cell" />
-              <td className="hidden px-3 py-2 lg:table-cell" />
+              <td className="hidden px-3 py-2.5 md:table-cell" />
+              <td className="hidden px-3 py-2.5 md:table-cell" />
               {assignments.map((a) => (
-                <td key={a.id} className="px-3 py-2 text-center font-semibold">
+                <td key={a.id} className="px-3 py-2.5 text-center" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-mid)' }}>
                   {a.maxPoints}
                 </td>
               ))}
-              <td className="px-3 py-2 text-center font-semibold">{totalMaxPoints}</td>
-              <td className="px-3 py-2 text-center">100%</td>
-              <td className="px-3 py-2 text-center" />
-              {onViewStudentReport && <td className="px-3 py-2" />}
+              <td className="px-3 py-2.5 text-center" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-mid)' }}>{totalMaxPoints}</td>
+              <td className="px-3 py-2.5 text-center" style={{ fontSize: '13px', color: 'var(--color-text-light)' }}>100%</td>
+              <td className="px-3 py-2.5 text-center" />
+              {onViewStudentReport && <td className="px-3 py-2.5" />}
             </tr>
 
             {/* Student rows */}
@@ -311,16 +297,24 @@ export function ReportsTable({
               const totals = studentTotals[student.id];
               const pct = totals?.percentage ?? 0;
               const earned = totals?.earned ?? 0;
+              const letter = getLetterGrade(pct);
 
               return (
                 <tr
                   key={student.id}
-                  className="hover:bg-gray-50 dark:hover:bg-gray-800/40"
+                  className="transition-colors"
+                  style={{ borderBottom: '1px solid var(--color-border)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-primary-bg)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
-                  <td className="sticky left-0 z-10 bg-white px-4 py-2.5 font-medium text-gray-900 dark:bg-gray-900 dark:text-gray-100">
+                  <td
+                    className="sticky left-0 z-10 px-4 py-3"
+                    style={{ backgroundColor: 'var(--color-surface)', fontSize: '14px', fontWeight: 500, color: 'var(--color-text-dark)' }}
+                  >
                     {onViewStudentReport ? (
                       <button
-                        className="text-left hover:text-[#6B0000] hover:underline"
+                        className="text-left hover:underline"
+                        style={{ color: 'var(--color-primary)' }}
                         onClick={() => onViewStudentReport(student.id)}
                       >
                         {student.name}
@@ -329,61 +323,56 @@ export function ReportsTable({
                       student.name
                     )}
                   </td>
-                  <td className="hidden px-3 py-2.5 text-gray-400 md:table-cell">
-                    {student.sisUserId}
+                  <td className="hidden px-3 py-3 md:table-cell" style={{ fontSize: '13px', color: 'var(--color-text-light)' }}>
+                    {student.sisUserId || '—'}
                   </td>
-                  <td className="hidden px-3 py-2.5 text-gray-400 md:table-cell">
+                  <td className="hidden px-3 py-3 md:table-cell" style={{ fontSize: '13px', color: 'var(--color-text-light)' }}>
                     {student.sisLoginId}
                   </td>
-                  <td className="hidden px-3 py-2.5 text-gray-400 lg:table-cell">
-                    {student.section}
-                  </td>
 
-                  {/* Grade cells */}
+                  {/* Grade cells — neutral, no color coding */}
                   {assignments.map((a) => {
                     const g = grades[student.id]?.[a.id] ?? null;
                     const isLate = lateFlags?.[student.id]?.[a.id] ?? false;
                     return (
-                      <td
-                        key={a.id}
-                        className={`px-3 py-2.5 text-center font-medium ${gradeCellClass(g, a.maxPoints, isLate)}`}
-                      >
+                      <td key={a.id} className="px-3 py-3 text-center" style={{ fontSize: '14px' }}>
                         {g === null ? (
-                          <span className="text-gray-300">—</span>
+                          <span style={{ color: 'var(--color-text-light)' }}>—</span>
                         ) : (
-                          <>
-                            {g}
-                            {isLate && <span className="text-orange-500">*</span>}
-                          </>
+                          <span style={{ fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                            {g}{isLate && <sup style={{ color: 'var(--color-text-light)', fontSize: '10px' }}>L</sup>}
+                          </span>
                         )}
                       </td>
                     );
                   })}
 
-                  {/* Total */}
-                  <td className="px-3 py-2.5 text-center font-semibold text-gray-900 dark:text-gray-100">
+                  <td className="px-3 py-3 text-center" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                     {earned}/{totalMaxPoints}
                   </td>
-                  <td className={`px-3 py-2.5 text-center font-semibold ${getGradeColor(pct)}`}>
+                  <td className="px-3 py-3 text-center" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-mid)' }}>
                     {pct.toFixed(1)}%
                   </td>
-                  <td className="px-3 py-2.5 text-center">
+                  <td className="px-3 py-3 text-center">
                     <span
-                      className={`inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        pct >= 90
-                          ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : pct >= 80
-                            ? 'bg-red-50 text-[#6B0000]'
-                            : pct >= 70
-                              ? 'bg-orange-50 text-orange-700'
-                              : 'bg-red-100 text-red-700'
-                      }`}
+                      style={{
+                        display: 'inline-block',
+                        padding: '2px 10px',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        border: '1px solid var(--color-border)',
+                        color: 'var(--color-text-dark)',
+                        backgroundColor: 'var(--color-surface)',
+                        minWidth: '32px',
+                        textAlign: 'center',
+                      }}
                     >
-                      {getLetterGrade(pct)}
+                      {letter}
                     </span>
                   </td>
                   {onViewStudentReport && (
-                    <td className="px-3 py-2.5 text-center">
+                    <td className="px-3 py-3 text-center">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -391,7 +380,7 @@ export function ReportsTable({
                         onClick={() => onViewStudentReport(student.id)}
                         aria-label={`View report for ${student.name}`}
                       >
-                        <Eye className="h-4 w-4" />
+                        <Eye className="h-4 w-4" style={{ color: 'var(--color-text-mid)' }} />
                       </Button>
                     </td>
                   )}
@@ -402,8 +391,9 @@ export function ReportsTable({
             {filteredStudents.length === 0 && (
               <tr>
                 <td
-                  colSpan={6 + assignments.length + (onViewStudentReport ? 4 : 3)}
-                  className="px-4 py-12 text-center text-sm text-gray-400"
+                  colSpan={5 + assignments.length + (onViewStudentReport ? 1 : 0)}
+                  className="px-4 py-12 text-center"
+                  style={{ fontSize: '14px', color: 'var(--color-text-light)' }}
                 >
                   No students match your search or filters.
                 </td>
@@ -413,26 +403,9 @@ export function ReportsTable({
         </table>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400">
-        <span>
-          <span className="text-orange-500">*</span> Late submission
-        </span>
-        <span>
-          <span className="text-gray-300">—</span> Not submitted
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-green-500" /> ≥90%
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-[#6B0000]" /> 80-89%
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-orange-500" /> 70-79%
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-red-500" /> &lt;70%
-        </span>
+      {/* Minimal legend */}
+      <div style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>
+        <sup>L</sup> Late submission &nbsp;·&nbsp; — Not submitted
       </div>
     </div>
   );

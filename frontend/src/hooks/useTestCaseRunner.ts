@@ -1,7 +1,9 @@
 import { useState, useCallback } from 'react';
-import { codeExecutionApiService } from '@/services/api/codeExecutionApiService';
+import { codeExecutionApiService, type ExecuteCodeResponse } from '@/services/api/codeExecutionApiService';
 import type { BackendTestCase } from '@/services/api/testcaseService';
 import type { TestCaseRunResult } from '@/components/TestResultsPanel';
+import { runClientJavaScript } from '@/utils/clientExecution';
+import { outputsMatch } from '@/utils/outputMatching';
 
 export function useTestCaseRunner() {
   const [isRunning, setIsRunning] = useState(false);
@@ -23,24 +25,31 @@ export function useTestCaseRunner() {
       const tc = testCases[i];
       const testName = tc.name || `Test ${i + 1}`;
       try {
-        const execResult = await codeExecutionApiService.execute({
-          code,
-          language,
-          stdin_input: tc.input_data ?? '',
-        });
+        let execResult: ExecuteCodeResponse;
 
-        const actual = execResult.stdout.trim();
-        const expected = (tc.expected_output ?? '').trim();
+        if (language === 'javascript') {
+          execResult = await runClientJavaScript(code, tc.input_data ?? '');
+        } else {
+          execResult = await codeExecutionApiService.execute({
+            code,
+            language,
+            stdin_input: tc.input_data ?? '',
+          });
+        }
+
+        const passedByOutput = outputsMatch(execResult.stdout, tc.expected_output ?? '');
+        const isExecutionSuccess = execResult.status === 'success' || execResult.status === 'SUCCESS';
+        const passed = isExecutionSuccess && passedByOutput;
 
         newResults.push({
           testcaseId: tc.id,
           testName,
-          passed: (execResult.status === 'success' || execResult.status === 'SUCCESS') && actual === expected,
+          passed,
           actualOutput: execResult.stdout,
           expectedOutput: tc.expected_output ?? '',
           executionTimeMs: execResult.execution_time_ms,
           points: tc.points,
-          pointsEarned: ((execResult.status === 'success' || execResult.status === 'SUCCESS') && actual === expected) ? tc.points : 0,
+          pointsEarned: passed ? tc.points : 0,
           error: execResult.stderr || undefined,
           status: execResult.status,
         });

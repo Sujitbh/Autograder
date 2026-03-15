@@ -26,6 +26,13 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [showNotRegisteredPrompt, setShowNotRegisteredPrompt] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
 
+  const createAccountPath =
+    selectedRole === 'student'
+      ? '/signup/student'
+      : selectedRole === 'admin'
+        ? '/signup/admin'
+        : '/signup/faculty';
+
   const validateULMEmail = (emailVal: string) => {
     const emailLower = emailVal.toLowerCase().trim();
     if (selectedRole === 'student') {
@@ -101,16 +108,16 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         <div className="text-center z-10 px-8">
           <div className="mb-8 flex justify-center">
             <div className="w-32 h-32 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-              <GraduationCap className="w-20 h-20 text-white" />
+              <GraduationCap className="w-20 h-20 text-[#FFFFFF]" />
             </div>
           </div>
-          <h1 className="text-white mb-4" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px' }}>
-            AutoGrade
+          <h1 className="text-[#FFFFFF] mb-4" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px' }}>
+            Axiom
           </h1>
-          <p className="text-white/80" style={{ fontSize: '18px', lineHeight: '26px' }}>
+          <p className="text-[#FFFFFF]/80" style={{ fontSize: '18px', lineHeight: '26px' }}>
             University of Louisiana Monroe
           </p>
-          <p className="text-white/70 mt-2" style={{ fontSize: '14px', lineHeight: '22px' }}>
+          <p className="text-[#FFFFFF]/70 mt-2" style={{ fontSize: '14px', lineHeight: '22px' }}>
             Automated Grading System
           </p>
         </div>
@@ -122,10 +129,10 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ backgroundColor: 'var(--color-primary)' }}>
-              <GraduationCap className="w-10 h-10 text-white" />
+              <GraduationCap className="w-10 h-10 text-[#FFFFFF]" />
             </div>
             <h2 style={{ fontSize: '22px', fontWeight: 600, lineHeight: '30px', color: 'var(--color-text-dark)' }}>
-              AutoGrade
+              Axiom
             </h2>
           </div>
 
@@ -223,10 +230,10 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                       }}>
                         {error}
                       </p>
-                      {showNotRegisteredPrompt && (
+                      {showNotRegisteredPrompt && selectedRole !== 'admin' && (
                         <Button
                           type="button"
-                          onClick={() => router.push('/signup')}
+                          onClick={() => router.push(createAccountPath)}
                           className="mt-2 h-9 text-white hover:opacity-90"
                           style={{ backgroundColor: 'var(--color-warning)', fontSize: '13px' }}
                         >
@@ -340,13 +347,15 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Signing in…</> : 'Sign In'}
                 </Button>
 
-                {/* Sign Up Link */}
-                <p className="text-center" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-text-light)' }}>
-                  Don't have an account?{' '}
-                  <button type="button" onClick={() => router.push('/signup')} className="hover:underline" style={{ color: 'var(--color-primary)', fontWeight: 500 }}>
-                    Create Account
-                  </button>
-                </p>
+                {/* Sign Up Link — hidden for admin (accounts cannot be self-registered) */}
+                {selectedRole !== 'admin' && (
+                  <p className="text-center" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-text-light)' }}>
+                    Don't have an account?{' '}
+                    <button type="button" onClick={() => router.push(createAccountPath)} className="hover:underline" style={{ color: 'var(--color-primary)', fontWeight: 500 }}>
+                      Create Account
+                    </button>
+                  </p>
+                )}
 
                 {/* Help Text */}
                 <p className="text-center" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-text-light)' }}>

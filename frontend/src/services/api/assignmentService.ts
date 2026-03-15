@@ -18,10 +18,20 @@ interface BackendAssignment {
     created_by: number | null;
     due_date: string | null;
     max_submissions: number | null;
+    max_points: number | null;
     allowed_languages: string | null;
+    starter_code: string | null;
+    status: string;
     is_active: boolean;
     created_at: string;
     updated_at?: string | null;
+    rubrics?: Array<{
+        id: number;
+        name: string;
+        description: string | null;
+        max_points: number | null;
+        weight?: number | null;
+    }>;
 }
 
 /** Map a backend assignment to the frontend Assignment type */
@@ -35,13 +45,21 @@ function mapAssignment(a: BackendAssignment): Assignment {
         language: (a.allowed_languages?.split(',')[0] as 'python' | 'java') ?? 'python',
         category: 'Homework',
         dueDate: a.due_date ?? '',
-        maxPoints: 100,
-        status: a.is_active ? 'published' : 'draft',
+        starterCode: a.starter_code ?? undefined,
+        maxPoints: a.max_points ?? 100,
+        status: (a.status as 'draft' | 'published' | 'closed') ?? (a.is_active ? 'published' : 'draft'),
         isGroup: false,
         allowLateSubmissions: false,
         publicTests: [],
         privateTests: [],
-        rubric: [],
+        rubric: (a.rubrics ?? []).map((r) => ({
+            id: String(r.id),
+            name: r.name,
+            description: r.description ?? '',
+            maxPoints: r.max_points ?? 0,
+            weight: r.weight ?? 1,
+            gradingMethod: 'manual' as const,
+        })),
         createdAt: a.created_at ?? '',
         updatedAt: a.updated_at ?? '',
     };
@@ -54,11 +72,16 @@ export const assignmentService = {
         const url = courseId
             ? `/assignments/?course_id=${courseId}`
             : '/assignments/';
-        
+
         const { data } = await withRetry(() =>
             api.get<BackendAssignment[]>(url)
         );
         return data.map(mapAssignment);
+    },
+
+    /** Get all assignments for a course (alias for getAssignments for convenience). */
+    async getCourseAssignments(courseId: string): Promise<Assignment[]> {
+        return this.getAssignments(courseId);
     },
 
     /** Get a single assignment by ID. */
@@ -69,28 +92,57 @@ export const assignmentService = {
         return mapAssignment(data);
     },
 
-    /** Create a new assignment. */
-    async createAssignment(dto: CreateAssignmentDto): Promise<Assignment> {
-        const payload = {
+    /** Create a new assignment (draft or published). */
+    async createAssignment(dto: CreateAssignmentDto & { status?: string }): Promise<Assignment> {
+        const payload: Record<string, unknown> = {
             title: dto.name ?? (dto as any).title ?? 'Untitled',
             description: dto.description ?? '',
             course_id: Number(dto.courseId) || null,
             allowed_languages: dto.language ?? 'python',
-            publicTests: (dto.publicTests ?? []).map((test: any) => ({
-                name: test.name,
-                input_data: test.input_data || test.input,
-                expected_output: test.expected_output || test.expectedOutput,
-                is_public: true,
-                points: test.points || 1,
-            })),
-            privateTests: (dto.privateTests ?? []).map((test: any) => ({
-                name: test.name,
-                input_data: test.input_data || test.input,
-                expected_output: test.expected_output || test.expectedOutput,
-                is_public: false,
-                points: test.points || 1,
-            })),
+            max_points: dto.maxPoints ?? 100,
+            max_submissions: (dto as any).maxSubmissions ?? null,
+            status: dto.status ?? 'published',
         };
+        // Include starter code when provided
+        if (dto.starterCode) {
+            payload.starter_code = dto.starterCode;
+        }
+        // Convert dueDate string to ISO datetime for the backend
+        if (dto.dueDate) {
+            payload.due_date = new Date(dto.dueDate).toISOString();
+        }
+
+        // Send test cases when provided
+        if (dto.publicTests && dto.publicTests.length > 0) {
+            payload.public_tests = dto.publicTests.map(t => ({
+                name: t.name,
+                input: t.input,
+                expectedOutput: t.expectedOutput,
+                isPublic: true,
+                points: t.points,
+            }));
+        }
+        if (dto.privateTests && dto.privateTests.length > 0) {
+            payload.private_tests = dto.privateTests.map(t => ({
+                name: t.name,
+                input: t.input,
+                expectedOutput: t.expectedOutput,
+                isPublic: false,
+                points: t.points,
+            }));
+        }
+
+        // Send rubric when provided
+        if (dto.rubric && dto.rubric.length > 0) {
+            payload.rubric = dto.rubric.map(r => ({
+                name: r.name,
+                description: r.description,
+                maxPoints: r.maxPoints,
+                weight: r.weight ?? 1,
+                gradingMethod: r.gradingMethod,
+            }));
+        }
+
         const { data } = await api.post<BackendAssignment>('/assignments/', payload);
         return mapAssignment(data);
     },

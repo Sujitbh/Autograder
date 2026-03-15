@@ -1,29 +1,14 @@
 'use client';
 
-import { Users, BookOpen, FileText, Activity, Plus, Shield, Loader2 } from 'lucide-react';
+import { Users, BookOpen, FileText, Plus, Shield, Loader2 } from 'lucide-react';
 import { AdminLayout } from '../AdminLayout';
 import { Button } from '../ui/button';
 import { useRouter } from 'next/navigation';
 import { useAdminStats, useAdminActivity } from '@/hooks/queries/useAdmin';
 
-function StatCard({ label, value, icon: Icon, color }: { label: string; value: number | string; icon: React.ElementType; color: string }) {
-  return (
-    <div
-      className="rounded-xl p-6"
-      style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: 'var(--shadow-card)' }}
-    >
-      <div className="flex items-center justify-between mb-2">
-        <Icon className="w-6 h-6" style={{ color }} />
-      </div>
-      <p className="text-3xl font-bold" style={{ color: 'var(--color-text-dark)' }}>{value}</p>
-      <p className="text-sm mt-1" style={{ color: 'var(--color-text-mid)' }}>{label}</p>
-    </div>
-  );
-}
-
 export function AdminDashboard() {
   const router = useRouter();
-  const { data: stats, isLoading: statsLoading } = useAdminStats();
+  const { data: stats } = useAdminStats();
   const { data: activity, isLoading: activityLoading } = useAdminActivity(15);
 
   return (
@@ -39,21 +24,6 @@ export function AdminDashboard() {
           </p>
         </div>
       </div>
-
-      {/* Stats Grid */}
-      {statsLoading ? (
-        <div className="flex items-center justify-center py-12 gap-3" style={{ color: 'var(--color-text-mid)' }}>
-          <Loader2 className="w-5 h-5 animate-spin" />
-          <span>Loading stats...</span>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-          <StatCard label="Total Users" value={stats?.total_users ?? 0} icon={Users} color="var(--color-primary)" />
-          <StatCard label="Active Courses" value={stats?.total_courses ?? 0} icon={BookOpen} color="#2D6A2D" />
-          <StatCard label="Total Assignments" value={stats?.total_assignments ?? 0} icon={FileText} color="#1A4D7A" />
-          <StatCard label="Total Submissions" value={stats?.total_submissions ?? 0} icon={Activity} color="#8A5700" />
-        </div>
-      )}
 
       {/* User Breakdown + Quick Actions */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">

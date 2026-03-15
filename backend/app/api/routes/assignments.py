@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from typing import List, Optional
 
 from app.api.deps import get_db, get_current_user, get_current_user_optional
@@ -10,7 +10,6 @@ from app.models.rubric import Rubric
 from app.models.user import User
 from app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentOut
 
-
 router = APIRouter(prefix="/assignments", tags=["assignments"])
 
 
@@ -20,7 +19,7 @@ def list_assignments(
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional),
 ):
-    q = db.query(Assignment)
+    q = db.query(Assignment).options(selectinload(Assignment.rubrics))
     if course_id is not None:
         q = q.filter(Assignment.course_id == course_id)
 
@@ -53,46 +52,39 @@ def create_assignment(
         status=payload.status or "published",
     )
     db.add(assignment)
-    db.flush()  # Flush to get the assignment ID before creating test cases
-    
-    # Create public test cases
-    if payload.publicTests:
-        for test_data in payload.publicTests:
-            test_case = TestCase(
-                assignment_id=assignment.id,
-                name=test_data.name,
-                input_data=test_data.input_data,
-                expected_output=test_data.expected_output,
-                is_public=True,
-                points=test_data.points,
-            )
-            db.add(test_case)
-    
-    # Create private test cases
-    if payload.privateTests:
-        for test_data in payload.privateTests:
-            test_case = TestCase(
-                assignment_id=assignment.id,
-                name=test_data.name,
-                input_data=test_data.input_data,
-                expected_output=test_data.expected_output,
-                is_public=False,
-                points=test_data.points,
-            )
-            db.add(test_case)
-    
-    # Persist rubric criteria
-    if hasattr(payload, 'rubric') and payload.rubric:
-        for idx, rc in enumerate(payload.rubric):
-            db.add(Rubric(
-                assignment_id=assignment.id,
-                name=rc.name,
-                description=rc.description,
-                max_points=getattr(rc, 'maxPoints', 10) or 10,
-                weight=1.0,
-                order=idx,
-            ))
-    
+    db.flush()  # get assignment.id before committing so we can create children
+
+    # ── Persist test cases ──────────────────────────────────────────
+    for tc in (payload.public_tests or []):
+        db.add(TestCase(
+            assignment_id=assignment.id,
+            name=tc.name,
+            input_data=tc.input,
+            expected_output=tc.expectedOutput,
+            is_public=True,
+            points=tc.points or 1,
+        ))
+    for tc in (payload.private_tests or []):
+        db.add(TestCase(
+            assignment_id=assignment.id,
+            name=tc.name,
+            input_data=tc.input,
+            expected_output=tc.expectedOutput,
+            is_public=False,
+            points=tc.points or 1,
+        ))
+
+    # ── Persist rubric criteria ─────────────────────────────────────
+    for idx, rc in enumerate(payload.rubric or []):
+        db.add(Rubric(
+            assignment_id=assignment.id,
+            name=rc.name,
+            description=rc.description,
+            max_points=rc.maxPoints or 10,
+            weight=rc.weight if rc.weight is not None else 1.0,
+            order=idx,
+        ))
+
     db.commit()
     db.refresh(assignment)
     return assignment
@@ -100,7 +92,12 @@ def create_assignment(
 
 @router.get("/{assignment_id}", response_model=AssignmentOut)
 def get_assignment(assignment_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
+    assignment = (
+        db.query(Assignment)
+        .options(selectinload(Assignment.rubrics))
+        .filter(Assignment.id == assignment_id)
+        .first()
+    )
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     return assignment

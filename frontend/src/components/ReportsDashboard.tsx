@@ -106,6 +106,30 @@ export function ReportsDashboard() {
     [assignments],
   );
 
+  const handleExportStudentCSV = useCallback(
+    (s: StudentRecord) => {
+      const headers = ['Assignment', 'Category', 'Max Points', 'Earned', 'Percentage', 'Status'];
+      const rows = assignments.map(a => {
+        const earned = s.grades[a.id];
+        const isNull = earned === null || earned === undefined;
+        const pctVal = isNull ? '' : ((earned / a.maxPoints) * 100).toFixed(1) + '%';
+        const status = isNull ? 'Missing' : s.lateFlags[a.id] ? 'Late' : 'Submitted';
+        return [a.fullName, a.category, a.maxPoints, isNull ? '' : earned, pctVal, status];
+      });
+      const csv = [headers, ...rows]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${s.lastName}_${s.firstName}_grades.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    [assignments],
+  );
+
   /* ── Build student records from grades API ──
        useGrades returns Grade[]. Each Grade has:
          id, submissionId, rubricScores[], totalScore, maxScore,
@@ -156,7 +180,7 @@ export function ReportsDashboard() {
           lastName,
           name: s.name || '',
           studentId: String(s.student_id ?? s.id),
-          sisUserId: String(s.student_id ?? s.id),
+          sisUserId: s.sis_user_id ? String(s.sis_user_id) : '',
           sisLoginId: s.email || '',
           email: s.email || '',
           avatarInitials: `${firstName[0] || ''}${lastName[0] || ''}`,
@@ -222,6 +246,36 @@ export function ReportsDashboard() {
     });
     return list;
   }, [students, searchQuery, sortField, sortDir, studentStats]);
+
+  /* ── Export ── */
+  const handleExport = useCallback(
+    (_format: 'csv' | 'excel' | 'pdf' | 'canvas') => {
+      // Build a CSV from the in-memory gradebook data
+      const assignCols = assignments.map(a => a.fullName);
+      const headers = ['Last Name', 'First Name', 'CWID', 'Email', ...assignCols, 'Total Earned', 'Total Possible', 'Percentage', 'Letter Grade'];
+      const rows = students.map(s => {
+        const stats = studentStats.get(s.id);
+        const pct = stats?.pct ?? 0;
+        const grade = pct >= 90 ? 'A' : pct >= 80 ? 'B' : pct >= 70 ? 'C' : pct >= 60 ? 'D' : 'F';
+        const assignScores = assignments.map(a => {
+          const g = s.grades[a.id];
+          return g === null || g === undefined ? '' : String(g);
+        });
+        return [s.lastName, s.firstName, s.sisUserId, s.email, ...assignScores, stats?.earned ?? '', stats?.possible ?? '', pct.toFixed(1) + '%', grade];
+      });
+      const csv = [headers, ...rows]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `gradebook_${courseId}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    [assignments, students, studentStats, courseId],
+  );
 
   const handleSort = useCallback((field: string) => {
     setSortField(prev => {
@@ -350,9 +404,7 @@ export function ReportsDashboard() {
                   const s = students.find(st => st.id === studentId);
                   if (s) openStudentReport(s);
                 }}
-                onExport={(_format) => {
-                  // TODO: call exportGrades API
-                }}
+                onExport={handleExport}
               />
             </>
           )}
@@ -415,8 +467,8 @@ export function ReportsDashboard() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button variant="outline" className="border-[var(--color-border)]"><Printer className="w-4 h-4 mr-2" /> Print Report</Button>
-                      <Button variant="outline" className="border-[var(--color-border)]"><Download className="w-4 h-4 mr-2" /> Export PDF</Button>
+                      <Button variant="outline" className="border-[var(--color-border)]" onClick={() => window.print()}><Printer className="w-4 h-4 mr-2" /> Print Report</Button>
+                      <Button variant="outline" className="border-[var(--color-border)]" onClick={() => handleExportStudentCSV(s)}><Download className="w-4 h-4 mr-2" /> Export CSV</Button>
                     </div>
                   </div>
                 </div>

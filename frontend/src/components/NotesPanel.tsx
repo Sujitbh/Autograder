@@ -7,6 +7,7 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
+import { useAuth } from '@/utils/AuthContext';
 
 /* ═══════════════════════════════════════════
    Types
@@ -48,52 +49,28 @@ function generateId() {
     return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function loadTodos(): TodoItem[] {
+function loadTodos(userId: string): TodoItem[] {
     try {
-        const stored = localStorage.getItem('autograde_faculty_todos');
+        const stored = localStorage.getItem(`autograde_todos_${userId}`);
         if (stored) return JSON.parse(stored);
     } catch { /* ignore */ }
-    return [
-        { id: 'demo-1', text: 'Grade CS-1001 Assignment 3 submissions', completed: false, createdAt: '2026-02-19T10:00:00' },
-        { id: 'demo-2', text: 'Prepare midterm exam questions', completed: false, createdAt: '2026-02-18T14:00:00' },
-        { id: 'demo-3', text: 'Review late submissions for CS-2050', completed: true, createdAt: '2026-02-17T09:00:00' },
-        { id: 'demo-4', text: 'Update rubric for Functions assignment', completed: false, createdAt: '2026-02-16T11:00:00' },
-    ];
+    return [];
 }
 
-function saveTodos(todos: TodoItem[]) {
-    localStorage.setItem('autograde_faculty_todos', JSON.stringify(todos));
+function saveTodos(userId: string, todos: TodoItem[]) {
+    localStorage.setItem(`autograde_todos_${userId}`, JSON.stringify(todos));
 }
 
-function loadNotes(): NoteItem[] {
+function loadNotes(userId: string): NoteItem[] {
     try {
-        const stored = localStorage.getItem('autograde_faculty_notes');
+        const stored = localStorage.getItem(`autograde_notes_${userId}`);
         if (stored) return JSON.parse(stored);
     } catch { /* ignore */ }
-    return [
-        {
-            id: 'demo-n1', title: 'Office Hours Reminder',
-            content: 'Move Wednesday office hours to 3-5 PM starting next week. Email students about the change.',
-            pinned: true, color: 'yellow',
-            createdAt: '2026-02-18T10:00:00', updatedAt: '2026-02-18T10:00:00',
-        },
-        {
-            id: 'demo-n2', title: 'CS-3100 Project Ideas',
-            content: '- REST API with authentication\n- Real-time chat app\n- Task management dashboard\n- E-commerce prototype',
-            pinned: false, color: 'blue',
-            createdAt: '2026-02-15T14:00:00', updatedAt: '2026-02-17T09:00:00',
-        },
-        {
-            id: 'demo-n3', title: 'Grading Criteria Updates',
-            content: 'Consider adding code style/formatting as 10% of grade for all future assignments. Discuss with department.',
-            pinned: false, color: 'default',
-            createdAt: '2026-02-14T11:00:00', updatedAt: '2026-02-14T11:00:00',
-        },
-    ];
+    return [];
 }
 
-function saveNotes(notes: NoteItem[]) {
-    localStorage.setItem('autograde_faculty_notes', JSON.stringify(notes));
+function saveNotes(userId: string, notes: NoteItem[]) {
+    localStorage.setItem(`autograde_notes_${userId}`, JSON.stringify(notes));
 }
 
 function formatRelativeDate(dateStr: string) {
@@ -121,25 +98,33 @@ interface NotesPanelProps {
 }
 
 export function NotesPanel({ open, onClose }: NotesPanelProps) {
+    const { user: authUser } = useAuth();
+    const userId = String((authUser as any)?.id ?? 'anonymous');
     const [activeTab, setActiveTab] = useState<TabId>('todos');
 
     /* ── Todos state ── */
-    const [todos, setTodos] = useState<TodoItem[]>(loadTodos);
+    const [todos, setTodos] = useState<TodoItem[]>(() => loadTodos(userId));
     const [newTodoText, setNewTodoText] = useState('');
     const [showCompleted, setShowCompleted] = useState(true);
     const todoInputRef = useRef<HTMLInputElement>(null);
 
     /* ── Notes state ── */
-    const [notes, setNotes] = useState<NoteItem[]>(loadNotes);
+    const [notes, setNotes] = useState<NoteItem[]>(() => loadNotes(userId));
     const [editingNote, setEditingNote] = useState<NoteItem | null>(null);
     const [noteTitle, setNoteTitle] = useState('');
     const [noteContent, setNoteContent] = useState('');
     const [noteColor, setNoteColor] = useState('default');
     const [searchQuery, setSearchQuery] = useState('');
 
+    /* ── Reload data when user changes ── */
+    useEffect(() => {
+        setTodos(loadTodos(userId));
+        setNotes(loadNotes(userId));
+    }, [userId]);
+
     /* ── Persist ── */
-    useEffect(() => { saveTodos(todos); }, [todos]);
-    useEffect(() => { saveNotes(notes); }, [notes]);
+    useEffect(() => { saveTodos(userId, todos); }, [userId, todos]);
+    useEffect(() => { saveNotes(userId, notes); }, [userId, notes]);
 
     /* ── Focus input on tab switch ── */
     useEffect(() => {
@@ -301,7 +286,6 @@ export function NotesPanel({ open, onClose }: NotesPanelProps) {
                                 fontSize: '13px',
                                 fontWeight: activeTab === tab.id ? 700 : 500,
                                 color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-mid)',
-                                borderBottom: activeTab === tab.id ? '2px solid var(--color-primary)' : '2px solid transparent',
                                 cursor: 'pointer',
                                 background: 'none',
                                 border: 'none',

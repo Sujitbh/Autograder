@@ -8,11 +8,8 @@ from fastapi import HTTPException, status
 
 from app.models.user import User
 from app.core.security import hash_password, verify_password, create_access_token
+from app.settings import settings
 from app.schemas.auth import RegisterRequest, LoginRequest, TokenResponse
-
-# Only this email is allowed to hold the admin role
-ADMIN_EMAIL = "admin@ulm.edu"
-
 
 class UserService:
     """Service for user-related operations."""
@@ -52,15 +49,16 @@ class UserService:
                 detail="Email already registered",
             )
 
-        # Determine role: use payload role, or infer from domain
-        # Admin accounts cannot be created via registration
-        if payload.role and payload.role == "admin":
+        # Determine role: use payload role, or infer from domain.
+        # Admin accounts can NEVER be self-registered; they must be seeded directly.
+        requested_role = (payload.role or "").lower()
+        if requested_role == "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin accounts cannot be created via registration",
+                detail="Admin registration is not allowed",
             )
         if payload.role:
-            role = payload.role
+            role = requested_role
         else:
             role = "faculty" if payload.email.lower().endswith("@ulm.edu") else "student"
 
@@ -153,12 +151,14 @@ class UserService:
                 detail="User not found",
             )
 
-        # Only admin@ulm.edu can hold the admin role
-        if new_role == "admin" and user.email.lower() != ADMIN_EMAIL:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only admin@ulm.edu can be assigned the admin role",
-            )
+        # Admin role assignment is allowed for institutional (@ulm.edu) accounts only.
+        if new_role == "admin":
+            email_lower = user.email.lower()
+            if (not email_lower.endswith("@ulm.edu")) or email_lower.endswith("@warhawks.ulm.edu"):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Only @ulm.edu accounts can be assigned the admin role",
+                )
 
         user.role = new_role
         db.add(user)

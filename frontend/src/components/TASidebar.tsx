@@ -53,7 +53,7 @@ function buildMenuItems(courseId?: string, permissions?: Partial<TAPermissions>)
     if (permissions?.can_manage_groups) {
         items.push({ id: 'groups', icon: UsersRound, label: 'Groups', path: `/ta/courses/${courseId}/groups` });
     }
-    items.push({ id: 'settings', icon: Settings, label: 'Settings', path: `/ta/courses/${courseId}/settings` });
+    items.push({ id: 'settings', icon: Settings, label: 'Settings', path: '/student/settings' });
 
     return items;
 }

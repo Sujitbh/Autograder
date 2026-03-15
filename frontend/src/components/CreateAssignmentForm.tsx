@@ -61,6 +61,7 @@ import {
     DialogFooter,
     DialogDescription,
 } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 
 
 // ── Rubric Template types ───────────────────────────────────────────
@@ -73,6 +74,7 @@ interface RubricTemplate {
         name: string;
         description: string;
         maxPoints: number;
+        weight?: number;
         gradingMethod: 'auto' | 'manual' | 'hybrid';
     }>;
 }
@@ -129,6 +131,7 @@ function saveSavedRubricTemplates(templates: RubricTemplate[]) {
 
 const testCaseSchema = z.object({
     name: z.string().min(1, 'Name is required'),
+    inputType: z.enum(['text', 'number', 'numbers']),
     input: z.string(),
     expectedOutput: z.string().min(1, 'Expected output is required'),
     points: z.number().min(0),
@@ -137,7 +140,8 @@ const testCaseSchema = z.object({
 const rubricSchema = z.object({
     name: z.string().min(1, 'Criterion name is required'),
     description: z.string(),
-    maxPoints: z.number().min(1, 'Must be at least 1 point'),
+    maxPoints: z.number().min(-1000, 'Value out of range').max(1000, 'Value out of range'),
+    weight: z.number().min(0.1, 'Weight must be at least 0.1').max(100, 'Weight too large'),
     gradingMethod: z.enum(['auto', 'manual', 'hybrid']),
 });
 
@@ -148,16 +152,14 @@ const formSchema = z.object({
     language: z.enum(['python', 'java']),
     category: z.enum(['Homework', 'Quiz', 'Exam', 'Lab', 'Project']),
     dueDate: z.string(),  // Optional for drafts; validated on publish
-    maxPoints: z.number().min(1, 'Must be at least 1 point'),
+    maxPoints: z.number().min(1).max(1000),
     isGroup: z.boolean(),
-    allowLateSubmissions: z.boolean(),
-    latePenaltyType: z.enum(['percentage', 'fixed']).optional(),
-    latePenaltyAmount: z.number().min(0).optional(),
     description: z.string(),
     starterCode: z.string(),
     // Tests & Rubric
     publicTests: z.array(testCaseSchema),
     privateTests: z.array(testCaseSchema),
+    rubricMode: z.enum(['weighted', 'unweighted']),
     rubric: z.array(rubricSchema),
     // Submission Settings
     maxAttempts: z.number().min(1).max(100),
@@ -246,13 +248,11 @@ export function CreateAssignmentForm({
             dueDate: '',
             maxPoints: 100,
             isGroup: false,
-            allowLateSubmissions: false,
-            latePenaltyType: 'percentage' as const,
-            latePenaltyAmount: 10,
             description: '',
             starterCode: '',
             publicTests: [],
             privateTests: [],
+            rubricMode: 'unweighted' as const,
             rubric: [],
             // Submission settings
             maxAttempts: 5,
@@ -282,6 +282,7 @@ export function CreateAssignmentForm({
         watch,
         trigger,
         getValues,
+        setValue,
         formState: { errors, isDirty },
     } = useForm<AssignmentFormData>({
         resolver: zodResolver(formSchema),
@@ -308,11 +309,18 @@ export function CreateAssignmentForm({
         replace: replaceRubric,
     } = useFieldArray({ control, name: 'rubric' });
 
-    const watchAllowLate = watch('allowLateSubmissions');
     const watchPlagiarism = watch('plagiarismEnabled');
     const watchAiDetection = watch('aiDetectionEnabled');
     const watchAutoFlag = watch('autoFlagEnabled');
     const watchLanguage = watch('language');
+    const watchRubricMode = watch('rubricMode');
+
+    useEffect(() => {
+        if (watchRubricMode === 'unweighted') {
+            const current = getValues('rubric');
+            current.forEach((_, idx) => setValue(`rubric.${idx}.weight`, 1));
+        }
+    }, [watchRubricMode, getValues, setValue]);
 
     // ── Auto-save to localStorage every 30 seconds ────────────────
 
@@ -342,7 +350,7 @@ export function CreateAssignmentForm({
     // ── Step validation map ───────────────────────────────────────
 
     const stepFields: (keyof AssignmentFormData)[][] = [
-        ['name', 'shortName', 'language', 'category', 'dueDate', 'maxPoints'],
+        ['name', 'shortName', 'language', 'category', 'dueDate'],
         ['description'],
         ['starterCode'],
         ['publicTests'],
@@ -352,6 +360,37 @@ export function CreateAssignmentForm({
         ['plagiarismSensitivity', 'aiDetectionSensitivity'],
         [], // review step — no fields
     ];
+
+    const focusFirstValidationStep = useCallback(() => {
+        const values = getValues();
+        if (!values.name || !values.shortName || !values.language || !values.category || !values.dueDate) {
+            setCurrentStep(0);
+            return;
+        }
+        if (!values.description) {
+            setCurrentStep(1);
+            return;
+        }
+        if (!values.starterCode) {
+            setCurrentStep(2);
+            return;
+        }
+        const hasInvalidPublic = (values.publicTests ?? []).some((t) => !t.name || !t.expectedOutput);
+        if (hasInvalidPublic) {
+            setCurrentStep(3);
+            return;
+        }
+        const hasInvalidPrivate = (values.privateTests ?? []).some((t) => !t.name || !t.expectedOutput);
+        if (hasInvalidPrivate) {
+            setCurrentStep(4);
+            return;
+        }
+        const hasInvalidRubric = (values.rubric ?? []).some((r) => !r.name);
+        if (hasInvalidRubric) {
+            setCurrentStep(5);
+            return;
+        }
+    }, [getValues]);
 
     const handleNext = useCallback(async () => {
         const fields = stepFields[currentStep];
@@ -375,7 +414,7 @@ export function CreateAssignmentForm({
     const handleLoadTemplate = (templateId: string) => {
         const template = allTemplates.find((t) => t.id === templateId);
         if (template) {
-            replaceRubric(template.criteria);
+            replaceRubric(template.criteria.map((c) => ({ ...c, weight: c.weight ?? 1 })));
         }
     };
 
@@ -405,11 +444,203 @@ export function CreateAssignmentForm({
         saveSavedRubricTemplates(updated);
     };
 
-    // ── PDF rubric upload & parse ─────────────────────────────────
+    // ── PDF / Image rubric upload & parse ──────────────────────────
 
     const pdfInputRef = useRef<HTMLInputElement>(null);
     const [pdfParsing, setPdfParsing] = useState(false);
     const [pdfError, setPdfError] = useState<string | null>(null);
+
+    /** Scale + enhance image before OCR for better word boundary detection. */
+    async function scaleImageForOCR(file: File): Promise<Blob> {
+        const img = await createImageBitmap(file);
+        const scale = Math.max(2, Math.min(4, 2400 / Math.max(img.width, img.height)));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return file;
+        ctx.filter = 'grayscale(1) contrast(1.8)';
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        return new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b ?? file), 'image/png', 1.0));
+    }
+
+    /**
+     * Word-position parser: groups Tesseract word detections by row (Y position),
+     * then splits each row into left (name) and right (points) columns.
+     * This avoids text-based pattern matching and handles run-together words correctly.
+     */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    function parseRubricFromWordPositions(words: any[], totalMaxPoints: number): Array<{ name: string; description: string; maxPoints: number; weight: number; gradingMethod: 'auto' | 'manual' | 'hybrid' }> {
+        if (!words?.length) return [];
+
+        // Filter noise words (empty, single punctuation marks)
+        const clean = words.filter((w) => w?.text?.trim()?.length > 0 && w?.bbox);
+        if (!clean.length) return [];
+
+        // Find the rightmost X to estimate column boundary
+        const maxX = Math.max(...clean.map((w) => w.bbox.x1 as number));
+        // Left column: < 65% of width, right column: > 65%
+        const colBoundary = maxX * 0.65;
+
+        // Group words into rows by Y centre (within 20px = same row)
+        const grouped: (typeof clean)[] = [];
+        const rowSorted = [...clean].sort((a, b) =>
+            (a.bbox.y0 + a.bbox.y1) / 2 - (b.bbox.y0 + b.bbox.y1) / 2
+        );
+        for (const word of rowSorted) {
+            const cy = (word.bbox.y0 + word.bbox.y1) / 2;
+            const existing = grouped.find((row) => {
+                const rowCY = (row[0].bbox.y0 + row[0].bbox.y1) / 2;
+                return Math.abs(cy - rowCY) < 20;
+            });
+            if (existing) existing.push(word);
+            else grouped.push([word]);
+        }
+
+        type Criterion = { name: string; description: string; maxPoints: number; weight: number; gradingMethod: 'auto' | 'manual' | 'hybrid' };
+        const results: Criterion[] = [];
+        const seen = new Set<string>();
+
+        for (const row of grouped) {
+            const rowSortedX = [...row].sort((a, b) => a.bbox.x0 - b.bbox.x0);
+            const leftWords = rowSortedX.filter((w) => w.bbox.x0 < colBoundary);
+            const rightWords = rowSortedX.filter((w) => w.bbox.x0 >= colBoundary);
+
+            if (!leftWords.length) continue;
+
+            // Find a signed integer in the right column, or at end of all words
+            let pts: number | null = null;
+            for (const w of rightWords) {
+                const m = (w.text as string).match(/^-?\d+$/);
+                if (m) { pts = parseInt(w.text, 10); break; }
+                // e.g. "[2points" or "-1point"
+                const m2 = (w.text as string).match(/^\[?(-?\d+)/);
+                if (m2) { pts = parseInt(m2[1], 10); break; }
+            }
+            // Also scan whole row text as fallback
+            if (pts === null) {
+                const rowText = rowSortedX.map((w) => w.text).join(' ');
+                const m = rowText.match(/(-?\d+)\s*(?:pts?|points?|pont|marks?)?\s*$/i);
+                if (m) pts = parseInt(m[1], 10);
+            }
+
+            if (pts === null || pts === 0 || Math.abs(pts) > 1000) continue;
+
+            const name = leftWords
+                .map((w) => w.text as string)
+                .join(' ')
+                .replace(/\s+/g, ' ')
+                .replace(/[.\s]+$/, '')
+                .trim();
+
+            // Skip header/junk rows
+            if (/^total\s+points?/i.test(name) || /^grading/i.test(name) || name.length < 3) continue;
+
+            const key = name.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+
+            results.push({ name, description: pts < 0 ? 'Penalty' : '', maxPoints: pts, weight: 1, gradingMethod: 'manual' });
+        }
+
+        // Scale positive criteria to match totalMaxPoints if needed
+        const pos = results.filter((r) => r.maxPoints > 0);
+        const posTotal = pos.reduce((s, c) => s + c.maxPoints, 0);
+        if (pos.length > 0 && posTotal > 0 && Math.abs(posTotal - totalMaxPoints) / totalMaxPoints > 0.1) {
+            const scale = totalMaxPoints / posTotal;
+            let running = 0;
+            for (let i = 0; i < pos.length; i++) {
+                if (i < pos.length - 1) { pos[i].maxPoints = Math.round(pos[i].maxPoints * scale); running += pos[i].maxPoints; }
+                else pos[i].maxPoints = totalMaxPoints - running;
+            }
+        }
+
+        return results;
+    }
+
+    const handleImageRubricUpload = async (file: File) => {
+        setPdfParsing(true);
+        setPdfError(null);
+        try {
+            // Scale up image for better OCR word boundary detection
+            const enhanced = await scaleImageForOCR(file);
+            const Tesseract = (await import('tesseract.js'));
+            const { data } = await Tesseract.recognize(enhanced, 'eng', { logger: () => { } });
+            console.log('[Rubric OCR raw text]\n', data.text);
+
+            const maxPts = getValues('rubric').reduce((s: number, c: { maxPoints: number }) => s + (c.maxPoints || 0), 0) || 100;
+
+            // Primary: word-position based (handles tables robustly)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            let criteria = parseRubricFromWordPositions((data as any).words ?? [], maxPts);
+            // Fallback: text-pattern based
+            if (criteria.length === 0) criteria = parseRubricText(data.text, maxPts);
+
+            if (criteria.length === 0) {
+                setPdfError(`Could not detect rubric criteria. Raw OCR (see console): ${data.text.slice(0, 300)}`);
+            } else {
+                replaceRubric(criteria);
+            }
+        } catch (err) {
+            console.error('Image OCR error', err);
+            setPdfError('Failed to read image. Please try a clearer screenshot.');
+        } finally {
+            setPdfParsing(false);
+            if (pdfInputRef.current) pdfInputRef.current.value = '';
+        }
+    };
+
+    // ── Description file upload ────────────────────────────────────
+
+    const descFileInputRef = useRef<HTMLInputElement>(null);
+    const [descFileLoading, setDescFileLoading] = useState(false);
+    const [descPdfImages, setDescPdfImages] = useState<string[]>([]);
+
+    const handleDescriptionFileUpload = async (file: File) => {
+        setDescFileLoading(true);
+        try {
+            if (file.name.endsWith('.pdf') || file.type === 'application/pdf') {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdfjsLib = await import('pdfjs-dist');
+                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const pageImages: string[] = [];
+                let text = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    // Render page to canvas at 2× scale for crisp display
+                    const viewport = page.getViewport({ scale: 2 });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        await page.render({ canvasContext: ctx, viewport }).promise;
+                        pageImages.push(canvas.toDataURL('image/png'));
+                    }
+                    // Also extract plain text for backend storage
+                    const content = await page.getTextContent();
+                    text += content.items
+                        .filter((item) => 'str' in item)
+                        .map((item) => (item as { str: string }).str)
+                        .join(' ') + '\n\n';
+                }
+                setDescPdfImages(pageImages);
+                setValue('description', text.trim(), { shouldDirty: true });
+            } else {
+                const text = await file.text();
+                setDescPdfImages([]);
+                setValue('description', text, { shouldDirty: true });
+            }
+        } catch (err) {
+            console.error('Description file read error', err);
+        } finally {
+            setDescFileLoading(false);
+            if (descFileInputRef.current) descFileInputRef.current.value = '';
+        }
+    };
 
     const handlePdfRubricUpload = async (file: File) => {
         setPdfParsing(true);
@@ -429,7 +660,7 @@ export function CreateAssignmentForm({
                 fullText += strings.join(' ') + '\n';
             }
 
-            const maxPts = getValues('maxPoints');
+            const maxPts = getValues('rubric').reduce((s: number, c: { maxPoints: number }) => s + (c.maxPoints || 0), 0) || 100;
             const criteria = parseRubricText(fullText, maxPts);
 
             if (criteria.length === 0) {
@@ -447,88 +678,136 @@ export function CreateAssignmentForm({
     };
 
     /**
-     * Heuristic parser: extracts rubric criteria from raw PDF text.
-     * Handles common formats:
-     *  - "Criterion Name ... 40 pts"  or  "Criterion Name (40 points)"
-     *  - "Criterion Name – 40"  or  "Criterion Name: 40"
-     *  - Bullet / numbered lists with point values
-     *  - Table-style: columns of Name | Description | Points
+     * Heuristic parser: extracts rubric criteria from raw OCR / PDF text.
+     * Handles the table format:
+     *   "Get song name correctly.   2 points"
+     *   "Not enough comments/whitespace.   -1 point"
+     * Also handles:
+     *   "Criterion – 40 pts" / "Criterion: 40" / "Criterion (40 points)"
      */
     function parseRubricText(
         text: string,
         totalMaxPoints: number,
-    ): Array<{ name: string; description: string; maxPoints: number; gradingMethod: 'auto' | 'manual' | 'hybrid' }> {
-        const results: Array<{ name: string; description: string; maxPoints: number; gradingMethod: 'auto' | 'manual' | 'hybrid' }> = [];
+    ): Array<{ name: string; description: string; maxPoints: number; weight: number; gradingMethod: 'auto' | 'manual' | 'hybrid' }> {
+        type Criterion = { name: string; description: string; maxPoints: number; weight: number; gradingMethod: 'auto' | 'manual' | 'hybrid' };
+        const results: Criterion[] = [];
         const seen = new Set<string>();
 
-        // Pattern 1: "Name ... <number> pt(s)/point(s)/%"
-        // Pattern 2: "Name (number pts)"
-        // Pattern 3: "Name – number" or "Name: number"
-        const patterns = [
-            /^[\s•\-\d.]*(.+?)\s*[–—:\-]+\s*(\d+)\s*(?:pts?|points?|marks?|%)?\s*$/gim,
-            /^[\s•\-\d.]*(.+?)\s*\((\d+)\s*(?:pts?|points?|marks?|%)?\)\s*$/gim,
-            /^[\s•\-\d.]*(.+?)\s+(\d+)\s*(?:pts?|points?|marks?)\s*$/gim,
-        ];
+        // Normalize
+        const norm = text
+            .replace(/[\u2013\u2014]/g, '-')
+            .replace(/[\u2018\u2019\u201c\u201d]/g, "'")
+            .replace(/\r\n/g, '\n')
+            .replace(/\r/g, '\n');
 
-        for (const pattern of patterns) {
-            let match: RegExpExecArray | null;
-            while ((match = pattern.exec(text)) !== null) {
-                const rawName = match[1].trim().replace(/[\s]+/g, ' ');
-                const pts = parseInt(match[2], 10);
-                // Skip junk lines
-                if (!rawName || rawName.length < 2 || rawName.length > 120 || pts <= 0 || pts > 1000) continue;
-                // Skip duplicates (case-insensitive)
-                const key = rawName.toLowerCase();
-                if (seen.has(key)) continue;
-                seen.add(key);
+        const shouldSkip = (name: string) =>
+            /^total\s+points?/i.test(name) ||
+            /^grading\s*:?\s*$/i.test(name) ||
+            /^tomas\s*$/i.test(name) ||
+            /^topos\s*$/i.test(name) ||
+            /^\d+\s*(?:pts?|points?|pont)?$/i.test(name) ||
+            name.length < 3 ||
+            name.length > 250;
 
-                results.push({
-                    name: rawName,
-                    description: '',
-                    maxPoints: pts,
-                    gradingMethod: 'manual',
-                });
+        // Insert spaces into CamelCase / runTogether words produced by OCR (e.g. "Getsongnamecorrectly")
+        const fixCamel = (s: string) =>
+            s.replace(/([a-z])([A-Z])/g, '$1 $2')
+                .replace(/([A-Z]{2,})([A-Z][a-z])/g, '$1 $2');
+
+        const addResult = (rawName: string, pts: number) => {
+            let name = rawName.trim().replace(/\s+/g, ' ').replace(/[.\s]+$/, '').trim();
+            name = fixCamel(name);
+            if (shouldSkip(name) || pts === 0 || Math.abs(pts) > 1000) return;
+            const key = name.toLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            results.push({ name, description: pts < 0 ? 'Penalty' : '', maxPoints: pts, weight: 1, gradingMethod: 'manual' });
+        };
+
+        // ── Strategy 1: Pipe-delimited OCR table format ───────────────
+        // Tesseract reads table columns as pipe-separated tokens.
+        // Each entry looks like: "Name text ~~ [Npoints"  or  "Name text ~~ -1point"
+        // Split the whole text on | and process each token.
+        const pipeTokens = norm.split('|').map((t) => t.trim()).filter((t) => t.length > 0);
+        const tildeSepPts = /~~\s*\[?(-?\d+)\s*(?:pts?|points?|pont)?\.?\s*$/i;
+        let pipeMatched = 0;
+        for (const token of pipeTokens) {
+            const m = token.match(tildeSepPts);
+            if (m) {
+                const namePart = token.slice(0, token.lastIndexOf('~~')).trim();
+                addResult(namePart, parseInt(m[1], 10));
+                pipeMatched++;
+            }
+        }
+        if (pipeMatched > 0) {
+            // Successfully parsed pipe format — skip line-by-line strategies
+            return finalize(results, positiveScale(results, totalMaxPoints));
+        }
+
+        // ── Strategy 2: Line-by-line ──────────────────────────────────
+        const lines = norm.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+
+        const ptsOnly = /^(-?\d+)\s*(?:pts?|points?|pont|marks?)\.?\s*$/i;
+        const inlinePts = /^(.+?)\s+(-?\d+)\s+(?:pts?|points?|pont|marks?)\.?\s*$/i;
+        const inlineSpaced = /^(.+?)\s{2,}(-?\d{1,4})\s*$/;
+        const dashStyle = /^(.+?)\s*[-:]+\s*(-?\d+)\s*(?:pts?|points?|marks?)?\s*$/i;
+        const parenStyle = /^(.+?)\s*\((-?\d+)\s*(?:pts?|points?|marks?)?\)\s*$/i;
+        // Tilde separator on same line: "Name ~~ [2points"
+        const tildeInline = /^(.+?)\s*~~\s*\[?(-?\d+)\s*(?:pts?|points?|pont)?\.?\s*$/i;
+
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            if (ptsOnly.test(line)) continue;
+
+            const m0 = line.match(tildeInline);
+            if (m0) { addResult(m0[1], parseInt(m0[2], 10)); continue; }
+
+            const m1 = line.match(inlinePts);
+            if (m1) { addResult(m1[1], parseInt(m1[2], 10)); continue; }
+
+            const m2 = line.match(inlineSpaced);
+            if (m2) { addResult(m2[1], parseInt(m2[2], 10)); continue; }
+
+            const m3 = line.match(dashStyle);
+            if (m3) { addResult(m3[1], parseInt(m3[2], 10)); continue; }
+
+            const m4 = line.match(parenStyle);
+            if (m4) { addResult(m4[1], parseInt(m4[2], 10)); continue; }
+
+            if (i + 1 < lines.length) {
+                const nextPts = lines[i + 1].match(ptsOnly);
+                if (nextPts) { addResult(line, parseInt(nextPts[1], 10)); i++; continue; }
+            }
+            if (i + 1 < lines.length) {
+                const nextNum = lines[i + 1].match(/^(-?\d{1,4})\s*$/);
+                if (nextNum && !shouldSkip(line)) { addResult(line, parseInt(nextNum[1], 10)); i++; continue; }
             }
         }
 
-        // If nothing matched with specific patterns, try line-by-line for "Category  Number" pairs
-        if (results.length === 0) {
-            const lines = text.split(/\n/);
-            for (const line of lines) {
-                const m = line.match(/^[\s•\-\d.)]*([A-Z][A-Za-z &/,]+?)\s+(\d{1,3})\s*$/);
-                if (m) {
-                    const rawName = m[1].trim();
-                    const pts = parseInt(m[2], 10);
-                    if (rawName.length >= 3 && pts > 0 && pts <= 500) {
-                        const key = rawName.toLowerCase();
-                        if (!seen.has(key)) {
-                            seen.add(key);
-                            results.push({ name: rawName, description: '', maxPoints: pts, gradingMethod: 'manual' });
+        return finalize(results, positiveScale(results, totalMaxPoints));
+
+        function positiveScale(arr: Criterion[], target: number): Criterion[] {
+            const pos = arr.filter((r) => r.maxPoints > 0);
+            const posTotal = pos.reduce((s, c) => s + c.maxPoints, 0);
+            if (pos.length > 0 && posTotal !== target && posTotal > 0) {
+                const ratio = Math.abs(posTotal - target) / target;
+                if (ratio > 0.1) {
+                    const scale = target / posTotal;
+                    let running = 0;
+                    for (let i = 0; i < pos.length; i++) {
+                        if (i < pos.length - 1) {
+                            pos[i].maxPoints = Math.round(pos[i].maxPoints * scale);
+                            running += pos[i].maxPoints;
+                        } else {
+                            pos[i].maxPoints = target - running;
                         }
                     }
                 }
             }
+            return arr;
         }
 
-        // If we found criteria but their total doesn't match maxPoints, scale them
-        if (results.length > 0) {
-            const parsedTotal = results.reduce((s, c) => s + c.maxPoints, 0);
-            if (parsedTotal !== totalMaxPoints && parsedTotal > 0) {
-                const scale = totalMaxPoints / parsedTotal;
-                let running = 0;
-                for (let i = 0; i < results.length; i++) {
-                    if (i < results.length - 1) {
-                        results[i].maxPoints = Math.round(results[i].maxPoints * scale);
-                        running += results[i].maxPoints;
-                    } else {
-                        // last criterion gets the remainder to ensure exact total
-                        results[i].maxPoints = totalMaxPoints - running;
-                    }
-                }
-            }
-        }
-
-        return results;
+        function finalize(arr: Criterion[], _: Criterion[]): Criterion[] { return arr; }
     }
 
     // ── Render helpers ────────────────────────────────────────────
@@ -648,12 +927,6 @@ export function CreateAssignmentForm({
                         {errors.dueDate && <p className="mt-1 text-xs text-red-600">{errors.dueDate.message}</p>}
                     </div>
 
-                    <div>
-                        <Label htmlFor="maxPoints">Max Points *</Label>
-                        <Input id="maxPoints" type="number" {...register('maxPoints', { valueAsNumber: true })} />
-                        {errors.maxPoints && <p className="mt-1 text-xs text-red-600">{errors.maxPoints.message}</p>}
-                    </div>
-
                     <div className="flex items-center gap-3">
                         <Controller
                             control={control}
@@ -673,49 +946,7 @@ export function CreateAssignmentForm({
                         </Label>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <Controller
-                            control={control}
-                            name="allowLateSubmissions"
-                            render={({ field }) => (
-                                <Checkbox
-                                    id="allowLate"
-                                    checked={field.value}
-                                    onCheckedChange={field.onChange}
-                                />
-                            )}
-                        />
-                        <Label htmlFor="allowLate" className="mb-0 cursor-pointer">Allow Late Submissions</Label>
-                    </div>
 
-                    {watchAllowLate && (
-                        <div className="md:col-span-2 grid gap-4 md:grid-cols-2 rounded-lg border p-4 bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
-                            <div>
-                                <Label>Penalty Type</Label>
-                                <Controller
-                                    control={control}
-                                    name="latePenaltyType"
-                                    render={({ field }) => (
-                                        <Select value={field.value} onValueChange={field.onChange}>
-                                            <SelectTrigger><SelectValue /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="percentage">Percentage per day</SelectItem>
-                                                <SelectItem value="fixed">Fixed points per day</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    )}
-                                />
-                            </div>
-                            <div>
-                                <Label htmlFor="latePenaltyAmount">Penalty Amount</Label>
-                                <Input
-                                    id="latePenaltyAmount"
-                                    type="number"
-                                    {...register('latePenaltyAmount', { valueAsNumber: true })}
-                                />
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
         );
@@ -733,15 +964,58 @@ export function CreateAssignmentForm({
                     <p className="text-xs text-gray-500 mt-1">Provide detailed instructions and requirements.</p>
                 </div>
                 <div>
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                        id="description"
-                        {...register('description')}
-                        rows={14}
-                        placeholder="Provide detailed assignment instructions, requirements, and examples..."
-                        className="font-mono text-sm"
-                    />
-                    <p className="mt-1 text-xs text-gray-400">Supports Markdown formatting.</p>
+                    <div className="flex items-center justify-between mb-1.5">
+                        <Label htmlFor="description">Description</Label>
+                        <div className="flex items-center gap-2">
+                            {descFileLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-400" />}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1.5"
+                                disabled={descFileLoading}
+                                onClick={() => descFileInputRef.current?.click()}
+                            >
+                                <FileUp className="h-3.5 w-3.5" /> Upload File
+                            </Button>
+                            <input
+                                ref={descFileInputRef}
+                                type="file"
+                                accept=".txt,.md,.pdf"
+                                className="hidden"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleDescriptionFileUpload(file);
+                                }}
+                            />
+                        </div>
+                    </div>
+                    {descPdfImages.length > 0 ? (
+                        <div className="rounded-lg border dark:border-gray-700 overflow-auto max-h-[600px] bg-white dark:bg-gray-950 p-4 space-y-3">
+                            {descPdfImages.map((src, i) => (
+                                <img
+                                    key={i}
+                                    src={src}
+                                    alt={`Page ${i + 1}`}
+                                    className="w-full rounded shadow-sm border dark:border-gray-700"
+                                    style={{ imageRendering: 'auto' }}
+                                />
+                            ))}
+                        </div>
+                    ) : (
+                        <Textarea
+                            id="description"
+                            {...register('description')}
+                            rows={14}
+                            placeholder="Provide detailed assignment instructions, requirements, and examples..."
+                            className="font-mono text-sm"
+                        />
+                    )}
+                    <p className="mt-1 text-xs text-gray-400">
+                        {descPdfImages.length > 0
+                            ? `${descPdfImages.length} page${descPdfImages.length !== 1 ? 's' : ''} rendered from PDF — exact fonts and formatting preserved.`
+                            : 'Supports Markdown formatting. Upload a .txt, .md, or .pdf file to auto-fill.'}
+                    </p>
                 </div>
             </div>
         );
@@ -789,11 +1063,17 @@ export function CreateAssignmentForm({
 
     function renderTestCases(
         fields: Array<Record<string, unknown> & { id: string }>,
-        append: (value: { name: string; input: string; expectedOutput: string; points: number }) => void,
+        append: (value: { name: string; inputType: 'text' | 'number' | 'numbers'; input: string; expectedOutput: string; points: number }) => void,
         remove: (index: number) => void,
         prefix: 'publicTests' | 'privateTests',
         isPrivate: boolean
     ) {
+        const INPUT_TYPES = [
+            { value: 'text', label: 'Text', hint: 'Any text (stdin)' },
+            { value: 'number', label: 'Number', hint: 'Single numeric value' },
+            { value: 'numbers', label: 'Numbers', hint: 'Multiple values (space or newline separated)' },
+        ] as const;
+
         return (
             <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -820,7 +1100,7 @@ export function CreateAssignmentForm({
                             size="sm"
                             variant="outline"
                             onClick={() =>
-                                append({ name: `${isPrivate ? 'Private' : 'Public'} Test ${fields.length + 1}`, input: '', expectedOutput: '', points: 10 })
+                                append({ name: `${isPrivate ? 'Private' : 'Public'} Test ${fields.length + 1}`, inputType: 'text', input: '', expectedOutput: '', points: 10 })
                             }
                         >
                             <Plus className="mr-1 h-3.5 w-3.5" /> Add Test
@@ -854,6 +1134,7 @@ export function CreateAssignmentForm({
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-2">
+                            {/* Header row: label, name, points */}
                             <div className="md:col-span-2 flex items-center gap-2">
                                 <GripVertical className="h-4 w-4 text-gray-300" />
                                 <span className="text-xs font-semibold text-gray-500">
@@ -871,13 +1152,68 @@ export function CreateAssignmentForm({
                                     placeholder="pts"
                                 />
                             </div>
+
+                            {/* Input type selector */}
+                            <div className="md:col-span-2">
+                                <Label className="text-xs mb-1.5 block">Input Type</Label>
+                                <Controller
+                                    control={control}
+                                    name={`${prefix}.${idx}.inputType`}
+                                    render={({ field: typeField }) => (
+                                        <div className="flex gap-1.5">
+                                            {INPUT_TYPES.map((t) => (
+                                                <button
+                                                    key={t.value}
+                                                    type="button"
+                                                    title={t.hint}
+                                                    onClick={() => typeField.onChange(t.value)}
+                                                    className={`px-3 py-1 rounded-md text-xs font-medium border transition-colors ${(typeField.value ?? 'text') === t.value
+                                                        ? 'bg-[#6B0000] text-white border-[#6B0000]'
+                                                        : 'bg-white text-gray-600 border-gray-200 hover:border-[#6B0000] dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
+                                                        }`}
+                                                >
+                                                    {t.label}
+                                                </button>
+                                            ))}
+                                            <span className="ml-2 text-xs text-gray-400 flex items-center">
+                                                {INPUT_TYPES.find((t) => t.value === (typeField.value ?? 'text'))?.hint}
+                                            </span>
+                                        </div>
+                                    )}
+                                />
+                            </div>
+
+                            {/* Input field */}
                             <div>
                                 <Label className="text-xs">Input (stdin)</Label>
-                                <Textarea
-                                    {...register(`${prefix}.${idx}.input`)}
-                                    rows={3}
-                                    className="font-mono text-xs"
-                                    placeholder="Input data..."
+                                <Controller
+                                    control={control}
+                                    name={`${prefix}.${idx}.inputType`}
+                                    render={({ field: typeField }) => {
+                                        const t = typeField.value ?? 'text';
+                                        if (t === 'number') {
+                                            return (
+                                                <Input
+                                                    type="number"
+                                                    {...register(`${prefix}.${idx}.input`)}
+                                                    className="font-mono text-xs"
+                                                    placeholder="e.g. 42"
+                                                />
+                                            );
+                                        }
+                                        return (
+                                            <Textarea
+                                                {...register(`${prefix}.${idx}.input`)}
+                                                rows={3}
+                                                className="font-mono text-xs"
+                                                placeholder={
+                                                    t === 'numbers'
+                                                        ? 'e.g. 1 2 3\n  or each on its own line'
+                                                        : 'Enter text input...'
+                                                }
+                                            />
+                                        );
+                                    }}
                                 />
                             </div>
                             <div>
@@ -923,6 +1259,31 @@ export function CreateAssignmentForm({
                     <p className="text-xs text-gray-500 mt-1">Configure grading criteria and point allocation.</p>
                 </div>
 
+                <div className="rounded-lg border p-4 bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
+                    <Label className="text-xs">Rubric Mode</Label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                        <Button
+                            type="button"
+                            variant={watchRubricMode === 'unweighted' ? 'default' : 'outline'}
+                            className="h-8"
+                            onClick={() => setValue('rubricMode', 'unweighted')}
+                        >
+                            Unweighted (equal weights)
+                        </Button>
+                        <Button
+                            type="button"
+                            variant={watchRubricMode === 'weighted' ? 'default' : 'outline'}
+                            className="h-8"
+                            onClick={() => setValue('rubricMode', 'weighted')}
+                        >
+                            Weighted (custom weights)
+                        </Button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                        Weighted mode lets you set a weight multiplier for each criterion.
+                    </p>
+                </div>
+
                 {/* Template controls */}
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border p-4 bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -953,15 +1314,20 @@ export function CreateAssignmentForm({
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {/* Hidden file input for PDF upload */}
+                        {/* Hidden file input for PDF / image upload */}
                         <input
                             ref={pdfInputRef}
                             type="file"
-                            accept=".pdf"
+                            accept=".pdf,image/png,image/jpeg,image/jpg,image/webp,image/gif"
                             className="hidden"
                             onChange={(e) => {
                                 const file = e.target.files?.[0];
-                                if (file) handlePdfRubricUpload(file);
+                                if (!file) return;
+                                if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+                                    handlePdfRubricUpload(file);
+                                } else {
+                                    handleImageRubricUpload(file);
+                                }
                             }}
                         />
                         <Button
@@ -975,7 +1341,7 @@ export function CreateAssignmentForm({
                             {pdfParsing ? (
                                 <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Parsing…</>
                             ) : (
-                                <><FileUp className="h-4 w-4 mr-1.5 text-[#6B0000]" /> Upload Rubric PDF</>
+                                <><FileUp className="h-4 w-4 mr-1.5 text-[#6B0000]" /> Upload Rubric (PDF or Image)</>
                             )}
                         </Button>
                         <Button
@@ -996,12 +1362,12 @@ export function CreateAssignmentForm({
                     </div>
                 </div>
 
-                {/* PDF parse error banner */}
+                {/* PDF / image parse error banner */}
                 {pdfError && (
                     <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
                         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                         <div>
-                            <p className="font-medium">PDF Parsing Issue</p>
+                            <p className="font-medium">Parsing Issue</p>
                             <p className="text-xs mt-0.5">{pdfError}</p>
                         </div>
                         <button type="button" className="ml-auto text-red-400 hover:text-red-600" onClick={() => setPdfError(null)} aria-label="Dismiss">✕</button>
@@ -1048,6 +1414,7 @@ export function CreateAssignmentForm({
                                 name: '',
                                 description: '',
                                 maxPoints: 10,
+                                weight: 1,
                                 gradingMethod: 'manual',
                             })
                         }
@@ -1124,6 +1491,17 @@ export function CreateAssignmentForm({
                                     )}
                                 />
                             </div>
+                            {watchRubricMode === 'weighted' && (
+                                <div>
+                                    <Label className="text-xs">Weight</Label>
+                                    <Input
+                                        type="number"
+                                        step="0.1"
+                                        min={0.1}
+                                        {...register(`rubric.${idx}.weight`, { valueAsNumber: true })}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -1134,6 +1512,12 @@ export function CreateAssignmentForm({
                         <div className="flex justify-between items-center">
                             <span className="text-sm font-semibold text-gray-700">Total Rubric Points:</span>
                             <span className="text-xl font-bold text-[#6B0000]">{totalRubricPoints}</span>
+                        </div>
+                        <div className="flex justify-between items-center mt-2">
+                            <span className="text-sm font-semibold text-gray-700">Rubric Mode:</span>
+                            <span className="text-sm font-bold text-[#6B0000]">
+                                {watchRubricMode === 'weighted' ? 'Weighted' : 'Unweighted'}
+                            </span>
                         </div>
                     </div>
                 )}
@@ -1431,9 +1815,7 @@ export function CreateAssignmentForm({
                     { label: 'Language', value: values.language === 'python' ? 'Python 3.10' : 'Java 17' },
                     { label: 'Category', value: values.category },
                     { label: 'Due Date', value: values.dueDate ? new Date(values.dueDate).toLocaleString() : '—' },
-                    { label: 'Max Points', value: String(values.maxPoints) },
                     { label: 'Group', value: values.isGroup ? 'Yes' : 'No' },
-                    { label: 'Late Submissions', value: values.allowLateSubmissions ? `Allowed (${values.latePenaltyAmount ?? 0}${values.latePenaltyType === 'fixed' ? ' pts' : '%'}/day)` : 'Not allowed' },
                 ],
             },
             {
@@ -1469,6 +1851,7 @@ export function CreateAssignmentForm({
                 items: [
                     { label: 'Criteria', value: `${values.rubric.length} criterion/criteria` },
                     { label: 'Total Rubric Points', value: String(totalRubricPoints) },
+                    { label: 'Rubric Mode', value: values.rubricMode === 'weighted' ? 'Weighted' : 'Unweighted' },
                     { label: 'Grading Methods', value: [...new Set(values.rubric.map((c) => c.gradingMethod))].join(', ') || '—' },
                 ],
             },
@@ -1723,10 +2106,6 @@ export function CreateAssignmentForm({
                                 <p className="text-xs font-medium text-gray-700">{getValues('dueDate') ? new Date(getValues('dueDate')).toLocaleDateString() : '—'}</p>
                             </div>
                             <div>
-                                <p className="text-[11px] text-gray-400">Points</p>
-                                <p className="text-xs font-medium text-gray-700">{getValues('maxPoints')}</p>
-                            </div>
-                            <div>
                                 <p className="text-[11px] text-gray-400">Test Cases</p>
                                 <p className="text-xs font-medium text-gray-700">{getValues('publicTests').length + getValues('privateTests').length}</p>
                             </div>
@@ -1740,11 +2119,17 @@ export function CreateAssignmentForm({
                                 if (!getValues('dueDate')) {
                                     setShowPublishDialog(false);
                                     setCurrentStep(0); // Go back to Basic Info step
-                                    alert('Due date is required to publish an assignment. Please set a due date.');
+                                    toast.error('Due date is required to publish an assignment.');
                                     return;
                                 }
                                 setShowPublishDialog(false);
-                                handleSubmit(onPublish)();
+                                handleSubmit(
+                                    onPublish,
+                                    () => {
+                                        focusFirstValidationStep();
+                                        toast.error('Please fix validation errors before publishing.');
+                                    }
+                                )();
                             }}
                             className="bg-[#6B0000] text-white hover:bg-[#8B1A1A]"
                         >

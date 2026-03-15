@@ -15,6 +15,9 @@ class User(Base):
     # roles: student | faculty | admin
     role = Column(String, nullable=False, default="student")
 
+    # SIS identifier (e.g., Canvas SIS User ID / CWID)
+    sis_user_id = Column(String, nullable=True)
+
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

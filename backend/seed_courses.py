@@ -14,33 +14,8 @@ def seed_courses():
     """Create sample courses."""
     db: Session = SessionLocal()
 
-    courses_data = [
-        {
-            "name": "Introduction to Computer Science",
-            "code": "CSCI 1010",
-            "description": "Fundamental concepts of computer science including problem solving, algorithms, and basic programming in Python.",
-        },
-        {
-            "name": "Data Structures & Algorithms",
-            "code": "CSCI 2020",
-            "description": "Study of fundamental data structures (arrays, linked lists, trees, graphs) and algorithm design techniques.",
-        },
-        {
-            "name": "Operating Systems",
-            "code": "CSCI 3030",
-            "description": "Concepts of operating systems: processes, threads, memory management, file systems, and concurrency.",
-        },
-        {
-            "name": "Database Management Systems",
-            "code": "CSCI 3050",
-            "description": "Relational database design, SQL, normalization, indexing, and transaction management.",
-        },
-        {
-            "name": "Software Engineering",
-            "code": "CSCI 4010",
-            "description": "Software development life cycle, agile methodologies, version control, testing, and team collaboration.",
-        },
-    ]
+    # No default courses — start completely empty
+    courses_data = []
 
     try:
         created = 0

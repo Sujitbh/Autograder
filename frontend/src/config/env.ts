@@ -55,7 +55,7 @@ export function validateEnv(): void {
 
     if (missing.length > 0) {
         console.error(
-            `[AutoGrade] Missing required environment variables: ${missing.join(', ')}`
+            `[Axiom] Missing required environment variables: ${missing.join(', ')}`
         );
     }
 }
