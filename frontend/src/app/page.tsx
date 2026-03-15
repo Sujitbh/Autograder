@@ -14,16 +14,20 @@ function dashboardForRole(role: string): string {
 }
 
 export default function Home() {
-    const { isAuthenticated, role } = useAuth();
+    const { isAuthenticated, role, isLoading } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
+        if (isLoading) {
+            return;
+        }
+
         if (isAuthenticated && role) {
             router.replace(dashboardForRole(role));
         } else {
             router.replace('/login');
         }
-    }, [isAuthenticated, role, router]);
+    }, [isAuthenticated, role, isLoading, router]);
 
     return null;
 }

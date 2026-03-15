@@ -9,9 +9,9 @@ export const gradeService = {
     /** Get all grades for a course (faculty view). */
     async getGrades(courseId: string): Promise<Grade[]> {
         const { data } = await withRetry(() =>
-            api.get<ApiResponse<Grade[]>>(`/courses/${courseId}/grades`)
+            api.get(`/courses/${courseId}/grades`)
         );
-        return data.data;
+        return data;
     },
 
     /** Update a single grade. */

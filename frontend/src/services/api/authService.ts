@@ -57,9 +57,9 @@ export const authService = {
             { email, password }
         );
         if (data.access_token && typeof window !== 'undefined') {
-            localStorage.setItem('autograde_token', data.access_token);
+            sessionStorage.setItem('autograde_token', data.access_token);
             if (data.refresh_token) {
-                localStorage.setItem('autograde_refresh_token', data.refresh_token);
+                sessionStorage.setItem('autograde_refresh_token', data.refresh_token);
             }
         }
         // Fetch user profile after login
@@ -83,10 +83,10 @@ export const authService = {
             await api.post('/auth/logout');
         } catch { /* backend may not have a logout endpoint */ }
         if (typeof window !== 'undefined') {
-            localStorage.removeItem('autograde_token');
-            localStorage.removeItem('autograde_refresh_token');
-            localStorage.removeItem('autograde_auth');
-            localStorage.removeItem('autograde_current_user');
+            sessionStorage.removeItem('autograde_token');
+            sessionStorage.removeItem('autograde_refresh_token');
+            sessionStorage.removeItem('autograde_auth');
+            sessionStorage.removeItem('autograde_current_user');
         }
     },
 
@@ -100,15 +100,15 @@ export const authService = {
 
     /** Refresh the JWT token. */
     async refreshToken(refreshToken?: string): Promise<string> {
-        const token = refreshToken || (typeof window !== 'undefined' ? localStorage.getItem('autograde_refresh_token') : null);
+        const token = refreshToken || (typeof window !== 'undefined' ? sessionStorage.getItem('autograde_refresh_token') : null);
         const { data } = await api.post<BackendTokenResponse>(
             '/auth/refresh',
             { refresh_token: token }
         );
         if (typeof window !== 'undefined') {
-            localStorage.setItem('autograde_token', data.access_token);
+            sessionStorage.setItem('autograde_token', data.access_token);
             if (data.refresh_token) {
-                localStorage.setItem('autograde_refresh_token', data.refresh_token);
+                sessionStorage.setItem('autograde_refresh_token', data.refresh_token);
             }
         }
         return data.access_token;

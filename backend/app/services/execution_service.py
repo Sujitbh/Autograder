@@ -356,13 +356,12 @@ class ExecutionService:
             stdin_input=input_data,
         )
 
-        # Normalize outputs for comparison (strip whitespace)
-        actual = result.stdout.strip()
-        expected = expected_output.strip()
+        actual = result.stdout
+        expected = expected_output
 
         passed = (
             result.status == ExecutionStatus.SUCCESS
-            and actual == expected
+            and ExecutionService._outputs_match(actual, expected)
         )
 
         return {
@@ -374,6 +373,59 @@ class ExecutionService:
             "execution_time_ms": result.execution_time_ms,
             "exit_code": result.exit_code,
         }
+
+    @staticmethod
+    def _normalize_lines(text: str) -> list[str]:
+        """Normalize output text into comparable non-empty lines."""
+        return [line.strip() for line in (text or "").splitlines() if line.strip()]
+
+    @staticmethod
+    def _line_candidates(line: str) -> list[str]:
+        """Return comparable variants for one output line."""
+        cleaned = (line or "").strip()
+        candidates = [cleaned]
+
+        # Common prompt format: "Enter n: 3" should match expected "3".
+        if ":" in cleaned:
+            tail = cleaned.rsplit(":", 1)[-1].strip()
+            if tail:
+                candidates.append(tail)
+
+        return candidates
+
+    @staticmethod
+    def _outputs_match(actual_output: str, expected_output: str) -> bool:
+        """
+        Match outputs using a clear rule set:
+        1) Exact normalized line match.
+        2) Expected lines match the trailing lines of actual output.
+        3) For a single expected line, allow prompt-prefixed final output.
+        """
+        actual_lines = ExecutionService._normalize_lines(actual_output)
+        expected_lines = ExecutionService._normalize_lines(expected_output)
+
+        if not expected_lines:
+            return len(actual_lines) == 0
+
+        if actual_lines == expected_lines:
+            return True
+
+        # Accept extra leading lines/logs as long as final lines match expected output.
+        if len(actual_lines) >= len(expected_lines):
+            suffix = actual_lines[-len(expected_lines):]
+            if suffix == expected_lines:
+                return True
+
+        # For single-line expectations, allow prompt text before the final value.
+        if len(expected_lines) == 1 and actual_lines:
+            expected_last = expected_lines[0]
+            actual_last = actual_lines[-1]
+
+            for candidate in ExecutionService._line_candidates(actual_last):
+                if candidate == expected_last:
+                    return True
+
+        return False
 
     @staticmethod
     def run_all_testcases(

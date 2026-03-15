@@ -105,7 +105,7 @@ const defaultNotifications: NotificationSetting[] = [
     { id: 'newEnrollment', label: 'New Student Enrollment', description: 'When a student joins your course', email: false, inApp: true },
     { id: 'studentDropped', label: 'Student Dropped Course', description: 'When a student drops your course', email: false, inApp: true },
     { id: 'assignmentDue', label: 'Assignment Due Soon', description: '2 days before an assignment is due', email: true, inApp: true },
-    { id: 'newFeatures', label: 'New Feature Announcements', description: 'When new features are added to AutoGrade', email: true, inApp: true },
+    { id: 'newFeatures', label: 'New Feature Announcements', description: 'When new features are added to Axiom', email: true, inApp: true },
     { id: 'maintenance', label: 'System Maintenance', description: 'Scheduled maintenance and downtime alerts', email: true, inApp: true },
     { id: 'securityAlerts', label: 'Security Alerts', description: 'Login from new device, password changes, suspicious activity', email: true, inApp: true, locked: true },
     { id: 'weeklySummary', label: 'Weekly Course Summary', description: 'Sunday summary of submissions, grades, and activity', email: true, inApp: false },
@@ -778,7 +778,7 @@ export function AccountSettings() {
     const renderPreferences = () => (
         <div>
             <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '4px' }}>Display Preferences</h2>
-            <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginBottom: '28px' }}>Customize your AutoGrade experience</p>
+            <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginBottom: '28px' }}>Customize your Axiom experience</p>
 
             {/* Appearance */}
             <Card title="Appearance">
@@ -1061,7 +1061,7 @@ export function AccountSettings() {
             </Card>
 
             {/* Data Export */}
-            <Card title="Export Your Data" subtitle="Download a copy of your AutoGrade data">
+            <Card title="Export Your Data" subtitle="Download a copy of your Axiom data">
                 <div className="space-y-2 mb-4" style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
                     <p>Includes:</p>
                     <ul className="list-disc pl-5 space-y-1">
@@ -1082,7 +1082,7 @@ export function AccountSettings() {
             </Card>
 
             {/* Activity Log */}
-            <Card title="Recent Activity" subtitle="View your recent AutoGrade activity">
+            <Card title="Recent Activity" subtitle="View your recent Axiom activity">
                 <div className="space-y-0">
                     {mockActivities.map((a, i) => (
                         <div key={i} className="flex items-center justify-between py-2.5" style={i < mockActivities.length - 1 ? { borderBottom: '1px solid var(--color-border)' } : undefined}>
@@ -1398,7 +1398,7 @@ export function AccountSettings() {
                                 <li>Stop grade syncing to Canvas gradebook</li>
                                 <li>Remove stored Canvas access tokens</li>
                             </ul>
-                            <span className="block">Your existing AutoGrade courses and data will not be affected. You can reconnect Canvas at any time.</span>
+                            <span className="block">Your existing Axiom courses and data will not be affected. You can reconnect Canvas at any time.</span>
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter className="mt-4">

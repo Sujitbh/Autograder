@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   AutoGrade — Comprehensive TypeScript Type Definitions
+   Axiom — Comprehensive TypeScript Type Definitions
    ═══════════════════════════════════════════════════════════════════ */
 
 // ── User Types ──────────────────────────────────────────────────────
@@ -44,6 +44,7 @@ export interface Course {
     facultyId: string;
     enrollmentCode: string;
     enrollmentCodeActive: boolean;
+    enrollmentPolicy: 'invite' | 'code' | 'both';
     status: CourseStatus;
     studentCount: number;
     assignmentCount: number;
@@ -103,6 +104,8 @@ export interface Submission {
     id: string;
     assignmentId: string;
     studentId: string;
+    studentName?: string;
+    studentEmail?: string;
     code: string;
     language: ProgrammingLanguage;
     submittedAt: string;
@@ -142,6 +145,7 @@ export interface RubricCriterion {
     name: string;
     description: string;
     maxPoints: number;
+    weight?: number;
     gradingMethod: GradingMethod;
 }
 
@@ -219,6 +223,7 @@ export interface CreateCourseDto {
 export interface UpdateCourseDto extends Partial<CreateCourseDto> {
     status?: CourseStatus;
     enrollmentCodeActive?: boolean;
+    enrollmentPolicy?: 'invite' | 'code' | 'both';
 }
 
 export interface CreateAssignmentDto {

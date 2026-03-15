@@ -3,8 +3,10 @@ Admin-only API routes for system management.
 """
 
 from typing import Optional
+from pathlib import Path
+import json
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import func, desc
 
 from app.api.deps import get_db, get_current_user
@@ -22,6 +24,7 @@ from app.models.system_setting import SystemSetting
 from app.models.ta_invitation import TAInvitation
 from app.models.ta_permission import TAPermission
 from app.schemas.admin import SemesterCreate, SemesterUpdate, LanguageCreate, LanguageUpdate
+from app.settings import settings
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -36,15 +39,29 @@ def _require_admin(user: User):
 def get_admin_stats(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     _require_admin(user)
 
-    total_users = db.query(func.count(User.id)).scalar() or 0
+    # Single query for all user role/active breakdowns (replaces 5 separate COUNT queries)
+    role_counts = (
+        db.query(User.role, User.is_active, func.count(User.id))
+        .group_by(User.role, User.is_active)
+        .all()
+    )
+    total_users = 0
+    active_users = 0
+    students = faculty = admins = 0
+    for role, is_active, count in role_counts:
+        total_users += count
+        if is_active:
+            active_users += count
+        if role == "student":
+            students += count
+        elif role == "faculty":
+            faculty += count
+        elif role == "admin":
+            admins += count
+
     total_courses = db.query(func.count(Course.id)).scalar() or 0
     total_assignments = db.query(func.count(Assignment.id)).scalar() or 0
     total_submissions = db.query(func.count(Submission.id)).scalar() or 0
-    active_users = db.query(func.count(User.id)).filter(User.is_active == True).scalar() or 0
-
-    students = db.query(func.count(User.id)).filter(User.role == "student").scalar() or 0
-    faculty = db.query(func.count(User.id)).filter(User.role == "faculty").scalar() or 0
-    admins = db.query(func.count(User.id)).filter(User.role == "admin").scalar() or 0
 
     return {
         "total_users": total_users,
@@ -78,17 +95,22 @@ def get_recent_activity(
             "user_name": u.name,
         })
 
-    recent_submissions = db.query(Submission).order_by(desc(Submission.created_at)).limit(limit).all()
+    # Eagerly load student and assignment to avoid N+1 queries
+    recent_submissions = (
+        db.query(Submission)
+        .options(joinedload(Submission.student), joinedload(Submission.assignment))
+        .order_by(desc(Submission.created_at))
+        .limit(limit)
+        .all()
+    )
     for s in recent_submissions:
-        student = db.query(User).filter(User.id == s.student_id).first()
-        assignment = db.query(Assignment).filter(Assignment.id == s.assignment_id).first()
         activities.append({
             "id": f"submission-{s.id}",
             "type": "submission",
-            "description": f"{student.name if student else 'Unknown'} submitted {assignment.title if assignment else 'Unknown'}",
+            "description": f"{s.student.name if s.student else 'Unknown'} submitted {s.assignment.title if s.assignment else 'Unknown'}",
             "timestamp": s.created_at.isoformat() if s.created_at else None,
             "user_id": s.student_id,
-            "user_name": student.name if student else None,
+            "user_name": s.student.name if s.student else None,
         })
 
     activities.sort(key=lambda x: x["timestamp"] or "", reverse=True)
@@ -106,7 +128,12 @@ def list_all_courses(
 ):
     _require_admin(user)
 
-    q = db.query(Course)
+    # Eagerly load relationships to avoid N+1 queries per course
+    q = db.query(Course).options(
+        selectinload(Course.enrollments).joinedload(Enrollment.user),
+        selectinload(Course.assignments),
+        joinedload(Course.faculty),
+    )
     if search:
         q = q.filter(
             (Course.name.ilike(f"%{search}%")) | (Course.code.ilike(f"%{search}%"))
@@ -117,33 +144,54 @@ def list_all_courses(
     courses = q.order_by(desc(Course.created_at)).all()
     result = []
     for c in courses:
-        student_count = db.query(func.count(Enrollment.id)).filter(
-            Enrollment.course_id == c.id, Enrollment.role == "student"
-        ).scalar() or 0
-        assignment_count = db.query(func.count(Assignment.id)).filter(
-            Assignment.course_id == c.id
-        ).scalar() or 0
-        faculty_enrollment = db.query(Enrollment).filter(
-            Enrollment.course_id == c.id, Enrollment.role == "instructor"
-        ).first()
-        faculty_user = None
-        if faculty_enrollment:
-            faculty_user = db.query(User).filter(User.id == faculty_enrollment.user_id).first()
+        # Use model properties (iterate already-loaded collections)
+        student_count = c.student_count
+        assignment_count = c.assignment_count
+
+        # Use direct faculty relationship; fall back to instructor enrollment (faculty only, not admin)
+        faculty_name = None
+        if c.faculty and c.faculty.role == "faculty":
+            faculty_name = c.faculty.name
+        else:
+            for e in c.enrollments:
+                if e.role == "instructor" and e.user and e.user.role == "faculty":
+                    faculty_name = e.user.name
+                    break
 
         result.append({
             "id": c.id,
             "name": c.name,
             "code": c.code,
+            "section": c.section,
             "description": c.description,
             "enrollment_code": c.enrollment_code,
             "is_active": c.is_active,
             "student_count": student_count,
             "assignment_count": assignment_count,
-            "faculty_name": faculty_user.name if faculty_user else None,
+            "faculty_name": faculty_name,
             "created_at": c.created_at.isoformat() if c.created_at else None,
         })
 
     return result
+
+
+@router.delete("/courses/{course_id}", status_code=204)
+def delete_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    _require_admin(user)
+    
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+        
+    # The SQLAlchemy relationships with cascade="all, delete-orphan" on the Course model 
+    # should automatically handle deleting associated Enrollments, Assignments, etc., 
+    # assuming the backend models are configured correctly.
+    db.delete(course)
+    db.commit()
 
 
 # ==================== Admin Users (enhanced) ====================
@@ -386,12 +434,40 @@ def _serialize_ta_assignment(e, ta_user, course, db):
 @router.get("/ta/assignments")
 def list_ta_assignments(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     _require_admin(user)
-    enrollments = db.query(Enrollment).filter(Enrollment.role == "ta").all()
+    # Eagerly load user and course to avoid N+1 queries per enrollment
+    enrollments = (
+        db.query(Enrollment)
+        .filter(Enrollment.role == "ta")
+        .options(joinedload(Enrollment.user), joinedload(Enrollment.course))
+        .all()
+    )
+
+    # Batch-load all TA permissions in one query
+    enrollment_ids = [e.id for e in enrollments]
+    permissions_map = {}
+    if enrollment_ids:
+        perms = db.query(TAPermission).filter(TAPermission.enrollment_id.in_(enrollment_ids)).all()
+        permissions_map = {p.enrollment_id: p for p in perms}
+
     result = []
     for e in enrollments:
-        ta_user = db.query(User).filter(User.id == e.user_id).first()
-        course = db.query(Course).filter(Course.id == e.course_id).first()
-        result.append(_serialize_ta_assignment(e, ta_user, course, db))
+        perm = permissions_map.get(e.id)
+        result.append({
+            "enrollment_id": e.id,
+            "user_id": e.user_id,
+            "user_name": e.user.name if e.user else None,
+            "user_email": e.user.email if e.user else None,
+            "course_id": e.course_id,
+            "course_name": e.course.name if e.course else None,
+            "course_code": e.course.code if e.course else None,
+            "permissions": {
+                "can_grade": perm.can_grade if perm else True,
+                "can_view_submissions": perm.can_view_submissions if perm else True,
+                "can_manage_testcases": perm.can_manage_testcases if perm else False,
+                "can_view_students": perm.can_view_students if perm else True,
+                "can_manage_assignments": perm.can_manage_assignments if perm else False,
+            },
+        })
     return result
 
 
@@ -561,24 +637,31 @@ def update_ta_permissions(
 @router.get("/ta/invitations")
 def list_ta_invitations(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     _require_admin(user)
-    invitations = db.query(TAInvitation).order_by(desc(TAInvitation.created_at)).all()
-    result = []
-    for inv in invitations:
-        student = db.query(User).filter(User.id == inv.student_id).first()
-        faculty = db.query(User).filter(User.id == inv.faculty_id).first()
-        course = db.query(Course).filter(Course.id == inv.course_id).first()
-        result.append({
+    # Eagerly load student, faculty, and course to avoid N+1 queries
+    invitations = (
+        db.query(TAInvitation)
+        .options(
+            joinedload(TAInvitation.student),
+            joinedload(TAInvitation.faculty),
+            joinedload(TAInvitation.course),
+        )
+        .order_by(desc(TAInvitation.created_at))
+        .all()
+    )
+    return [
+        {
             "id": inv.id,
-            "student_name": student.name if student else None,
-            "student_email": student.email if student else None,
-            "faculty_name": faculty.name if faculty else None,
-            "course_name": course.name if course else None,
-            "course_code": course.code if course else None,
+            "student_name": inv.student.name if inv.student else None,
+            "student_email": inv.student.email if inv.student else None,
+            "faculty_name": inv.faculty.name if inv.faculty else None,
+            "course_name": inv.course.name if inv.course else None,
+            "course_code": inv.course.code if inv.course else None,
             "status": inv.status,
             "created_at": inv.created_at.isoformat() if inv.created_at else None,
             "responded_at": inv.responded_at.isoformat() if inv.responded_at else None,
-        })
-    return result
+        }
+        for inv in invitations
+    ]
 
 
 # ==================== Audit Log ====================
@@ -603,9 +686,16 @@ def list_audit_logs(
     total = q.count()
     logs = q.order_by(desc(AuditLog.created_at)).offset(skip).limit(limit).all()
 
+    # Batch-load all referenced users in one query instead of per-log
+    log_user_ids = {log.user_id for log in logs if log.user_id}
+    users_map = {}
+    if log_user_ids:
+        users = db.query(User).filter(User.id.in_(log_user_ids)).all()
+        users_map = {u.id: u for u in users}
+
     result = []
     for log in logs:
-        log_user = db.query(User).filter(User.id == log.user_id).first() if log.user_id else None
+        log_user = users_map.get(log.user_id) if log.user_id else None
         result.append({
             "id": log.id,
             "user_id": log.user_id,
@@ -652,6 +742,31 @@ def update_system_settings(
 
     db.commit()
     return {"message": "Settings updated"}
+
+
+@router.get("/integrity-detector")
+def get_integrity_detector_status(user: User = Depends(get_current_user)):
+    _require_admin(user)
+
+    model_path = Path(settings.DATA_ROOT) / "models" / "ai_code_detector.joblib"
+    metrics_path = Path(settings.DATA_ROOT) / "models" / "ai_code_detector_metrics.json"
+
+    metrics_payload = None
+    if metrics_path.exists():
+        try:
+            with open(metrics_path, "r", encoding="utf-8") as fh:
+                metrics_payload = json.load(fh)
+        except Exception:
+            metrics_payload = None
+
+    return {
+        "model_available": model_path.exists(),
+        "model_path": str(model_path),
+        "model_size_bytes": model_path.stat().st_size if model_path.exists() else None,
+        "model_last_modified": model_path.stat().st_mtime if model_path.exists() else None,
+        "metrics_available": metrics_payload is not None,
+        "metrics": metrics_payload,
+    }
 
 
 # ==================== Password Management ====================

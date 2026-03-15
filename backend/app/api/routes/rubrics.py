@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from app.api.deps import get_db, get_current_user
 from app.core.permissions import require_course_role
@@ -20,8 +20,22 @@ def _get_assignment_or_404(db: Session, assignment_id: int) -> Assignment:
 
 
 @router.get("/", response_model=List[RubricOut])
-def list_rubrics(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    return db.query(Rubric).all()
+def list_rubrics(
+    assignment_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    q = db.query(Rubric)
+    if assignment_id is not None:
+        assignment = _get_assignment_or_404(db, assignment_id)
+        require_course_role(
+            db=db,
+            user=user,
+            course_id=assignment.course_id,
+            allowed_roles=["instructor", "ta", "student"],
+        )
+        q = q.filter(Rubric.assignment_id == assignment_id)
+    return q.order_by(Rubric.order.asc(), Rubric.id.asc()).all()
 
 
 @router.post("/", response_model=RubricOut)

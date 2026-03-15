@@ -21,6 +21,7 @@ class RubricInline(BaseModel):
     name: str
     description: Optional[str] = None
     maxPoints: Optional[int] = 10
+    weight: Optional[float] = 1.0
     gradingMethod: Optional[str] = None  # auto | manual | hybrid
 
 
@@ -54,6 +55,18 @@ class AssignmentUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
+class AssignmentRubricOut(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    weight: Optional[float] = None
+    max_points: Optional[int] = None
+    order: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
 class AssignmentOut(BaseModel):
     """Schema for assignment output."""
     id: int
@@ -69,6 +82,7 @@ class AssignmentOut(BaseModel):
     status: str = "published"
     is_active: bool = True
     created_at: Optional[datetime] = None
+    rubrics: List[AssignmentRubricOut] = []
 
     class Config:
         from_attributes = True
