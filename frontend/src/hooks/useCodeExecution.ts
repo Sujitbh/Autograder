@@ -6,10 +6,12 @@ export function useCodeExecution() {
   const [isRunning, setIsRunning] = useState(false);
   const [result, setResult] = useState<ExecuteCodeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastStdinInput, setLastStdinInput] = useState('');
 
   const execute = useCallback(async (code: string, language: string, stdin?: string) => {
     setIsRunning(true);
     setError(null);
+    setLastStdinInput(stdin || '');
     try {
       let res: ExecuteCodeResponse;
 
@@ -37,7 +39,8 @@ export function useCodeExecution() {
   const clearResult = useCallback(() => {
     setResult(null);
     setError(null);
+    setLastStdinInput('');
   }, []);
 
-  return { execute, isRunning, result, error, clearResult };
+  return { execute, isRunning, result, error, clearResult, lastStdinInput };
 }

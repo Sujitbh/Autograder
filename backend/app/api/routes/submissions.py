@@ -343,6 +343,7 @@ def get_submission_detail(
             results_out.append({
                 "testcase_id": r.testcase_id or r.id,
                 "test_name": tc.name if tc else f"Test {r.id}",
+                "input_data": tc.input_data if tc else "",
                 "passed": r.passed,
                 "actual_output": r.output or "",
                 "expected_output": tc.expected_output if tc else "",

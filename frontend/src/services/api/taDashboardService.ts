@@ -102,6 +102,8 @@ export interface TASubmissionDetail {
         id: number;
         testcase_id: number | null;
         testcase_name: string | null;
+        input_data: string | null;
+        expected_output: string | null;
         passed: boolean;
         output: string | null;
         error_output: string | null;
@@ -214,6 +216,8 @@ export const taDashboardService = {
             testcase_id: number | null;
             testcase_name: string | null;
             is_public: boolean | null;
+            input_data: string | null;
+            expected_output: string | null;
             passed: boolean;
             output: string | null;
             error_output: string | null;
@@ -238,6 +242,8 @@ export const taDashboardService = {
             id: number;
             testcase_id: number | null;
             testcase_name: string | null;
+            input_data: string | null;
+            expected_output: string | null;
             passed: boolean;
             output: string | null;
             error_output: string | null;

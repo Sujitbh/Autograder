@@ -9,7 +9,6 @@ import { Button } from './ui/button';
 import { CodeEditor } from './CodeEditor';
 import { OutputPanel } from './OutputPanel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { Textarea } from './ui/textarea';
 import { useAssignment } from '@/hooks/queries/useAssignments';
 import { useSubmissions } from '@/hooks/queries/useSubmissions';
 import { useCourses } from '@/hooks/queries/useCourses';
@@ -153,6 +152,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const [mode, setMode] = useState<'editor' | 'upload'>('editor');
   const [infoTab, setInfoTab] = useState<'desc' | 'rubric' | 'tests' | 'submit'>('desc');
   const [outputOpen, setOutputOpen] = useState(false);
+  const [outputPanelHeight, setOutputPanelHeight] = useState(280);
 
   // Panel visibility
   const [showExplorer, setShowExplorer] = useState(true);
@@ -167,15 +167,15 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Dialogs
-  const [stdinDialogOpen, setStdinDialogOpen] = useState(false);
   const [stdinValue, setStdinValue] = useState('');
+  const [showInlineInput, setShowInlineInput] = useState(false);
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
   const [newFileName, setNewFileName] = useState('');
 
   // Execution hooks
-  const { execute, isRunning: isExecuting, result: execResult, error: execError } = useCodeExecution();
+  const { execute, isRunning: isExecuting, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
   const { runTests, isRunning: isTestsRunning, results: testResults, progress: testProgress } = useTestCaseRunner();
 
   // Auto-save
@@ -236,7 +236,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     }
   }, []);
 
-  // Detect common stdin patterns by language to offer input dialog automatically.
+  // Detect common stdin patterns by language to offer inline input automatically.
   const codeUsesInput = (codeStr: string, lang: string) => {
     const lines = codeStr.split('\n');
     for (const line of lines) {
@@ -258,23 +258,29 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
   // Run code
   const handleRunCode = async () => {
+    setOutputOpen(true);
     if (codeUsesInput(code, language)) {
-      setStdinDialogOpen(true);
+      if (!showInlineInput) {
+        setShowInlineInput(true);
+        return; // open input area on first click; user types then clicks Run inside
+      }
+      // input area already open — run with whatever is currently in stdinValue
+      await execute(code, language, stdinValue);
       return;
     }
-
-    setOutputOpen(true);
+    setShowInlineInput(false);
     await execute(code, language);
   };
 
-  const handleOpenStdinDialog = () => {
-    setStdinDialogOpen(true);
+  const handleOpenInlineInput = () => {
+    setOutputOpen(true);
+    setShowInlineInput(true);
   };
 
   // Run with stdin
   const handleRunWithStdin = async () => {
-    setStdinDialogOpen(false);
     setOutputOpen(true);
+    setShowInlineInput(true);
     await execute(code, language, stdinValue);
   };
 
@@ -523,7 +529,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
               </button>
 
               <button
-                onClick={handleOpenStdinDialog}
+                onClick={handleOpenInlineInput}
                 disabled={isExecuting || isTestsRunning}
                 style={{
                   padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
@@ -604,15 +610,28 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
             {/* Output Panel (collapsible, matching codelab) */}
             <div style={{
-              height: outputOpen ? 280 : 0,
+              height: outputOpen ? outputPanelHeight : 0,
               background: 'var(--color-surface)',
               borderTop: outputOpen ? '1px solid var(--color-border)' : 'none',
               overflow: 'hidden',
-              transition: 'height .3s ease',
               flexShrink: 0,
               display: 'flex',
               flexDirection: 'column' as const,
             }}>
+              {/* Drag-to-resize handle */}
+              <div
+                onMouseDown={(e) => {
+                  const startY = e.clientY;
+                  const startH = outputPanelHeight;
+                  const onMove = (ev: MouseEvent) => setOutputPanelHeight(Math.max(120, Math.min(700, startH + (startY - ev.clientY))));
+                  const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+                  window.addEventListener('mousemove', onMove);
+                  window.addEventListener('mouseup', onUp);
+                }}
+                style={{ height: 5, cursor: 'ns-resize', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-surface-elevated)' }}
+              >
+                <div style={{ width: 28, height: 3, borderRadius: 2, background: 'var(--color-border)' }} />
+              </div>
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '6px 14px', background: 'var(--color-surface-elevated)',
@@ -633,7 +652,17 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                 </button>
               </div>
               <div className="flex-1 min-h-0">
-                <OutputPanel result={execResult} isRunning={isExecuting} error={execError} />
+                <OutputPanel
+                  result={execResult}
+                  isRunning={isExecuting}
+                  error={execError}
+                  stdinInput={lastStdinInput}
+                  showInputEditor={showInlineInput}
+                  inputDraft={stdinValue}
+                  onInputDraftChange={setStdinValue}
+                  onRunWithInput={handleRunWithStdin}
+                  isRunWithInputDisabled={isExecuting || isTestsRunning}
+                />
               </div>
             </div>
 
@@ -1072,33 +1101,6 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
               style={{ backgroundColor: 'var(--color-primary)' }}
             >
               <FilePlus className="w-4 h-4 mr-2" /> Create
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Stdin Dialog */}
-      <Dialog open={stdinDialogOpen} onOpenChange={setStdinDialogOpen}>
-        <DialogContent style={{ maxWidth: '500px' }}>
-          <DialogHeader>
-            <DialogTitle>Run with Input</DialogTitle>
-          </DialogHeader>
-          <div className="mt-4">
-            <label className="text-sm font-medium" style={{ color: 'var(--color-text-dark)' }}>
-              Enter program input (stdin):
-            </label>
-            <Textarea
-              value={stdinValue}
-              onChange={(e) => setStdinValue(e.target.value)}
-              placeholder="Type your input here..."
-              className="mt-2 font-mono text-sm"
-              rows={6}
-            />
-          </div>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setStdinDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleRunWithStdin} className="text-white" style={{ backgroundColor: 'var(--color-success)' }}>
-              <Play className="w-4 h-4 mr-2" /> Run
             </Button>
           </DialogFooter>
         </DialogContent>
