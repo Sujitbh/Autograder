@@ -54,6 +54,13 @@ class TAService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Student is not enrolled in this course",
             )
+
+        # Block inviting someone who is already a TA in this course
+        if enrollment.role == "ta":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This student is already a TA in this course",
+            )
         
         # Check for existing pending invitation
         existing = db.query(TAInvitation).filter(

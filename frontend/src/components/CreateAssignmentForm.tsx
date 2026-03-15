@@ -61,6 +61,7 @@ import {
     DialogFooter,
     DialogDescription,
 } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 
 
 // ── Rubric Template types ───────────────────────────────────────────
@@ -359,6 +360,37 @@ export function CreateAssignmentForm({
         ['plagiarismSensitivity', 'aiDetectionSensitivity'],
         [], // review step — no fields
     ];
+
+    const focusFirstValidationStep = useCallback(() => {
+        const values = getValues();
+        if (!values.name || !values.shortName || !values.language || !values.category || !values.dueDate) {
+            setCurrentStep(0);
+            return;
+        }
+        if (!values.description) {
+            setCurrentStep(1);
+            return;
+        }
+        if (!values.starterCode) {
+            setCurrentStep(2);
+            return;
+        }
+        const hasInvalidPublic = (values.publicTests ?? []).some((t) => !t.name || !t.expectedOutput);
+        if (hasInvalidPublic) {
+            setCurrentStep(3);
+            return;
+        }
+        const hasInvalidPrivate = (values.privateTests ?? []).some((t) => !t.name || !t.expectedOutput);
+        if (hasInvalidPrivate) {
+            setCurrentStep(4);
+            return;
+        }
+        const hasInvalidRubric = (values.rubric ?? []).some((r) => !r.name);
+        if (hasInvalidRubric) {
+            setCurrentStep(5);
+            return;
+        }
+    }, [getValues]);
 
     const handleNext = useCallback(async () => {
         const fields = stepFields[currentStep];
@@ -2087,11 +2119,17 @@ export function CreateAssignmentForm({
                                 if (!getValues('dueDate')) {
                                     setShowPublishDialog(false);
                                     setCurrentStep(0); // Go back to Basic Info step
-                                    alert('Due date is required to publish an assignment. Please set a due date.');
+                                    toast.error('Due date is required to publish an assignment.');
                                     return;
                                 }
                                 setShowPublishDialog(false);
-                                handleSubmit(onPublish)();
+                                handleSubmit(
+                                    onPublish,
+                                    () => {
+                                        focusFirstValidationStep();
+                                        toast.error('Please fix validation errors before publishing.');
+                                    }
+                                )();
                             }}
                             className="bg-[#6B0000] text-white hover:bg-[#8B1A1A]"
                         >

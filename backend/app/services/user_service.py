@@ -50,20 +50,13 @@ class UserService:
             )
 
         # Determine role: use payload role, or infer from domain.
-        # Admin self-registration is backend-controlled via settings.
+        # Admin accounts can NEVER be self-registered; they must be seeded directly.
         requested_role = (payload.role or "").lower()
         if requested_role == "admin":
-            if not settings.ALLOW_ADMIN_REGISTRATION:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Admin registration is disabled by backend policy",
-                )
-            email_lower = payload.email.lower()
-            if (not email_lower.endswith("@ulm.edu")) or email_lower.endswith("@warhawks.ulm.edu"):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Admin email must be a valid @ulm.edu address",
-                )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin registration is not allowed",
+            )
         if payload.role:
             role = requested_role
         else:

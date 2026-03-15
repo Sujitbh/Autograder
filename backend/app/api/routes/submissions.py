@@ -376,6 +376,7 @@ def get_submission_detail(
         "assignment": {
             "id": assignment.id,
             "title": assignment.title,
+            "max_points": assignment.max_points,
             "due_date": assignment.due_date.isoformat() if getattr(assignment, "due_date", None) else None,
             "language": (assignment.allowed_languages.split(",")[0].strip().lower() if assignment.allowed_languages else "python"),
         },
@@ -449,6 +450,9 @@ def get_submissions_by_assignment(
     
     # For faculty/admin, return submissions with student details and files
     submissions = query.all()
+    assignment_testcases = db.query(TestCase).filter(TestCase.assignment_id == assignment_id).all()
+    testcase_points_total = sum((tc.points or 0) for tc in assignment_testcases)
+    resolved_assignment_max = testcase_points_total or assignment.max_points or 100
     result = []
     for sub in submissions:
         student = db.query(User).filter(User.id == sub.student_id).first()
@@ -461,6 +465,7 @@ def get_submissions_by_assignment(
             "status": sub.status,
             "score": sub.score,
             "max_score": sub.max_score,
+            "display_max_score": sub.max_score if sub.max_score is not None else resolved_assignment_max,
             "feedback": sub.feedback,
             "graded_at": sub.graded_at,
             "created_at": sub.created_at,

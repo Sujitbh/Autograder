@@ -230,7 +230,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                       }}>
                         {error}
                       </p>
-                      {showNotRegisteredPrompt && (
+                      {showNotRegisteredPrompt && selectedRole !== 'admin' && (
                         <Button
                           type="button"
                           onClick={() => router.push(createAccountPath)}
@@ -347,13 +347,15 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   {isSubmitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Signing in…</> : 'Sign In'}
                 </Button>
 
-                {/* Sign Up Link */}
-                <p className="text-center" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-text-light)' }}>
-                  Don't have an account?{' '}
-                  <button type="button" onClick={() => router.push(createAccountPath)} className="hover:underline" style={{ color: 'var(--color-primary)', fontWeight: 500 }}>
-                    Create Account
-                  </button>
-                </p>
+                {/* Sign Up Link — hidden for admin (accounts cannot be self-registered) */}
+                {selectedRole !== 'admin' && (
+                  <p className="text-center" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-text-light)' }}>
+                    Don't have an account?{' '}
+                    <button type="button" onClick={() => router.push(createAccountPath)} className="hover:underline" style={{ color: 'var(--color-primary)', fontWeight: 500 }}>
+                      Create Account
+                    </button>
+                  </p>
+                )}
 
                 {/* Help Text */}
                 <p className="text-center" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-text-light)' }}>

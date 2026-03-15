@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { Search, Filter, CheckCircle2, Clock, AlertTriangle, ChevronDown, Eye, ArrowUpDown, BarChart3, Loader2 } from 'lucide-react';
+import { Search, Filter, CheckCircle2, Clock, AlertTriangle, ChevronDown, ChevronRight, ArrowUpDown, BarChart3, Loader2, RotateCcw } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
 import { Sidebar } from './Sidebar';
@@ -37,6 +37,17 @@ interface QueueSubmission {
     _raw: ApiSubmission;
 }
 
+interface QueueSubmissionGroup {
+    id: string;
+    studentName: string;
+    studentId: string;
+    studentEmail: string | null;
+    assignmentName: string;
+    assignmentId: string;
+    latest: QueueSubmission;
+    attempts: QueueSubmission[];
+}
+
 /** Map an API submission + its parent assignment into a queue row */
 function toQueueSubmission(sub: ApiSubmission, assignment: Assignment): QueueSubmission {
     const status: QueueSubmission['status'] =
@@ -54,7 +65,7 @@ function toQueueSubmission(sub: ApiSubmission, assignment: Assignment): QueueSub
         submittedAt: sub.submittedAt,
         status,
         score: sub.grade?.totalScore ?? null,
-        maxScore: assignment.maxPoints,
+        maxScore: sub.grade?.maxScore ?? assignment.maxPoints,
         aiFlag: false,
         lateSubmission: sub.isLate,
         _raw: sub,
@@ -88,26 +99,17 @@ export function GradingQueue() {
     const submissionsLoading = submissionQueries.some((q) => q.isLoading);
 
     /** Flatten all per-assignment submission lists into a single queue,
-     *  keeping only the latest submission per (student, assignment) pair. */
+     *  preserving every attempt so faculty can regrade historical submissions. */
     const allSubmissions: QueueSubmission[] = useMemo(() => {
-        const latestMap = new Map<string, QueueSubmission>();
+        const rows: QueueSubmission[] = [];
         assignments.forEach((assignment, idx) => {
             const queryResult = submissionQueries[idx];
             if (!queryResult?.data) return;
             for (const sub of queryResult.data) {
-                const key = `${sub.studentId}__${assignment.id}`;
-                const row = toQueueSubmission(sub, assignment);
-                const existing = latestMap.get(key);
-                if (!existing) {
-                    latestMap.set(key, row);
-                } else {
-                    const existingTime = new Date(existing.submittedAt ?? 0).getTime();
-                    const newTime = new Date(row.submittedAt ?? 0).getTime();
-                    if (newTime > existingTime) latestMap.set(key, row);
-                }
+                rows.push(toQueueSubmission(sub, assignment));
             }
         });
-        return Array.from(latestMap.values());
+        return rows;
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [assignments, submissionQueries.map((q) => q.dataUpdatedAt).join(',')]);
 
@@ -118,20 +120,51 @@ export function GradingQueue() {
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [gradingSubmissionId, setGradingSubmissionId] = useState<string | null>(null);
     const [selectedSubmissions, setSelectedSubmissions] = useState<string[]>([]);
+    const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+
+    const groupedSubmissions: QueueSubmissionGroup[] = useMemo(() => {
+        const grouped = new Map<string, QueueSubmission[]>();
+        for (const sub of allSubmissions) {
+            const key = `${sub.assignmentId}::${sub.studentId}`;
+            const existing = grouped.get(key) ?? [];
+            existing.push(sub);
+            grouped.set(key, existing);
+        }
+
+        const rows: QueueSubmissionGroup[] = [];
+        for (const [key, attemptsRaw] of grouped.entries()) {
+            const attempts = [...attemptsRaw].sort(
+                (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+            );
+            const latest = attempts[0];
+            rows.push({
+                id: key,
+                studentName: latest.studentName,
+                studentId: latest.studentId,
+                studentEmail: latest.studentEmail,
+                assignmentName: latest.assignmentName,
+                assignmentId: latest.assignmentId,
+                latest,
+                attempts,
+            });
+        }
+
+        return rows;
+    }, [allSubmissions]);
 
     const tabs = [
-        { id: 'all', label: 'All', count: allSubmissions.length },
-        { id: 'pending', label: 'Pending', count: allSubmissions.filter(s => s.status === 'pending').length },
-        { id: 'in-review', label: 'In Review', count: allSubmissions.filter(s => s.status === 'in-review').length },
-        { id: 'resubmitted', label: 'Resubmitted', count: allSubmissions.filter(s => s.status === 'resubmitted').length },
-        { id: 'graded', label: 'Graded', count: allSubmissions.filter(s => s.status === 'graded').length },
+        { id: 'all', label: 'All', count: groupedSubmissions.length },
+        { id: 'pending', label: 'Pending', count: groupedSubmissions.filter(s => s.latest.status === 'pending').length },
+        { id: 'in-review', label: 'In Review', count: groupedSubmissions.filter(s => s.latest.status === 'in-review').length },
+        { id: 'resubmitted', label: 'Resubmitted', count: groupedSubmissions.filter(s => s.latest.status === 'resubmitted').length },
+        { id: 'graded', label: 'Graded', count: groupedSubmissions.filter(s => s.latest.status === 'graded').length },
     ];
 
-    const uniqueAssignments = [...new Set(allSubmissions.map(s => s.assignmentName))];
+    const uniqueAssignments = [...new Set(groupedSubmissions.map(s => s.assignmentName))];
 
-    const filteredSubmissions = allSubmissions
+    const filteredSubmissions = groupedSubmissions
         .filter(s => {
-            if (activeTab !== 'all' && s.status !== activeTab) return false;
+            if (activeTab !== 'all' && s.latest.status !== activeTab) return false;
             if (assignmentFilter !== 'all' && s.assignmentName !== assignmentFilter) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
@@ -143,11 +176,17 @@ export function GradingQueue() {
         })
         .sort((a, b) => {
             let cmp = 0;
-            if (sortBy === 'date') cmp = new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime();
+            if (sortBy === 'date') cmp = new Date(a.latest.submittedAt).getTime() - new Date(b.latest.submittedAt).getTime();
             else if (sortBy === 'name') cmp = a.studentName.localeCompare(b.studentName);
             else if (sortBy === 'assignment') cmp = a.assignmentName.localeCompare(b.assignmentName);
             return sortOrder === 'asc' ? cmp : -cmp;
         });
+
+    const toggleGroupExpanded = (groupId: string) => {
+        setExpandedGroups((prev) =>
+            prev.includes(groupId) ? prev.filter((id) => id !== groupId) : [...prev, groupId]
+        );
+    };
 
     const getStatusBadge = (status: QueueSubmission['status']) => {
         const styles: Record<string, { bg: string; text: string; label: string }> = {
@@ -411,6 +450,7 @@ export function GradingQueue() {
                                 </thead>
                                 <tbody>
                                     {filteredSubmissions.map((submission) => (
+                                        <>
                                         <tr
                                             key={submission.id}
                                             className="border-b hover:bg-[var(--color-primary-bg)]/50 transition-colors"
@@ -447,15 +487,15 @@ export function GradingQueue() {
                                                 {submission.assignmentName}
                                             </td>
                                             <td className="px-4 py-4" style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>
-                                                {submission.submittedAt ? (
+                                                {submission.latest.submittedAt ? (
                                                     <>
-                                                        {new Date(submission.submittedAt).toLocaleDateString('en-US', {
+                                                        {new Date(submission.latest.submittedAt).toLocaleDateString('en-US', {
                                                             month: 'short',
                                                             day: 'numeric',
                                                             year: 'numeric'
                                                         })}
                                                         <p style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>
-                                                            {new Date(submission.submittedAt).toLocaleTimeString('en-US', {
+                                                            {new Date(submission.latest.submittedAt).toLocaleTimeString('en-US', {
                                                                 hour: '2-digit',
                                                                 minute: '2-digit'
                                                             })}
@@ -466,15 +506,15 @@ export function GradingQueue() {
                                                 )}
                                             </td>
                                             <td className="px-4 py-4">
-                                                {submission.score !== null ? (
+                                                {submission.latest.score !== null ? (
                                                     <span style={{
                                                         fontSize: '14px',
                                                         fontWeight: 600,
-                                                        color: submission.score >= 90 ? 'var(--color-success)' :
-                                                            submission.score >= 80 ? 'var(--color-info)' :
-                                                                submission.score >= 70 ? 'var(--color-warning)' : 'var(--color-error)'
+                                                        color: submission.latest.score >= 90 ? 'var(--color-success)' :
+                                                            submission.latest.score >= 80 ? 'var(--color-info)' :
+                                                                submission.latest.score >= 70 ? 'var(--color-warning)' : 'var(--color-error)'
                                                     }}>
-                                                        {submission.score}/{submission.maxScore}
+                                                        {submission.latest.score}/{submission.latest.maxScore}
                                                     </span>
                                                 ) : (
                                                     <span style={{ fontSize: '14px', color: 'var(--color-text-light)' }}>--</span>
@@ -482,7 +522,7 @@ export function GradingQueue() {
                                             </td>
                                             <td className="px-4 py-4">
                                                 <div className="flex items-center gap-2">
-                                                    {submission.aiFlag && (
+                                                    {submission.latest.aiFlag && (
                                                         <span
                                                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded"
                                                             style={{ backgroundColor: 'var(--color-warning-bg, #FFF8E1)', fontSize: '11px', fontWeight: 600, color: 'var(--color-warning)' }}
@@ -491,7 +531,7 @@ export function GradingQueue() {
                                                             AI
                                                         </span>
                                                     )}
-                                                    {submission.lateSubmission && (
+                                                    {submission.latest.lateSubmission && (
                                                         <span
                                                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded"
                                                             style={{ backgroundColor: 'var(--color-error-bg, #FFEBEE)', fontSize: '11px', fontWeight: 600, color: 'var(--color-error)' }}
@@ -500,36 +540,103 @@ export function GradingQueue() {
                                                             Late
                                                         </span>
                                                     )}
-                                                    {!submission.aiFlag && !submission.lateSubmission && (
+                                                    {!submission.latest.aiFlag && !submission.latest.lateSubmission && (
                                                         <span style={{ fontSize: '14px', color: 'var(--color-text-light)' }}>--</span>
                                                     )}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-4">
-                                                {getStatusBadge(submission.status)}
+                                                {getStatusBadge(submission.latest.status)}
                                             </td>
                                             <td className="px-4 py-4">
-                                                <Button
-                                                    size="sm"
-                                                    variant={submission.status === 'graded' ? 'outline' : 'default'}
-                                                    onClick={() => handleOpenGrading(submission.id)}
-                                                    className={submission.status === 'graded' ? 'border-[var(--color-border)]' : 'text-white'}
-                                                    style={submission.status !== 'graded' ? { backgroundColor: 'var(--color-primary)' } : undefined}
-                                                >
-                                                    {submission.status === 'graded' ? (
-                                                        <>
-                                                            <Eye className="w-3.5 h-3.5 mr-1" />
-                                                            Review
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                                                            Grade
-                                                        </>
+                                                <div className="flex items-center gap-2">
+                                                    <Button
+                                                        size="sm"
+                                                        variant={submission.latest.status === 'graded' ? 'outline' : 'default'}
+                                                        onClick={() => handleOpenGrading(submission.latest.id)}
+                                                        className={submission.latest.status === 'graded' ? 'border-[var(--color-border)]' : 'text-white'}
+                                                        style={submission.latest.status !== 'graded' ? { backgroundColor: 'var(--color-primary)' } : undefined}
+                                                    >
+                                                        {submission.latest.status === 'graded' ? (
+                                                            <>
+                                                                <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                                                                Regrade
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                                                                Grade
+                                                            </>
+                                                        )}
+                                                    </Button>
+                                                    {submission.attempts.length > 1 && (
+                                                        <button
+                                                            onClick={() => toggleGroupExpanded(submission.id)}
+                                                            className="inline-flex items-center gap-1 px-2 py-1 rounded border"
+                                                            style={{ borderColor: 'var(--color-border)', fontSize: '12px', color: 'var(--color-text-mid)' }}
+                                                        >
+                                                            {expandedGroups.includes(submission.id) ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                                            {submission.attempts.length} attempts
+                                                        </button>
                                                     )}
-                                                </Button>
+                                                </div>
                                             </td>
                                         </tr>
+                                        {expandedGroups.includes(submission.id) && submission.attempts.slice(1).map((attempt, idx) => (
+                                            <tr
+                                                key={`${submission.id}-attempt-${attempt.id}`}
+                                                className="border-b"
+                                                style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-primary-bg)' }}
+                                            >
+                                                <td className="px-4 py-3">
+                                                    <span style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>#{idx + 2}</span>
+                                                </td>
+                                                <td className="px-4 py-3" style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
+                                                    Previous attempt
+                                                </td>
+                                                <td className="px-4 py-3" style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
+                                                    {submission.assignmentName}
+                                                </td>
+                                                <td className="px-4 py-3" style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
+                                                    {attempt.submittedAt ? new Date(attempt.submittedAt).toLocaleString('en-US', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        year: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit',
+                                                    }) : '--'}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {attempt.score !== null ? (
+                                                        <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                                                            {attempt.score}/{attempt.maxScore}
+                                                        </span>
+                                                    ) : (
+                                                        <span style={{ fontSize: '13px', color: 'var(--color-text-light)' }}>--</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>
+                                                        {attempt.lateSubmission ? 'Late' : '--'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    {getStatusBadge(attempt.status)}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <Button
+                                                        size="sm"
+                                                        variant={attempt.status === 'graded' ? 'outline' : 'default'}
+                                                        onClick={() => handleOpenGrading(attempt.id)}
+                                                        className={attempt.status === 'graded' ? 'border-[var(--color-border)]' : 'text-white'}
+                                                        style={attempt.status !== 'graded' ? { backgroundColor: 'var(--color-primary)' } : undefined}
+                                                    >
+                                                        {attempt.status === 'graded' ? 'View' : 'Grade'}
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        </>
                                     ))}
                                 </tbody>
                             </table>
@@ -538,10 +645,10 @@ export function GradingQueue() {
                                 <div className="text-center py-16">
                                     <CheckCircle2 className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-success)' }} />
                                     <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '4px' }}>
-                                        {allSubmissions.length === 0 ? 'No submissions yet' : 'All caught up!'}
+                                        {groupedSubmissions.length === 0 ? 'No submissions yet' : 'All caught up!'}
                                     </p>
                                     <p style={{ fontSize: '14px', color: 'var(--color-text-light)' }}>
-                                        {allSubmissions.length === 0
+                                        {groupedSubmissions.length === 0
                                             ? 'Submissions will appear here once students submit their work.'
                                             : 'No submissions match your current filters.'}
                                     </p>
@@ -554,7 +661,7 @@ export function GradingQueue() {
                     {!isLoading && (
                         <div className="flex items-center justify-between mt-4">
                             <p style={{ fontSize: '13px', color: 'var(--color-text-light)' }}>
-                                Showing {filteredSubmissions.length} of {allSubmissions.length} submissions
+                                Showing {filteredSubmissions.length} of {groupedSubmissions.length} students
                             </p>
                             <div className="flex items-center gap-2">
                                 <Button variant="outline" size="sm" className="border-[var(--color-border)]" disabled>

@@ -36,7 +36,7 @@ function SignupInner() {
 
     return <SignupPage role={role} onSignup={() => {
         try {
-            const stored = localStorage.getItem('autograde_current_user');
+            const stored = sessionStorage.getItem('autograde_current_user');
             if (stored) {
                 const userData = JSON.parse(stored);
                 signup(userData);
