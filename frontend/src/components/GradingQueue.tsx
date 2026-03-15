@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { Fragment, useState, useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { Search, Filter, CheckCircle2, Clock, AlertTriangle, ChevronDown, ChevronRight, ArrowUpDown, BarChart3, Loader2, RotateCcw } from 'lucide-react';
 import { TopNav } from './TopNav';
@@ -450,9 +450,8 @@ export function GradingQueue() {
                                 </thead>
                                 <tbody>
                                     {filteredSubmissions.map((submission) => (
-                                        <>
+                                        <Fragment key={submission.id}>
                                         <tr
-                                            key={submission.id}
                                             className="border-b hover:bg-[var(--color-primary-bg)]/50 transition-colors"
                                             style={{ borderColor: 'var(--color-border)' }}
                                         >
@@ -636,7 +635,7 @@ export function GradingQueue() {
                                                 </td>
                                             </tr>
                                         ))}
-                                        </>
+                                        </Fragment>
                                     ))}
                                 </tbody>
                             </table>
