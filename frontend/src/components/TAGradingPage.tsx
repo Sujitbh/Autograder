@@ -7,9 +7,6 @@ import { PageLayout } from './PageLayout';
 import { TopNav } from './TopNav';
 import { CodeEditor } from './CodeEditor';
 import { OutputPanel } from './OutputPanel';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { Textarea } from './ui/textarea';
-import { Button } from './ui/button';
 import { useCodeExecution } from '@/hooks/useCodeExecution';
 import {
     useTASubmissionDetail,
@@ -84,7 +81,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const autoGradeMutation = useTAAutoGrade(courseIdNum);
 
     // Code execution hook (for ad-hoc run)
-    const { execute, isRunning: isExecutingCode, result: execResult, error: execError } = useCodeExecution();
+    const { execute, isRunning: isExecutingCode, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
 
     const [activeFileIndex, setActiveFileIndex] = useState(0);
     const [score, setScore] = useState<string>('');
@@ -96,9 +93,10 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const [showExplorer, setShowExplorer] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
     const [outputOpen, setOutputOpen] = useState(false);
+    const [outputPanelHeight, setOutputPanelHeight] = useState(280);
     const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading'>('grading');
-    const [stdinDialogOpen, setStdinDialogOpen] = useState(false);
     const [stdinValue, setStdinValue] = useState('');
+    const [showInlineInput, setShowInlineInput] = useState(false);
 
     const [runTestsResult, setRunTestsResult] = useState<{
         total_testcases: number;
@@ -111,6 +109,8 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
             testcase_id: number | null;
             testcase_name: string | null;
             is_public?: boolean | null;
+            input_data?: string | null;
+            expected_output?: string | null;
             passed: boolean;
             output: string | null;
             error_output: string | null;
@@ -292,21 +292,27 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     };
 
     const handleRunCode = async () => {
+        setOutputOpen(true);
         if (codeUsesInput(code, language)) {
-            setStdinDialogOpen(true);
+            if (!showInlineInput) {
+                setShowInlineInput(true);
+                return;
+            }
+            await execute(code, language, stdinValue);
             return;
         }
-        setOutputOpen(true);
+        setShowInlineInput(false);
         await execute(code, language);
     };
 
-    const handleOpenStdinDialog = () => {
-        setStdinDialogOpen(true);
+    const handleOpenInlineInput = () => {
+        setOutputOpen(true);
+        setShowInlineInput(true);
     };
 
     const handleRunWithStdin = async () => {
-        setStdinDialogOpen(false);
         setOutputOpen(true);
+        setShowInlineInput(true);
         await execute(code, language, stdinValue);
     };
 
@@ -411,7 +417,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                             </button>
 
                             <button
-                                onClick={handleOpenStdinDialog}
+                                onClick={handleOpenInlineInput}
                                 disabled={isExecutingCode || runTestsMutation.isPending || autoGradeMutation.isPending}
                                 style={{
                                     padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
@@ -524,15 +530,28 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
 
                         {/* Output Panel (collapsible, matching student) */}
                         <div style={{
-                            height: outputOpen ? 280 : 0,
+                            height: outputOpen ? outputPanelHeight : 0,
                             background: 'var(--color-surface)',
                             borderTop: outputOpen ? '1px solid var(--color-border)' : 'none',
                             overflow: 'hidden',
-                            transition: 'height .3s ease',
                             flexShrink: 0,
                             display: 'flex',
                             flexDirection: 'column' as const,
                         }}>
+                            {/* Drag-to-resize handle */}
+                            <div
+                                onMouseDown={(e) => {
+                                    const startY = e.clientY;
+                                    const startH = outputPanelHeight;
+                                    const onMove = (ev: MouseEvent) => setOutputPanelHeight(Math.max(120, Math.min(700, startH + (startY - ev.clientY))));
+                                    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+                                    window.addEventListener('mousemove', onMove);
+                                    window.addEventListener('mouseup', onUp);
+                                }}
+                                style={{ height: 5, cursor: 'ns-resize', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-surface-elevated)' }}
+                            >
+                                <div style={{ width: 28, height: 3, borderRadius: 2, background: 'var(--color-border)' }} />
+                            </div>
                             <div style={{
                                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                 padding: '6px 14px', background: 'var(--color-surface-elevated)',
@@ -553,7 +572,17 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                 </button>
                             </div>
                             <div className="flex-1 min-h-0">
-                                <OutputPanel result={execResult} isRunning={isExecutingCode} error={execError} />
+                                <OutputPanel
+                                    result={execResult}
+                                    isRunning={isExecutingCode}
+                                    error={execError}
+                                    stdinInput={lastStdinInput}
+                                    showInputEditor={showInlineInput}
+                                    inputDraft={stdinValue}
+                                    onInputDraftChange={setStdinValue}
+                                    onRunWithInput={handleRunWithStdin}
+                                    isRunWithInputDisabled={isExecutingCode || runTestsMutation.isPending || autoGradeMutation.isPending}
+                                />
                             </div>
                         </div>
                     </div>
@@ -742,6 +771,42 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                         className="px-3 py-2 border-t"
                                                                         style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-primary-bg)' }}
                                                                     >
+                                                                        {test.input_data && (
+                                                                            <div className="mb-2">
+                                                                                <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>
+                                                                                    Input:
+                                                                                </p>
+                                                                                <pre
+                                                                                    className="p-2 rounded text-xs overflow-x-auto"
+                                                                                    style={{
+                                                                                        backgroundColor: '#111827',
+                                                                                        color: '#E5E7EB',
+                                                                                        fontFamily: 'monospace',
+                                                                                        maxHeight: '120px',
+                                                                                    }}
+                                                                                >
+                                                                                    {test.input_data}
+                                                                                </pre>
+                                                                            </div>
+                                                                        )}
+                                                                        {test.expected_output && (
+                                                                            <div className="mb-2">
+                                                                                <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>
+                                                                                    Expected Output:
+                                                                                </p>
+                                                                                <pre
+                                                                                    className="p-2 rounded text-xs overflow-x-auto"
+                                                                                    style={{
+                                                                                        backgroundColor: '#111827',
+                                                                                        color: '#E5E7EB',
+                                                                                        fontFamily: 'monospace',
+                                                                                        maxHeight: '120px',
+                                                                                    }}
+                                                                                >
+                                                                                    {test.expected_output}
+                                                                                </pre>
+                                                                            </div>
+                                                                        )}
                                                                         {test.output && (
                                                                             <div className="mb-2">
                                                                                 <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>
@@ -1046,33 +1111,6 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                 </div>
 
             </div>
-
-            {/* Stdin Dialog */}
-            <Dialog open={stdinDialogOpen} onOpenChange={setStdinDialogOpen}>
-                <DialogContent style={{ maxWidth: '500px' }}>
-                    <DialogHeader>
-                        <DialogTitle>Run with Input</DialogTitle>
-                    </DialogHeader>
-                    <div className="mt-4">
-                        <label className="text-sm font-medium" style={{ color: 'var(--color-text-dark)' }}>
-                            Enter program input (stdin):
-                        </label>
-                        <Textarea
-                            value={stdinValue}
-                            onChange={(e) => setStdinValue(e.target.value)}
-                            placeholder="Type your input here..."
-                            className="mt-2 font-mono text-sm"
-                            rows={6}
-                        />
-                    </div>
-                    <DialogFooter className="mt-4">
-                        <Button variant="outline" onClick={() => setStdinDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleRunWithStdin} className="text-white" style={{ backgroundColor: 'var(--color-success)' }}>
-                            <Play className="w-4 h-4 mr-2" /> Run
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
         </PageLayout>
     );

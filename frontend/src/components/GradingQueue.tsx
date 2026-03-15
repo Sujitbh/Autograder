@@ -240,6 +240,10 @@ export function GradingQueue() {
         ? filteredSubmissions.find(s => s.id === gradingSubmissionId) ?? allSubmissions.find(s => s.id === gradingSubmissionId) ?? null
         : null;
 
+    const gradingSubmissionRow: QueueSubmission | null = gradingSubmission
+        ? ('_raw' in gradingSubmission ? gradingSubmission : gradingSubmission.latest)
+        : null;
+
     const gradingIndex = gradingSubmission
         ? filteredSubmissions.findIndex(s => s.id === gradingSubmission.id)
         : -1;
@@ -274,8 +278,8 @@ export function GradingQueue() {
     };
 
     /** Resolve the assignment's rubric for the grading panel */
-    const gradingAssignment = gradingSubmission
-        ? assignments.find(a => a.id === gradingSubmission.assignmentId)
+    const gradingAssignment = gradingSubmissionRow
+        ? assignments.find(a => a.id === gradingSubmissionRow.assignmentId)
         : undefined;
 
     const gradingRubric: RubricCriterion[] = gradingAssignment?.rubric ?? [];
@@ -683,7 +687,7 @@ export function GradingQueue() {
             </div>
 
             {/* Grading Interface Panel */}
-            {gradingSubmission && (
+            {gradingSubmissionRow && (
                 <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--color-background, #f5f5f5)' }}>
                     {/* Header bar */}
                     <div className="flex items-center justify-between px-6 py-3 border-b" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
@@ -695,25 +699,25 @@ export function GradingQueue() {
                             &larr; Back to Grading Queue
                         </button>
                         <span className="text-sm" style={{ color: 'var(--color-text-mid)' }}>
-                            Grading: {gradingSubmission.assignmentName} &mdash; {gradingSubmission.studentName}
+                            Grading: {gradingSubmissionRow.assignmentName} &mdash; {gradingSubmissionRow.studentName}
                         </span>
                     </div>
                     {/* GradingInterface */}
                     <div className="flex-1 overflow-auto p-6">
                         <GradingInterface
                             submission={{
-                                id: gradingSubmission.id,
-                                studentName: gradingSubmission.studentName,
-                                studentId: gradingSubmission.studentId,
-                                code: gradingSubmission._raw.code || '# No code available',
-                                language: gradingSubmission._raw.language ?? 'python',
-                                submittedAt: gradingSubmission.submittedAt,
-                                isLate: gradingSubmission.lateSubmission,
-                                testResults: gradingSubmission._raw.testResults,
+                                id: gradingSubmissionRow.id,
+                                studentName: gradingSubmissionRow.studentName,
+                                studentId: gradingSubmissionRow.studentId,
+                                code: gradingSubmissionRow._raw.code || '# No code available',
+                                language: gradingSubmissionRow._raw.language ?? 'python',
+                                submittedAt: gradingSubmissionRow.submittedAt,
+                                isLate: gradingSubmissionRow.lateSubmission,
+                                testResults: gradingSubmissionRow._raw.testResults,
                             }}
                             rubricCriteria={gradingRubric}
-                            autoScore={gradingSubmission.score ?? undefined}
-                            maxPoints={gradingSubmission.maxScore}
+                            autoScore={gradingSubmissionRow.score ?? undefined}
+                            maxPoints={gradingSubmissionRow.maxScore}
                             totalSubmissions={filteredSubmissions.length}
                             currentIndex={gradingIndex}
                             onPrevious={handleGradingPrev}

@@ -136,6 +136,7 @@ export const submissionService = {
     results: Array<{
       testcase_id: number;
       test_name: string;
+      input_data: string | null;
       passed: boolean;
       actual_output: string;
       expected_output: string;

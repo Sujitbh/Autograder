@@ -453,11 +453,13 @@ class ExecutionService:
             if hasattr(tc, "input_data"):
                 input_data = tc.input_data
                 expected_output = tc.expected_output
+                testcase_name = tc.name if hasattr(tc, "name") else None
                 points = tc.points if hasattr(tc, "points") else 1
                 tc_id = tc.id if hasattr(tc, "id") else None
             else:
                 input_data = tc.get("input_data", "")
                 expected_output = tc.get("expected_output", "")
+                testcase_name = tc.get("name")
                 points = tc.get("points", 1)
                 tc_id = tc.get("id")
 
@@ -469,6 +471,9 @@ class ExecutionService:
             )
 
             result["testcase_id"] = tc_id
+            result["testcase_name"] = testcase_name
+            result["input_data"] = input_data
+            result["expected_output"] = expected_output
             result["points"] = points
             result["points_earned"] = points if result["passed"] else 0
 

@@ -79,6 +79,8 @@ interface RubricTemplate {
     }>;
 }
 
+const NO_RUBRIC_TEMPLATE_ID = 'none';
+
 const BUILTIN_RUBRIC_TEMPLATES: RubricTemplate[] = [
     {
         id: 'tpl-standard',
@@ -111,6 +113,57 @@ const BUILTIN_RUBRIC_TEMPLATES: RubricTemplate[] = [
             { name: 'Testing', description: 'Includes unit tests with good coverage', maxPoints: 15, gradingMethod: 'auto' },
             { name: 'Documentation', description: 'README, docstrings, and inline comments', maxPoints: 15, gradingMethod: 'manual' },
             { name: 'UI/UX', description: 'Clean interface and user experience (if applicable)', maxPoints: 10, gradingMethod: 'manual' },
+        ],
+    },
+    {
+        id: 'tpl-prof-matrix-eval',
+        name: 'Professor Rubric: Matrix Evaluation Form',
+        isBuiltIn: true,
+        criteria: [
+            { name: 'I. Correctness - Correct Output', description: 'All test cases produce expected output', maxPoints: 30, gradingMethod: 'manual' },
+            { name: 'I. Correctness - Output Quality', description: 'Excellent output format; exceeds requirements', maxPoints: 10, gradingMethod: 'manual' },
+            { name: 'I. Correctness - Specification', description: 'Meets specified requirements without exception', maxPoints: 10, gradingMethod: 'manual' },
+            { name: 'I. Correctness - Testing', description: 'Testing evidence included (n/a in sample form when not required)', maxPoints: 0, gradingMethod: 'manual' },
+            { name: 'I. Correctness - Efficiency', description: 'Program operates with optimal efficiency', maxPoints: 10, gradingMethod: 'manual' },
+            { name: 'II. Style - Code Style', description: 'Style conventions and readability', maxPoints: 10, gradingMethod: 'manual' },
+            { name: 'II. Style - Program Design/Modularity', description: 'Class/module decomposition quality', maxPoints: 10, gradingMethod: 'manual' },
+            { name: 'II. Style - Parameter Usage', description: 'Proper parameter and scope usage', maxPoints: 5, gradingMethod: 'manual' },
+            { name: 'III. Documentation - Neatness/Clarity', description: 'Layout/indentation consistent and attractive', maxPoints: 5, gradingMethod: 'manual' },
+            { name: 'III. Documentation - General Documentation', description: 'General comments are accurate and useful', maxPoints: 5, gradingMethod: 'manual' },
+            { name: 'III. Documentation - Module-level', description: 'Module comments are complete and properly formatted', maxPoints: 5, gradingMethod: 'manual' },
+            { name: 'IV. Design Documents - Neatness/Clarity', description: 'Design document presentation quality', maxPoints: 0, gradingMethod: 'manual' },
+            { name: 'IV. Design Documents - Completeness', description: 'Design document completeness', maxPoints: 0, gradingMethod: 'manual' },
+            { name: 'IV. Design Documents - Agreement with Code', description: 'Design document aligns with implementation', maxPoints: 0, gradingMethod: 'manual' },
+        ],
+    },
+    {
+        id: 'tpl-prof-functional-10pt',
+        name: 'Professor Rubric: Functional 10-Point Breakdown',
+        isBuiltIn: true,
+        criteria: [
+            { name: 'Main Function - Gets word from user', description: 'Main function interaction', maxPoints: 0.25, gradingMethod: 'manual' },
+            { name: 'Main Function - Error checking for word', description: 'Main function validation', maxPoints: 0.5, gradingMethod: 'manual' },
+            { name: 'Main Function - Test selection prompt', description: 'Asks user which test to perform', maxPoints: 0.25, gradingMethod: 'manual' },
+            { name: 'Main Function - Error checking test choice', description: 'Validates selected test', maxPoints: 0.5, gradingMethod: 'manual' },
+            { name: 'Main Function - Calls correction function', description: 'Invokes correct function for selected test', maxPoints: 0.5, gradingMethod: 'manual' },
+            { name: 'Main Function - Displays correct result', description: 'Displays test output correctly', maxPoints: 0.5, gradingMethod: 'manual' },
+            { name: 'Main Function - Continue prompt', description: 'Asks whether user wants another word', maxPoints: 0.25, gradingMethod: 'manual' },
+            { name: 'Main Function - Multiple words support', description: 'Handles any number of words', maxPoints: 0.25, gradingMethod: 'manual' },
+            { name: 'Word Validation Function - Correct parameter', description: 'Function signature correctness', maxPoints: 0.5, gradingMethod: 'manual' },
+            { name: 'Word Validation Function - Input validation logic', description: 'Validates word input properly', maxPoints: 1, gradingMethod: 'manual' },
+            { name: 'Word Validation Function - Correct return value', description: 'Returns expected result type/value', maxPoints: 0.5, gradingMethod: 'manual' },
+            { name: 'Palindrome Function - Correct parameter', description: 'Function signature correctness', maxPoints: 0.5, gradingMethod: 'manual' },
+            { name: 'Palindrome Function - Correct palindrome logic', description: 'Determines palindrome accurately', maxPoints: 1, gradingMethod: 'manual' },
+            { name: 'Palindrome Function - Correct return value', description: 'Returns expected result type/value', maxPoints: 0.5, gradingMethod: 'manual' },
+            { name: 'Vowel/Consonant Function - Correct parameter', description: 'Function signature correctness', maxPoints: 0.5, gradingMethod: 'manual' },
+            { name: 'Vowel/Consonant Function - Counts correctly', description: 'Counts vowels and consonants accurately', maxPoints: 0.5, gradingMethod: 'manual' },
+            { name: 'Vowel/Consonant Function - Compares counts correctly', description: 'Correct comparison and decision logic', maxPoints: 0.5, gradingMethod: 'manual' },
+            { name: 'Vowel/Consonant Function - Correct return value', description: 'Returns expected result type/value', maxPoints: 0.5, gradingMethod: 'manual' },
+            { name: 'Test Cases', description: 'Runs/provides required test cases', maxPoints: 1, gradingMethod: 'manual' },
+            { name: 'Deduction Note - Not enough comments/whitespace', description: 'Manual deduction guideline: up to -1 point', maxPoints: 0, gradingMethod: 'manual' },
+            { name: 'Deduction Note - Difficult to read/understand or messy output', description: 'Manual deduction guideline: up to -1 point', maxPoints: 0, gradingMethod: 'manual' },
+            { name: 'Deduction Note - Poor variable naming', description: 'Manual deduction guideline: up to -1 point', maxPoints: 0, gradingMethod: 'manual' },
+            { name: 'Deduction Note - Uses uncovered class topics', description: 'Manual deduction guideline: up to -1 point', maxPoints: 0, gradingMethod: 'manual' },
         ],
     },
 ];
@@ -228,6 +281,7 @@ export function CreateAssignmentForm({
     const [rubricSaveSuccess, setRubricSaveSuccess] = useState(false);
     const [savedTemplates, setSavedTemplates] = useState<RubricTemplate[]>([]);
     const [showPublishDialog, setShowPublishDialog] = useState(false);
+    const [selectedRubricTemplateId, setSelectedRubricTemplateId] = useState(NO_RUBRIC_TEMPLATE_ID);
 
     // Load saved rubric templates on mount
     useEffect(() => {
@@ -412,6 +466,11 @@ export function CreateAssignmentForm({
     // ── Rubric template functions ─────────────────────────────────
 
     const handleLoadTemplate = (templateId: string) => {
+        setSelectedRubricTemplateId(templateId);
+        if (templateId === NO_RUBRIC_TEMPLATE_ID) {
+            replaceRubric([]);
+            return;
+        }
         const template = allTemplates.find((t) => t.id === templateId);
         if (template) {
             replaceRubric(template.criteria.map((c) => ({ ...c, weight: c.weight ?? 1 })));
@@ -449,6 +508,17 @@ export function CreateAssignmentForm({
     const pdfInputRef = useRef<HTMLInputElement>(null);
     const [pdfParsing, setPdfParsing] = useState(false);
     const [pdfError, setPdfError] = useState<string | null>(null);
+    const [rubricUploadName, setRubricUploadName] = useState<string | null>(null);
+    const [rubricPreviewImages, setRubricPreviewImages] = useState<string[]>([]);
+
+    async function readFileAsDataUrl(file: File): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result ?? ''));
+            reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
+            reader.readAsDataURL(file);
+        });
+    }
 
     /** Scale + enhance image before OCR for better word boundary detection. */
     async function scaleImageForOCR(file: File): Promise<Blob> {
@@ -564,6 +634,8 @@ export function CreateAssignmentForm({
         setPdfParsing(true);
         setPdfError(null);
         try {
+            setRubricUploadName(file.name);
+            setRubricPreviewImages([await readFileAsDataUrl(file)]);
             // Scale up image for better OCR word boundary detection
             const enhanced = await scaleImageForOCR(file);
             const Tesseract = (await import('tesseract.js'));
@@ -581,7 +653,9 @@ export function CreateAssignmentForm({
             if (criteria.length === 0) {
                 setPdfError(`Could not detect rubric criteria. Raw OCR (see console): ${data.text.slice(0, 300)}`);
             } else {
+                setSelectedRubricTemplateId(NO_RUBRIC_TEMPLATE_ID);
                 replaceRubric(criteria);
+                toast.success(`Rubric uploaded from ${file.name}`);
             }
         } catch (err) {
             console.error('Image OCR error', err);
@@ -646,19 +720,31 @@ export function CreateAssignmentForm({
         setPdfParsing(true);
         setPdfError(null);
         try {
+            setRubricUploadName(file.name);
             const arrayBuffer = await file.arrayBuffer();
             const pdfjsLib = await import('pdfjs-dist');
             pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const pageImages: string[] = [];
             let fullText = '';
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
+                const viewport = page.getViewport({ scale: 1.5 });
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                    pageImages.push(canvas.toDataURL('image/png'));
+                }
                 const content = await page.getTextContent();
                 const strings = content.items
                     .filter((item) => 'str' in item && typeof (item as Record<string, unknown>).str === 'string')
                     .map((item) => (item as { str: string }).str);
                 fullText += strings.join(' ') + '\n';
             }
+            setRubricPreviewImages(pageImages);
 
             const maxPts = getValues('rubric').reduce((s: number, c: { maxPoints: number }) => s + (c.maxPoints || 0), 0) || 100;
             const criteria = parseRubricText(fullText, maxPts);
@@ -666,7 +752,9 @@ export function CreateAssignmentForm({
             if (criteria.length === 0) {
                 setPdfError('Could not detect rubric criteria in this PDF. Make sure it contains criterion names with point values (e.g. "Correctness – 40 pts").');
             } else {
+                setSelectedRubricTemplateId(NO_RUBRIC_TEMPLATE_ID);
                 replaceRubric(criteria);
+                toast.success(`Rubric uploaded from ${file.name}`);
             }
         } catch (err) {
             console.error('PDF parse error', err);
@@ -1288,11 +1376,12 @@ export function CreateAssignmentForm({
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border p-4 bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                         <FolderOpen className="h-4 w-4 flex-shrink-0 text-[#6B0000]" />
-                        <Select onValueChange={handleLoadTemplate}>
+                        <Select value={selectedRubricTemplateId} onValueChange={handleLoadTemplate}>
                             <SelectTrigger className="h-9 max-w-xs">
                                 <SelectValue placeholder="Load saved rubric..." />
                             </SelectTrigger>
                             <SelectContent>
+                                <SelectItem value={NO_RUBRIC_TEMPLATE_ID}>None</SelectItem>
                                 <div className="px-2 py-1.5 text-xs font-semibold text-gray-400">Built-in Templates</div>
                                 {BUILTIN_RUBRIC_TEMPLATES.map((t) => (
                                     <SelectItem key={t.id} value={t.id}>
@@ -1371,6 +1460,43 @@ export function CreateAssignmentForm({
                             <p className="text-xs mt-0.5">{pdfError}</p>
                         </div>
                         <button type="button" className="ml-auto text-red-400 hover:text-red-600" onClick={() => setPdfError(null)} aria-label="Dismiss">✕</button>
+                    </div>
+                )}
+
+                {rubricUploadName && (
+                    <div className="rounded-lg border p-3 bg-white dark:bg-gray-900 dark:border-gray-700">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                            <div>
+                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Uploaded rubric file</p>
+                                <p className="text-xs text-gray-500">{rubricUploadName}</p>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    setRubricUploadName(null);
+                                    setRubricPreviewImages([]);
+                                }}
+                            >
+                                Clear
+                            </Button>
+                        </div>
+                        {rubricPreviewImages.length > 0 ? (
+                            <div className="rounded-lg border overflow-auto max-h-[420px] bg-gray-50 dark:bg-gray-950 p-3 space-y-3">
+                                {rubricPreviewImages.map((src, i) => (
+                                    <img
+                                        key={`${rubricUploadName}-${i}`}
+                                        src={src}
+                                        alt={`Rubric preview page ${i + 1}`}
+                                        className="w-full rounded shadow-sm border dark:border-gray-700"
+                                        style={{ imageRendering: 'auto' }}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-gray-500">File selected. Preview is not available for this upload.</p>
+                        )}
                     </div>
                 )}
 
