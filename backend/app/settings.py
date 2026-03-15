@@ -1,10 +1,16 @@
 from typing import List
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 import os
 from pathlib import Path
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=str(Path(__file__).resolve().parents[2] / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
     DATABASE_URL: str = "postgresql+psycopg2://autograder_user:autograder_pass@127.0.0.1:5432/autograder"
     ALLOW_ADMIN_REGISTRATION: bool = False
     JWT_SECRET: str = "change-me-now"

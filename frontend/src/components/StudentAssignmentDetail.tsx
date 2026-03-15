@@ -236,26 +236,39 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     }
   }, []);
 
-  // Detect if python code uses input() to trigger prompt modal
-  const codeUsesInput = (codeStr: string) => {
+  // Detect common stdin patterns by language to offer input dialog automatically.
+  const codeUsesInput = (codeStr: string, lang: string) => {
     const lines = codeStr.split('\n');
     for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed.startsWith('#')) continue;
-      if (trimmed.includes('input(')) return true;
+      if (lang === 'python' && trimmed.includes('input(')) return true;
+      if (
+        lang === 'java' && (
+          trimmed.includes('Scanner')
+          || trimmed.includes('System.in')
+          || /\bnext(Line|Int|Double|Float|Long|Short|Byte|Boolean)?\s*\(/.test(trimmed)
+        )
+      ) {
+        return true;
+      }
     }
     return false;
   };
 
   // Run code
   const handleRunCode = async () => {
-    if (language === 'python' && codeUsesInput(code)) {
+    if (codeUsesInput(code, language)) {
       setStdinDialogOpen(true);
       return;
     }
 
     setOutputOpen(true);
     await execute(code, language);
+  };
+
+  const handleOpenStdinDialog = () => {
+    setStdinDialogOpen(true);
   };
 
   // Run with stdin
@@ -507,6 +520,23 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                 onMouseLeave={e => { e.currentTarget.style.background = '#16a34a'; e.currentTarget.style.boxShadow = 'none'; }}
               >
                 {isExecuting ? '⏳ Running...' : '▶ Run'}
+              </button>
+
+              <button
+                onClick={handleOpenStdinDialog}
+                disabled={isExecuting || isTestsRunning}
+                style={{
+                  padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                  background: 'var(--color-surface-elevated)', color: 'var(--color-text-dark)', letterSpacing: '.3px',
+                  transition: 'background .15s',
+                  opacity: isExecuting || isTestsRunning ? 0.7 : 1,
+                  cursor: isExecuting || isTestsRunning ? 'not-allowed' : 'pointer',
+                  border: '1px solid var(--color-border)',
+                }}
+                onMouseEnter={e => { if (!isExecuting && !isTestsRunning) { e.currentTarget.style.background = 'var(--color-border)'; } }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
+              >
+                ⌨ Input
               </button>
 
               <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 6px' }} />

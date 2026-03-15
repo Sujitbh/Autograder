@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import type { AxiosError } from 'axios';
 import { useTheme } from '@/utils/ThemeContext';
 import { PageLayout } from './PageLayout';
 import { TopNav } from './TopNav';
@@ -90,6 +91,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         mutationFn: () => submissionService.autoGrade(submissionId),
     });
 
+    const runTestsMutation = useMutation({
+        mutationFn: () => submissionService.runTests(submissionId),
+    });
+
     const { execute, isRunning: isExecutingCode, result: execResult, error: execError } = useCodeExecution();
 
     const [activeFileIndex, setActiveFileIndex] = useState(0);
@@ -104,6 +109,12 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const [stdinValue, setStdinValue] = useState('');
     const [autoGradeResult, setAutoGradeResult] = useState<any>(null);
     const [liveTestResults, setLiveTestResults] = useState<any[] | null>(null);
+
+    const { data: assignmentSubmissions = [] } = useQuery({
+        queryKey: ['faculty-assignment-submissions', detail?.assignment?.id],
+        queryFn: () => submissionService.getSubmissions(String(detail!.assignment.id)),
+        enabled: !!detail?.assignment?.id,
+    });
 
     // Initialise form when detail loads
     useEffect(() => {
@@ -126,10 +137,33 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const rubrics = detail?.rubrics ?? [];
     const getTotalScore = () => rubricScores.reduce((s, n) => s + (Number(n) || 0), 0);
     const getTotalMax = () => rubrics.reduce((s, r) => s + r.max_points, 0);
+    const resultPointsTotal = (detail?.results ?? []).reduce((s, r) => s + (r.points || 0), 0);
+    const resolvedMaxPoints = getTotalMax() || detail?.max_score || resultPointsTotal || detail?.assignment?.max_points || 100;
 
     const updateRubricScore = (idx: number, val: string) => {
         const num = Math.max(0, Math.min(Number(val) || 0, rubrics[idx]?.max_points ?? 0));
         setRubricScores(prev => { const next = [...prev]; next[idx] = num; return next; });
+    };
+
+    const getGradeErrorMessage = () => {
+        if (!gradeMutation.isError || !gradeMutation.error) {
+            return 'Failed to save grade. Please try again.';
+        }
+        const err = gradeMutation.error as AxiosError<{ detail?: string | Array<{ msg?: string }> }>;
+        const detail = err.response?.data?.detail;
+        if (typeof detail === 'string' && detail.trim()) {
+            return detail;
+        }
+        if (Array.isArray(detail)) {
+            const combined = detail
+                .map((d) => d?.msg)
+                .filter((msg): msg is string => Boolean(msg && msg.trim()))
+                .join('; ');
+            if (combined) {
+                return combined;
+            }
+        }
+        return err.message || 'Failed to save grade. Please try again.';
     };
 
     const toggleTest = (id: number) => {
@@ -165,30 +199,74 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         } catch (e) { /* handled by mutation state */ }
     }, [rubrics, autoGradeMutation]);
 
-    const handleRunTests = () => {
+    const sortedAssignmentSubmissions = [...assignmentSubmissions].sort(
+        (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+    );
+    const currentSubmissionIndex = sortedAssignmentSubmissions.findIndex((s) => s.id === submissionId);
+    const nextSubmissionId =
+        currentSubmissionIndex >= 0 && currentSubmissionIndex < sortedAssignmentSubmissions.length - 1
+            ? sortedAssignmentSubmissions[currentSubmissionIndex + 1].id
+            : null;
+
+    const handleRunTests = async () => {
         setInfoTab('tests');
-        handleAutoGrade();
+        try {
+            const result = await runTestsMutation.mutateAsync();
+            const testRows = result?.test_results?.results ?? result?.results ?? [];
+            setLiveTestResults(
+                testRows.map((r: any, i: number) => ({
+                    id: r.id ?? r.testcase_id ?? i,
+                    testcase_id: r.testcase_id ?? null,
+                    testcase_name: r.testcase_name ?? null,
+                    passed: !!r.passed,
+                    output: r.output ?? r.actual_output ?? null,
+                    error_output: r.error_output ?? r.stderr ?? null,
+                    points_awarded: r.points_awarded ?? r.points_earned ?? null,
+                }))
+            );
+        } catch {
+            // Mutation state handles the UI error state.
+        }
     };
 
-    const handleGrade = async (isDraft: boolean) => {
-        const score = getTotalScore();
-        const maxScore = getTotalMax() || (detail?.max_score ?? 100);
-        await gradeMutation.mutateAsync({ score, max_score: maxScore, feedback: feedback || undefined });
+    const handleGrade = async (isDraft: boolean, moveToNext: boolean = false) => {
+        const rawScore = getTotalScore();
+        const normalizedScore = Math.max(0, Math.min(Math.round(rawScore), resolvedMaxPoints));
+        const normalizedMax = Math.max(1, Math.round(resolvedMaxPoints));
+        const feedbackToSave = feedback.trim() || 'Reviewed by instructor.';
+        await gradeMutation.mutateAsync({ score: normalizedScore, max_score: normalizedMax, feedback: feedbackToSave });
         if (!isDraft) {
+            if (moveToNext && nextSubmissionId) {
+                router.push(`/courses/${courseId}/submissions/${nextSubmissionId}/grade`);
+                return;
+            }
             router.push(`/courses/${courseId}/assignments/${detail?.assignment.id}/grading`);
         }
     };
 
-    const codeUsesInput = (code: string) =>
-        code.split('\n').some(l => !l.trim().startsWith('#') && l.includes('input('));
+    const codeUsesInput = (code: string, lang: string) =>
+        code.split('\n').some((line) => {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('#')) return false;
+            if (lang === 'python') return trimmed.includes('input(');
+            if (lang === 'java') {
+                return trimmed.includes('Scanner')
+                    || trimmed.includes('System.in')
+                    || /\bnext(Line|Int|Double|Float|Long|Short|Byte|Boolean)?\s*\(/.test(trimmed);
+            }
+            return false;
+        });
 
     const handleRunCode = async () => {
         if (!detail) return;
         const lang = (detail.assignment.language || 'python').toLowerCase();
         const code = detail.files[activeFileIndex]?.content ?? '';
-        if (lang === 'python' && codeUsesInput(code)) { setStdinDialogOpen(true); return; }
+        if (codeUsesInput(code, lang)) { setStdinDialogOpen(true); return; }
         setOutputOpen(true);
         await execute(code, lang);
+    };
+    const handleOpenStdinDialog = () => {
+        setStdinDialogOpen(true);
     };
     const handleRunWithStdin = async () => {
         if (!detail) return;
@@ -304,6 +382,9 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                             <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#3b1a1a' : '#fef3c7', color: isDark ? '#fca5a5' : '#92400e', display: 'inline-flex', alignItems: 'center' }}>
                                 {language.charAt(0).toUpperCase() + language.slice(1)}
                             </span>
+                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#d1d5db' : '#374151', display: 'inline-flex', alignItems: 'center' }}>
+                                View Only
+                            </span>
                             <div style={{ flex: 1 }} />
                             {/* Run Code */}
                             <button onClick={handleRunCode} disabled={isExecutingCode || autoGradeMutation.isPending}
@@ -311,6 +392,20 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                 onMouseEnter={e => { if (!isExecutingCode) { e.currentTarget.style.background = '#15803d'; } }}
                                 onMouseLeave={e => { e.currentTarget.style.background = '#16a34a'; }}>
                                 {isExecutingCode ? '⏳ Running...' : '▶ Run Code'}
+                            </button>
+                            <button
+                                onClick={handleOpenStdinDialog}
+                                disabled={isExecutingCode || autoGradeMutation.isPending}
+                                style={{
+                                    padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                                    background: 'var(--color-surface-elevated)', color: 'var(--color-text-dark)', letterSpacing: '.3px',
+                                    transition: 'background .15s', opacity: isExecutingCode ? 0.7 : 1,
+                                    cursor: isExecutingCode ? 'not-allowed' : 'pointer', border: '1px solid var(--color-border)'
+                                }}
+                                onMouseEnter={e => { if (!isExecutingCode) e.currentTarget.style.background = 'var(--color-border)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
+                            >
+                                ⌨ Input
                             </button>
                             <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 6px' }} />
                             {/* Auto Grade */}
@@ -341,7 +436,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                         {/* Code Editor */}
                         <div className="flex-1 overflow-hidden relative" style={{ background: 'var(--color-surface)' }}>
                             {activeFile ? (
-                                <CodeEditor language={language} value={code} onChange={() => { }} />
+                                <CodeEditor language={language} value={code} onChange={() => { }} readOnly />
                             ) : (
                                 <div className="flex items-center justify-center h-full">
                                     <p style={{ color: 'var(--color-text-mid)', fontSize: '14px' }}>No file content available</p>
@@ -427,16 +522,16 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                     <div>
                                         <div className="flex items-center justify-between mb-4">
                                             <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)' }}>🧪 Test Results</h2>
-                                            <button onClick={handleRunTests} disabled={autoGradeMutation.isPending}
+                                            <button onClick={handleRunTests} disabled={runTestsMutation.isPending || autoGradeMutation.isPending}
                                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shadow-sm disabled:opacity-50"
                                                 style={{ backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase' as const, cursor: 'pointer' }}>
-                                                {autoGradeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                                                {runTestsMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                                                 Run All Tests
                                             </button>
                                         </div>
                                         {(() => {
                                             if (!displayTests || displayTests.length === 0) {
-                                                if (autoGradeMutation.isPending) return (
+                                                if (runTestsMutation.isPending) return (
                                                     <div className="flex flex-col items-center justify-center p-8 gap-3">
                                                         <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--color-primary)' }} />
                                                         <p style={{ fontSize: 12, color: 'var(--color-text-mid)' }}>Running tests...</p>
@@ -651,13 +746,22 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                             <div className="grid grid-cols-2 gap-4 mb-4">
                                                 <div>
                                                     <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-mid)', display: 'block', marginBottom: '6px' }}>Score Earned</label>
-                                                    <input type="number" value={rubricScores[0] ?? detail.score ?? ''} onChange={e => setRubricScores([Number(e.target.value)])}
+                                                    <input
+                                                        type="number"
+                                                        min={0}
+                                                        max={resolvedMaxPoints}
+                                                        value={rubricScores[0] ?? detail.score ?? ''}
+                                                        onChange={e => {
+                                                            const raw = Number(e.target.value);
+                                                            const clamped = Math.max(0, Math.min(Number.isFinite(raw) ? raw : 0, resolvedMaxPoints));
+                                                            setRubricScores([clamped]);
+                                                        }}
                                                         className="w-full px-3 py-2 rounded-lg focus:outline-none"
                                                         style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-dark)' }} />
                                                 </div>
                                                 <div>
                                                     <label style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-mid)', display: 'block', marginBottom: '6px' }}>Max Points</label>
-                                                    <input type="number" value={detail.max_score ?? ''} readOnly
+                                                    <input type="number" value={resolvedMaxPoints} readOnly
                                                         className="w-full px-3 py-2 rounded-lg"
                                                         style={{ backgroundColor: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-mid)', cursor: 'not-allowed' }} />
                                                 </div>
@@ -675,14 +779,21 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
                                         {/* Submit / Draft buttons */}
                                         <div className="flex flex-col gap-3">
-                                            <button onClick={() => handleGrade(false)}
-                                                disabled={gradeMutation.isPending || (rubrics.length === 0 && !rubricScores[0])}
+                                                    <button onClick={() => handleGrade(false)}
+                                                disabled={gradeMutation.isPending || (rubrics.length === 0 && (rubricScores[0] == null || Number.isNaN(rubricScores[0])))}
                                                 style={{ width: '100%', padding: '12px', borderRadius: 6, fontSize: 13, fontWeight: 700, border: 'none', background: 'linear-gradient(135deg, #15803d, #16a34a)', color: '#fff', textTransform: 'uppercase' as const, letterSpacing: '.5px', cursor: gradeMutation.isPending ? 'not-allowed' : 'pointer', opacity: gradeMutation.isPending ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all .2s' }}
                                                 onMouseEnter={e => { if (!gradeMutation.isPending) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(21,128,61,.35)'; } }}
                                                 onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>
                                                 {gradeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                                 Submit Final Grade
                                             </button>
+                                                    {nextSubmissionId && (
+                                                        <button onClick={() => handleGrade(false, true)} disabled={gradeMutation.isPending}
+                                                            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
+                                                            style={{ backgroundColor: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-dark)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                                                            <Send className="w-4 h-4" /> Save &amp; Next
+                                                        </button>
+                                                    )}
                                             <button onClick={() => handleGrade(true)} disabled={gradeMutation.isPending}
                                                 className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
                                                 style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)', color: 'var(--color-text-dark)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
@@ -697,7 +808,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                         )}
                                         {gradeMutation.isError && (
                                             <div className="mt-4 px-4 py-2 rounded-lg" style={{ backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5' }}>
-                                                <p style={{ fontSize: '12px', fontWeight: 500, color: '#991B1B' }}>Failed to save grade. Please try again.</p>
+                                                <p style={{ fontSize: '12px', fontWeight: 500, color: '#991B1B' }}>{getGradeErrorMessage()}</p>
                                             </div>
                                         )}
                                     </div>

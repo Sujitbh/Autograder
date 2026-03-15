@@ -22,6 +22,8 @@ import {
   DialogDescription,
 } from './ui/dialog';
 import { useAssignments, useDeleteAssignment } from '@/hooks/queries';
+import { useQueries } from '@tanstack/react-query';
+import { submissionService } from '@/services/api';
 
 interface Assignment {
   id: string;
@@ -112,6 +114,53 @@ export function CourseInterior() {
     [apiAssignments],
   );
 
+  // Fetch submissions for each assignment so Submitted/Needs Grade use live data.
+  const submissionQueries = useQueries({
+    queries: assignments.map((a) => ({
+      queryKey: ['submissions', a.id],
+      queryFn: () => submissionService.getSubmissions(a.id),
+      enabled: !!a.id,
+    })),
+  });
+
+  const submissionsLoading = submissionQueries.some((q) => q.isLoading);
+
+  const assignmentsWithStats: Assignment[] = useMemo(() => {
+    if (assignments.length === 0) return [];
+
+    return assignments.map((assignment, idx) => {
+      const data = submissionQueries[idx]?.data ?? [];
+      const latestByStudent = new Map<string, any>();
+
+      for (const sub of data as any[]) {
+        const sid = String(sub.studentId ?? sub.student_id ?? '');
+        if (!sid) continue;
+        const existing = latestByStudent.get(sid);
+        if (!existing) {
+          latestByStudent.set(sid, sub);
+        } else {
+          const existingTime = new Date(existing.submittedAt ?? existing.created_at ?? 0).getTime();
+          const nextTime = new Date(sub.submittedAt ?? sub.created_at ?? 0).getTime();
+          if (nextTime > existingTime) latestByStudent.set(sid, sub);
+        }
+      }
+
+      const latest = Array.from(latestByStudent.values());
+      const submittedStudents = latest.length;
+      const gradedStudents = latest.filter((s: any) => s.status === 'graded' || s.grade?.totalScore != null).length;
+      const totalStudents = assignment.totalStudents > 0 ? assignment.totalStudents : submittedStudents;
+
+      return {
+        ...assignment,
+        submissions: submittedStudents,
+        gradedCount: gradedStudents,
+        totalStudents,
+      };
+    });
+    // React Query result updates are tracked through dataUpdatedAt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignments, submissionQueries.map((q) => q.dataUpdatedAt).join(',')]);
+
   const handleDeleteAssignment = useCallback(() => {
     if (!deleteTarget || !courseId) return;
     deleteMutation.mutate(
@@ -150,21 +199,21 @@ export function CourseInterior() {
 
   // Derived counts for tabs
   const tabCounts = useMemo(() => {
-    const all = assignments.length;
-    const recent = assignments.filter(a => {
+    const all = assignmentsWithStats.length;
+    const recent = assignmentsWithStats.filter(a => {
       if (getStatus(a) === 'draft') return false;
       if (!a.dueDate) return true;
       const due = new Date(a.dueDate);
       return due >= NOW;
     }).length;
-    const pastDeadline = assignments.filter(a => {
+    const pastDeadline = assignmentsWithStats.filter(a => {
       if (getStatus(a) === 'draft') return false;
       if (!a.dueDate) return false;
       return new Date(a.dueDate) < NOW;
     }).length;
-    const draft = assignments.filter(a => getStatus(a) === 'draft').length;
+    const draft = assignmentsWithStats.filter(a => getStatus(a) === 'draft').length;
     return { all, recent, pastDeadline, draft };
-  }, [assignments]);
+  }, [assignmentsWithStats]);
 
   const tabs = [
     { id: 'all', label: 'All', count: tabCounts.all },
@@ -175,7 +224,7 @@ export function CourseInterior() {
 
   // Filter
   const filtered = useMemo(() => {
-    return assignments.filter(a => {
+    return assignmentsWithStats.filter(a => {
       const status = getStatus(a);
       if (activeTab === 'recent') {
         if (status === 'draft') return false;
@@ -192,7 +241,7 @@ export function CourseInterior() {
       }
       return true;
     });
-  }, [activeTab, searchQuery]);
+  }, [activeTab, searchQuery, assignmentsWithStats]);
 
   // Sort
   const sorted = useMemo(() => {
@@ -291,7 +340,7 @@ export function CourseInterior() {
                 Assignments
               </h1>
               <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '8px' }}>
-                {assignments.length} assignments · {courseInfo.code} {courseInfo.title}
+                {assignmentsWithStats.length} assignments · {courseInfo.code} {courseInfo.title}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -301,7 +350,7 @@ export function CourseInterior() {
                 aria-label="Refresh data"
                 title="Refresh data"
               >
-                <RefreshCw className={`w-4.5 h-4.5 text-[var(--color-text-mid)] ${isLoading ? 'animate-spin' : ''}`} />
+                    <RefreshCw className={`w-4.5 h-4.5 text-[var(--color-text-mid)] ${(isLoading || submissionsLoading) ? 'animate-spin' : ''}`} />
               </button>
               <Button
                 onClick={() => router.push(`/courses/${courseId}/assignment/new`)}
@@ -315,7 +364,7 @@ export function CourseInterior() {
           </div>
 
           {/* Loading state */}
-          {isLoading && (
+          {(isLoading || submissionsLoading) && (
             <div className="flex items-center justify-center py-20 gap-3" style={{ color: 'var(--color-text-mid)' }}>
               <Loader2 className="w-5 h-5 animate-spin" />
               <span>Loading assignments…</span>
@@ -331,7 +380,7 @@ export function CourseInterior() {
             </div>
           )}
 
-          {!isLoading && !fetchError && (<>
+          {!isLoading && !submissionsLoading && !fetchError && (<>
             {/* Search Bar */}
             <div className="mb-4">
               <div className="relative max-w-md">
@@ -385,7 +434,7 @@ export function CourseInterior() {
             </div>
 
             {/* Assignments Table */}
-            {assignments.length === 0 ? (
+            {assignmentsWithStats.length === 0 ? (
               /* Empty State: No Assignments at all */
               <div className="text-center py-20">
                 <ClipboardX className="w-16 h-16 mx-auto mb-4" style={{ color: '#D9D9D9' }} />

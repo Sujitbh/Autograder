@@ -110,7 +110,7 @@ export function SignupPage({ role, onSignup }: SignupPageProps) {
 
     authService.register(registerPayload)
       .then((user) => {
-        localStorage.setItem('autograde_current_user', JSON.stringify(user));
+        sessionStorage.setItem('autograde_current_user', JSON.stringify(user));
         if (typeof onSignup === 'function') {
           onSignup();
         }

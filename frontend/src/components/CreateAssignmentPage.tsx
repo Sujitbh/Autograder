@@ -101,7 +101,11 @@ export function CreateAssignmentPage() {
                             JSON.stringify(data),
                         );
                     } catch { /* ignore */ }
-                    toast.error(`Failed to save draft to server: ${err.message}. Saved locally instead.`);
+                    const msg = `Failed to save draft to server: ${err.message}. Saved locally instead.`;
+                    toast.error(msg);
+                    if (typeof window !== 'undefined') {
+                        window.alert(msg);
+                    }
                 },
             });
         },
@@ -121,7 +125,11 @@ export function CreateAssignmentPage() {
                     router.push(`/courses/${cid}`);
                 },
                 onError: (err) => {
-                    toast.error(`Failed to create assignment: ${err.message}`);
+                    const msg = `Failed to create assignment: ${err.message}`;
+                    toast.error(msg);
+                    if (typeof window !== 'undefined') {
+                        window.alert(msg);
+                    }
                 },
             });
         },

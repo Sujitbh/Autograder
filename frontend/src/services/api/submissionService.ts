@@ -13,6 +13,7 @@ interface BackendSubmission {
   status: 'pending' | 'grading' | 'graded' | 'error';
   score?: number | null;
   max_score?: number | null;
+  display_max_score?: number | null;
   feedback?: string | null;
   graded_at?: string | null;
   created_at?: string | null;
@@ -37,6 +38,7 @@ interface BackendGradingResults {
 }
 
 function mapSubmission(s: BackendSubmission): Submission {
+  const resolvedMax = s.max_score ?? s.display_max_score ?? 100;
   return {
     id: String(s.id),
     assignmentId: String(s.assignment_id),
@@ -55,10 +57,10 @@ function mapSubmission(s: BackendSubmission): Submission {
           submissionId: String(s.id),
           rubricScores: [],
           totalScore: s.score,
-          maxScore: s.max_score ?? 100,
+          maxScore: resolvedMax,
           percentage:
-            s.max_score && s.max_score > 0
-              ? Number(((s.score / s.max_score) * 100).toFixed(2))
+            resolvedMax > 0
+              ? Number(((s.score / resolvedMax) * 100).toFixed(2))
               : 0,
           letterGrade: '',
           feedback: s.feedback ?? '',
@@ -83,7 +85,7 @@ export const submissionService = {
     files.forEach((file) => formData.append('files', file));
 
     // Use fetch directly to avoid axios Content-Type header interference with FormData
-    const token = typeof window !== 'undefined' ? localStorage.getItem('autograde_token') : null;
+    const token = typeof window !== 'undefined' ? sessionStorage.getItem('autograde_token') : null;
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -128,7 +130,7 @@ export const submissionService = {
     submitted_at: string | null;
     attempt_number: number;
     student: { id: number; name: string; email: string | null };
-    assignment: { id: number; title: string; due_date: string | null; language: string };
+    assignment: { id: number; title: string; max_points: number | null; due_date: string | null; language: string };
     rubrics: Array<{ id: number; name: string; description: string | null; max_points: number; weight: number | null; order: number }>;
     files: Array<{ id: number; filename: string; content: string | null }>;
     results: Array<{

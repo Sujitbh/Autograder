@@ -45,7 +45,7 @@ const api = axios.create({
 
 api.interceptors.request.use((req: InternalAxiosRequestConfig) => {
     if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('autograde_token');
+        const token = sessionStorage.getItem('autograde_token');
         if (token && req.headers) {
             req.headers.Authorization = `Bearer ${token}`;
         }
@@ -71,22 +71,34 @@ api.interceptors.response.use(
 
         const { status, data } = error.response;
         const backendDetail = (data as any)?.detail;
+        const backendDetailFromArray = Array.isArray(backendDetail)
+            ? backendDetail
+                .map((d: any) => d?.msg)
+                .filter((m: unknown): m is string => typeof m === 'string' && m.trim().length > 0)
+                .join('; ')
+            : undefined;
         const backendMessage = (typeof backendDetail === 'string' ? backendDetail : undefined)
+            ?? backendDetailFromArray
             ?? data?.message
             ?? data?.error;
 
         if (status === 401) {
-            // Token expired / invalid — clear local auth and notify AuthContext
-            if (typeof window !== 'undefined') {
-                localStorage.removeItem('autograde_token');
-                localStorage.removeItem('autograde_auth');
-                localStorage.removeItem('autograde_current_user');
+            const requestUrl = error.config?.url ?? '';
+            const isLoginRequest = requestUrl.includes('/auth/login');
+
+            // Wrong credentials on login should not trigger global signout + page reset.
+            // Keep user on the login form and surface the error locally.
+            if (!isLoginRequest && typeof window !== 'undefined') {
+                // Token expired / invalid on authenticated endpoints.
+                sessionStorage.removeItem('autograde_token');
+                sessionStorage.removeItem('autograde_auth');
+                sessionStorage.removeItem('autograde_current_user');
                 window.dispatchEvent(new Event('auth:signout'));
             }
             throw new AuthError(backendMessage ?? 'Unauthorized');
         }
 
-        if (status === 422 && data?.error) {
+        if (status === 422) {
             throw new ValidationError(backendMessage ?? 'Validation error');
         }
 

@@ -5,10 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/utils/AuthContext';
 
 export function AdminGuard({ children }: { children: ReactNode }) {
-    const { isAuthenticated, role } = useAuth();
+    const { isAuthenticated, role, isLoading } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
+        if (isLoading) {
+            return;
+        }
+
         if (!isAuthenticated) {
             router.replace('/login');
             return;
@@ -16,9 +20,9 @@ export function AdminGuard({ children }: { children: ReactNode }) {
         if (role !== 'admin') {
             router.replace(role === 'student' ? '/student' : '/courses');
         }
-    }, [isAuthenticated, role, router]);
+    }, [isAuthenticated, role, isLoading, router]);
 
-    if (!isAuthenticated || role !== 'admin') return null;
+    if (isLoading || !isAuthenticated || role !== 'admin') return null;
 
     return <>{children}</>;
 }

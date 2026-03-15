@@ -15,6 +15,7 @@ import {
     useTASubmissionDetail,
     useTAGradeSubmission,
     useTACoursePermissions,
+    useTACourseSubmissions,
     useTARunTests,
     useTAAutoGrade,
 } from '@/hooks/queries/useTADashboard';
@@ -74,6 +75,10 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
 
     const { data: permissions } = useTACoursePermissions(courseIdNum);
     const { data: detail, isLoading, error } = useTASubmissionDetail(courseIdNum, submissionIdNum);
+    const { data: assignmentSubmissionsData } = useTACourseSubmissions(
+        courseIdNum,
+        detail?.assignment?.id ? { assignment_id: detail.assignment.id, limit: 200 } : { limit: 200 }
+    );
     const gradeMutation = useTAGradeSubmission(courseIdNum);
     const runTestsMutation = useTARunTests(courseIdNum);
     const autoGradeMutation = useTAAutoGrade(courseIdNum);
@@ -146,20 +151,38 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         });
     };
 
-    const handleGrade = (isDraft: boolean) => {
+    const sortedSubmissionIds = (assignmentSubmissionsData?.submissions ?? [])
+        .slice()
+        .sort(
+            (a, b) =>
+                new Date(b.created_at ?? 0).getTime() -
+                new Date(a.created_at ?? 0).getTime()
+        );
+    const currentSubmissionIndex = sortedSubmissionIds.findIndex((s) => s.id === submissionIdNum);
+    const nextSubmissionId =
+        currentSubmissionIndex >= 0 && currentSubmissionIndex < sortedSubmissionIds.length - 1
+            ? sortedSubmissionIds[currentSubmissionIndex + 1].id
+            : null;
+
+    const handleGrade = (isDraft: boolean, moveToNext: boolean = false) => {
+        const feedbackToSave = feedback.trim() || 'Reviewed by TA.';
         gradeMutation.mutate(
             {
                 submissionId: submissionIdNum,
                 payload: {
                     score: score ? Number.parseFloat(score) : undefined,
                     max_score: maxScore ? Number.parseFloat(maxScore) : undefined,
-                    feedback: feedback || undefined,
+                    feedback: feedbackToSave,
                     is_draft: isDraft,
                 },
             },
             {
                 onSuccess: () => {
                     if (!isDraft) {
+                        if (moveToNext && nextSubmissionId) {
+                            router.push(`/ta/courses/${courseId}/submissions/${nextSubmissionId}/grade`);
+                            return;
+                        }
                         router.push(`/ta/courses/${courseId}/submissions`);
                     }
                 },
@@ -197,9 +220,11 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const handleRunTests = () => {
         setRunTestsResult(null);
         setInfoTab('tests');
-        // prompt: "automatically grades after running test cases"
-        // So we trigger auto-grade which runs tests and computes score.
-        handleAutoGrade(true);
+        runTestsMutation.mutate(submissionIdNum, {
+            onSuccess: (data) => {
+                setRunTestsResult(data);
+            },
+        });
     };
 
     const breadcrumbs = [
@@ -247,23 +272,36 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const code = activeFile?.content || '';
 
     // Ad-hoc execution helpers (similar to StudentAssignmentDetail)
-    const codeUsesInput = (codeStr: string) => {
+    const codeUsesInput = (codeStr: string, lang: string) => {
         const lines = codeStr.split('\n');
         for (const line of lines) {
             const trimmed = line.trim();
             if (trimmed.startsWith('#')) continue;
-            if (trimmed.includes('input(')) return true;
+            if (lang === 'python' && trimmed.includes('input(')) return true;
+            if (
+                lang === 'java' && (
+                    trimmed.includes('Scanner')
+                    || trimmed.includes('System.in')
+                    || /\bnext(Line|Int|Double|Float|Long|Short|Byte|Boolean)?\s*\(/.test(trimmed)
+                )
+            ) {
+                return true;
+            }
         }
         return false;
     };
 
     const handleRunCode = async () => {
-        if (language === 'python' && codeUsesInput(code)) {
+        if (codeUsesInput(code, language)) {
             setStdinDialogOpen(true);
             return;
         }
         setOutputOpen(true);
         await execute(code, language);
+    };
+
+    const handleOpenStdinDialog = () => {
+        setStdinDialogOpen(true);
     };
 
     const handleRunWithStdin = async () => {
@@ -370,6 +408,23 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                 onMouseLeave={e => { e.currentTarget.style.background = '#16a34a'; e.currentTarget.style.boxShadow = 'none'; }}
                             >
                                 {isExecutingCode ? '⏳ Running...' : '▶ Run Code'}
+                            </button>
+
+                            <button
+                                onClick={handleOpenStdinDialog}
+                                disabled={isExecutingCode || runTestsMutation.isPending || autoGradeMutation.isPending}
+                                style={{
+                                    padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                                    background: 'var(--color-surface-elevated)', color: 'var(--color-text-dark)', letterSpacing: '.3px',
+                                    transition: 'background .15s',
+                                    opacity: isExecutingCode ? 0.7 : 1,
+                                    cursor: isExecutingCode ? 'not-allowed' : 'pointer',
+                                    border: '1px solid var(--color-border)',
+                                }}
+                                onMouseEnter={e => { if (!isExecutingCode) { e.currentTarget.style.background = 'var(--color-border)'; } }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
+                            >
+                                ⌨ Input
                             </button>
 
                             <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 6px' }} />
@@ -616,7 +671,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                         textTransform: 'uppercase',
                                                     }}
                                                 >
-                                                    {autoGradeMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                                                    {runTestsMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
                                                     Run All Tests
                                                 </button>
                                             )}
@@ -625,10 +680,10 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                         {(() => {
                                             const displayTests = runTestsResult?.results ?? (detail.test_results.length > 0 ? detail.test_results : null);
                                             if (!displayTests || displayTests.length === 0) {
-                                                if (autoGradeMutation.isPending) {
+                                                if (runTestsMutation.isPending) {
                                                     return <div className="flex flex-col items-center justify-center p-8 gap-3">
                                                         <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--color-primary)' }} />
-                                                        <p style={{ fontSize: 12, color: 'var(--color-text-mid)' }}>Running tests and grading...</p>
+                                                        <p style={{ fontSize: 12, color: 'var(--color-text-mid)' }}>Running tests...</p>
                                                     </div>;
                                                 }
                                                 return <p style={{ fontSize: 13, color: 'var(--color-text-mid)' }}>No test results yet. Run tests to see output.</p>;
@@ -914,6 +969,23 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                         {gradeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                                         Submit Final Grade
                                                     </button>
+
+                                                    {nextSubmissionId && (
+                                                        <button
+                                                            onClick={() => handleGrade(false, true)}
+                                                            disabled={gradeMutation.isPending || !score}
+                                                            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
+                                                            style={{
+                                                                backgroundColor: 'var(--color-surface-elevated)',
+                                                                border: '1px solid var(--color-border)',
+                                                                color: 'var(--color-text-dark)',
+                                                                fontSize: '13px',
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            <Send className="w-4 h-4" /> Save &amp; Next
+                                                        </button>
+                                                    )}
 
                                                     <button
                                                         onClick={() => handleGrade(true)}

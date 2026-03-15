@@ -27,7 +27,7 @@ export default function FacultySignupPage() {
             role="faculty"
             onSignup={() => {
                 try {
-                    const stored = localStorage.getItem('autograde_current_user');
+                    const stored = sessionStorage.getItem('autograde_current_user');
                     if (stored) {
                         const userData = JSON.parse(stored);
                         signup(userData);

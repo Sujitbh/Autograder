@@ -164,13 +164,22 @@ def list_courses(db: DbSession, user: CurrentUser):
     Return courses scoped to the authenticated user:
       - admin: all courses
       - faculty: courses where user is enrolled as instructor
-      - student: courses where user is enrolled as student or ta
+      - student: courses where user is enrolled as student (excludes ta-only enrollments)
     """
     if user.role == "admin":
         return db.query(Course).all()
 
-    # For faculty and students, only return courses they are enrolled in
-    enrollments = db.query(Enrollment).filter(Enrollment.user_id == user.id).all()
+    # For students, only return courses where they are enrolled with role="student".
+    # This ensures courses where the user is a TA do not appear in the student dashboard.
+    if user.role == "student":
+        enrollments = db.query(Enrollment).filter(
+            Enrollment.user_id == user.id,
+            Enrollment.role == "student"
+        ).all()
+    else:
+        # Faculty/instructors: return all their enrollments (instructor role)
+        enrollments = db.query(Enrollment).filter(Enrollment.user_id == user.id).all()
+
     course_ids = [e.course_id for e in enrollments]
     if not course_ids:
         return []
@@ -544,6 +553,12 @@ async def import_course_enrollments(
         ).first()
         if existing:
             already_enrolled_count += 1
+            # If trying to import as student but user is already a TA, block silently
+            conflict_msg = (
+                "User is already a TA in this course — cannot re-enroll as student"
+                if existing.role == "ta" and role == "student"
+                else "User already enrolled"
+            )
             results.append(
                 EnrollmentImportRowOut(
                     row_number=idx,
@@ -553,7 +568,7 @@ async def import_course_enrollments(
                     sis_user_id=sis_user_id,
                     external_id=external_id,
                     status="already_enrolled",
-                    message="User already enrolled",
+                    message=conflict_msg,
                 )
             )
             continue
@@ -627,6 +642,13 @@ def update_course_enrollment(
         raise HTTPException(
             status_code=400,
             detail="Only faculty/admin users can be assigned role=instructor",
+        )
+
+    # A TA cannot be downgraded to student in the same course.
+    if enrollment.role == "ta" and payload.role == "student":
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot change a TA's role to student in the same course. Remove the TA assignment first.",
         )
 
     enrollment.role = payload.role
