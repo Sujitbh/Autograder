@@ -6,11 +6,16 @@ import { useAuth } from '@/utils/AuthContext';
 
 /** Wraps any page that requires authentication. Redirects to /login if not authenticated. */
 export function AuthGuard({ children }: { children: ReactNode }) {
-    const { isAuthenticated, role } = useAuth();
+    const { isAuthenticated, role, isLoading } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
+        // Wait for local session restoration on hard refresh before enforcing redirects.
+        if (isLoading) {
+            return;
+        }
+
         if (!isAuthenticated) {
             router.replace('/login');
             return;
@@ -34,9 +39,9 @@ export function AuthGuard({ children }: { children: ReactNode }) {
         if (role !== 'admin' && pathname?.startsWith('/admin')) {
             router.replace(role === 'student' ? '/student' : '/courses');
         }
-    }, [isAuthenticated, role, pathname, router]);
+    }, [isAuthenticated, role, isLoading, pathname, router]);
 
-    if (!isAuthenticated) return null;
+    if (isLoading || !isAuthenticated) return null;
 
     return <>{children}</>;
 }

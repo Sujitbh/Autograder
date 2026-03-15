@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
     ChevronLeft, ChevronRight, Check, Copy, Mail, Printer,
     BookOpen, Users, ClipboardList, Info, AlertTriangle, Sparkles,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
+import { AdminLayout } from './AdminLayout';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -57,35 +58,7 @@ function generateCourseCode(): string {
     return code;
 }
 
-function generateSemesters(): { value: string; label: string }[] {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const terms: { value: string; label: string }[] = [];
-    let y = year;
-    let startSeason: number;
-    if (month >= 0 && month <= 4) startSeason = 0;
-    else if (month >= 5 && month <= 6) startSeason = 1;
-    else startSeason = 2;
-    const seasons = ['Spring', 'Summer', 'Fall'];
-    let si = startSeason;
-    for (let i = 0; i < 6; i++) {
-        if (si > 2) { si = 0; y++; }
-        const label = `${seasons[si]} ${y}`;
-        terms.push({ value: label, label });
-        si++;
-    }
-    return terms;
-}
 
-function getDefaultSemester(): string {
-    const now = new Date();
-    const month = now.getMonth();
-    const year = now.getFullYear();
-    if (month >= 0 && month <= 4) return `Spring ${year}`;
-    if (month >= 5 && month <= 6) return `Summer ${year}`;
-    return `Fall ${year}`;
-}
 
 /* ═══════════════════════════════════════════
    Steps
@@ -97,14 +70,23 @@ const STEPS = [
     { id: 3, label: 'Review & Create', icon: ClipboardList },
 ];
 
+const ADMIN_STEPS = [
+    { id: 1, label: 'Course Info', icon: BookOpen },
+    { id: 3, label: 'Review & Create', icon: ClipboardList },
+];
+
 /* ═══════════════════════════════════════════
    Component
    ═══════════════════════════════════════════ */
 
-export function CreateCourse() {
+interface CreateCourseProps {
+    isAdmin?: boolean;
+}
+
+export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
     const router = useRouter();
-    const semesters = useMemo(() => generateSemesters(), []);
     const createCourse = useCreateCourse();
+    const backRoute = isAdmin ? '/admin/courses' : '/courses';
 
     /* ── Step ── */
     const [currentStep, setCurrentStep] = useState(1);
@@ -112,7 +94,8 @@ export function CreateCourse() {
     /* ── Form fields ── */
     const [courseCode, setCourseCode] = useState('');
     const [courseName, setCourseName] = useState('');
-    const [semester, setSemester] = useState(getDefaultSemester());
+    const [semester, setSemester] = useState('');
+    const [semesters, setSemesters] = useState<{ value: string; label: string }[]>([]);
     const [section, setSection] = useState('');
     const [description, setDescription] = useState('');
     const [enrollmentMethod, setEnrollmentMethod] = useState<'code' | 'manual'>('code');
@@ -122,6 +105,80 @@ export function CreateCourse() {
 
     /* ── Validation ── */
     const [formErrors, setFormErrors] = useState<FormErrors>({});
+
+    /* ── Semesters from DB ── */
+    useEffect(() => {
+        courseService.getSemesters().then((data) => {
+            const mapped = data.map(s => ({ value: s.name, label: s.name }));
+            setSemesters(mapped);
+            const current = data.find(s => s.is_current);
+            if (current) setSemester(current.name);
+            else if (mapped.length > 0) setSemester(mapped[0].value);
+        }).catch(() => { });
+    }, []);
+
+    /* ── Course catalog for autocomplete ── */
+    const [catalog, setCatalog] = useState<{ code: string; name: string }[]>([]);
+    const [showCodeSugg, setShowCodeSugg] = useState(false);
+    const [showNameSugg, setShowNameSugg] = useState(false);
+    const codeInputRef = useRef<HTMLDivElement>(null);
+    const nameInputRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        courseService.getCatalog().then(setCatalog).catch(() => { });
+    }, []);
+
+    /* Close dropdowns when clicking outside */
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (codeInputRef.current && !codeInputRef.current.contains(e.target as Node)) {
+                setShowCodeSugg(false);
+            }
+            if (nameInputRef.current && !nameInputRef.current.contains(e.target as Node)) {
+                setShowNameSugg(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const codeSuggestions = useMemo(() => {
+        const q = courseCode.trim().toLowerCase();
+        if (!q) return [];
+        return catalog.filter(c => c.code.toLowerCase().includes(q)).slice(0, 7);
+    }, [courseCode, catalog]);
+
+    const nameSuggestions = useMemo(() => {
+        const q = courseName.trim().toLowerCase();
+        if (!q) return [];
+        return catalog.filter(c => c.name.toLowerCase().includes(q)).slice(0, 7);
+    }, [courseName, catalog]);
+
+    const handleCourseCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setCourseCode(val);
+        setShowCodeSugg(val.trim().length > 0);
+    };
+
+    const handleCourseNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setCourseName(val);
+        setShowNameSugg(val.trim().length > 0);
+    };
+
+    const selectCodeSuggestion = (item: { code: string; name: string }) => {
+        setCourseCode(item.code);
+        setCourseName(item.name);
+        setShowCodeSugg(false);
+        setShowNameSugg(false);
+    };
+
+    const selectNameSuggestion = (item: { code: string; name: string }) => {
+        setCourseName(item.name);
+        setCourseCode(item.code);
+        setShowNameSugg(false);
+        setShowCodeSugg(false);
+    };
 
     /* ── Creation state ── */
     const [isCreating, setIsCreating] = useState(false);
@@ -135,9 +192,13 @@ export function CreateCourse() {
         if (step === 1) {
             if (!courseCode.trim()) errors.courseCode = 'Course code is required';
             else if (!/^[A-Z0-9\s-]+$/i.test(courseCode.trim()))
-                errors.courseCode = 'Use letters, numbers, spaces, or hyphens (e.g., CS-1001)';
+                errors.courseCode = 'Use letters, numbers, spaces, or hyphens (e.g., CSCI 2000)';
             if (!courseName.trim()) errors.courseName = 'Course name is required';
             if (!semester) errors.semester = 'Semester is required';
+            if (!isAdmin) {
+                if (!section.trim()) errors.section = 'Section number is required';
+                else if (!/^\d{5}$/.test(section.trim())) errors.section = 'Section number must be exactly 5 digits';
+            }
         }
 
         setFormErrors(errors);
@@ -146,12 +207,17 @@ export function CreateCourse() {
 
     const goNext = () => {
         if (!validateStep(currentStep)) return;
-        if (currentStep < 3) setCurrentStep(currentStep + 1);
+        if (isAdmin && currentStep === 1) {
+            setCurrentStep(3);
+        } else if (currentStep < 3) {
+            setCurrentStep(currentStep + 1);
+        }
     };
 
     const goBack = () => {
         if (currentStep > 1) {
-            setCurrentStep(currentStep - 1);
+            const prevStep = isAdmin && currentStep === 3 ? 1 : currentStep - 1;
+            setCurrentStep(prevStep);
             setFormErrors({});
         }
     };
@@ -246,60 +312,63 @@ export function CreateCourse() {
     /* ═══════════════════════════════════════════
        Step Indicator
        ═══════════════════════════════════════════ */
-    const renderStepIndicator = () => (
-        <div className="flex items-center justify-center gap-0 mb-10">
-            {STEPS.map((step, idx) => {
-                const Icon = step.icon;
-                const isActive = currentStep === step.id;
-                const isComplete = currentStep > step.id || currentStep === 4;
+    const renderStepIndicator = () => {
+        const activeSteps = isAdmin ? ADMIN_STEPS : STEPS;
+        return (
+            <div className="flex items-center justify-center gap-0 mb-10">
+                {activeSteps.map((step, idx) => {
+                    const Icon = step.icon;
+                    const isActive = currentStep === step.id;
+                    const isComplete = currentStep > step.id || currentStep === 4;
 
-                return (
-                    <div key={step.id} className="flex items-center">
-                        <div className="flex flex-col items-center" style={{ minWidth: '120px' }}>
-                            <div
-                                className="w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300"
-                                style={{
-                                    backgroundColor: (() => {
-                                        if (isComplete) return '#2D6A2D';
-                                        if (isActive) return '#6B0000';
-                                        return '#F1F1F1';
-                                    })(),
-                                    color: isComplete || isActive ? '#fff' : '#8A8A8A',
-                                    boxShadow: isActive ? '0 0 0 4px rgba(107,0,0,0.15)' : 'none',
-                                }}
-                            >
-                                {isComplete ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                    return (
+                        <div key={step.id} className="flex items-center">
+                            <div className="flex flex-col items-center" style={{ minWidth: '120px' }}>
+                                <div
+                                    className="w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300"
+                                    style={{
+                                        backgroundColor: (() => {
+                                            if (isComplete) return '#2D6A2D';
+                                            if (isActive) return '#6B0000';
+                                            return '#F1F1F1';
+                                        })(),
+                                        color: isComplete || isActive ? '#fff' : '#8A8A8A',
+                                        boxShadow: isActive ? '0 0 0 4px rgba(107,0,0,0.15)' : 'none',
+                                    }}
+                                >
+                                    {isComplete ? <Check className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                                </div>
+                                <span
+                                    className="mt-2 text-center"
+                                    style={{
+                                        fontSize: '12px',
+                                        fontWeight: isActive ? 600 : 400,
+                                        color: (() => {
+                                            if (isActive) return '#6B0000';
+                                            if (isComplete) return '#2D6A2D';
+                                            return '#8A8A8A';
+                                        })(),
+                                    }}
+                                >
+                                    {step.label}
+                                </span>
                             </div>
-                            <span
-                                className="mt-2 text-center"
-                                style={{
-                                    fontSize: '12px',
-                                    fontWeight: isActive ? 600 : 400,
-                                    color: (() => {
-                                        if (isActive) return '#6B0000';
-                                        if (isComplete) return '#2D6A2D';
-                                        return '#8A8A8A';
-                                    })(),
-                                }}
-                            >
-                                {step.label}
-                            </span>
+                            {idx < activeSteps.length - 1 && (
+                                <div
+                                    className="h-[2px] transition-colors duration-300"
+                                    style={{
+                                        width: '80px',
+                                        backgroundColor: currentStep > step.id || currentStep === 4 ? '#2D6A2D' : '#E5E5E5',
+                                        marginBottom: '20px',
+                                    }}
+                                />
+                            )}
                         </div>
-                        {idx < STEPS.length - 1 && (
-                            <div
-                                className="h-[2px] transition-colors duration-300"
-                                style={{
-                                    width: '80px',
-                                    backgroundColor: currentStep > step.id || currentStep === 4 ? '#2D6A2D' : '#E5E5E5',
-                                    marginBottom: '20px',
-                                }}
-                            />
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-    );
+                    );
+                })}
+            </div>
+        );
+    };
 
     /* ═══════════════════════════════════════════
        STEP 1: Course Information
@@ -320,16 +389,18 @@ export function CreateCourse() {
             {/* Form */}
             <div className="grid grid-cols-2 gap-6">
                 {/* Course Code */}
-                <div>
+                <div ref={codeInputRef} style={{ position: 'relative' }}>
                     <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
                         <Hash className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
                         Course Code <span style={{ color: '#B91C1C' }}>*</span>
                     </label>
                     <Input
                         value={courseCode}
-                        onChange={e => setCourseCode(e.target.value)}
-                        placeholder="e.g., CS-1001"
+                        onChange={handleCourseCodeChange}
+                        onFocus={() => courseCode.trim() && setShowCodeSugg(true)}
+                        placeholder="CSCI 2000"
                         maxLength={20}
+                        autoComplete="off"
                         className="border-[var(--color-border)] h-11"
                         style={{ fontSize: '15px' }}
                     />
@@ -337,19 +408,51 @@ export function CreateCourse() {
                         Official course code from your institution's catalog
                     </p>
                     {renderFieldError(formErrors.courseCode)}
+                    {showCodeSugg && codeSuggestions.length > 0 && (
+                        <div
+                            style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                right: 0,
+                                zIndex: 50,
+                                backgroundColor: '#fff',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+                                overflow: 'hidden',
+                                marginTop: '2px',
+                            }}
+                        >
+                            {codeSuggestions.map((item) => (
+                                <button
+                                    key={item.code + item.name}
+                                    type="button"
+                                    onMouseDown={() => selectCodeSuggestion(item)}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-[#F5EDED] transition-colors"
+                                    style={{ fontSize: '14px', borderBottom: '1px solid #F0F0F0' }}
+                                >
+                                    <span style={{ fontWeight: 600, color: '#6B0000' }}>{item.code}</span>
+                                    <span style={{ color: '#595959', marginLeft: '8px' }}>{item.name}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 {/* Course Name */}
-                <div>
+                <div ref={nameInputRef} style={{ position: 'relative' }}>
                     <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
                         <BookOpen className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
                         Course Name <span style={{ color: '#B91C1C' }}>*</span>
                     </label>
                     <Input
                         value={courseName}
-                        onChange={e => setCourseName(e.target.value)}
-                        placeholder="e.g., Introduction to Computer Science"
+                        onChange={handleCourseNameChange}
+                        onFocus={() => courseName.trim() && setShowNameSugg(true)}
+                        placeholder="Introduction to Computer Science"
                         maxLength={100}
+                        autoComplete="off"
                         className="border-[var(--color-border)] h-11"
                         style={{ fontSize: '15px' }}
                     />
@@ -357,11 +460,41 @@ export function CreateCourse() {
                         {renderFieldError(formErrors.courseName)}
                         <span style={{ fontSize: '11px', color: '#8A8A8A' }}>{courseName.length}/100</span>
                     </div>
+                    {showNameSugg && nameSuggestions.length > 0 && (
+                        <div
+                            style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                right: 0,
+                                zIndex: 50,
+                                backgroundColor: '#fff',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: '8px',
+                                boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+                                overflow: 'hidden',
+                                marginTop: '2px',
+                            }}
+                        >
+                            {nameSuggestions.map((item) => (
+                                <button
+                                    key={item.code + item.name}
+                                    type="button"
+                                    onMouseDown={() => selectNameSuggestion(item)}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-[#F5EDED] transition-colors"
+                                    style={{ fontSize: '14px', borderBottom: '1px solid #F0F0F0' }}
+                                >
+                                    <span style={{ fontWeight: 600, color: '#595959' }}>{item.name}</span>
+                                    <span style={{ fontSize: '12px', color: '#8A8A8A', marginLeft: '8px' }}>({item.code})</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 
             {/* Semester + Section */}
-            <div className="grid grid-cols-2 gap-6">
+            <div className={isAdmin ? '' : 'grid grid-cols-2 gap-6'}>
                 <div>
                     <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
                         <Calendar className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
@@ -379,68 +512,26 @@ export function CreateCourse() {
                     </Select>
                     {renderFieldError(formErrors.semester)}
                 </div>
-                <div>
-                    <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
-                        <FileText className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
-                        Section Number
-                        <span style={{ fontSize: '11px', color: '#8A8A8A', fontWeight: 400 }}>(optional)</span>
-                    </label>
-                    <Input
-                        value={section}
-                        onChange={e => setSection(e.target.value)}
-                        placeholder="e.g., 001, A"
-                        maxLength={10}
-                        className="border-[var(--color-border)] h-11"
-                        style={{ fontSize: '15px' }}
-                    />
-                    <p style={{ fontSize: '11px', color: '#8A8A8A', marginTop: '6px' }}>
-                        Use if you teach multiple sections of this course
-                    </p>
-                </div>
-            </div>
-
-            {/* Description */}
-            <div>
-                <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
-                    <FileText className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
-                    Course Description
-                    <span style={{ fontSize: '11px', color: '#8A8A8A', fontWeight: 400 }}>(optional)</span>
-                </label>
-                <Textarea
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                    placeholder="Brief description of the course content, learning objectives, or prerequisites..."
-                    rows={4}
-                    maxLength={500}
-                    className="border-[var(--color-border)]"
-                    style={{ fontSize: '14px' }}
-                />
-                <div className="flex justify-between mt-1">
-                    <p style={{ fontSize: '11px', color: '#8A8A8A' }}>Helps students identify your course</p>
-                    <span style={{ fontSize: '11px', color: '#8A8A8A' }}>{description.length}/500</span>
-                </div>
-            </div>
-
-            {/* Max Students */}
-            <div className="max-w-xs">
-                <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
-                    <Users className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
-                    Max Students
-                    <span style={{ fontSize: '11px', color: '#8A8A8A', fontWeight: 400 }}>(optional)</span>
-                </label>
-                <Input
-                    type="number"
-                    value={maxStudents}
-                    onChange={e => setMaxStudents(e.target.value)}
-                    placeholder="e.g., 40"
-                    min={1}
-                    max={999}
-                    className="border-[var(--color-border)] h-11"
-                    style={{ fontSize: '15px' }}
-                />
-                <p style={{ fontSize: '11px', color: '#8A8A8A', marginTop: '6px' }}>
-                    Leave blank for no enrollment cap
-                </p>
+                {!isAdmin && (
+                    <div>
+                        <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
+                            <FileText className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
+                            Section Number <span style={{ color: '#B91C1C' }}>*</span>
+                        </label>
+                        <Input
+                            value={section}
+                            onChange={e => setSection(e.target.value.replace(/\D/g, '').slice(0, 5))}
+                            placeholder="12345"
+                            maxLength={5}
+                            className="border-[var(--color-border)] h-11"
+                            style={{ fontSize: '15px' }}
+                        />
+                        <p style={{ fontSize: '11px', color: '#8A8A8A', marginTop: '6px' }}>
+                            Uniquely identifies this section of the course
+                        </p>
+                        {renderFieldError(formErrors.section)}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -564,7 +655,7 @@ export function CreateCourse() {
                         </p>
                         <ul className="space-y-1" style={{ fontSize: '13px', color: '#1A4D7A', lineHeight: '20px' }}>
                             <li>• A unique 7-character alphanumeric code is generated when you create the course</li>
-                            <li>• Students enter the code in their AutoGrade dashboard to join instantly</li>
+                            <li>• Students enter the code in their Axiom dashboard to join instantly</li>
                             <li>• You can disable, regenerate, or share the code anytime from Course Settings</li>
                             <li>• You can still manually add students even with code enrollment enabled</li>
                         </ul>
@@ -690,10 +781,6 @@ export function CreateCourse() {
                                 </p>
                             </div>
                         </div>
-                        <div>
-                            <p style={{ fontSize: '11px', fontWeight: 600, color: '#8A8A8A', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Max Students</p>
-                            <p style={{ fontSize: '15px', fontWeight: 500, color: '#2D2D2D' }}>{maxStudents || 'No limit'}</p>
-                        </div>
                     </div>
 
                     {description.trim() && (
@@ -706,25 +793,27 @@ export function CreateCourse() {
             </div>
 
             {/* What happens next */}
-            <div className="p-5 rounded-xl" style={{ backgroundColor: '#F9FAFB', border: '1px solid var(--color-border)' }}>
-                <p style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D', marginBottom: '10px' }}>What happens next?</p>
-                <div className="space-y-3">
-                    {[
-                        { text: 'Your course will be created and set to Active status', color: '#2D6A2D', order: 1 },
-                        enrollmentMethod === 'code'
-                            ? { text: 'A unique 7-character enrollment code will be generated for students', color: '#1A4D7A', order: 2 }
-                            : { text: 'You can add students manually from the Students page', color: '#8A5700', order: 2 },
-                        { text: 'You can start creating assignments right away', color: '#6B0000', order: 3 },
-                    ].map((item) => (
-                        <div key={item.text} className="flex items-center gap-3">
-                            <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: item.color, color: '#fff' }}>
-                                <span style={{ fontSize: '11px', fontWeight: 700 }}>{item.order}</span>
+            {!isAdmin && (
+                <div className="p-5 rounded-xl" style={{ backgroundColor: '#F9FAFB', border: '1px solid var(--color-border)' }}>
+                    <p style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D', marginBottom: '10px' }}>What happens next?</p>
+                    <div className="space-y-3">
+                        {[
+                            { text: 'Your course will be created and set to Active status', color: '#2D6A2D', order: 1 },
+                            enrollmentMethod === 'code'
+                                ? { text: 'A unique 7-character enrollment code will be generated for students', color: '#1A4D7A', order: 2 }
+                                : { text: 'You can add students manually from the Students page', color: '#8A5700', order: 2 },
+                            { text: 'You can start creating assignments right away', color: '#6B0000', order: 3 },
+                        ].map((item) => (
+                            <div key={item.text} className="flex items-center gap-3">
+                                <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: item.color, color: '#fff' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: 700 }}>{item.order}</span>
+                                </div>
+                                <p style={{ fontSize: '13px', color: '#595959' }}>{item.text}</p>
                             </div>
-                            <p style={{ fontSize: '13px', color: '#595959' }}>{item.text}</p>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 
@@ -784,9 +873,9 @@ export function CreateCourse() {
                             </button>
                             <button
                                 onClick={() => {
-                                    const subject = encodeURIComponent(`Join ${createdCourse.title} on AutoGrade`);
+                                    const subject = encodeURIComponent(`Join ${createdCourse.title} on Axiom`);
                                     const body = encodeURIComponent(
-                                        `Hello,\n\nYou are invited to join ${createdCourse.title} (${createdCourse.code}) for ${createdCourse.semester} on AutoGrade.\n\nTo join:\n1. Log in to AutoGrade\n2. Click 'Join Course' in your dashboard\n3. Enter this course code: ${createdCourse.enrollmentCode}\n\nBest regards`
+                                        `Hello,\n\nYou are invited to join ${createdCourse.title} (${createdCourse.code}) for ${createdCourse.semester} on Axiom.\n\nTo join:\n1. Log in to Axiom\n2. Click 'Join Course' in your dashboard\n3. Enter this course code: ${createdCourse.enrollmentCode}\n\nBest regards`
                                     );
                                     window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
                                 }}
@@ -811,7 +900,7 @@ export function CreateCourse() {
                       <h1>${createdCourse.code} — ${createdCourse.title}</h1>
                       <p class="sub">${createdCourse.semester}${createdCourse.section ? ` · Section ${createdCourse.section}` : ''}</p>
                       <div class="code">${createdCourse.enrollmentCode}</div>
-                      <p class="help">To join this course on AutoGrade:<br>
+                      <p class="help">To join this course on Axiom:<br>
                       1. Go to autograde.app and log in<br>
                       2. Click "Join Course" in your dashboard<br>
                       3. Enter the code above</p>
@@ -869,14 +958,19 @@ export function CreateCourse() {
     /* ═══════════════════════════════════════════
        Render
        ═══════════════════════════════════════════ */
+    const Layout = isAdmin ? AdminLayout : PageLayout;
+    const layoutProps = isAdmin ? { activeItem: 'courses', breadcrumbs: [{ label: 'Courses', href: '/admin/courses' }, { label: 'Create New Course' }] } : {};
+
     return (
-        <PageLayout>
-            <TopNav
-                breadcrumbs={[
-                    { label: 'Courses', href: '/courses' },
-                    { label: 'Create New Course' },
-                ]}
-            />
+        <Layout {...layoutProps as any}>
+            {!isAdmin && (
+                <TopNav
+                    breadcrumbs={[
+                        { label: 'Courses', href: '/courses' },
+                        { label: 'Create New Course' },
+                    ]}
+                />
+            )}
 
             <main className="flex-1 overflow-auto" style={{ backgroundColor: '#FAFAFA' }}>
                 <div className="max-w-3xl mx-auto py-10 px-6">
@@ -906,12 +1000,12 @@ export function CreateCourse() {
                                 {currentStep === 1 ? (
                                     <Button
                                         variant="outline"
-                                        onClick={() => router.push('/courses')}
+                                        onClick={() => router.push(backRoute)}
                                         className="border-[var(--color-border)]"
                                         style={{ height: '44px', padding: '0 24px' }}
                                     >
                                         <ChevronLeft className="w-4 h-4 mr-2" />
-                                        Back to Courses
+                                        {isAdmin ? 'Back to Course Management' : 'Back to Courses'}
                                     </Button>
                                 ) : (
                                     <Button
@@ -928,7 +1022,10 @@ export function CreateCourse() {
 
                             <div className="flex items-center gap-2">
                                 <span style={{ fontSize: '13px', color: '#8A8A8A' }}>
-                                    Step {currentStep} of 3
+                                    {isAdmin
+                                        ? `Step ${currentStep === 1 ? 1 : 2} of 2`
+                                        : `Step ${currentStep} of 3`
+                                    }
                                 </span>
                             </div>
 
@@ -971,17 +1068,17 @@ export function CreateCourse() {
                         <div className="flex justify-center mt-8">
                             <Button
                                 variant="outline"
-                                onClick={() => router.push('/courses')}
+                                onClick={() => router.push(backRoute)}
                                 className="border-[var(--color-border)]"
                                 style={{ height: '44px', padding: '0 28px' }}
                             >
                                 <ChevronLeft className="w-4 h-4 mr-2" />
-                                Back to My Courses
+                                {isAdmin ? 'Back to Course Management' : 'Back to My Courses'}
                             </Button>
                         </div>
                     )}
                 </div>
             </main>
-        </PageLayout>
+        </Layout>
     );
 }

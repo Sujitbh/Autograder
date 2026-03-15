@@ -106,15 +106,9 @@ export function getGradeBgColor(percentage: number): string {
  * Get the letter grade for a percentage.
  */
 export function getLetterGrade(percentage: number): string {
-    if (percentage >= 97) return 'A+';
-    if (percentage >= 93) return 'A';
-    if (percentage >= 90) return 'A-';
-    if (percentage >= 87) return 'B+';
-    if (percentage >= 83) return 'B';
-    if (percentage >= 80) return 'B-';
-    if (percentage >= 77) return 'C+';
-    if (percentage >= 73) return 'C';
-    if (percentage >= 70) return 'C-';
+    if (percentage >= 90) return 'A';
+    if (percentage >= 80) return 'B';
+    if (percentage >= 70) return 'C';
     if (percentage >= 60) return 'D';
     return 'F';
 }

@@ -8,6 +8,7 @@ import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
 import { Button } from './ui/button';
 import { useCourses, useAllAssignments } from '@/hooks/queries';
+import { useTheme } from '@/utils/ThemeContext';
 
 /* ═══════════════════════════════════════════
    Types
@@ -37,6 +38,18 @@ const COURSE_COLORS: Record<string, string> = {
 
 function getCourseColor(courseCode: string): string {
     return COURSE_COLORS[courseCode] || '#6B0000';
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+    const sanitized = hex.replace('#', '');
+    const normalized = sanitized.length === 3
+        ? sanitized.split('').map(ch => ch + ch).join('')
+        : sanitized;
+    const value = Number.parseInt(normalized, 16);
+    const red = (value >> 16) & 255;
+    const green = (value >> 8) & 255;
+    const blue = value & 255;
+    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
 }
 
 /* ═══════════════════════════════════════════
@@ -77,6 +90,7 @@ function formatDateStr(y: number, m: number, d: number) {
 
 export function CalendarPage() {
     const router = useRouter();
+    const { isDark } = useTheme();
     const [calendarDate, setCalendarDate] = useState(() => new Date(TODAY.getFullYear(), TODAY.getMonth(), 1));
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -118,12 +132,20 @@ export function CalendarPage() {
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const monthLabel = calendarDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
+    const monthAssignmentsCount = allAssignments.filter(a => {
+        const d = new Date(a.dueDate + 'T00:00:00');
+        return d.getFullYear() === year && d.getMonth() === month;
+    }).length;
+
     // Group assignments by date
     const assignmentsByDate: Record<string, CalendarAssignment[]> = {};
     allAssignments.forEach(a => {
         if (!assignmentsByDate[a.dueDate]) assignmentsByDate[a.dueDate] = [];
         assignmentsByDate[a.dueDate].push(a);
     });
+
+    const todayDateStr = formatDateStr(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate());
+    const dueTodayCount = (assignmentsByDate[todayDateStr] || []).length;
 
     // Calendar grid cells — each cell gets a stable unique key
     const cells: { key: string; day: number | null }[] = [];
@@ -163,13 +185,26 @@ export function CalendarPage() {
 
     function handleDateClick(day: number) {
         const dateStr = formatDateStr(year, month, day);
-        setSelectedDate(prev => prev === dateStr ? null : dateStr);
+        if (selectedDate === dateStr) {
+            setSelectedDate(null);
+            return;
+        }
+        setSelectedDate(dateStr);
     }
 
     function getSelectedDateLabel() {
         if (!selectedDate) return '';
         const d = new Date(selectedDate + 'T00:00:00');
         return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    }
+
+    let dueTodayBadgeBg = 'var(--color-surface-elevated)';
+    let dueTodayBadgeColor = 'var(--color-text-light)';
+    let dueTodayBadgeBorder = 'var(--color-border)';
+    if (dueTodayCount > 0) {
+        dueTodayBadgeBg = isDark ? 'rgba(212,84,76,.2)' : 'rgba(107,0,0,.08)';
+        dueTodayBadgeColor = 'var(--color-primary)';
+        dueTodayBadgeBorder = 'var(--color-primary)';
     }
 
     return (
@@ -186,6 +221,30 @@ export function CalendarPage() {
                         <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '4px' }}>
                             View all assignment due dates across your courses
                         </p>
+                        <div className="flex items-center gap-2 mt-3">
+                            <span style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '4px 10px',
+                                borderRadius: '999px',
+                                backgroundColor: 'var(--color-surface-elevated)',
+                                color: 'var(--color-text-mid)',
+                                border: '1px solid var(--color-border)',
+                            }}>
+                                {monthAssignmentsCount} due this month
+                            </span>
+                            <span style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                padding: '4px 10px',
+                                borderRadius: '999px',
+                                backgroundColor: dueTodayBadgeBg,
+                                color: dueTodayBadgeColor,
+                                border: `1px solid ${dueTodayBadgeBorder}`,
+                            }}>
+                                {dueTodayCount} due today
+                            </span>
+                        </div>
                     </div>
                     <Button
                         onClick={goToday}
@@ -249,7 +308,7 @@ export function CalendarPage() {
                                     return (
                                         <div
                                             key={cell.key}
-                                            style={{ minHeight: '80px', borderTop: '1px solid var(--color-border)' }}
+                                            style={{ minHeight: '96px', borderTop: '1px solid var(--color-border)' }}
                                         />
                                     );
                                 }
@@ -268,12 +327,12 @@ export function CalendarPage() {
                                         onClick={() => handleDateClick(day)}
                                         className="text-left transition-colors relative group"
                                         style={{
-                                            minHeight: '80px',
-                                            padding: '6px 8px',
+                                            minHeight: '96px',
+                                            padding: '8px 8px',
                                             borderTop: '1px solid var(--color-border)',
                                             background: (() => {
-                                                if (isSelected) return 'rgba(107,0,0,0.06)';
-                                                if (isToday) return 'rgba(107,0,0,0.03)';
+                                                if (isSelected) return isDark ? 'rgba(212,84,76,0.20)' : 'rgba(107,0,0,0.06)';
+                                                if (isToday) return isDark ? 'rgba(212,84,76,0.10)' : 'rgba(107,0,0,0.03)';
                                                 return 'transparent';
                                             })(),
                                             cursor: 'pointer',
@@ -306,7 +365,15 @@ export function CalendarPage() {
                                                 {day}
                                             </span>
                                             {hasDue && (
-                                                <span style={{ fontSize: '10px', fontWeight: 600, color: 'var(--color-primary)' }}>
+                                                <span style={{
+                                                    fontSize: '10px',
+                                                    fontWeight: 700,
+                                                    color: 'var(--color-primary)',
+                                                    backgroundColor: isDark ? 'rgba(212,84,76,.18)' : 'rgba(107,0,0,.06)',
+                                                    border: '1px solid rgba(212,84,76,.35)',
+                                                    borderRadius: '999px',
+                                                    padding: '1px 6px',
+                                                }}>
                                                     {dayAssignments.length} due
                                                 </span>
                                             )}
@@ -314,22 +381,31 @@ export function CalendarPage() {
 
                                         {/* Assignment dots/pills */}
                                         <div className="space-y-0.5">
-                                            {dayAssignments.slice(0, 2).map(a => (
-                                                <div
-                                                    key={a.id}
-                                                    className="truncate rounded"
-                                                    style={{
-                                                        fontSize: '10px',
-                                                        fontWeight: 500,
-                                                        padding: '1px 5px',
-                                                        backgroundColor: getCourseColor(a.courseCode) + '18',
-                                                        color: getCourseColor(a.courseCode),
-                                                        borderLeft: `3px solid ${getCourseColor(a.courseCode)}`,
-                                                    }}
-                                                >
-                                                    {a.name}
-                                                </div>
-                                            ))}
+                                            {dayAssignments.slice(0, 2).map(a => {
+                                                const courseColor = getCourseColor(a.courseCode);
+                                                const chipBg = hexToRgba(courseColor, isDark ? 0.3 : 0.12);
+                                                const chipText = isDark ? '#F8F8F8' : courseColor;
+                                                const chipBorder = isDark ? `1px solid ${hexToRgba(courseColor, 0.48)}` : 'none';
+
+                                                return (
+                                                    <div
+                                                        key={`${a.id}-${dateStr}`}
+                                                        className="truncate rounded"
+                                                        style={{
+                                                            fontSize: '10px',
+                                                            fontWeight: 600,
+                                                            padding: '2px 6px',
+                                                            backgroundColor: chipBg,
+                                                            color: chipText,
+                                                            borderLeft: `3px solid ${courseColor}`,
+                                                            border: chipBorder,
+                                                        }}
+                                                        title={a.name}
+                                                    >
+                                                        {a.name}
+                                                    </div>
+                                                );
+                                            })}
                                             {dayAssignments.length > 2 && (
                                                 <span style={{ fontSize: '10px', color: 'var(--color-text-light)', paddingLeft: '5px' }}>
                                                     +{dayAssignments.length - 2} more
@@ -496,7 +572,9 @@ export function CalendarPage() {
                                                                 display: 'inline-block', marginTop: '3px',
                                                                 fontSize: '10px', fontWeight: 700,
                                                                 padding: '1px 6px', borderRadius: '4px',
-                                                                backgroundColor: '#FEF2F2', color: '#991B1B',
+                                                                backgroundColor: isDark ? 'rgba(212,84,76,.22)' : '#FEF2F2',
+                                                                color: isDark ? '#FFD1CE' : '#991B1B',
+                                                                border: isDark ? '1px solid rgba(212,84,76,.45)' : 'none',
                                                             }}>
                                                                 {(() => {
                                                                     if (daysUntil === 0) return 'Due today';

@@ -18,22 +18,28 @@ def create_initial_users():
     try:
         users_to_create = [
             {
-                "name": "Sujit Bhattarai",
-                "email": "sujit.bhattarai@student.edu",
-                "password": "Student@123",
+                "name": "Student Test",
+                "email": "student@warhawks.ulm.edu",
+                "password": "Axiom@123",
                 "role": "student"
             },
             {
-                "name": "Lon Smith",
-                "email": "lon.smith@ulm.edu",
-                "password": "Faculty@123",
+                "name": "Faculty Test",
+                "email": "faculty@ulm.edu",
+                "password": "Axiom@123",
                 "role": "faculty"
             },
             {
-                "name": "Arturo Rodriguez",
+                "name": "Admin Test",
                 "email": "admin@ulm.edu",
-                "password": "Admin@123",
+                "password": "Axiom@123",
                 "role": "admin"
+            },
+            {
+                "name": "Teaching Assistant",
+                "email": "tassistant@warhawks.ulm.edu",
+                "password": "Axiom@123",
+                "role": "student"  # Assuming TA is a student role or similar
             }
         ]
         

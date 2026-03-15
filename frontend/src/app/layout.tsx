@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import '@/styles/index.css';
 import { Providers } from './providers';
+import { Toaster } from '@/components/ui/sonner';
 
 export const metadata: Metadata = {
-    title: 'Axiom Autograder',
-    description: 'Axiom Autograder – Automated Grading Platform',
+    title: 'Axiom',
+    description: 'Axiom – Automated Grading Platform',
 };
 
 export default function RootLayout({
@@ -15,7 +16,10 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body>
-                <Providers>{children}</Providers>
+                <Providers>
+                    {children}
+                    <Toaster richColors position="top-right" />
+                </Providers>
             </body>
         </html>
     );
