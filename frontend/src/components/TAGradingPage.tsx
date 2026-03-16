@@ -90,6 +90,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const [score, setScore] = useState<string>('');
     const [maxScore, setMaxScore] = useState<string>('');
     const [feedback, setFeedback] = useState('');
+    const [rubricScores, setRubricScores] = useState<Record<number, number>>({});
     const [expandedTests, setExpandedTests] = useState<Set<number>>(new Set());
 
     // UI Layout state
@@ -139,8 +140,32 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
             setScore(detail.score?.toString() || '');
             setMaxScore(detail.max_score?.toString() || '');
             setFeedback(detail.feedback || '');
+
+            const byRubric: Record<number, number> = {};
+            for (const rs of detail.rubric_scores ?? []) {
+                byRubric[rs.rubric_id] = Number(rs.score_awarded) || 0;
+            }
+            setRubricScores(byRubric);
         }
     }, [detail]);
+
+    const setRubricScore = (rubricId: number, raw: string) => {
+        if (!detail) return;
+        const rubric = detail.rubrics.find((r) => r.id === rubricId);
+        const maxPts = Number(rubric?.max_points ?? 0);
+        const nextVal = Math.max(0, Math.min(Number(raw) || 0, maxPts));
+
+        setRubricScores((prev) => {
+            const next = { ...prev, [rubricId]: nextVal };
+            const rubricTotal = detail.rubrics.reduce((sum, r) => sum + (next[r.id] ?? 0), 0);
+            const rubricMax = detail.rubrics.reduce((sum, r) => sum + Number(r.max_points || 0), 0);
+            setScore(String(rubricTotal));
+            if (!maxScore && rubricMax > 0) {
+                setMaxScore(String(rubricMax));
+            }
+            return next;
+        });
+    };
 
     const toggleTest = (testId: number) => {
         setExpandedTests((prev) => {
@@ -166,6 +191,18 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
 
     const handleGrade = (isDraft: boolean, moveToNext: boolean = false) => {
         const feedbackToSave = feedback.trim() || 'Reviewed by TA.';
+        const rubricBreakdown = (detail?.rubrics ?? []).map((rubric) => ({
+            rubric_id: rubric.id,
+            score_awarded: Math.max(
+                0,
+                Math.min(
+                    Number(rubricScores[rubric.id] ?? 0),
+                    Number(rubric.max_points || 0)
+                )
+            ),
+            feedback: null,
+        }));
+
         gradeMutation.mutate(
             {
                 submissionId: submissionIdNum,
@@ -174,6 +211,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                     max_score: maxScore ? Number.parseFloat(maxScore) : undefined,
                     feedback: feedbackToSave,
                     is_draft: isDraft,
+                    rubric_breakdown: rubricBreakdown,
                 },
             },
             {
@@ -202,6 +240,15 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                 if (data.score != null) setScore(data.score.toString());
                 if (data.max_score != null) setMaxScore(data.max_score.toString());
                 if (data.feedback) setFeedback(data.feedback);
+                if (detail?.rubrics?.length) {
+                    const evalMap: Record<number, number> = {};
+                    for (const ev of data.rubric_results?.evaluations ?? []) {
+                        evalMap[ev.rubric_id] = Number(ev.earned_points) || 0;
+                    }
+                    if (Object.keys(evalMap).length > 0) {
+                        setRubricScores(evalMap);
+                    }
+                }
                 // Also update test results display
                 if (data.stored_results) {
                     setRunTestsResult({
@@ -215,7 +262,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                 }
             },
         });
-    }, [submissionIdNum, autoGradeMutation]);
+    }, [submissionIdNum, autoGradeMutation, detail?.rubrics]);
 
     const handleRunTests = () => {
         setRunTestsResult(null);
@@ -828,7 +875,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                         const autoEval = autoGradeResult?.rubric_results?.evaluations?.find(
                                                             (e: any) => e.rubric_id === rubric.id
                                                         );
-                                                        const earned = autoEval ? autoEval.earned_points : null;
+                                                        const earned = rubricScores[rubric.id] ?? (autoEval ? autoEval.earned_points : null);
                                                         const max = rubric.max_points || 0;
 
                                                         return (
@@ -847,18 +894,39 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                         </p>
                                                                     )}
                                                                 </div>
-                                                                <span
-                                                                    className="px-2 py-0.5 rounded-md shrink-0"
-                                                                    style={{
-                                                                        fontSize: '11px',
-                                                                        fontWeight: 600,
-                                                                        color: earned !== null ? (earned === max ? '#059669' : '#D97706') : 'var(--color-text-mid)',
-                                                                        backgroundColor: 'var(--color-surface)',
-                                                                        border: '1px solid var(--color-border)',
-                                                                    }}
-                                                                >
-                                                                    {earned !== null ? `${earned} / ` : ''}{max} pts
-                                                                </span>
+                                                                <div className="flex items-center gap-2 shrink-0">
+                                                                    <span
+                                                                        className="px-2 py-0.5 rounded-md"
+                                                                        style={{
+                                                                            fontSize: '11px',
+                                                                            fontWeight: 600,
+                                                                            color: earned !== null ? (earned === max ? '#059669' : '#D97706') : 'var(--color-text-mid)',
+                                                                            backgroundColor: 'var(--color-surface)',
+                                                                            border: '1px solid var(--color-border)',
+                                                                        }}
+                                                                    >
+                                                                        {earned !== null ? `${earned} / ` : ''}{max} pts
+                                                                    </span>
+                                                                    {permissions?.can_grade !== false && (
+                                                                        <input
+                                                                            type="number"
+                                                                            min={0}
+                                                                            max={max}
+                                                                            value={rubricScores[rubric.id] ?? ''}
+                                                                            onChange={(e) => setRubricScore(rubric.id, e.target.value)}
+                                                                            placeholder="0"
+                                                                            style={{
+                                                                                width: 72,
+                                                                                padding: '4px 6px',
+                                                                                borderRadius: 6,
+                                                                                border: '1px solid var(--color-border)',
+                                                                                backgroundColor: 'var(--color-surface)',
+                                                                                color: 'var(--color-text-dark)',
+                                                                                fontSize: 12,
+                                                                            }}
+                                                                        />
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         );
                                                     })}

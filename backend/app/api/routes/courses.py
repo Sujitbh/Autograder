@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+from datetime import datetime, UTC
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from app.services.email_service import EmailService
@@ -78,6 +79,21 @@ def _build_email_from_row(row: dict, default_domain: str) -> Optional[str]:
             return f"{login}@{default_domain}"
 
     return None
+
+
+def _submission_status_for_gradebook(assignment: Assignment, submission: Optional[Submission]) -> str:
+    """Return a report-friendly assignment status."""
+    if submission and submission.status == "graded" and submission.score is not None:
+        return "graded"
+    if submission is not None:
+        return "ungraded"
+
+    due_date = assignment.due_date
+    if due_date is None:
+        return "not_submitted"
+
+    now = datetime.now(due_date.tzinfo) if due_date.tzinfo else datetime.now(UTC).replace(tzinfo=None)
+    return "missing" if due_date < now else "not_submitted"
 
 
 def _parse_dict_rows(decoded_text: str) -> list[dict]:
@@ -796,20 +812,33 @@ def get_course_grades(
                 sub = db.query(Submission).filter(
                     Submission.student_id == student.id,
                     Submission.assignment_id == a.id,
-                    Submission.status == "graded",
-                ).order_by(Submission.created_at.desc()).first()
+                ).order_by(Submission.created_at.desc(), Submission.id.desc()).first()
 
-                if sub and sub.score is not None:
+                status = _submission_status_for_gradebook(a, sub)
+
+                if sub and sub.status == "graded" and sub.score is not None:
                     grades[str(a.id)] = {
                         "score": float(sub.score),
                         "max_score": float(sub.max_score) if sub.max_score else float(a.max_points or 100),
                         "submission_id": sub.id,
                         "is_late": False,
+                        "status": status,
+                        "raw_submission_status": sub.status,
                     }
                     total_earned += float(sub.score)
                     total_possible += float(sub.max_score) if sub.max_score else float(a.max_points or 100)
                 else:
-                    grades[str(a.id)] = None
+                    grades[str(a.id)] = {
+                        "score": None,
+                        "max_score": float(a.max_points or 100),
+                        "submission_id": sub.id if sub else None,
+                        "is_late": False,
+                        "status": status,
+                        "raw_submission_status": sub.status if sub else None,
+                    }
+
+                    if status == "missing":
+                        total_possible += float(a.max_points or 100)
 
             students_data.append({
                 "student_id": student.id,
@@ -870,6 +899,7 @@ def get_course_grades(
     
     for assignment in assignments:
         sub = latest_submissions.get(assignment.id)
+        status = _submission_status_for_gradebook(assignment, sub)
         if sub and sub.status == "graded" and sub.score is not None and sub.max_score is not None and sub.max_score > 0:
             percentage = (sub.score / sub.max_score) * 100
             graded_scores.append(percentage)
@@ -880,6 +910,7 @@ def get_course_grades(
                 "max_score": sub.max_score,
                 "percentage": round(percentage, 1),
                 "submitted": True,
+                "status": status,
                 "feedback": sub.feedback,
                 "graded_at": sub.graded_at.isoformat() if sub.graded_at else None,
             })
@@ -891,6 +922,7 @@ def get_course_grades(
                 "max_score": assignment.max_points,
                 "percentage": None,
                 "submitted": sub is not None,
+                "status": status,
                 "feedback": sub.feedback if sub is not None else None,
                 "graded_at": sub.graded_at.isoformat() if sub and sub.graded_at else None,
             })

@@ -16,6 +16,7 @@ from app.models.rubric import Rubric
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
 from app.models.submission_result import SubmissionResult
+from app.models.submission_rubric_score import SubmissionRubricScore
 from app.models.testcase import TestCase
 from app.models.user import User
 from app.schemas.submission import SubmissionCreate, SubmissionOut, SubmissionWithStudent
@@ -390,6 +391,16 @@ def get_submission_detail(
                 "order": r.order or 0,
             }
             for r in db.query(Rubric).filter(Rubric.assignment_id == s.assignment_id).order_by(Rubric.order).all()
+        ],
+        "rubric_scores": [
+            {
+                "id": rs.id,
+                "rubric_id": rs.rubric_id,
+                "score_awarded": rs.score_awarded,
+                "feedback": rs.feedback,
+                "grader_id": rs.grader_id,
+            }
+            for rs in db.query(SubmissionRubricScore).filter(SubmissionRubricScore.submission_id == s.id).all()
         ],
         "attempt_number": db.query(Submission).filter(
             Submission.assignment_id == s.assignment_id,
