@@ -256,7 +256,7 @@ export function AssignmentGrading() {
         setIsGradingAll(true);
         try {
             const result = await submissionService.gradeAllSubmissions(assignmentId);
-            window.alert(`Graded ${result.total_graded} submission(s). Errors: ${result.total_errors}.`);
+            window.alert(`Executed grading for ${result.total_considered ?? result.total_graded} latest submission(s). Graded: ${result.total_graded}. Errors: ${result.total_errors}.`);
             refetchSubmissions();
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to grade submissions';
@@ -858,22 +858,30 @@ export function AssignmentGrading() {
                 <DialogContent className="max-w-md" style={{ boxShadow: '0 8px 24px rgba(107,0,0,.15)' }}>
                     <DialogHeader>
                         <DialogTitle style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                            Apply Auto-Scores as Final Grades
+                            Run Bulk Execution Across Class
                         </DialogTitle>
                         <DialogDescription style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '8px' }}>
-                            This will use automated test scores as final grades for all ungraded submissions. Manual review is recommended for accuracy.
+                            This will rerun automated grading for the latest submission from every student who has submitted work, then refresh class-wide test dataset performance.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="mt-3 p-3 rounded-lg flex items-start gap-2" style={{ backgroundColor: '#FFF8E1' }}>
                         <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#8A5700' }} />
                         <p style={{ fontSize: '12px', color: '#8A5700' }}>
-                            {counts.submitted + counts.needsReview} ungraded submission(s) will receive their auto-score as the final grade.
+                            {gradableStudents.length} latest submission(s) will be executed. Existing automated results for those submissions will be replaced.
                         </p>
                     </div>
                     <DialogFooter className="mt-4">
                         <Button variant="outline" onClick={() => setShowBulkGradeDialog(false)} className="border-[var(--color-border)]">Cancel</Button>
-                        <Button onClick={() => setShowBulkGradeDialog(false)} className="text-white" style={{ backgroundColor: 'var(--color-primary)' }}>
-                            <CheckCircle2 className="w-4 h-4 mr-2" /> Apply Grades
+                        <Button
+                            onClick={async () => {
+                                setShowBulkGradeDialog(false);
+                                await handleGradeAll();
+                            }}
+                            className="text-white"
+                            style={{ backgroundColor: 'var(--color-primary)' }}
+                            disabled={isGradingAll}
+                        >
+                            <CheckCircle2 className="w-4 h-4 mr-2" /> {isGradingAll ? 'Running...' : 'Run Bulk Execution'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

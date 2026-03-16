@@ -22,3 +22,4 @@ class Rubric(Base):
 
     # Relationships
     assignment = relationship("Assignment", back_populates="rubrics")
+    submission_scores = relationship("SubmissionRubricScore", back_populates="rubric", cascade="all, delete-orphan")

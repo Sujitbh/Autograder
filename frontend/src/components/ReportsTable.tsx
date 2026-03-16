@@ -17,6 +17,7 @@ import {
   FileDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
@@ -56,6 +57,8 @@ interface ReportsTableProps {
   students: ReportsTableStudent[];
   /** studentId → assignmentId → earned points (null = not submitted). */
   grades: Record<string, Record<string, number | null>>;
+  /** studentId → assignmentId → explicit report status. */
+  gradeStatuses?: Record<string, Record<string, 'graded' | 'ungraded' | 'missing' | 'not_submitted'>>;
   /** studentId → assignmentId → true if late. */
   lateFlags?: Record<string, Record<string, boolean>>;
   onViewStudentReport?: (studentId: string) => void;
@@ -72,6 +75,7 @@ export function ReportsTable({
   assignments,
   students,
   grades,
+  gradeStatuses,
   lateFlags,
   onViewStudentReport,
   onExport,
@@ -80,6 +84,12 @@ export function ReportsTable({
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [perfFilter, setPerfFilter] = useState<FilterPerformance>('all');
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+  const [showSelectedOnly, setShowSelectedOnly] = useState(false);
+
+  const getStatus = useCallback((studentId: string, assignmentId: string) => {
+    return gradeStatuses?.[studentId]?.[assignmentId] ?? (grades[studentId]?.[assignmentId] != null ? 'graded' : 'not_submitted');
+  }, [gradeStatuses, grades]);
 
   const totalMaxPoints = useMemo(
     () => assignments.reduce((s, a) => s + a.maxPoints, 0),
@@ -87,20 +97,28 @@ export function ReportsTable({
   );
 
   const studentTotals = useMemo(() => {
-    const map: Record<string, { earned: number; percentage: number }> = {};
+    const map: Record<string, { earned: number; possible: number; percentage: number }> = {};
     students.forEach((s) => {
       let earned = 0;
+      let possible = 0;
       assignments.forEach((a) => {
         const g = grades[s.id]?.[a.id];
-        if (g != null) earned += g;
+        const status = getStatus(s.id, a.id);
+        if (status === 'graded' && g != null) {
+          earned += g;
+          possible += a.maxPoints;
+        } else if (status === 'missing') {
+          possible += a.maxPoints;
+        }
       });
       map[s.id] = {
         earned,
-        percentage: calculatePercentage(earned, totalMaxPoints),
+        possible,
+        percentage: calculatePercentage(earned, possible),
       };
     });
     return map;
-  }, [students, assignments, grades, totalMaxPoints]);
+  }, [students, assignments, grades, getStatus]);
 
   const filteredStudents = useMemo(() => {
     let list = [...students];
@@ -127,6 +145,10 @@ export function ReportsTable({
       });
     }
 
+    if (showSelectedOnly) {
+      list = list.filter((s) => selectedStudentIds.has(s.id));
+    }
+
     list.sort((a, b) => {
       let cmp = 0;
       if (sortField === 'name') {
@@ -144,7 +166,7 @@ export function ReportsTable({
     });
 
     return list;
-  }, [students, search, perfFilter, sortField, sortDir, grades, studentTotals]);
+  }, [students, search, perfFilter, showSelectedOnly, selectedStudentIds, sortField, sortDir, grades, studentTotals]);
 
   const toggleSort = useCallback(
     (field: SortField) => {
@@ -164,6 +186,29 @@ export function ReportsTable({
       ? <ArrowUp className="h-3 w-3 inline-block ml-1" />
       : <ArrowDown className="h-3 w-3 inline-block ml-1" />;
   }
+
+  const allVisibleSelected = filteredStudents.length > 0 && filteredStudents.every((student) => selectedStudentIds.has(student.id));
+
+  const toggleStudentSelection = useCallback((studentId: string) => {
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(studentId)) next.delete(studentId);
+      else next.add(studentId);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectVisible = useCallback(() => {
+    setSelectedStudentIds((prev) => {
+      const next = new Set(prev);
+      if (filteredStudents.length > 0 && filteredStudents.every((student) => next.has(student.id))) {
+        filteredStudents.forEach((student) => next.delete(student.id));
+      } else {
+        filteredStudents.forEach((student) => next.add(student.id));
+      }
+      return next;
+    });
+  }, [filteredStudents]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -191,6 +236,20 @@ export function ReportsTable({
             <SelectItem value="failing">Failing (&lt;60%)</SelectItem>
           </SelectContent>
         </Select>
+
+        <Button variant="outline" size="sm" className="border-[var(--color-border)]" onClick={toggleSelectVisible}>
+          {allVisibleSelected ? 'Clear Visible' : 'Select Visible'}
+        </Button>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-[var(--color-border)]"
+          onClick={() => setShowSelectedOnly((value) => !value)}
+          disabled={selectedStudentIds.size === 0}
+        >
+          {showSelectedOnly ? 'Show All' : `Show Selected (${selectedStudentIds.size})`}
+        </Button>
 
         {onExport && (
           <DropdownMenu>
@@ -229,6 +288,9 @@ export function ReportsTable({
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr style={{ borderBottom: '2px solid var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
+              <th className="px-3 py-3 text-center" style={{ width: 44 }}>
+                <Checkbox checked={allVisibleSelected} onCheckedChange={() => toggleSelectVisible()} aria-label="Select visible students" />
+              </th>
               <th
                 className="sticky left-0 z-20 cursor-pointer px-4 py-3 text-left"
                 style={{ backgroundColor: 'var(--color-surface)', fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase', minWidth: 180 }}
@@ -273,6 +335,7 @@ export function ReportsTable({
           <tbody>
             {/* Points Possible row */}
             <tr style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: '#F9F9F9' }}>
+              <td className="px-3 py-2.5" />
               <td
                 className="sticky left-0 z-10 px-4 py-2.5"
                 style={{ backgroundColor: '#F9F9F9', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-mid)' }}
@@ -297,6 +360,7 @@ export function ReportsTable({
               const totals = studentTotals[student.id];
               const pct = totals?.percentage ?? 0;
               const earned = totals?.earned ?? 0;
+              const possible = totals?.possible ?? 0;
               const letter = getLetterGrade(pct);
 
               return (
@@ -307,6 +371,13 @@ export function ReportsTable({
                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--color-primary-bg)'; }}
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
                 >
+                  <td className="px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={selectedStudentIds.has(student.id)}
+                      onCheckedChange={() => toggleStudentSelection(student.id)}
+                      aria-label={`Select ${student.name}`}
+                    />
+                  </td>
                   <td
                     className="sticky left-0 z-10 px-4 py-3"
                     style={{ backgroundColor: 'var(--color-surface)', fontSize: '14px', fontWeight: 500, color: 'var(--color-text-dark)' }}
@@ -334,24 +405,29 @@ export function ReportsTable({
                   {assignments.map((a) => {
                     const g = grades[student.id]?.[a.id] ?? null;
                     const isLate = lateFlags?.[student.id]?.[a.id] ?? false;
+                    const status = getStatus(student.id, a.id);
                     return (
                       <td key={a.id} className="px-3 py-3 text-center" style={{ fontSize: '14px' }}>
-                        {g === null ? (
-                          <span style={{ color: 'var(--color-text-light)' }}>—</span>
-                        ) : (
+                        {status === 'graded' && g !== null ? (
                           <span style={{ fontWeight: 500, color: 'var(--color-text-dark)' }}>
                             {g}{isLate && <sup style={{ color: 'var(--color-text-light)', fontSize: '10px' }}>L</sup>}
                           </span>
+                        ) : status === 'ungraded' ? (
+                          <span style={{ color: '#8A5700', fontWeight: 600, fontSize: '12px' }}>Ungraded</span>
+                        ) : status === 'missing' ? (
+                          <span style={{ color: '#8B0000', fontWeight: 600, fontSize: '12px' }}>Missing</span>
+                        ) : (
+                          <span style={{ color: 'var(--color-text-light)', fontSize: '12px' }}>Not Submitted</span>
                         )}
                       </td>
                     );
                   })}
 
                   <td className="px-3 py-3 text-center" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                    {earned}/{totalMaxPoints}
+                    {earned}/{possible || totalMaxPoints}
                   </td>
                   <td className="px-3 py-3 text-center" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-mid)' }}>
-                    {pct.toFixed(1)}%
+                    {possible > 0 ? `${pct.toFixed(1)}%` : '—'}
                   </td>
                   <td className="px-3 py-3 text-center">
                     <span
@@ -368,7 +444,7 @@ export function ReportsTable({
                         textAlign: 'center',
                       }}
                     >
-                      {letter}
+                      {possible > 0 ? letter : '—'}
                     </span>
                   </td>
                   {onViewStudentReport && (
@@ -391,7 +467,7 @@ export function ReportsTable({
             {filteredStudents.length === 0 && (
               <tr>
                 <td
-                  colSpan={5 + assignments.length + (onViewStudentReport ? 1 : 0)}
+                  colSpan={6 + assignments.length + (onViewStudentReport ? 1 : 0)}
                   className="px-4 py-12 text-center"
                   style={{ fontSize: '14px', color: 'var(--color-text-light)' }}
                 >
@@ -405,7 +481,7 @@ export function ReportsTable({
 
       {/* Minimal legend */}
       <div style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>
-        <sup>L</sup> Late submission &nbsp;·&nbsp; — Not submitted
+        <sup>L</sup> Late submission &nbsp;·&nbsp; Cells may show Graded, Ungraded, Missing, or Not Submitted
       </div>
     </div>
   );
