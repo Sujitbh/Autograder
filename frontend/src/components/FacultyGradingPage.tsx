@@ -80,7 +80,12 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     });
 
     const gradeMutation = useMutation({
-        mutationFn: (payload: { score: number; max_score: number; feedback?: string }) =>
+        mutationFn: (payload: {
+            score: number;
+            max_score: number;
+            feedback?: string;
+            rubric_breakdown?: Array<{ rubric_id: number; score_awarded: number; feedback?: string | null }>;
+        }) =>
             submissionService.overrideSubmissionScore(submissionId, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['faculty-submission-detail', submissionId] });
@@ -122,8 +127,13 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         setFeedback(detail.feedback || '');
         const rubrics = detail.rubrics ?? [];
         if (rubrics.length > 0) {
-            // If already graded, distribute score proportionally across criteria
-            if (detail.score != null && rubrics.length > 0) {
+            const existingByRubric = new Map(
+                (detail.rubric_scores ?? []).map((rs: any) => [rs.rubric_id, Number(rs.score_awarded) || 0])
+            );
+
+            if (existingByRubric.size > 0) {
+                setRubricScores(rubrics.map((r) => existingByRubric.get(r.id) ?? 0));
+            } else if (detail.score != null) {
                 const totalMax = rubrics.reduce((s, r) => s + r.max_points, 0);
                 setRubricScores(rubrics.map(r =>
                     totalMax > 0 ? Math.round((detail.score! / totalMax) * r.max_points) : 0
@@ -177,11 +187,18 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
             const result = await autoGradeMutation.mutateAsync();
             setAutoGradeResult(result);
             // Populate score fields
-            if (result.score != null && rubrics.length > 0) {
-                const totalMax = rubrics.reduce((s: number, r: any) => s + r.max_points, 0);
-                setRubricScores(rubrics.map((r: any) =>
-                    totalMax > 0 ? Math.round((result.score / totalMax) * r.max_points) : 0
-                ));
+            if (rubrics.length > 0) {
+                const evalMap = new Map(
+                    (result?.rubric_results?.evaluations ?? []).map((e: any) => [e.rubric_id, Number(e.earned_points) || 0])
+                );
+                if (evalMap.size > 0) {
+                    setRubricScores(rubrics.map((r: any) => evalMap.get(r.id) ?? 0));
+                } else if (result.score != null) {
+                    const totalMax = rubrics.reduce((s: number, r: any) => s + r.max_points, 0);
+                    setRubricScores(rubrics.map((r: any) =>
+                        totalMax > 0 ? Math.round((result.score / totalMax) * r.max_points) : 0
+                    ));
+                }
             }
             if (result.feedback) setFeedback(result.feedback);
             // Update live test results
@@ -234,7 +251,17 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         const normalizedScore = Math.max(0, Math.min(Math.round(rawScore), resolvedMaxPoints));
         const normalizedMax = Math.max(1, Math.round(resolvedMaxPoints));
         const feedbackToSave = feedback.trim() || 'Reviewed by instructor.';
-        await gradeMutation.mutateAsync({ score: normalizedScore, max_score: normalizedMax, feedback: feedbackToSave });
+        const rubricBreakdown = rubrics.map((rubric, idx) => ({
+            rubric_id: rubric.id,
+            score_awarded: Math.max(0, Math.min(Number(rubricScores[idx]) || 0, rubric.max_points || 0)),
+            feedback: null,
+        }));
+        await gradeMutation.mutateAsync({
+            score: normalizedScore,
+            max_score: normalizedMax,
+            feedback: feedbackToSave,
+            rubric_breakdown: rubricBreakdown,
+        });
         if (!isDraft) {
             if (moveToNext && nextSubmissionId) {
                 router.push(`/courses/${courseId}/submissions/${nextSubmissionId}/grade`);
