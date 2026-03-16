@@ -13,6 +13,7 @@ from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
 from app.models.submission_result import SubmissionResult
+from app.models.submission_rubric_score import SubmissionRubricScore
 from app.models.enrollment import Enrollment
 from app.models.testcase import TestCase
 from app.models.rubric import Rubric
@@ -433,6 +434,19 @@ def get_submission_detail(
             "order": r.order,
         } for r in rubrics]
 
+        rubric_scores_data = [
+            {
+                "id": rs.id,
+                "rubric_id": rs.rubric_id,
+                "score_awarded": rs.score_awarded,
+                "feedback": rs.feedback,
+                "grader_id": rs.grader_id,
+            }
+            for rs in db.query(SubmissionRubricScore).filter(
+                SubmissionRubricScore.submission_id == submission.id
+            ).all()
+        ]
+
         # Get submission files
         files_data = []
         if hasattr(submission, 'files') and submission.files:
@@ -483,6 +497,7 @@ def get_submission_detail(
             "files": files_data,
             "test_results": results_data,
             "rubrics": rubrics_data,
+            "rubric_scores": rubric_scores_data,
             "permissions": permissions,
         }
     except HTTPException:
@@ -651,6 +666,7 @@ def ta_auto_grade(
             submission_id=submission.id,
             run_tests=True,
             apply_rubric=True,
+            grader_id=user.id,
         )
 
         # Update submission with grading results
@@ -769,6 +785,7 @@ def grade_submission(
     max_score = payload.get("max_score")
     feedback = payload.get("feedback", "")
     is_draft = payload.get("is_draft", False)
+    rubric_breakdown = payload.get("rubric_breakdown")
 
     if score is not None:
         submission.score = score
@@ -776,6 +793,37 @@ def grade_submission(
         submission.max_score = max_score
     if feedback:
         submission.feedback = feedback
+
+    if rubric_breakdown is not None:
+        db.query(SubmissionRubricScore).filter(
+            SubmissionRubricScore.submission_id == submission.id
+        ).delete()
+
+        for item in rubric_breakdown:
+            rubric_id = item.get("rubric_id")
+            if rubric_id is None:
+                continue
+
+            rubric = db.query(Rubric).filter(Rubric.id == rubric_id).first()
+            if not rubric:
+                continue
+
+            max_pts = int(rubric.max_points or 0)
+            score_awarded = int(item.get("score_awarded") or 0)
+            if max_pts > 0:
+                score_awarded = max(0, min(score_awarded, max_pts))
+            else:
+                score_awarded = max(0, score_awarded)
+
+            db.add(
+                SubmissionRubricScore(
+                    submission_id=submission.id,
+                    rubric_id=rubric_id,
+                    grader_id=user.id,
+                    score_awarded=score_awarded,
+                    feedback=item.get("feedback"),
+                )
+            )
 
     submission.status = "grading" if is_draft else "graded"
 

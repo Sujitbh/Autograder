@@ -132,6 +132,13 @@ export const submissionService = {
     student: { id: number; name: string; email: string | null };
     assignment: { id: number; title: string; max_points: number | null; due_date: string | null; language: string };
     rubrics: Array<{ id: number; name: string; description: string | null; max_points: number; weight: number | null; order: number }>;
+    rubric_scores?: Array<{
+      id: number;
+      rubric_id: number;
+      score_awarded: number;
+      feedback: string | null;
+      grader_id: number | null;
+    }>;
     files: Array<{ id: number; filename: string; content: string | null }>;
     results: Array<{
       testcase_id: number;
@@ -208,7 +215,16 @@ export const submissionService = {
   /** Manual score entry/override by instructor/TA. */
   async overrideSubmissionScore(
     submissionId: string,
-    payload: { score: number; max_score?: number; feedback?: string }
+    payload: {
+      score: number;
+      max_score?: number;
+      feedback?: string;
+      rubric_breakdown?: Array<{
+        rubric_id: number;
+        score_awarded: number;
+        feedback?: string | null;
+      }>;
+    }
   ): Promise<BackendGradingResults> {
     const { data } = await api.patch<BackendGradingResults>(
       `/grading/submissions/${submissionId}/score`,
