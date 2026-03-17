@@ -372,7 +372,7 @@ export function ReportsDashboard() {
                 <div>
                   <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--color-text-dark)' }}>Gradebook</h1>
                   <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '4px' }}>
-                    All student grades at a glance
+                    Student list first. Click a name for detailed grades, or switch to Full Gradebook for all columns.
                   </p>
                 </div>
               </div>

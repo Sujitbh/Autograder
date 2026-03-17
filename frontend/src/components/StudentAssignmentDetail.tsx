@@ -157,6 +157,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   // Panel visibility
   const [showExplorer, setShowExplorer] = useState(true);
   const [showInfoPanel, setShowInfoPanel] = useState(true);
+  const [infoPanelWidth, setInfoPanelWidth] = useState(360);
 
   // File upload state
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -219,8 +220,25 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
   const course = courses?.find((c) => c.id === courseId);
   const latestSubmission = submissions && submissions.length > 0 ? submissions[0] : null;
-  const assignmentRubrics = assignment?.rubric ?? [];
-  const rubricTotalPoints = assignmentRubrics.reduce((sum, rubric) => sum + (rubric.maxPoints ?? 0), 0);
+  const sectionWeightPercent = (weight?: number | null) => {
+    if (weight == null || Number.isNaN(weight)) return 100;
+    return weight <= 1.5 ? weight * 100 : weight;
+  };
+  const rubricSections = assignment?.rubric ?? [];
+  const rubricTotalPoints = rubricSections.reduce((sum, section) => 
+    sum + (section.criteria || []).reduce((sectionSum, crit) => sectionSum + (crit.maxPoints ?? 0), 0), 0);
+  const getSectionFallbackPoints = (section: any) => {
+    const assignmentMaxPoints = assignment?.maxPoints ?? 0;
+    if (assignmentMaxPoints <= 0) return null;
+    if (rubricSections.length === 1) return assignmentMaxPoints;
+    if (isWeightedRubric) return Math.round((assignmentMaxPoints * sectionWeightPercent(section.weight)) / 100);
+    return null;
+  };
+  const inferredWeightedRubric = rubricSections.some((section) => 
+    Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 || 
+    (section.criteria || []).some((crit) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
+  );
+  const isWeightedRubric = assignment?.rubricMode === 'weighted' || inferredWeightedRubric;
 
   // File upload handlers
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -684,12 +702,40 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
             <div
               className="flex flex-col overflow-hidden shrink-0"
               style={{
-                width: 360, minWidth: 360,
+                width: infoPanelWidth, minWidth: infoPanelWidth,
                 background: 'var(--color-surface)',
                 borderLeft: '1px solid var(--color-border)',
                 transition: 'width .3s ease, min-width .3s ease, opacity .25s ease',
+                position: 'relative',
               }}
             >
+              <div
+                onMouseDown={(e) => {
+                  const startX = e.clientX;
+                  const startWidth = infoPanelWidth;
+                  const onMove = (ev: MouseEvent) => {
+                    const next = Math.max(300, Math.min(760, startWidth + (startX - ev.clientX)));
+                    setInfoPanelWidth(next);
+                  };
+                  const onUp = () => {
+                    window.removeEventListener('mousemove', onMove);
+                    window.removeEventListener('mouseup', onUp);
+                  };
+                  window.addEventListener('mousemove', onMove);
+                  window.addEventListener('mouseup', onUp);
+                }}
+                title="Drag to resize panel"
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 6,
+                  cursor: 'col-resize',
+                  zIndex: 20,
+                  background: 'transparent',
+                }}
+              />
               {/* Tabs */}
               <div style={{ display: 'flex', padding: '8px 10px 0', gap: 4, flexShrink: 0, flexWrap: 'wrap' as const }}>
                 {(['desc', 'rubric', 'tests', 'submit'] as const).map(tab => (
@@ -804,35 +850,113 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                       📊 Rubric &amp; Points
                     </h2>
 
-                    {assignmentRubrics.length > 0 ? (
-                      <>
-                        <div style={{
-                          borderRadius: 8,
-                          overflow: 'hidden',
-                          border: '1px solid var(--color-border)',
-                          background: 'var(--color-surface-elevated)',
-                          marginBottom: 12,
-                        }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                            <thead>
-                              <tr style={{ background: 'var(--color-surface)' }}>
-                                <th style={{ textAlign: 'left', padding: '10px 12px', color: 'var(--color-text-light)', fontWeight: 700 }}>Criteria</th>
-                                <th style={{ textAlign: 'center', width: 80, padding: '10px 12px', color: 'var(--color-text-light)', fontWeight: 700 }}>Points</th>
-                                <th style={{ textAlign: 'left', padding: '10px 12px', color: 'var(--color-text-light)', fontWeight: 700 }}>Description</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {assignmentRubrics.map((rubric, idx) => (
-                                <tr key={rubric.id} style={{ borderTop: idx === 0 ? 'none' : '1px solid var(--color-border)' }}>
-                                  <td style={{ padding: '10px 12px', color: 'var(--color-text-dark)', fontWeight: 600 }}>{rubric.name}</td>
-                                  <td style={{ padding: '10px 12px', textAlign: 'center', color: isDark ? '#4ade80' : '#16a34a', fontWeight: 700 }}>{rubric.maxPoints ?? 0}</td>
-                                  <td style={{ padding: '10px 12px', color: 'var(--color-text-mid)' }}>{rubric.description || '—'}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                    {rubricSections.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '4px 10px',
+                            borderRadius: 999,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            letterSpacing: '.4px',
+                            textTransform: 'uppercase' as const,
+                            color: isWeightedRubric ? '#6B0000' : '#2D6A2D',
+                            background: isWeightedRubric ? 'rgba(107,0,0,.10)' : 'rgba(45,106,45,.12)',
+                            border: `1px solid ${isWeightedRubric ? 'rgba(107,0,0,.24)' : 'rgba(45,106,45,.24)'}`,
+                          }}
+                        >
+                          {isWeightedRubric ? 'Weighted Rubric' : 'Unweighted Rubric'}
+                        </span>
+                      </div>
+                    )}
 
+                    {rubricSections.length > 0 ? (
+                      <>
+                        {/* Rubric sections */}
+                        {rubricSections.map((section, sectionIdx) => (
+                          <div key={sectionIdx} style={{ marginBottom: 16 }}>
+                            {/* Section header */}
+                            <div style={{
+                              padding: '10px 12px',
+                              background: 'var(--color-surface)',
+                              borderRadius: '6px 6px 0 0',
+                              borderBottom: '1px solid var(--color-border)',
+                              fontWeight: 700,
+                              fontSize: 13,
+                              color: 'var(--color-text-dark)',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}>
+                              <span>{section.name}</span>
+                              {isWeightedRubric && <span style={{ fontSize: 11, color: 'var(--color-text-light)' }}>Weight: {sectionWeightPercent(section.weight).toFixed(1)}%</span>}
+                            </div>
+
+                            {(section.criteria || []).length > 0 ? (
+                              <table style={{
+                                width: '100%',
+                                borderCollapse: 'collapse' as const,
+                                fontSize: 12,
+                                borderRadius: '0 0 6px 6px',
+                                overflow: 'hidden',
+                                marginBottom: sectionIdx < rubricSections.length - 1 ? 12 : 0,
+                              }}>
+                                <thead>
+                                  <tr style={{ background: 'var(--color-surface-elevated)' }}>
+                                    <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Criteria</th>
+                                    <th style={{ textAlign: 'center', width: 70, padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Points</th>
+                                    {isWeightedRubric && <th style={{ textAlign: 'center', width: 70, padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Weight</th>}
+                                    <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Description</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(section.criteria || []).map((criterion, critIdx) => (
+                                    <tr key={critIdx} style={{ borderTop: '1px solid var(--color-border)' }}>
+                                      <td style={{ padding: '10px 12px', color: 'var(--color-text-dark)', fontWeight: 500 }}>{criterion.name}</td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'center', color: isDark ? '#4ade80' : '#16a34a', fontWeight: 700 }}>{criterion.maxPoints ?? 0}</td>
+                                      {isWeightedRubric && <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--color-text-dark)', fontWeight: 600 }}>{((criterion.weight ?? 1) * 100).toFixed(0)}%</td>}
+                                      <td style={{ padding: '10px 12px', color: 'var(--color-text-mid)', fontSize: 11 }}>{criterion.description || '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : (
+                              <div style={{
+                                border: '1px solid var(--color-border)',
+                                borderTop: 'none',
+                                borderRadius: '0 0 6px 6px',
+                                padding: '14px 12px',
+                                background: 'var(--color-surface-elevated)',
+                                marginBottom: sectionIdx < rubricSections.length - 1 ? 12 : 0,
+                              }}>
+                                {section.description ? (
+                                  <p style={{ fontSize: 12, color: 'var(--color-text-mid)', lineHeight: 1.6, marginBottom: isWeightedRubric ? 10 : 0 }}>
+                                    {section.description}
+                                  </p>
+                                ) : (
+                                  <p style={{ fontSize: 12, color: 'var(--color-text-light)', fontStyle: 'italic' }}>
+                                    No criteria were defined for this section.
+                                  </p>
+                                )}
+                                {getSectionFallbackPoints(section) !== null && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12 }}>
+                                    <span style={{ color: 'var(--color-text-light)', fontWeight: 600 }}>Points</span>
+                                    <span style={{ color: isDark ? '#4ade80' : '#16a34a', fontWeight: 700 }}>{getSectionFallbackPoints(section)}</span>
+                                  </div>
+                                )}
+                                {isWeightedRubric && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12 }}>
+                                    <span style={{ color: 'var(--color-text-light)', fontWeight: 600 }}>Section Weight</span>
+                                    <span style={{ color: 'var(--color-text-dark)', fontWeight: 700 }}>{sectionWeightPercent(section.weight).toFixed(1)}%</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Total points summary */}
                         <div style={{
                           display: 'flex',
                           justifyContent: 'space-between',

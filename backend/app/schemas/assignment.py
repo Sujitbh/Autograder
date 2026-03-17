@@ -4,7 +4,8 @@ Assignment schemas for request/response validation.
 
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from app.schemas.rubric import RubricSectionOut
 
 
 # ── Inline test-case / rubric schemas for nested creation ────────────
@@ -26,6 +27,14 @@ class RubricInline(BaseModel):
     gradingMethod: Optional[str] = None  # auto | manual | hybrid
 
 
+class RubricSectionInline(BaseModel):
+    """Rubric section embedded inside assignment creation payload."""
+    name: str
+    description: Optional[str] = None
+    weight: Optional[float] = 100.0
+    criteria: List[RubricInline] = []
+
+
 class AssignmentCreate(BaseModel):
     """Schema for creating an assignment."""
     title: str
@@ -34,13 +43,14 @@ class AssignmentCreate(BaseModel):
     due_date: Optional[datetime] = None
     max_submissions: Optional[int] = None
     max_points: Optional[int] = 100
+    rubric_mode: Optional[str] = "unweighted"
     allowed_languages: Optional[str] = None  # Comma-separated: "python,java,cpp"
     starter_code: Optional[str] = None  # Faculty-provided starter code template
     status: Optional[str] = "published"  # draft | published | closed
     # Nested test cases & rubric (optional — sent from the assignment creation form)
     public_tests: Optional[List[TestCaseInline]] = None
     private_tests: Optional[List[TestCaseInline]] = None
-    rubric: Optional[List[RubricInline]] = None
+    rubric: Optional[List[RubricSectionInline]] = None
 
 
 class AssignmentUpdate(BaseModel):
@@ -51,6 +61,7 @@ class AssignmentUpdate(BaseModel):
     due_date: Optional[datetime] = None
     max_submissions: Optional[int] = None
     max_points: Optional[int] = None
+    rubric_mode: Optional[str] = None
     allowed_languages: Optional[str] = None
     starter_code: Optional[str] = None
     status: Optional[str] = None
@@ -79,12 +90,14 @@ class AssignmentOut(BaseModel):
     due_date: Optional[datetime] = None
     max_submissions: Optional[int] = None
     max_points: Optional[int] = None
+    rubric_mode: str = "unweighted"
     allowed_languages: Optional[str] = None
     starter_code: Optional[str] = None
     status: str = "published"
     is_active: bool = True
     created_at: Optional[datetime] = None
-    rubrics: List[AssignmentRubricOut] = []
+    # Keep API key as "rubrics" but source data from Assignment.rubric_sections.
+    rubrics: List[RubricSectionOut] = Field(default_factory=list, validation_alias="rubric_sections")
 
     class Config:
         from_attributes = True

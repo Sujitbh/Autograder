@@ -9,6 +9,7 @@ from .course import Course
 from .enrollment import Enrollment
 from .testcase import TestCase
 from .rubric import Rubric
+from .rubric_section import RubricSection, RubricCriterion
 from .group import Group, GroupMembership
 from .submission_result import SubmissionResult
 from .language import Language
@@ -29,6 +30,8 @@ __all__ = [
 	"Enrollment",
 	"TestCase",
 	"Rubric",
+	"RubricSection",
+	"RubricCriterion",
 	"Group",
 	"GroupMembership",
 	"SubmissionResult",
