@@ -130,8 +130,24 @@ export const submissionService = {
     submitted_at: string | null;
     attempt_number: number;
     student: { id: number; name: string; email: string | null };
-    assignment: { id: number; title: string; max_points: number | null; due_date: string | null; language: string };
-    rubrics: Array<{ id: number; name: string; description: string | null; max_points: number; weight: number | null; order: number }>;
+    assignment: { id: number; title: string; max_points: number | null; due_date: string | null; language: string; rubric_mode?: 'weighted' | 'unweighted' | null };
+    rubrics: Array<{
+      id: number;
+      assignment_id?: number;
+      name: string;
+      description: string | null;
+      weight: number | null;
+      criteria: Array<{
+        id: number;
+        section_id?: number;
+        name: string;
+        description: string | null;
+        weight: number | null;
+        max_points: number;
+        grading_method?: string | null;
+        order?: number;
+      }>;
+    }>;
     files: Array<{ id: number; filename: string; content: string | null }>;
     results: Array<{
       testcase_id: number;

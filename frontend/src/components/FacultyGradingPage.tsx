@@ -100,9 +100,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const [expandedTests, setExpandedTests] = useState<Set<number>>(new Set());
     const [showExplorer, setShowExplorer] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
+    const [infoPanelWidth, setInfoPanelWidth] = useState(380);
     const [outputOpen, setOutputOpen] = useState(false);
     const [outputPanelHeight, setOutputPanelHeight] = useState(280);
-    const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading' | 'integrity'>('grading');
+    const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading' | 'rubric' | 'integrity'>('grading');
     const [stdinValue, setStdinValue] = useState('');
     const [showInlineInput, setShowInlineInput] = useState(false);
     const [autoGradeResult, setAutoGradeResult] = useState<any>(null);
@@ -114,27 +115,56 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         enabled: !!detail?.assignment?.id,
     });
 
+    // Helper: flatten rubric sections into flat array of criteria for scoring
+    const flattenRubrics = (sections: any[]) => {
+        return sections.flatMap((section) => (section.criteria || []).map((crit: any) => ({
+            ...crit,
+            section_name: section.name,
+            section_weight: section.weight ?? 1,
+        })));
+    };
+
+    const sectionWeightPercent = (weight?: number | null) => {
+        if (weight == null || Number.isNaN(weight)) return 100;
+        return weight <= 1.5 ? weight * 100 : weight;
+    };
+
     // Initialise form when detail loads
     useEffect(() => {
         if (!detail) return;
         setFeedback(detail.feedback || '');
-        const rubrics = detail.rubrics ?? [];
-        if (rubrics.length > 0) {
+        const rubricSections = detail.rubrics ?? [];
+        const flatRubrics = flattenRubrics(rubricSections);
+        
+        if (flatRubrics.length > 0) {
             // If already graded, distribute score proportionally across criteria
-            if (detail.score != null && rubrics.length > 0) {
-                const totalMax = rubrics.reduce((s, r) => s + r.max_points, 0);
-                setRubricScores(rubrics.map(r =>
-                    totalMax > 0 ? Math.round((detail.score! / totalMax) * r.max_points) : 0
+            if (detail.score != null && flatRubrics.length > 0) {
+                const totalMax = flatRubrics.reduce((s: number, r: any) => s + (r.max_points || 0), 0);
+                setRubricScores(flatRubrics.map((r: any) =>
+                    totalMax > 0 ? Math.round((detail.score! / totalMax) * (r.max_points || 0)) : 0
                 ));
             } else {
-                setRubricScores(rubrics.map(() => 0));
+                setRubricScores(flatRubrics.map(() => 0));
             }
         }
     }, [detail?.id]);
 
-    const rubrics = detail?.rubrics ?? [];
+    const rubricSections = detail?.rubrics ?? [];
+    const rubrics = flattenRubrics(rubricSections);
+    const inferredWeightedRubric = rubricSections.some((section: any) => 
+        Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 || 
+        (section.criteria || []).some((crit: any) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
+    );
+    const isWeightedRubric = detail?.assignment?.rubric_mode === 'weighted' || inferredWeightedRubric;
+    const getSectionFallbackPoints = (section: any) => {
+        const assignmentMaxPoints = detail?.assignment?.max_points ?? 0;
+        if (assignmentMaxPoints <= 0) return null;
+        if (rubricSections.length === 1) return assignmentMaxPoints;
+        if (isWeightedRubric) return Math.round((assignmentMaxPoints * sectionWeightPercent(section.weight)) / 100);
+        return null;
+    };
     const getTotalScore = () => rubricScores.reduce((s, n) => s + (Number(n) || 0), 0);
-    const getTotalMax = () => rubrics.reduce((s, r) => s + r.max_points, 0);
+    const getTotalMax = () => rubrics.reduce((s: number, r: any) => s + (r.max_points || 0), 0);
     const resultPointsTotal = (detail?.results ?? []).reduce((s, r) => s + (r.points || 0), 0);
     const resolvedMaxPoints = getTotalMax() || detail?.max_score || resultPointsTotal || detail?.assignment?.max_points || 100;
 
@@ -498,15 +528,42 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                     {/* ── RIGHT: Info Panel ── */}
                     {showInfoPanel && (
                         <div className="flex flex-col overflow-hidden shrink-0"
-                            style={{ width: 380, minWidth: 380, background: 'var(--color-surface)', borderLeft: '1px solid var(--color-border)' }}>
+                            style={{ width: infoPanelWidth, minWidth: infoPanelWidth, background: 'var(--color-surface)', borderLeft: '1px solid var(--color-border)', position: 'relative' }}>
+                            <div
+                                onMouseDown={(e) => {
+                                    const startX = e.clientX;
+                                    const startWidth = infoPanelWidth;
+                                    const onMove = (ev: MouseEvent) => {
+                                        const next = Math.max(300, Math.min(760, startWidth + (startX - ev.clientX)));
+                                        setInfoPanelWidth(next);
+                                    };
+                                    const onUp = () => {
+                                        window.removeEventListener('mousemove', onMove);
+                                        window.removeEventListener('mouseup', onUp);
+                                    };
+                                    window.addEventListener('mousemove', onMove);
+                                    window.addEventListener('mouseup', onUp);
+                                }}
+                                title="Drag to resize panel"
+                                style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: 6,
+                                    cursor: 'col-resize',
+                                    zIndex: 20,
+                                    background: 'transparent',
+                                }}
+                            />
                             {/* Tabs */}
                             <div style={{ display: 'flex', padding: '8px 10px 0', gap: 4, flexShrink: 0 }}>
-                                {(['desc', 'tests', 'grading', 'integrity'] as const).map(tab => (
+                                {(['desc', 'tests', 'grading', 'rubric', 'integrity'] as const).map(tab => (
                                     <button key={tab} onClick={() => setInfoTab(tab)}
                                         style={{ padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' as const, transition: 'all .2s', background: infoTab === tab ? '#7f1d1d' : 'transparent', color: infoTab === tab ? '#fff' : 'var(--color-text-light)', border: 'none', cursor: 'pointer' }}
                                         onMouseEnter={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'var(--color-surface-elevated)'; e.currentTarget.style.color = 'var(--color-text-mid)'; } }}
                                         onMouseLeave={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-light)'; } }}>
-                                        {tab === 'desc' ? '📋 Info' : tab === 'tests' ? '🧪 Tests' : tab === 'grading' ? '📊 Grading' : '🛡 Integrity'}
+                                        {tab === 'desc' ? '📋 Info' : tab === 'tests' ? '🧪 Tests' : tab === 'grading' ? '📊 Grading' : tab === 'rubric' ? '📚 Rubric' : '🛡 Integrity'}
                                     </button>
                                 ))}
                             </div>
@@ -638,6 +695,96 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                 )}
 
                                 {/* ── Integrity Tab ── */}
+                                {infoTab === 'rubric' && (
+                                    <div>
+                                        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: 12 }}>📚 Rubric &amp; Points</h2>
+
+                                        {rubricSections.length > 0 ? (
+                                            <div className="space-y-4">
+                                                {rubricSections.map((section: any, sectionIdx: number) => (
+                                                    <div key={sectionIdx}>
+                                                        {/* Section header */}
+                                                        <div style={{
+                                                            padding: '10px 12px',
+                                                            background: 'var(--color-surface)',
+                                                            borderRadius: '6px 6px 0 0',
+                                                            borderBottom: '1px solid var(--color-border)',
+                                                            fontWeight: 700,
+                                                            fontSize: 13,
+                                                            color: 'var(--color-text-dark)',
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center',
+                                                        }}>
+                                                            <span>{section.name}</span>
+                                                            {isWeightedRubric && <span style={{ fontSize: 11, color: 'var(--color-text-light)' }}>Weight: {sectionWeightPercent(section.weight).toFixed(1)}%</span>}
+                                                        </div>
+
+                                                        {/* Criteria for this section */}
+                                                        <div style={{
+                                                            borderRadius: '0 0 6px 6px',
+                                                            overflow: 'hidden',
+                                                            marginBottom: sectionIdx < rubricSections.length - 1 ? 16 : 0,
+                                                            border: '1px solid var(--color-border)',
+                                                            borderTop: 'none',
+                                                        }}>
+                                                            {(section.criteria || []).length > 0 ? (
+                                                                (section.criteria || []).map((criterion: any, critIdx: number) => {
+                                                                    const flatIdx = rubrics.findIndex((r: any) => 
+                                                                        r.name === criterion.name && r.section_name === section.name
+                                                                    );
+                                                                    return (
+                                                                        <div
+                                                                            key={critIdx}
+                                                                            className="rounded-lg p-3"
+                                                                            style={{
+                                                                                borderBottom: critIdx < ((section.criteria || []).length - 1) ? '1px solid var(--color-border)' : 'none',
+                                                                                backgroundColor: 'var(--color-surface-elevated)',
+                                                                            }}
+                                                                        >
+                                                                            <div className="flex items-start justify-between gap-3">
+                                                                                <div style={{ flex: 1 }}>
+                                                                                    <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{criterion.name}</p>
+                                                                                    {criterion.description && <p style={{ fontSize: '11px', color: 'var(--color-text-mid)', marginTop: 2 }}>{criterion.description}</p>}
+                                                                                    {isWeightedRubric && <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: 3 }}>
+                                                                                        Weight: {((criterion.weight ?? 1) * 100).toFixed(0)}%
+                                                                                    </p>}
+                                                                                </div>
+                                                                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', flexShrink: 0 }}>
+                                                                                    {criterion.max_points} pts
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })
+                                                            ) : (
+                                                                <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-surface-elevated)' }}>
+                                                                    <p style={{ fontSize: '12px', color: 'var(--color-text-mid)', lineHeight: 1.6 }}>
+                                                                        {section.description || 'No criteria were defined for this section.'}
+                                                                    </p>
+                                                                    {getSectionFallbackPoints(section) !== null && (
+                                                                        <p style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 700, marginTop: 8 }}>
+                                                                            Points: {getSectionFallbackPoints(section)}
+                                                                        </p>
+                                                                    )}
+                                                                    {isWeightedRubric && (
+                                                                        <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: 8 }}>
+                                                                            Section Weight: {sectionWeightPercent(section.weight).toFixed(1)}%
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p style={{ fontSize: 13, color: 'var(--color-text-mid)' }}>No rubric has been configured for this assignment.</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* ── Integrity Tab ── */}
                                 {infoTab === 'integrity' && (
                                     <div>
                                         <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: 12 }}>🛡 Integrity Check</h2>
@@ -760,26 +907,90 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                         {/* Per-criterion rubric scoring */}
                                         {rubrics.length > 0 ? (
                                             <div className="mb-5">
-                                                <h3 style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 700, color: 'var(--color-text-mid)', marginBottom: 10 }}>
-                                                    Rubric Grading
-                                                </h3>
-                                                <div className="space-y-3">
-                                                    {rubrics.map((rubric, idx) => (
-                                                        <div key={rubric.id} className="rounded-lg p-3" style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface-elevated)' }}>
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <div>
-                                                                    <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{rubric.name}</p>
-                                                                    {rubric.description && <p style={{ fontSize: '11px', color: 'var(--color-text-mid)', marginTop: 2 }}>{rubric.description}</p>}
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h3 style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 700, color: 'var(--color-text-mid)' }}>
+                                                        Rubric Grading
+                                                    </h3>
+                                                    <span
+                                                        style={{
+                                                            fontSize: 11,
+                                                            fontWeight: 700,
+                                                            letterSpacing: '.35px',
+                                                            textTransform: 'uppercase' as const,
+                                                            color: isWeightedRubric ? '#6B0000' : '#2D6A2D',
+                                                            backgroundColor: isWeightedRubric ? 'rgba(107,0,0,.10)' : 'rgba(45,106,45,.12)',
+                                                            border: `1px solid ${isWeightedRubric ? 'rgba(107,0,0,.24)' : 'rgba(45,106,45,.24)'}`,
+                                                            borderRadius: 999,
+                                                            padding: '3px 9px',
+                                                        }}
+                                                    >
+                                                        {isWeightedRubric ? 'Weighted' : 'Unweighted'}
+                                                    </span>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    {rubricSections.map((section: any, sectionIdx: number) => (
+                                                        <div key={sectionIdx}>
+                                                            {/* Section header */}
+                                                            {sectionIdx === 0 || rubricSections[sectionIdx - 1].name !== section.name ? (
+                                                                <div style={{
+                                                                    padding: '8px 12px',
+                                                                    background: 'var(--color-surface)',
+                                                                    borderRadius: '6px 6px 0 0',
+                                                                    fontWeight: 700,
+                                                                    fontSize: 13,
+                                                                    color: 'var(--color-text-dark)',
+                                                                    marginBottom: 8,
+                                                                    display: 'flex',
+                                                                    justifyContent: 'space-between',
+                                                                    alignItems: 'center',
+                                                                }}>
+                                                                    <span>{section.name}</span>
+                                                                    {isWeightedRubric && <span style={{ fontSize: 11, color: 'var(--color-text-light)' }}>Weight: {(section.weight ?? 1).toFixed(2)}x</span>}
                                                                 </div>
-                                                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', flexShrink: 0, marginLeft: 8 }}>
-                                                                    {rubricScores[idx] ?? 0} / {rubric.max_points}
-                                                                </span>
+                                                            ) : null}
+
+                                                            {/* Criteria in this section */}
+                                                            <div style={{
+                                                                background: 'var(--color-surface-elevated)',
+                                                                borderRadius: '6px',
+                                                                border: '1px solid var(--color-border)',
+                                                                marginBottom: sectionIdx < rubricSections.length - 1 ? 12 : 0,
+                                                                overflow: 'hidden',
+                                                            }}>
+                                                                {(section.criteria || []).map((criterion: any, critIdx: number, critArray: any[]) => {
+                                                                    // Find the index in the flattened rubrics array
+                                                                    const flatIdx = rubrics.findIndex((r: any) => 
+                                                                        r.name === criterion.name && r.section_name === section.name
+                                                                    );
+                                                                    return (
+                                                                        <div
+                                                                            key={critIdx}
+                                                                            className="p-3"
+                                                                            style={{
+                                                                                borderBottom: critIdx < critArray.length - 1 ? '1px solid var(--color-border)' : 'none',
+                                                                            }}
+                                                                        >
+                                                                            <div className="flex items-center justify-between mb-2">
+                                                                                <div style={{ flex: 1 }}>
+                                                                                    <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{criterion.name}</p>
+                                                                                    {criterion.description && <p style={{ fontSize: '11px', color: 'var(--color-text-mid)', marginTop: 2 }}>{criterion.description}</p>}
+                                                                                    {isWeightedRubric && <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: 3 }}>
+                                                                                        Weight: {((criterion.weight ?? 1) * 100).toFixed(0)}%
+                                                                                    </p>}
+                                                                                </div>
+                                                                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', flexShrink: 0, marginLeft: 8 }}>
+                                                                                    {rubricScores[flatIdx] ?? 0} / {criterion.max_points}
+                                                                                </span>
+                                                                            </div>
+                                                                            <input type="number" min={0} max={criterion.max_points}
+                                                                                value={rubricScores[flatIdx] ?? 0}
+                                                                                onChange={e => flatIdx >= 0 && updateRubricScore(flatIdx, e.target.value)}
+                                                                                className="w-full px-3 py-1.5 rounded-md focus:outline-none transition-shadow"
+                                                                                style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-dark)' }} />
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
-                                                            <input type="number" min={0} max={rubric.max_points}
-                                                                value={rubricScores[idx] ?? 0}
-                                                                onChange={e => updateRubricScore(idx, e.target.value)}
-                                                                className="w-full px-3 py-1.5 rounded-md focus:outline-none transition-shadow"
-                                                                style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-dark)' }} />
                                                         </div>
                                                     ))}
                                                 </div>

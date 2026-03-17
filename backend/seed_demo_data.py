@@ -36,18 +36,18 @@ from app.models.submission_result import SubmissionResult
 
 # ── Demo students ─────────────────────────────────────────────────────────────
 DEMO_STUDENTS = [
-    {"name": "Emma Johnson",     "email": "ejohnson@warhawks.ulm.edu",  "sis": "S001"},
-    {"name": "Lucas Williams",   "email": "lwilliams@warhawks.ulm.edu", "sis": "S002"},
-    {"name": "Olivia Brown",     "email": "obrown@warhawks.ulm.edu",    "sis": "S003"},
-    {"name": "Noah Davis",       "email": "ndavis@warhawks.ulm.edu",    "sis": "S004"},
-    {"name": "Ava Martinez",     "email": "amartinez@warhawks.ulm.edu", "sis": "S005"},
-    {"name": "Ethan Wilson",     "email": "ewilson@warhawks.ulm.edu",   "sis": "S006"},
-    {"name": "Isabella Moore",   "email": "imoore@warhawks.ulm.edu",    "sis": "S007"},
-    {"name": "Liam Taylor",      "email": "ltaylor@warhawks.ulm.edu",   "sis": "S008"},
-    {"name": "Sophia Anderson",  "email": "sanderson@warhawks.ulm.edu", "sis": "S009"},
-    {"name": "Mason Thomas",     "email": "mthomas@warhawks.ulm.edu",   "sis": "S010"},
-    {"name": "Charlotte Jackson","email": "cjackson@warhawks.ulm.edu",  "sis": "S011"},
-    {"name": "Aiden White",      "email": "awhite@warhawks.ulm.edu",    "sis": "S012"},
+    {"name": "Emma Johnson",     "email": "ejohnson@warhawks.ulm.edu",  "sis": "10000001"},
+    {"name": "Lucas Williams",   "email": "lwilliams@warhawks.ulm.edu", "sis": "10000002"},
+    {"name": "Olivia Brown",     "email": "obrown@warhawks.ulm.edu",    "sis": "10000003"},
+    {"name": "Noah Davis",       "email": "ndavis@warhawks.ulm.edu",    "sis": "10000004"},
+    {"name": "Ava Martinez",     "email": "amartinez@warhawks.ulm.edu", "sis": "10000005"},
+    {"name": "Ethan Wilson",     "email": "ewilson@warhawks.ulm.edu",   "sis": "10000006"},
+    {"name": "Isabella Moore",   "email": "imoore@warhawks.ulm.edu",    "sis": "10000007"},
+    {"name": "Liam Taylor",      "email": "ltaylor@warhawks.ulm.edu",   "sis": "10000008"},
+    {"name": "Sophia Anderson",  "email": "sanderson@warhawks.ulm.edu", "sis": "10000009"},
+    {"name": "Mason Thomas",     "email": "mthomas@warhawks.ulm.edu",   "sis": "10000010"},
+    {"name": "Charlotte Jackson","email": "cjackson@warhawks.ulm.edu",  "sis": "10000011"},
+    {"name": "Aiden White",      "email": "awhite@warhawks.ulm.edu",    "sis": "10000012"},
 ]
 
 STUDENT_PASSWORD = "Student@123"
@@ -135,6 +135,11 @@ public class Calculator {
 def get_or_create_user(db: Session, student: dict) -> User:
     user = db.query(User).filter(User.email == student["email"]).first()
     if user:
+        # Keep seeded CWID consistent with current 8-digit requirement.
+        if user.sis_user_id != student["sis"]:
+            user.sis_user_id = student["sis"]
+            db.add(user)
+            db.flush()
         return user
     user = User(
         name=student["name"],

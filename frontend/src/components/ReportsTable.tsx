@@ -65,6 +65,7 @@ interface ReportsTableProps {
 type SortField = 'name' | 'studentId' | 'total' | string;
 type SortDir = 'asc' | 'desc';
 type FilterPerformance = 'all' | 'high' | 'mid' | 'low' | 'failing';
+type DisplayMode = 'compact' | 'full';
 
 // ── Component ───────────────────────────────────────────────────────
 
@@ -80,6 +81,7 @@ export function ReportsTable({
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [perfFilter, setPerfFilter] = useState<FilterPerformance>('all');
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('compact');
 
   const totalMaxPoints = useMemo(
     () => assignments.reduce((s, a) => s + a.maxPoints, 0),
@@ -192,6 +194,28 @@ export function ReportsTable({
           </SelectContent>
         </Select>
 
+        <div className="inline-flex overflow-hidden rounded-md border" style={{ borderColor: 'var(--color-border)' }}>
+          <Button
+            type="button"
+            variant={displayMode === 'compact' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setDisplayMode('compact')}
+            className="rounded-none"
+          >
+            Student List
+          </Button>
+          <Button
+            type="button"
+            variant={displayMode === 'full' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setDisplayMode('full')}
+            className="rounded-none border-l"
+            style={{ borderColor: 'var(--color-border)' }}
+          >
+            Full Gradebook
+          </Button>
+        </div>
+
         {onExport && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -243,7 +267,7 @@ export function ReportsTable({
                 Username
               </th>
 
-              {assignments.map((a) => (
+              {displayMode === 'full' && assignments.map((a) => (
                 <th
                   key={a.id}
                   className="cursor-pointer whitespace-nowrap px-3 py-3 text-center"
@@ -255,15 +279,19 @@ export function ReportsTable({
                 </th>
               ))}
 
-              <th
-                className="cursor-pointer px-3 py-3 text-center"
-                style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}
-                onClick={() => toggleSort('total')}
-              >
-                Total <SortIcon field="total" />
-              </th>
-              <th className="px-3 py-3 text-center" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>%</th>
-              <th className="px-3 py-3 text-center" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Grade</th>
+              {displayMode === 'full' && (
+                <>
+                  <th
+                    className="cursor-pointer px-3 py-3 text-center"
+                    style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}
+                    onClick={() => toggleSort('total')}
+                  >
+                    Total <SortIcon field="total" />
+                  </th>
+                  <th className="px-3 py-3 text-center" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>%</th>
+                  <th className="px-3 py-3 text-center" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Grade</th>
+                </>
+              )}
               {onViewStudentReport && (
                 <th className="px-3 py-3 text-center" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Action</th>
               )}
@@ -272,25 +300,27 @@ export function ReportsTable({
 
           <tbody>
             {/* Points Possible row */}
-            <tr style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: '#F9F9F9' }}>
-              <td
-                className="sticky left-0 z-10 px-4 py-2.5"
-                style={{ backgroundColor: '#F9F9F9', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-mid)' }}
-              >
-                Points Possible
-              </td>
-              <td className="hidden px-3 py-2.5 md:table-cell" />
-              <td className="hidden px-3 py-2.5 md:table-cell" />
-              {assignments.map((a) => (
-                <td key={a.id} className="px-3 py-2.5 text-center" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-mid)' }}>
-                  {a.maxPoints}
+            {displayMode === 'full' && (
+              <tr style={{ borderBottom: '1px solid var(--color-border)', backgroundColor: '#F9F9F9' }}>
+                <td
+                  className="sticky left-0 z-10 px-4 py-2.5"
+                  style={{ backgroundColor: '#F9F9F9', fontSize: '13px', fontWeight: 600, color: 'var(--color-text-mid)' }}
+                >
+                  Points Possible
                 </td>
-              ))}
-              <td className="px-3 py-2.5 text-center" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-mid)' }}>{totalMaxPoints}</td>
-              <td className="px-3 py-2.5 text-center" style={{ fontSize: '13px', color: 'var(--color-text-light)' }}>100%</td>
-              <td className="px-3 py-2.5 text-center" />
-              {onViewStudentReport && <td className="px-3 py-2.5" />}
-            </tr>
+                <td className="hidden px-3 py-2.5 md:table-cell" />
+                <td className="hidden px-3 py-2.5 md:table-cell" />
+                {assignments.map((a) => (
+                  <td key={a.id} className="px-3 py-2.5 text-center" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-mid)' }}>
+                    {a.maxPoints}
+                  </td>
+                ))}
+                <td className="px-3 py-2.5 text-center" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-mid)' }}>{totalMaxPoints}</td>
+                <td className="px-3 py-2.5 text-center" style={{ fontSize: '13px', color: 'var(--color-text-light)' }}>100%</td>
+                <td className="px-3 py-2.5 text-center" />
+                {onViewStudentReport && <td className="px-3 py-2.5" />}
+              </tr>
+            )}
 
             {/* Student rows */}
             {filteredStudents.map((student) => {
@@ -330,47 +360,51 @@ export function ReportsTable({
                     {student.sisLoginId}
                   </td>
 
-                  {/* Grade cells — neutral, no color coding */}
-                  {assignments.map((a) => {
-                    const g = grades[student.id]?.[a.id] ?? null;
-                    const isLate = lateFlags?.[student.id]?.[a.id] ?? false;
-                    return (
-                      <td key={a.id} className="px-3 py-3 text-center" style={{ fontSize: '14px' }}>
-                        {g === null ? (
-                          <span style={{ color: 'var(--color-text-light)' }}>—</span>
-                        ) : (
-                          <span style={{ fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                            {g}{isLate && <sup style={{ color: 'var(--color-text-light)', fontSize: '10px' }}>L</sup>}
-                          </span>
-                        )}
-                      </td>
-                    );
-                  })}
+                  {displayMode === 'full' && (
+                    <>
+                      {/* Grade cells — neutral, no color coding */}
+                      {assignments.map((a) => {
+                        const g = grades[student.id]?.[a.id] ?? null;
+                        const isLate = lateFlags?.[student.id]?.[a.id] ?? false;
+                        return (
+                          <td key={a.id} className="px-3 py-3 text-center" style={{ fontSize: '14px' }}>
+                            {g === null ? (
+                              <span style={{ color: 'var(--color-text-light)' }}>—</span>
+                            ) : (
+                              <span style={{ fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                                {g}{isLate && <sup style={{ color: 'var(--color-text-light)', fontSize: '10px' }}>L</sup>}
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
 
-                  <td className="px-3 py-3 text-center" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                    {earned}/{totalMaxPoints}
-                  </td>
-                  <td className="px-3 py-3 text-center" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-mid)' }}>
-                    {pct.toFixed(1)}%
-                  </td>
-                  <td className="px-3 py-3 text-center">
-                    <span
-                      style={{
-                        display: 'inline-block',
-                        padding: '2px 10px',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        border: '1px solid var(--color-border)',
-                        color: 'var(--color-text-dark)',
-                        backgroundColor: 'var(--color-surface)',
-                        minWidth: '32px',
-                        textAlign: 'center',
-                      }}
-                    >
-                      {letter}
-                    </span>
-                  </td>
+                      <td className="px-3 py-3 text-center" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                        {earned}/{totalMaxPoints}
+                      </td>
+                      <td className="px-3 py-3 text-center" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-mid)' }}>
+                        {pct.toFixed(1)}%
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '2px 10px',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            border: '1px solid var(--color-border)',
+                            color: 'var(--color-text-dark)',
+                            backgroundColor: 'var(--color-surface)',
+                            minWidth: '32px',
+                            textAlign: 'center',
+                          }}
+                        >
+                          {letter}
+                        </span>
+                      </td>
+                    </>
+                  )}
                   {onViewStudentReport && (
                     <td className="px-3 py-3 text-center">
                       <Button
@@ -391,7 +425,7 @@ export function ReportsTable({
             {filteredStudents.length === 0 && (
               <tr>
                 <td
-                  colSpan={5 + assignments.length + (onViewStudentReport ? 1 : 0)}
+                  colSpan={displayMode === 'full' ? 5 + assignments.length + (onViewStudentReport ? 1 : 0) : 3 + (onViewStudentReport ? 1 : 0)}
                   className="px-4 py-12 text-center"
                   style={{ fontSize: '14px', color: 'var(--color-text-light)' }}
                 >

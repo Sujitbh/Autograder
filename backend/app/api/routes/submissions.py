@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_user
 from app.core.permissions import require_role, require_course_role
 from app.models.assignment import Assignment
-from app.models.rubric import Rubric
+from app.models.rubric_section import RubricSection
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
 from app.models.submission_result import SubmissionResult
@@ -380,17 +380,33 @@ def get_submission_detail(
             "max_points": assignment.max_points,
             "due_date": assignment.due_date.isoformat() if getattr(assignment, "due_date", None) else None,
             "language": (assignment.allowed_languages.split(",")[0].strip().lower() if assignment.allowed_languages else "python"),
+            "rubric_mode": assignment.rubric_mode,
         },
         "rubrics": [
             {
-                "id": r.id,
-                "name": r.name,
-                "description": r.description,
-                "max_points": r.max_points or 0,
-                "weight": r.weight,
-                "order": r.order or 0,
+                "id": section.id,
+                "assignment_id": section.assignment_id,
+                "name": section.name,
+                "description": section.description,
+                "weight": section.weight,
+                "criteria": [
+                    {
+                        "id": crit.id,
+                        "section_id": crit.section_id,
+                        "name": crit.name,
+                        "description": crit.description,
+                        "weight": crit.weight,
+                        "max_points": crit.max_points or 0,
+                        "grading_method": crit.grading_method,
+                        "order": crit.order or 0,
+                    }
+                    for crit in sorted(section.criteria or [], key=lambda c: (c.order or 0, c.id))
+                ],
             }
-            for r in db.query(Rubric).filter(Rubric.assignment_id == s.assignment_id).order_by(Rubric.order).all()
+            for section in db.query(RubricSection)
+                .filter(RubricSection.assignment_id == s.assignment_id)
+                .order_by(RubricSection.order.asc(), RubricSection.id.asc())
+                .all()
         ],
         "attempt_number": db.query(Submission).filter(
             Submission.assignment_id == s.assignment_id,

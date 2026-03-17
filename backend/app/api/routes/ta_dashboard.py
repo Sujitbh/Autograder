@@ -15,7 +15,7 @@ from app.models.submission_file import SubmissionFile
 from app.models.submission_result import SubmissionResult
 from app.models.enrollment import Enrollment
 from app.models.testcase import TestCase
-from app.models.rubric import Rubric
+from app.models.rubric_section import RubricSection
 from app.models.ta_permission import TAPermission
 from app.services.execution_service import ExecutionService
 from app.services.grading_service import GradingService
@@ -421,19 +421,28 @@ def get_submission_detail(
                 "execution_time_ms": tr.execution_time_ms,
             })
 
-        # Get rubrics for this assignment
-        rubrics = db.query(Rubric).filter(
-            Rubric.assignment_id == submission.assignment_id,
-        ).order_by(Rubric.order).all()
+        # Get rubric sections + criteria for this assignment
+        sections = db.query(RubricSection).filter(
+            RubricSection.assignment_id == submission.assignment_id,
+        ).order_by(RubricSection.order.asc(), RubricSection.id.asc()).all()
 
         rubrics_data = [{
-            "id": r.id,
-            "name": r.name,
-            "description": r.description,
-            "weight": float(r.weight) if r.weight is not None else None,
-            "max_points": float(r.max_points) if r.max_points is not None else None,
-            "order": r.order,
-        } for r in rubrics]
+            "id": s.id,
+            "assignment_id": s.assignment_id,
+            "name": s.name,
+            "description": s.description,
+            "weight": float(s.weight) if s.weight is not None else None,
+            "criteria": [{
+                "id": c.id,
+                "section_id": c.section_id,
+                "name": c.name,
+                "description": c.description,
+                "weight": float(c.weight) if c.weight is not None else None,
+                "max_points": float(c.max_points) if c.max_points is not None else None,
+                "grading_method": c.grading_method,
+                "order": c.order,
+            } for c in sorted((s.criteria or []), key=lambda c: (c.order or 0, c.id))],
+        } for s in sections]
 
         # Get submission files
         files_data = []
@@ -475,6 +484,7 @@ def get_submission_detail(
                 "due_date": assignment.due_date.isoformat() if assignment.due_date else None,
                 "max_submissions": assignment.max_submissions,
                 "allowed_languages": assignment.allowed_languages,
+                    "rubric_mode": assignment.rubric_mode if assignment else None,
             },
             "status": submission.status,
             "score": float(submission.score) if submission.score is not None else None,

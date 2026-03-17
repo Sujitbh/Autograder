@@ -61,7 +61,10 @@ try:
     logger.info("Database tables created/verified successfully")
     # Quick connectivity check
     with engine.connect() as conn:
+        # Backward-compatible schema patch for existing databases.
+        conn.execute(text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS rubric_mode VARCHAR NOT NULL DEFAULT 'unweighted'"))
         conn.execute(text("SELECT 1"))
+        conn.commit()
     logger.info(f"Database connection OK: {settings.DATABASE_URL.split('@')[1]}")
 except Exception as e:
     logger.error(f"Database connection FAILED: {e}")

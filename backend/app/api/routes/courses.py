@@ -461,9 +461,35 @@ async def import_course_enrollments(
                 s = s[:-2]
             return s or None
 
+        def _normalize_cwid(val: str | None) -> str | None:
+            """Normalize CWID to exactly 8 digits or return None if invalid."""
+            if not val:
+                return None
+            digits = "".join(ch for ch in val if ch.isdigit())
+            if len(digits) != 8:
+                return None
+            return digits
+
         sis_login_id = _clean_id(row.get("sis login id") or row.get("sis_login_id"))
-        sis_user_id = _clean_id(row.get("sis user id") or row.get("sis_user_id"))
+        raw_sis_user_id = _clean_id(row.get("sis user id") or row.get("sis_user_id"))
+        sis_user_id = _normalize_cwid(raw_sis_user_id)
         external_id = _clean_id(row.get("id") or row.get("external_id"))
+
+        if raw_sis_user_id and not sis_user_id:
+            skipped_count += 1
+            results.append(
+                EnrollmentImportRowOut(
+                    row_number=idx,
+                    name=normalized_name or None,
+                    email=email,
+                    sis_login_id=sis_login_id,
+                    sis_user_id=raw_sis_user_id,
+                    external_id=external_id,
+                    status="skipped",
+                    message="CWID must be exactly 8 digits",
+                )
+            )
+            continue
 
         if not email:
             skipped_count += 1

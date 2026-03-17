@@ -92,6 +92,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     // UI Layout state
     const [showExplorer, setShowExplorer] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
+    const [infoPanelWidth, setInfoPanelWidth] = useState(360);
     const [outputOpen, setOutputOpen] = useState(false);
     const [outputPanelHeight, setOutputPanelHeight] = useState(280);
     const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading'>('grading');
@@ -268,6 +269,37 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         detail.assignment.allowed_languages?.split(',')[0]
         || 'python'
     ).toLowerCase();
+
+    // Helper to flatten rubric sections into a single array
+    const flattenRubrics = (sections: any[]) =>
+        sections.flatMap((section) =>
+            (section.criteria || []).map((criterion) => ({
+                ...criterion,
+                section_name: section.name,
+                section_weight: section.weight,
+            }))
+        );
+
+    const sectionWeightPercent = (weight?: number | null) => {
+        if (weight == null || Number.isNaN(weight)) return 100;
+        return weight <= 1.5 ? weight * 100 : weight;
+    };
+
+    const rubricSections = detail.rubrics ?? [];
+    const rubrics = flattenRubrics(rubricSections);
+    const inferredWeightedRubric = rubricSections.some(
+        (section) =>
+            Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 ||
+            (section.criteria || []).some((criterion) => Math.abs((criterion.weight ?? 1) - 1) > 0.0001)
+    );
+    const isWeightedRubric = detail.assignment?.rubric_mode === 'weighted' || inferredWeightedRubric;
+    const getSectionFallbackPoints = (section: any) => {
+        const assignmentMaxPoints = detail.assignment?.max_points ?? 0;
+        if (assignmentMaxPoints <= 0) return null;
+        if (rubricSections.length === 1) return assignmentMaxPoints;
+        if (isWeightedRubric) return Math.round((assignmentMaxPoints * sectionWeightPercent(section.weight)) / 100);
+        return null;
+    };
     const activeFile = detail.files[activeFileIndex];
     const code = activeFile?.content || '';
 
@@ -592,12 +624,40 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                         <div
                             className="flex flex-col overflow-hidden shrink-0"
                             style={{
-                                width: 360, minWidth: 360,
+                                width: infoPanelWidth, minWidth: infoPanelWidth,
                                 background: 'var(--color-surface)',
                                 borderLeft: '1px solid var(--color-border)',
                                 transition: 'width .3s ease, min-width .3s ease, opacity .25s ease',
+                                position: 'relative',
                             }}
                         >
+                            <div
+                                onMouseDown={(e) => {
+                                    const startX = e.clientX;
+                                    const startWidth = infoPanelWidth;
+                                    const onMove = (ev: MouseEvent) => {
+                                        const next = Math.max(300, Math.min(760, startWidth + (startX - ev.clientX)));
+                                        setInfoPanelWidth(next);
+                                    };
+                                    const onUp = () => {
+                                        window.removeEventListener('mousemove', onMove);
+                                        window.removeEventListener('mouseup', onUp);
+                                    };
+                                    window.addEventListener('mousemove', onMove);
+                                    window.addEventListener('mouseup', onUp);
+                                }}
+                                title="Drag to resize panel"
+                                style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: 6,
+                                    cursor: 'col-resize',
+                                    zIndex: 20,
+                                    background: 'transparent',
+                                }}
+                            />
                             {/* Tabs */}
                             <div style={{ display: 'flex', padding: '8px 10px 0', gap: 4, flexShrink: 0, flexWrap: 'wrap' as const }}>
                                 {(['desc', 'tests', 'grading'] as const).map(tab => (
@@ -882,51 +942,107 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                         )}
 
                                         {/* Rubric Section */}
-                                        {detail.rubrics.length > 0 && (
+                                        {rubrics.length > 0 && (
                                             <div className="mb-6">
-                                                <h3 style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '8px' }}>
-                                                    Rubric Reference
-                                                </h3>
-                                                <div className="space-y-2">
-                                                    {detail.rubrics.map((rubric) => {
-                                                        // Find if we have auto-grade results for this rubric
-                                                        const autoEval = autoGradeResult?.rubric_results?.evaluations?.find(
-                                                            (e: any) => e.rubric_id === rubric.id
-                                                        );
-                                                        const earned = autoEval ? autoEval.earned_points : null;
-                                                        const max = rubric.max_points || 0;
-
-                                                        return (
-                                                            <div
-                                                                key={rubric.id}
-                                                                className="flex items-center justify-between px-3 py-2 rounded-lg"
-                                                                style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}
-                                                            >
-                                                                <div className="flex-1 pr-2">
-                                                                    <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                                        {rubric.name}
-                                                                    </p>
-                                                                    {autoEval?.feedback && (
-                                                                        <p style={{ fontSize: '10px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
-                                                                            {autoEval.feedback}
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                                <span
-                                                                    className="px-2 py-0.5 rounded-md shrink-0"
-                                                                    style={{
-                                                                        fontSize: '11px',
-                                                                        fontWeight: 600,
-                                                                        color: earned !== null ? (earned === max ? '#059669' : '#D97706') : 'var(--color-text-mid)',
-                                                                        backgroundColor: 'var(--color-surface)',
-                                                                        border: '1px solid var(--color-border)',
-                                                                    }}
-                                                                >
-                                                                    {earned !== null ? `${earned} / ` : ''}{max} pts
-                                                                </span>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h3 style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)' }}>
+                                                        Rubric Reference
+                                                    </h3>
+                                                    <span
+                                                        style={{
+                                                            fontSize: 11,
+                                                            fontWeight: 700,
+                                                            letterSpacing: '.35px',
+                                                            textTransform: 'uppercase' as const,
+                                                            color: isWeightedRubric ? '#6B0000' : '#2D6A2D',
+                                                            backgroundColor: isWeightedRubric ? 'rgba(107,0,0,.10)' : 'rgba(45,106,45,.12)',
+                                                            border: `1px solid ${isWeightedRubric ? 'rgba(107,0,0,.24)' : 'rgba(45,106,45,.24)'}`,
+                                                            borderRadius: 999,
+                                                            padding: '3px 9px',
+                                                        }}
+                                                    >
+                                                        {isWeightedRubric ? 'Weighted' : 'Unweighted'}
+                                                    </span>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    {rubricSections.map((section) => (
+                                                        <div key={section.id} className="border-l-2 border-blue-500 pl-3">
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                                                                    {section.name}
+                                                                </p>
+                                                                {Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 && (
+                                                                    <span style={{ fontSize: '10px', color: '#6B0000', backgroundColor: 'rgba(107,0,0,.10)', padding: '2px 6px', borderRadius: '3px' }}>
+                                                                        {sectionWeightPercent(section.weight).toFixed(1)}%
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                        );
-                                                    })}
+                                                            <div className="space-y-2">
+                                                                {(section.criteria || []).length > 0 ? (
+                                                                    (section.criteria || []).map((criterion) => {
+                                                                        const autoEval = autoGradeResult?.rubric_results?.evaluations?.find(
+                                                                            (e: any) => e.rubric_id === criterion.id
+                                                                        );
+                                                                        const earned = autoEval ? autoEval.earned_points : null;
+                                                                        const max = criterion.max_points || 0;
+
+                                                                        return (
+                                                                            <div
+                                                                                key={criterion.id}
+                                                                                className="flex items-center justify-between px-3 py-2 rounded-lg"
+                                                                                style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}
+                                                                            >
+                                                                                <div className="flex-1 pr-2">
+                                                                                    <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                                                                                        {criterion.name}
+                                                                                    </p>
+                                                                                    <p style={{ fontSize: '10px', color: 'var(--color-text-light)', marginTop: '2px' }}>
+                                                                                        Weight: {((criterion.weight ?? 1) * 100).toFixed(0)}%
+                                                                                    </p>
+                                                                                    {criterion.description && (
+                                                                                        <p style={{ fontSize: '10px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
+                                                                                            {criterion.description}
+                                                                                        </p>
+                                                                                    )}
+                                                                                    {autoEval?.feedback && (
+                                                                                        <p style={{ fontSize: '10px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
+                                                                                            {autoEval.feedback}
+                                                                                        </p>
+                                                                                    )}
+                                                                                </div>
+                                                                                <span
+                                                                                    className="px-2 py-0.5 rounded-md shrink-0"
+                                                                                    style={{
+                                                                                        fontSize: '11px',
+                                                                                        fontWeight: 600,
+                                                                                        color: earned !== null ? (earned === max ? '#059669' : '#D97706') : 'var(--color-text-mid)',
+                                                                                        backgroundColor: 'var(--color-surface)',
+                                                                                        border: '1px solid var(--color-border)',
+                                                                                    }}
+                                                                                >
+                                                                                    {earned !== null ? `${earned} / ` : ''}{max} pts
+                                                                                </span>
+                                                                            </div>
+                                                                        );
+                                                                    })
+                                                                ) : (
+                                                                    <div
+                                                                        className="px-3 py-2 rounded-lg"
+                                                                        style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}
+                                                                    >
+                                                                        <p style={{ fontSize: '12px', color: 'var(--color-text-mid)', lineHeight: 1.6 }}>
+                                                                            {section.description || 'No criteria were defined for this section.'}
+                                                                        </p>
+                                                                        {getSectionFallbackPoints(section) !== null && (
+                                                                            <p style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 700, marginTop: 8 }}>
+                                                                                Points: {getSectionFallbackPoints(section)}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
                                         )}
