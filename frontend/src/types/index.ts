@@ -77,6 +77,7 @@ export interface Assignment {
     category: AssignmentCategory;
     dueDate: string;
     maxPoints: number;
+    rubricMode?: 'weighted' | 'unweighted';
     status: AssignmentStatus;
     isGroup: boolean;
     allowLateSubmissions: boolean;
@@ -84,7 +85,7 @@ export interface Assignment {
     starterCode?: string;
     publicTests: TestCase[];
     privateTests: TestCase[];
-    rubric: RubricCriterion[];
+    rubric: RubricSection[] | RubricCriterion[];
     createdAt: string;
     updatedAt: string;
 }
@@ -147,6 +148,14 @@ export interface RubricCriterion {
     maxPoints: number;
     weight?: number;
     gradingMethod: GradingMethod;
+}
+
+export interface RubricSection {
+    id?: string;
+    name: string;
+    description?: string;
+    weight?: number;
+    criteria: RubricCriterion[];
 }
 
 export interface Rubric {
@@ -235,13 +244,14 @@ export interface CreateAssignmentDto {
     category: AssignmentCategory;
     dueDate: string;
     maxPoints: number;
+    rubricMode?: 'weighted' | 'unweighted';
     isGroup: boolean;
     allowLateSubmissions: boolean;
     latePenalty?: LatePenalty;
     starterCode?: string;
     publicTests: Omit<TestCase, 'id' | 'assignmentId'>[];
     privateTests: Omit<TestCase, 'id' | 'assignmentId'>[];
-    rubric: Omit<RubricCriterion, 'id'>[];
+    rubric: Array<Omit<RubricSection, 'id'> | Omit<RubricCriterion, 'id'>>;
 }
 
 export interface UpdateAssignmentDto extends Partial<CreateAssignmentDto> {

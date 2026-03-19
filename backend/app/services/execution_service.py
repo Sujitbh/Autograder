@@ -8,16 +8,16 @@ This service provides secure code execution with:
 - Support for multiple languages
 """
 
+import os
 import subprocess
 import tempfile
-import time
-import re
-import os
-import signal
+import shutil
 from pathlib import Path
 from typing import Optional
 from dataclasses import dataclass
 from enum import Enum
+
+from app.settings import settings
 
 
 class ExecutionStatus(str, Enum):
@@ -48,14 +48,12 @@ LANGUAGE_CONFIG = {
         "compile_cmd": None,  # Interpreted
         "run_cmd": ["python3", "{file}"],
         "timeout": 10,
-        "compile_timeout": 10,
     },
     "java": {
         "extension": ".java",
         "compile_cmd": ["javac", "{file}"],
         "run_cmd": ["java", "-cp", "{dir}", "{classname}"],
         "timeout": 15,
-        "compile_timeout": 20,
     },
     "cpp": {
         "extension": ".cpp",
@@ -110,141 +108,8 @@ class ExecutionService:
 
     # Default resource limits
     DEFAULT_TIMEOUT = 10  # seconds
-    MAX_TIMEOUT = 30  # seconds
     DEFAULT_MEMORY_LIMIT = 256  # MB
     MAX_OUTPUT_SIZE = 1024 * 1024  # 1MB
-    MAX_STDIN_SIZE = 64 * 1024  # 64KB
-
-    @staticmethod
-    def _sanitize_timeout(timeout: Optional[int], default: int) -> int:
-        """Clamp timeout to a safe and predictable range."""
-        if timeout is None:
-            return default
-        return max(1, min(int(timeout), ExecutionService.MAX_TIMEOUT))
-
-    @staticmethod
-    def _sanitize_stdin(stdin_input: str) -> str:
-        """Bound stdin size to avoid unbounded request payload impact."""
-        data = stdin_input or ""
-        if len(data) > ExecutionService.MAX_STDIN_SIZE:
-            return data[:ExecutionService.MAX_STDIN_SIZE]
-        return data
-
-    @staticmethod
-    def _safe_env() -> dict:
-        """Use a reduced environment for subprocesses."""
-        inherited_path = os.environ.get("PATH", "").strip()
-        return {
-            "PATH": inherited_path or "/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin",
-            "HOME": os.environ.get("HOME", ""),
-            "TMPDIR": os.environ.get("TMPDIR", "/tmp"),
-            "LANG": "C.UTF-8",
-            "LC_ALL": "C.UTF-8",
-            "PYTHONUNBUFFERED": "1",
-        }
-
-    @staticmethod
-    def _extract_java_metadata(code: str) -> tuple[str, str]:
-        """
-        Return (source_filename, runtime_classname).
-
-        - If package declaration exists, runtime classname is fully-qualified.
-        - Prefer class containing main(String[] args), then public class, then first class.
-        """
-        package_match = re.search(r"\bpackage\s+([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*;", code)
-        package_name = package_match.group(1) if package_match else ""
-
-        main_match = re.search(
-            r"\bclass\s+([A-Za-z_]\w*)\b[\s\S]*?\bpublic\s+static\s+void\s+main\s*\(",
-            code,
-        )
-        public_match = re.search(r"\bpublic\s+class\s+([A-Za-z_]\w*)\b", code)
-        any_match = re.search(r"\bclass\s+([A-Za-z_]\w*)\b", code)
-
-        class_name = (
-            (main_match.group(1) if main_match else None)
-            or (public_match.group(1) if public_match else None)
-            or (any_match.group(1) if any_match else None)
-            or "Main"
-        )
-
-        runtime_name = f"{package_name}.{class_name}" if package_name else class_name
-        source_filename = f"{class_name}.java"
-        return source_filename, runtime_name
-
-    @staticmethod
-    def _run_command(
-        cmd: list[str],
-        *,
-        cwd: str,
-        timeout: int,
-        stdin_input: str = "",
-    ) -> ExecutionResult:
-        """
-        Run one command in its own process group.
-
-        On timeout, kill the full process group to avoid leaving child processes alive.
-        """
-        start_time = time.time()
-        proc = None
-
-        try:
-            proc = subprocess.Popen(
-                cmd,
-                cwd=cwd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=ExecutionService._safe_env(),
-                start_new_session=True,
-            )
-
-            stdout, stderr = proc.communicate(input=stdin_input, timeout=timeout)
-            execution_time = (time.time() - start_time) * 1000
-
-            status = (
-                ExecutionStatus.SUCCESS
-                if proc.returncode == 0
-                else ExecutionStatus.RUNTIME_ERROR
-            )
-
-            return ExecutionResult(
-                status=status,
-                stdout=(stdout or "")[:ExecutionService.MAX_OUTPUT_SIZE],
-                stderr=(stderr or "")[:ExecutionService.MAX_OUTPUT_SIZE],
-                exit_code=proc.returncode if proc.returncode is not None else -1,
-                execution_time_ms=execution_time,
-            )
-
-        except subprocess.TimeoutExpired:
-            if proc is not None:
-                try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except Exception:
-                    proc.kill()
-                try:
-                    proc.communicate(timeout=1)
-                except Exception:
-                    pass
-
-            execution_time = (time.time() - start_time) * 1000
-            return ExecutionResult(
-                status=ExecutionStatus.TIMEOUT,
-                stdout="",
-                stderr=f"Execution timed out after {timeout} seconds",
-                exit_code=-1,
-                execution_time_ms=execution_time,
-            )
-        except Exception as e:
-            execution_time = (time.time() - start_time) * 1000
-            return ExecutionResult(
-                status=ExecutionStatus.RUNTIME_ERROR,
-                stdout="",
-                stderr=f"Execution failed: {str(e)}",
-                exit_code=-1,
-                execution_time_ms=execution_time,
-            )
 
     @staticmethod
     def detect_language(filename: str) -> Optional[str]:
@@ -317,11 +182,7 @@ class ExecutionService:
             )
 
         config = LANGUAGE_CONFIG[language]
-        timeout = ExecutionService._sanitize_timeout(
-            timeout,
-            config.get("timeout", ExecutionService.DEFAULT_TIMEOUT),
-        )
-        stdin_input = ExecutionService._sanitize_stdin(stdin_input)
+        timeout = timeout or config.get("timeout", ExecutionService.DEFAULT_TIMEOUT)
 
         # Security check
         is_safe, reason = ExecutionService.check_security(code, language)
@@ -365,23 +226,23 @@ class ExecutionService:
         timeout: int,
     ) -> ExecutionResult:
         """Execute code in temporary directory."""
+        import time
+
         # Write source file
         ext = config["extension"]
         if language == "java":
-            source_name, runtime_classname = ExecutionService._extract_java_metadata(code)
-            source_file = Path(tmpdir) / source_name
+            # Extract class name for Java
+            import re
+            match = re.search(r"public\s+class\s+(\w+)", code)
+            classname = match.group(1) if match else "Main"
+            source_file = Path(tmpdir) / f"{classname}{ext}"
         else:
             source_file = Path(tmpdir) / f"solution{ext}"
 
-        source_file.write_text(code, encoding="utf-8")
+        source_file.write_text(code)
 
         # Compile if needed
         if config["compile_cmd"]:
-            compile_timeout = ExecutionService._sanitize_timeout(
-                None,
-                config.get("compile_timeout", max(timeout, 15)),
-            )
-
             compile_cmd = [
                 c.format(
                     file=str(source_file),
@@ -391,37 +252,27 @@ class ExecutionService:
                 for c in config["compile_cmd"]
             ]
 
-            if language == "java":
-                # Keep bytecode in temp dir and enforce utf-8 source handling.
-                compile_cmd = ["javac", "-encoding", "UTF-8", "-d", tmpdir, str(source_file)]
-
             try:
-                compile_result = ExecutionService._run_command(
+                compile_result = subprocess.run(
                     compile_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
                     cwd=tmpdir,
-                    timeout=compile_timeout,
                 )
-                if compile_result.status == ExecutionStatus.TIMEOUT:
-                    return ExecutionResult(
-                        status=ExecutionStatus.TIMEOUT,
-                        stdout="",
-                        stderr="Compilation timed out",
-                        exit_code=-1,
-                        execution_time_ms=compile_result.execution_time_ms,
-                    )
-                if compile_result.exit_code != 0:
+                if compile_result.returncode != 0:
                     return ExecutionResult(
                         status=ExecutionStatus.COMPILE_ERROR,
                         stdout="",
                         stderr=compile_result.stderr,
-                        exit_code=compile_result.exit_code,
-                        execution_time_ms=compile_result.execution_time_ms,
+                        exit_code=compile_result.returncode,
+                        execution_time_ms=0,
                     )
-            except Exception as e:
+            except subprocess.TimeoutExpired:
                 return ExecutionResult(
-                    status=ExecutionStatus.RUNTIME_ERROR,
+                    status=ExecutionStatus.TIMEOUT,
                     stdout="",
-                    stderr=f"Compilation failed: {str(e)}",
+                    stderr="Compilation timed out",
                     exit_code=-1,
                     execution_time_ms=0,
                 )
@@ -432,7 +283,7 @@ class ExecutionService:
                 c.format(
                     file=str(source_file),
                     dir=tmpdir,
-                    classname=runtime_classname,
+                    classname=classname,
                 )
                 for c in config["run_cmd"]
             ]
@@ -445,12 +296,46 @@ class ExecutionService:
                 for c in config["run_cmd"]
             ]
 
-        return ExecutionService._run_command(
-            run_cmd,
-            cwd=tmpdir,
-            timeout=timeout,
-            stdin_input=stdin_input,
-        )
+        # Execute
+        start_time = time.time()
+        try:
+            result = subprocess.run(
+                run_cmd,
+                input=stdin_input,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=tmpdir,
+            )
+            execution_time = (time.time() - start_time) * 1000
+
+            # Truncate output if too large
+            stdout = result.stdout[:ExecutionService.MAX_OUTPUT_SIZE]
+            stderr = result.stderr[:ExecutionService.MAX_OUTPUT_SIZE]
+
+            status = (
+                ExecutionStatus.SUCCESS
+                if result.returncode == 0
+                else ExecutionStatus.RUNTIME_ERROR
+            )
+
+            return ExecutionResult(
+                status=status,
+                stdout=stdout,
+                stderr=stderr,
+                exit_code=result.returncode,
+                execution_time_ms=execution_time,
+            )
+
+        except subprocess.TimeoutExpired:
+            execution_time = (time.time() - start_time) * 1000
+            return ExecutionResult(
+                status=ExecutionStatus.TIMEOUT,
+                stdout="",
+                stderr=f"Execution timed out after {timeout} seconds",
+                exit_code=-1,
+                execution_time_ms=execution_time,
+            )
 
     @staticmethod
     def run_testcase(
@@ -568,11 +453,13 @@ class ExecutionService:
             if hasattr(tc, "input_data"):
                 input_data = tc.input_data
                 expected_output = tc.expected_output
+                testcase_name = tc.name if hasattr(tc, "name") else None
                 points = tc.points if hasattr(tc, "points") else 1
                 tc_id = tc.id if hasattr(tc, "id") else None
             else:
                 input_data = tc.get("input_data", "")
                 expected_output = tc.get("expected_output", "")
+                testcase_name = tc.get("name")
                 points = tc.get("points", 1)
                 tc_id = tc.get("id")
 
@@ -584,6 +471,9 @@ class ExecutionService:
             )
 
             result["testcase_id"] = tc_id
+            result["testcase_name"] = testcase_name
+            result["input_data"] = input_data
+            result["expected_output"] = expected_output
             result["points"] = points
             result["points_earned"] = points if result["passed"] else 0
 

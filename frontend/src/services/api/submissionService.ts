@@ -130,19 +130,29 @@ export const submissionService = {
     submitted_at: string | null;
     attempt_number: number;
     student: { id: number; name: string; email: string | null };
-    assignment: { id: number; title: string; max_points: number | null; due_date: string | null; language: string };
-    rubrics: Array<{ id: number; name: string; description: string | null; max_points: number; weight: number | null; order: number }>;
-    rubric_scores?: Array<{
+    assignment: { id: number; title: string; max_points: number | null; due_date: string | null; language: string; rubric_mode?: 'weighted' | 'unweighted' | null };
+    rubrics: Array<{
       id: number;
-      rubric_id: number;
-      score_awarded: number;
-      feedback: string | null;
-      grader_id: number | null;
+      assignment_id?: number;
+      name: string;
+      description: string | null;
+      weight: number | null;
+      criteria: Array<{
+        id: number;
+        section_id?: number;
+        name: string;
+        description: string | null;
+        weight: number | null;
+        max_points: number;
+        grading_method?: string | null;
+        order?: number;
+      }>;
     }>;
     files: Array<{ id: number; filename: string; content: string | null }>;
     results: Array<{
       testcase_id: number;
       test_name: string;
+      input_data: string | null;
       passed: boolean;
       actual_output: string;
       expected_output: string;
@@ -215,16 +225,7 @@ export const submissionService = {
   /** Manual score entry/override by instructor/TA. */
   async overrideSubmissionScore(
     submissionId: string,
-    payload: {
-      score: number;
-      max_score?: number;
-      feedback?: string;
-      rubric_breakdown?: Array<{
-        rubric_id: number;
-        score_awarded: number;
-        feedback?: string | null;
-      }>;
-    }
+    payload: { score: number; max_score?: number; feedback?: string }
   ): Promise<BackendGradingResults> {
     const { data } = await api.patch<BackendGradingResults>(
       `/grading/submissions/${submissionId}/score`,
@@ -261,6 +262,21 @@ export const submissionService = {
   async getSubmissionResults(submissionId: string): Promise<BackendGradingResults> {
     const { data } = await withRetry(() =>
       api.get<BackendGradingResults>(`/grading/submissions/${submissionId}/results`)
+    );
+    return data;
+  },
+
+  /** Get all testcases configured for an assignment (faculty/instructor see public + private). */
+  async getAssignmentTestcases(assignmentId: string): Promise<Array<{
+    id: number;
+    name: string;
+    input_data: string;
+    expected_output: string;
+    is_public: boolean;
+    points: number;
+  }>> {
+    const { data } = await withRetry(() =>
+      api.get(`/testcases/by-assignment/${assignmentId}`)
     );
     return data;
   },

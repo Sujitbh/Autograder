@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Users, CheckCircle2, Clock, AlertTriangle, BarChart3 } from 'lucide-react';
 import { PageLayout } from './PageLayout';
@@ -9,7 +9,6 @@ import { TopNav } from './TopNav';
 import { Sidebar } from './Sidebar';
 import { Button } from './ui/button';
 import api from '@/services/api/client';
-import { submissionService } from '@/services/api/submissionService';
 
 interface ClassPerformancePageProps {
   courseId: string;
@@ -78,18 +77,6 @@ export function ClassPerformancePage({ courseId, assignmentId }: ClassPerformanc
     },
   });
 
-  const bulkExecutionMutation = useMutation({
-    mutationFn: () => submissionService.gradeAllSubmissions(assignmentId),
-    onSuccess: async (result) => {
-      await refetch();
-      window.alert(`Executed grading for ${result.total_considered ?? result.total_graded} latest submission(s). Graded: ${result.total_graded}. Errors: ${result.total_errors}.`);
-    },
-    onError: (err) => {
-      const message = err instanceof Error ? err.message : 'Failed to run bulk execution';
-      window.alert(message);
-    },
-  });
-
   const gradedStudents = useMemo(() => {
     return (data?.students ?? []).filter((s) => s.submission_status === 'graded');
   }, [data]);
@@ -133,17 +120,9 @@ export function ClassPerformancePage({ courseId, assignmentId }: ClassPerformanc
               {data?.assignment_title ?? `Assignment ${assignmentId}`}
             </h2>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => bulkExecutionMutation.mutate()}
-              disabled={bulkExecutionMutation.isPending}
-            >
-              {bulkExecutionMutation.isPending ? 'Running Bulk Execution...' : 'Run Bulk Execution'}
-            </Button>
-            <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
-              {isFetching ? 'Refreshing...' : 'Refresh'}
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+            {isFetching ? 'Refreshing...' : 'Refresh'}
+          </Button>
         </div>
 
         {isLoading ? (

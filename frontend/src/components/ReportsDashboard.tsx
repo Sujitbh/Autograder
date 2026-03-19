@@ -37,7 +37,6 @@ interface StudentRecord {
   enrollmentDate: string;
   section: string;
   grades: Record<string, number | null>;
-  gradeStatuses: Record<string, 'graded' | 'ungraded' | 'missing' | 'not_submitted'>;
   lateFlags: Record<string, boolean>;
 }
 
@@ -72,13 +71,6 @@ function toNormalisedAssignment(a: Assignment): NormalisedAssignment {
     dueDate: a.dueDate,
     isGroup: a.isGroup,
   };
-}
-
-function formatAssignmentStatus(status: 'graded' | 'ungraded' | 'missing' | 'not_submitted', isLate: boolean): string {
-  if (status === 'graded') return isLate ? 'Late' : 'Graded';
-  if (status === 'ungraded') return 'Ungraded';
-  if (status === 'missing') return 'Missing';
-  return 'Not Submitted';
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -119,10 +111,10 @@ export function ReportsDashboard() {
       const headers = ['Assignment', 'Category', 'Max Points', 'Earned', 'Percentage', 'Status'];
       const rows = assignments.map(a => {
         const earned = s.grades[a.id];
-        const status = s.gradeStatuses[a.id] ?? 'not_submitted';
         const isNull = earned === null || earned === undefined;
         const pctVal = isNull ? '' : ((earned / a.maxPoints) * 100).toFixed(1) + '%';
-        return [a.fullName, a.category, a.maxPoints, isNull ? '' : earned, pctVal, formatAssignmentStatus(status, !!s.lateFlags[a.id])];
+        const status = isNull ? 'Missing' : s.lateFlags[a.id] ? 'Late' : 'Submitted';
+        return [a.fullName, a.category, a.maxPoints, isNull ? '' : earned, pctVal, status];
       });
       const csv = [headers, ...rows]
         .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
@@ -164,23 +156,19 @@ export function ReportsDashboard() {
 
         // s.grades is { "<assignmentId>": { score, status } | number | null }
         const grades: Record<string, number | null> = {};
-        const gradeStatuses: Record<string, 'graded' | 'ungraded' | 'missing' | 'not_submitted'> = {};
         const lateFlags: Record<string, boolean> = {};
 
         if (s.grades && typeof s.grades === 'object') {
           for (const [aId, val] of Object.entries(s.grades)) {
             if (val === null || val === undefined) {
               grades[aId] = null;
-              gradeStatuses[aId] = 'not_submitted';
               lateFlags[aId] = false;
             } else if (typeof val === 'number') {
               grades[aId] = val;
-              gradeStatuses[aId] = 'graded';
               lateFlags[aId] = false;
             } else if (typeof val === 'object') {
               const g = val as any;
               grades[aId] = g.score ?? null;
-              gradeStatuses[aId] = (g.status ?? (g.score != null ? 'graded' : 'not_submitted')) as 'graded' | 'ungraded' | 'missing' | 'not_submitted';
               lateFlags[aId] = !!g.is_late;
             }
           }
@@ -199,7 +187,6 @@ export function ReportsDashboard() {
           enrollmentDate: '',
           section: '',
           grades,
-          gradeStatuses,
           lateFlags,
         } satisfies StudentRecord;
       });
@@ -211,57 +198,26 @@ export function ReportsDashboard() {
 
   /* ── Per-student statistics ── */
   const studentStats = useMemo(() => {
-    const map = new Map<string, {
-      earned: number;
-      possible: number;
-      pct: number;
-      submitted: number;
-      graded: number;
-      ungraded: number;
-      missing: number;
-      notSubmitted: number;
-      total: number;
-    }>();
+    const map = new Map<string, { earned: number; possible: number; pct: number; submitted: number; total: number }>();
     students.forEach(s => {
       let earned = 0;
-      let possible = 0;
       let submitted = 0;
-      let graded = 0;
-      let ungraded = 0;
-      let missing = 0;
-      let notSubmitted = 0;
       assignments.forEach(a => {
-        const status = s.gradeStatuses[a.id] ?? 'not_submitted';
-        const score = s.grades[a.id];
-        if (status === 'graded' && score !== null && score !== undefined) {
-          earned += score;
-          possible += a.maxPoints;
+        if (s.grades[a.id] !== null && s.grades[a.id] !== undefined) {
+          earned += s.grades[a.id]!;
           submitted++;
-          graded++;
-        } else if (status === 'ungraded') {
-          submitted++;
-          ungraded++;
-        } else if (status === 'missing') {
-          possible += a.maxPoints;
-          missing++;
-        } else {
-          notSubmitted++;
         }
       });
       map.set(s.id, {
         earned,
-        possible,
-        pct: possible > 0 ? (earned / possible) * 100 : 0,
+        possible: totalMax,
+        pct: totalMax > 0 ? (earned / totalMax) * 100 : 0,
         submitted,
-        graded,
-        ungraded,
-        missing,
-        notSubmitted,
         total: assignments.length,
       });
     });
     return map;
-  }, [students, assignments]);
+  }, [students, assignments, totalMax]);
 
   const filtered = useMemo(() => {
     let list = [...students];
@@ -416,7 +372,7 @@ export function ReportsDashboard() {
                 <div>
                   <h1 style={{ fontSize: '28px', fontWeight: 700, color: 'var(--color-text-dark)' }}>Gradebook</h1>
                   <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '4px' }}>
-                    All student grades at a glance
+                    Student list first. Click a name for detailed grades, or switch to Full Gradebook for all columns.
                   </p>
                 </div>
               </div>
@@ -440,10 +396,6 @@ export function ReportsDashboard() {
                   acc[s.id] = { ...s.grades };
                   return acc;
                 }, {} as Record<string, Record<string, number | null>>)}
-                gradeStatuses={students.reduce((acc, s) => {
-                  acc[s.id] = { ...s.gradeStatuses };
-                  return acc;
-                }, {} as Record<string, Record<string, 'graded' | 'ungraded' | 'missing' | 'not_submitted'>>)}
                 lateFlags={students.reduce((acc, s) => {
                   acc[s.id] = { ...s.lateFlags };
                   return acc;
@@ -465,13 +417,14 @@ export function ReportsDashboard() {
             const pct = stats.pct;
             const grade = letterGrade(pct);
 
-            const gradeCounts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, F: 0, missing: 0, ungraded: 0, notSubmitted: 0 };
+            const gradeCounts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, F: 0, missing: 0 };
             let onTime = 0;
             let lateCount = 0;
             assignments.forEach(a => {
               const g = s.grades[a.id];
-              const status = s.gradeStatuses[a.id] ?? 'not_submitted';
-              if (status === 'graded' && g !== null && g !== undefined) {
+              if (g === null || g === undefined) {
+                gradeCounts.missing++;
+              } else {
                 const aPct = (g / a.maxPoints) * 100;
                 if (aPct >= 90) gradeCounts.A++;
                 else if (aPct >= 80) gradeCounts.B++;
@@ -480,12 +433,6 @@ export function ReportsDashboard() {
                 else gradeCounts.F++;
                 if (s.lateFlags[a.id]) lateCount++;
                 else onTime++;
-              } else if (status === 'ungraded') {
-                gradeCounts.ungraded++;
-              } else if (status === 'missing') {
-                gradeCounts.missing++;
-              } else {
-                gradeCounts.notSubmitted++;
               }
             });
 
@@ -536,12 +483,12 @@ export function ReportsDashboard() {
                   <div className="rounded-lg p-5" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
                     <p style={{ fontSize: '12px', color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Total Points</p>
                     <p style={{ fontSize: '32px', fontWeight: 700, color: 'var(--color-text-dark)' }}>{stats.earned} <span style={{ fontSize: '18px', fontWeight: 400, color: '#8A8A8A' }}>/ {stats.possible}</span></p>
-                    <p style={{ fontSize: '14px', color: '#595959', marginTop: '6px' }}>Missing impact: {Math.max(0, stats.possible - stats.earned)} pts</p>
+                    <p style={{ fontSize: '14px', color: '#595959', marginTop: '6px' }}>Missing: {stats.possible - stats.earned} pts</p>
                   </div>
                   <div className="rounded-lg p-5" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
                     <p style={{ fontSize: '12px', color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Submissions</p>
                     <p style={{ fontSize: '32px', fontWeight: 700, color: 'var(--color-text-dark)' }}>{stats.submitted}<span style={{ fontSize: '18px', fontWeight: 400, color: '#8A8A8A' }}>/{stats.total}</span></p>
-                    <p style={{ fontSize: '14px', color: '#595959', marginTop: '6px' }}>Graded: {stats.graded} · Ungraded: {stats.ungraded}</p>
+                    <p style={{ fontSize: '14px', color: '#595959', marginTop: '6px' }}>On time: {onTime} · Late: {lateCount}</p>
                   </div>
                   <div className="rounded-lg p-5" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
                     <p style={{ fontSize: '12px', color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Grade Breakdown</p>
@@ -552,8 +499,6 @@ export function ReportsDashboard() {
                       {gradeCounts.D > 0 && <p><span style={{ color: '#8B0000', fontWeight: 600 }}>D:</span> {gradeCounts.D} assignments</p>}
                       {gradeCounts.F > 0 && <p><span style={{ color: '#8B0000', fontWeight: 600 }}>F:</span> {gradeCounts.F} assignments</p>}
                       {gradeCounts.missing > 0 && <p><span style={{ color: '#8A8A8A', fontWeight: 600 }}>Missing:</span> {gradeCounts.missing}</p>}
-                      {gradeCounts.ungraded > 0 && <p><span style={{ color: '#8A5700', fontWeight: 600 }}>Ungraded:</span> {gradeCounts.ungraded}</p>}
-                      {gradeCounts.notSubmitted > 0 && <p><span style={{ color: '#8A8A8A', fontWeight: 600 }}>Not Submitted:</span> {gradeCounts.notSubmitted}</p>}
                     </div>
                   </div>
                 </div>
@@ -578,10 +523,9 @@ export function ReportsDashboard() {
                     <tbody>
                       {assignments.map((a, aIdx) => {
                         const earned = s.grades[a.id];
-                        const status = s.gradeStatuses[a.id] ?? 'not_submitted';
                         const isNull = earned === null || earned === undefined;
                         const aPct = isNull ? 0 : (earned / a.maxPoints) * 100;
-                        const isLate = s.lateFlags[a.id] && status === 'graded';
+                        const isLate = s.lateFlags[a.id] && !isNull;
                         const expanded = expandedRows.has(a.id);
                         const altBg = aIdx % 2 ? '#FAFAF8' : '#fff';
 
@@ -590,12 +534,12 @@ export function ReportsDashboard() {
                             <tr
                               className="cursor-pointer transition-colors"
                               style={{ borderBottom: expanded ? 'none' : '1px solid #E8E8E8', backgroundColor: altBg }}
-                              onClick={() => status === 'graded' && !isNull && toggleExpand(a.id)}
+                              onClick={() => !isNull && toggleExpand(a.id)}
                               onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--color-primary-bg)'; }}
                               onMouseLeave={e => { e.currentTarget.style.backgroundColor = altBg; }}
                             >
                               <td className="text-center px-2 py-3">
-                                {status === 'graded' && !isNull && (expanded
+                                {!isNull && (expanded
                                   ? <ChevronDown className="w-4 h-4 mx-auto" style={{ color: '#6B0000' }} />
                                   : <ChevronRight className="w-4 h-4 mx-auto" style={{ color: '#8A8A8A' }} />
                                 )}
@@ -621,17 +565,9 @@ export function ReportsDashboard() {
                               </td>
                               <td className="text-center px-4 py-3" style={{ color: '#595959' }}>{a.maxPoints}</td>
                               <td className="px-4 py-3">
-                                {status === 'missing' ? (
+                                {isNull ? (
                                   <span className="flex items-center gap-1 text-xs" style={{ color: '#8B0000', fontWeight: 600 }}>
                                     <XCircle className="w-3.5 h-3.5" /> Missing
-                                  </span>
-                                ) : status === 'not_submitted' ? (
-                                  <span className="flex items-center gap-1 text-xs" style={{ color: '#8A8A8A', fontWeight: 600 }}>
-                                    <XCircle className="w-3.5 h-3.5" /> Not Submitted
-                                  </span>
-                                ) : status === 'ungraded' ? (
-                                  <span className="flex items-center gap-1 text-xs" style={{ color: '#8A5700', fontWeight: 600 }}>
-                                    <Clock className="w-3.5 h-3.5" /> Ungraded
                                   </span>
                                 ) : isLate ? (
                                   <span className="flex items-center gap-1 text-xs" style={{ color: '#8A5700', fontWeight: 600 }}>
@@ -644,17 +580,17 @@ export function ReportsDashboard() {
                                 )}
                               </td>
                               <td className="text-center px-4 py-3" style={{ fontWeight: 600, color: isNull ? '#8A8A8A' : gradeColor(earned!, a.maxPoints) }}>
-                                {status === 'graded' && !isNull ? earned : '—'}
+                                {isNull ? '0' : earned}
                               </td>
                               <td className="text-center px-4 py-3" style={{ fontWeight: 600, color: isNull ? '#8A8A8A' : gradeColor(earned!, a.maxPoints) }}>
-                                {status === 'graded' && !isNull ? `${aPct.toFixed(0)}%` : '—'}
-                                {status === 'graded' && !isNull && aPct >= 90 && <span style={{ marginLeft: 4 }}>&#10003;</span>}
-                                {status === 'missing' && <span style={{ marginLeft: 4 }}>&#10007;</span>}
-                                {status === 'graded' && !isNull && aPct < 70 && <span style={{ marginLeft: 4 }}>&#9888;</span>}
+                                {isNull ? '0%' : `${aPct.toFixed(0)}%`}
+                                {!isNull && aPct >= 90 && <span style={{ marginLeft: 4 }}>&#10003;</span>}
+                                {isNull && <span style={{ marginLeft: 4 }}>&#10007;</span>}
+                                {!isNull && aPct < 70 && <span style={{ marginLeft: 4 }}>&#9888;</span>}
                               </td>
                             </tr>
 
-                            {expanded && status === 'graded' && !isNull && (
+                            {expanded && !isNull && (
                               <tr style={{ borderBottom: '1px solid #E8E8E8' }}>
                                 <td colSpan={7} className="px-6 py-5" style={{ backgroundColor: '#FAFAFA' }}>
                                   <div className="space-y-2" style={{ fontSize: '13px', color: '#595959' }}>
@@ -662,7 +598,7 @@ export function ReportsDashboard() {
                                     {a.dueDate && (
                                       <p><strong>Due:</strong> {new Date(a.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} at 11:59 PM</p>
                                     )}
-                                    <p><strong>Status:</strong> {isLate ? 'Late (submitted after deadline)' : 'On time and graded'}</p>
+                                    <p><strong>Status:</strong> {isLate ? 'Late (submitted after deadline)' : 'On time'}</p>
                                   </div>
                                 </td>
                               </tr>
@@ -680,13 +616,13 @@ export function ReportsDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ fontSize: '14px', color: '#595959', lineHeight: '1.8' }}>
                     <div>
                       <p><strong>Total Earned:</strong> {stats.earned} / {stats.possible} points ({pct.toFixed(1)}%)</p>
-                      <p><strong>Assignments Submitted:</strong> {stats.submitted} / {stats.total} ({stats.total > 0 ? ((stats.submitted / stats.total) * 100).toFixed(1) : 0}%)</p>
+                      <p><strong>Assignments Completed:</strong> {stats.submitted} / {stats.total} ({stats.total > 0 ? ((stats.submitted / stats.total) * 100).toFixed(1) : 0}%)</p>
                       <p><strong>Average Assignment Score:</strong> {pct.toFixed(1)}%</p>
                     </div>
                     <div>
                       <p><strong>Current Course Grade:</strong> {grade} ({pct.toFixed(1)}%)</p>
                       <p><strong>Class Rank:</strong> {ordinal(rank)} out of {students.length} students</p>
-                      <p><strong>Submission Status:</strong> On time {onTime} · Late {lateCount} · Ungraded {stats.ungraded}</p>
+                      <p><strong>On-Time Submissions:</strong> {onTime} / {stats.submitted} ({stats.submitted > 0 ? ((onTime / stats.submitted) * 100).toFixed(0) : 0}%)</p>
                     </div>
                   </div>
                 </div>

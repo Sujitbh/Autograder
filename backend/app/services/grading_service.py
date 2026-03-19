@@ -11,14 +11,12 @@ This service provides:
 from typing import Optional, List
 from datetime import datetime
 import os
-import re
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
 from app.models.submission_result import SubmissionResult
-from app.models.submission_rubric_score import SubmissionRubricScore
 from app.models.testcase import TestCase
 from app.models.rubric import Rubric
 from app.services.execution_service import ExecutionService
@@ -28,133 +26,12 @@ class GradingService:
     """Service for grading student submissions."""
 
     @staticmethod
-    def get_latest_submissions_for_assignment(
-        db: Session,
-        assignment_id: int,
-    ) -> list[Submission]:
-        """Return the most recent submission for each student in an assignment."""
-        submissions = db.query(Submission).filter(
-            Submission.assignment_id == assignment_id,
-        ).order_by(
-            Submission.student_id.asc(),
-            Submission.created_at.desc(),
-            Submission.id.desc(),
-        ).all()
-
-        latest_by_student: dict[int, Submission] = {}
-        for submission in submissions:
-            if submission.student_id not in latest_by_student:
-                latest_by_student[submission.student_id] = submission
-
-        return list(latest_by_student.values())
-
-    @staticmethod
-    def _resolve_file_path(raw_path: Optional[str]) -> Optional[str]:
-        """Resolve stored relative submission paths to absolute paths."""
-        if not raw_path:
-            return None
-        if os.path.isabs(raw_path):
-            return raw_path
-        if raw_path.startswith("data/"):
-            from app.settings import settings
-            from pathlib import Path
-            return str(Path(settings.DATA_ROOT) / raw_path[5:])
-        return raw_path
-
-    @staticmethod
-    def _read_submission_file_content(submission_file: SubmissionFile) -> tuple[Optional[str], Optional[str]]:
-        """Read one submission file and return (resolved_path, text_content)."""
-        actual_path = GradingService._resolve_file_path(submission_file.path)
-        if not actual_path or not os.path.exists(actual_path):
-            return actual_path, None
-        try:
-            with open(actual_path, "r", errors="replace") as f:
-                return actual_path, f.read()
-        except Exception:
-            return actual_path, None
-
-    @staticmethod
-    def _main_entry_score(filename: str, language: Optional[str], content: str) -> int:
-        """Score how likely a file is the executable entrypoint."""
-        name = (filename or "").lower()
-        text = content or ""
-        score = 0
-
-        if name in {"main.py", "solution.py", "main.java", "solution.java"}:
-            score += 120
-        if name.startswith("main") or name.startswith("solution"):
-            score += 30
-
-        if language == "python":
-            score += 20
-            if "if __name__ == \"__main__\":" in text or "if __name__ == '__main__':" in text:
-                score += 80
-            if "input(" in text:
-                score += 15
-        elif language == "java":
-            score += 20
-            if "public static void main" in text:
-                score += 100
-            if re.search(r"\bclass\s+[A-Za-z_]\w*", text):
-                score += 10
-
-        return score
-
-    @staticmethod
-    def _select_main_file(files: List[SubmissionFile]) -> tuple[SubmissionFile, str]:
-        """
-        Select the best entrypoint file from a submission.
-
-        Returns:
-            (main_file, source_code)
-        """
-        if not files:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="No files in submission",
-            )
-
-        analyzed: list[tuple[int, int, SubmissionFile, str]] = []
-        first_read_error: Optional[str] = None
-
-        for idx, submission_file in enumerate(files):
-            actual_path, content = GradingService._read_submission_file_content(submission_file)
-            if content is None:
-                if first_read_error is None:
-                    first_read_error = actual_path or submission_file.path or submission_file.filename
-                continue
-
-            language = ExecutionService.detect_language(submission_file.filename)
-            if language not in {"python", "java"}:
-                continue
-
-            score = GradingService._main_entry_score(submission_file.filename, language, content)
-            analyzed.append((score, -idx, submission_file, content))
-
-        if analyzed:
-            analyzed.sort(key=lambda item: (item[0], item[1]), reverse=True)
-            _, _, selected_file, selected_content = analyzed[0]
-            return selected_file, selected_content
-
-        # Fall back to first readable file when no Python/Java source is found.
-        for submission_file in files:
-            actual_path, content = GradingService._read_submission_file_content(submission_file)
-            if content is not None:
-                return submission_file, content
-
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error reading submission file: [Errno 2] No such file or directory: '{first_read_error or files[0].path or files[0].filename}'",
-        )
-
-    @staticmethod
     def grade_submission(
         db: Session,
         submission_id: int,
         *,
         run_tests: bool = True,
         apply_rubric: bool = True,
-        grader_id: Optional[int] = None,
     ) -> dict:
         """
         Grade a submission against test cases and rubric.
@@ -199,8 +76,28 @@ class GradingService:
             "feedback": [],
         }
 
-        # Read likely entrypoint file for grading in multi-file submissions.
-        main_file, code = GradingService._select_main_file(files)
+        # Read main code file
+        main_file = files[0]  # TODO: Better logic to identify main file
+        actual_path = main_file.path
+        if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
+            from app.settings import settings
+            from pathlib import Path
+            actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
+
+        if not actual_path or not __import__("os").path.exists(actual_path):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error reading submission file: [Errno 2] No such file or directory: '{actual_path or main_file.path}'",
+            )
+
+        try:
+            with open(actual_path, "r", errors="replace") as f:
+                code = f.read()
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Error reading submission file {actual_path}: {str(e)}",
+            )
 
         # Detect language
         language = ExecutionService.detect_language(main_file.filename)
@@ -227,13 +124,6 @@ class GradingService:
                 db, submission, code, test_results
             )
             results["rubric_results"] = rubric_results
-            GradingService._persist_rubric_scores(
-                db=db,
-                submission_id=submission_id,
-                evaluations=rubric_results.get("evaluations", []),
-                grader_id=grader_id,
-                replace_existing=True,
-            )
             results["total_score"] += rubric_results["earned_points"]
             results["max_score"] += rubric_results["total_points"]
             
@@ -255,40 +145,6 @@ class GradingService:
         results["feedback"] = GradingService._generate_feedback(results)
 
         return results
-
-    @staticmethod
-    def _persist_rubric_scores(
-        db: Session,
-        submission_id: int,
-        evaluations: list[dict],
-        grader_id: Optional[int] = None,
-        replace_existing: bool = True,
-    ) -> None:
-        """Store rubric criterion scores for a submission."""
-        if replace_existing:
-            db.query(SubmissionRubricScore).filter(
-                SubmissionRubricScore.submission_id == submission_id
-            ).delete()
-
-        for ev in evaluations or []:
-            rubric_id = ev.get("rubric_id")
-            if not rubric_id:
-                continue
-
-            score_awarded = int(ev.get("earned_points") or 0)
-            feedback = ev.get("feedback")
-
-            db.add(
-                SubmissionRubricScore(
-                    submission_id=submission_id,
-                    rubric_id=rubric_id,
-                    grader_id=grader_id,
-                    score_awarded=score_awarded,
-                    feedback=feedback,
-                )
-            )
-
-        db.flush()
 
     @staticmethod
     def _run_tests(
@@ -319,10 +175,12 @@ class GradingService:
             testcases=testcases,
         )
 
-        # Replace previous testcase results so repeated grading reflects the latest bulk execution.
+        # Replace any prior test results for this submission so repeated grading
+        # runs do not accumulate duplicate rows in the UI.
         db.query(SubmissionResult).filter(
             SubmissionResult.submission_id == submission.id
         ).delete()
+        db.flush()
 
         # Store results in database
         for result in execution_results["results"]:
