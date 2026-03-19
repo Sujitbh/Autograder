@@ -175,6 +175,13 @@ class GradingService:
             testcases=testcases,
         )
 
+        # Replace any prior test results for this submission so repeated grading
+        # runs do not accumulate duplicate rows in the UI.
+        db.query(SubmissionResult).filter(
+            SubmissionResult.submission_id == submission.id
+        ).delete()
+        db.flush()
+
         # Store results in database
         for result in execution_results["results"]:
             db_result = SubmissionResult(

@@ -115,6 +115,12 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         enabled: !!detail?.assignment?.id,
     });
 
+    const { data: assignmentTestcases = [] } = useQuery({
+        queryKey: ['faculty-assignment-testcases', detail?.assignment?.id],
+        queryFn: () => submissionService.getAssignmentTestcases(String(detail!.assignment.id)),
+        enabled: !!detail?.assignment?.id,
+    });
+
     // Helper: flatten rubric sections into flat array of criteria for scoring
     const flattenRubrics = (sections: any[]) => {
         return sections.flatMap((section) => (section.criteria || []).map((crit: any) => ({
@@ -355,19 +361,47 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const language = (detail.assignment.language || 'python').toLowerCase();
     const activeFile = detail.files[activeFileIndex];
     const code = activeFile?.content || '';
-    const displayTests = liveTestResults ?? (detail.results.length > 0
-        ? detail.results.map((r, i) => ({
-            id: i,
-            testcase_id: r.testcase_id,
-            testcase_name: r.test_name,
-            input_data: r.input_data,
-            expected_output: r.expected_output,
-            passed: r.passed,
-            output: r.actual_output,
-            error_output: r.error,
-            points_awarded: r.points_earned,
-        }))
-        : null);
+    const displayTests = (() => {
+        const latestResults = liveTestResults ?? (detail.results.length > 0
+            ? detail.results.map((r, i) => ({
+                id: i,
+                testcase_id: r.testcase_id,
+                testcase_name: r.test_name,
+                input_data: r.input_data,
+                expected_output: r.expected_output,
+                passed: r.passed,
+                output: r.actual_output,
+                error_output: r.error,
+                points_awarded: r.points_earned,
+            }))
+            : null);
+
+        if (assignmentTestcases.length === 0) {
+            return latestResults;
+        }
+
+        const byTestcaseId = new Map<number, any>();
+        (latestResults || []).forEach((r: any) => {
+            if (typeof r.testcase_id === 'number') byTestcaseId.set(r.testcase_id, r);
+        });
+
+        return assignmentTestcases.map((tc: any) => {
+            const r = byTestcaseId.get(tc.id);
+            return {
+                id: tc.id,
+                testcase_id: tc.id,
+                testcase_name: tc.name,
+                input_data: r?.input_data ?? tc.input_data,
+                expected_output: r?.expected_output ?? tc.expected_output,
+                passed: r?.passed ?? false,
+                has_result: Boolean(r),
+                is_public: tc.is_public,
+                output: r?.output ?? null,
+                error_output: r?.error_output ?? null,
+                points_awarded: r?.points_awarded ?? null,
+            };
+        });
+    })();
 
     return (
         <PageLayout>
@@ -633,7 +667,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                 );
                                                 return <p style={{ fontSize: 13, color: 'var(--color-text-mid)' }}>No test results yet. Run tests to see output.</p>;
                                             }
-                                            const passed = displayTests.filter((t: any) => t.passed).length;
+                                            const passed = displayTests.filter((t: any) => t.has_result && t.passed).length;
                                             return (
                                                 <div>
                                                     <span className="px-2.5 py-1 rounded-full mb-4 inline-block"
@@ -650,6 +684,21 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                     <div className="flex items-center gap-2">
                                                                         {test.passed ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#059669' }} /> : <XCircle className="w-3.5 h-3.5" style={{ color: '#DC2626' }} />}
                                                                         <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>{test.testcase_name || `Test #${test.testcase_id}`}</span>
+                                                                        {typeof test.is_public === 'boolean' && (
+                                                                            <span
+                                                                                style={{
+                                                                                    fontSize: '10px',
+                                                                                    fontWeight: 700,
+                                                                                    padding: '2px 6px',
+                                                                                    borderRadius: 999,
+                                                                                    border: '1px solid var(--color-border)',
+                                                                                    color: test.is_public ? '#065F46' : '#7C2D12',
+                                                                                    backgroundColor: test.is_public ? '#D1FAE5' : '#FFEDD5',
+                                                                                }}
+                                                                            >
+                                                                                {test.is_public ? 'Public' : 'Private'}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                     <div className="flex items-center gap-2">
                                                                         {test.points_awarded != null && <span style={{ fontSize: '11px', color: 'var(--color-text-mid)' }}>{test.points_awarded} pts</span>}
@@ -682,7 +731,11 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                                 <pre className="p-2 rounded text-xs overflow-x-auto" style={{ backgroundColor: '#FEF2F2', color: '#991B1B', fontFamily: 'monospace', maxHeight: '120px' }}>{test.error_output}</pre>
                                                                             </div>
                                                                         )}
-                                                                        {!test.output && !test.error_output && <p style={{ fontSize: '11px', color: 'var(--color-text-light)', fontStyle: 'italic' }}>No output recorded</p>}
+                                                                        {!test.output && !test.error_output && (
+                                                                            <p style={{ fontSize: '11px', color: 'var(--color-text-light)', fontStyle: 'italic' }}>
+                                                                                {test.has_result ? 'No output recorded' : 'Not executed yet. Click Run All Tests.'}
+                                                                            </p>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             </div>
