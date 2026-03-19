@@ -9,7 +9,6 @@ import { Button } from './ui/button';
 import { CodeEditor } from './CodeEditor';
 import { OutputPanel } from './OutputPanel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { Textarea } from './ui/textarea';
 import { useAssignment } from '@/hooks/queries/useAssignments';
 import { useSubmissions } from '@/hooks/queries/useSubmissions';
 import { useCourses } from '@/hooks/queries/useCourses';
@@ -153,10 +152,12 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const [mode, setMode] = useState<'editor' | 'upload'>('editor');
   const [infoTab, setInfoTab] = useState<'desc' | 'rubric' | 'tests' | 'submit'>('desc');
   const [outputOpen, setOutputOpen] = useState(false);
+  const [outputPanelHeight, setOutputPanelHeight] = useState(280);
 
   // Panel visibility
   const [showExplorer, setShowExplorer] = useState(true);
   const [showInfoPanel, setShowInfoPanel] = useState(true);
+  const [infoPanelWidth, setInfoPanelWidth] = useState(360);
 
   // File upload state
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -167,15 +168,15 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Dialogs
-  const [stdinDialogOpen, setStdinDialogOpen] = useState(false);
   const [stdinValue, setStdinValue] = useState('');
+  const [showInlineInput, setShowInlineInput] = useState(false);
   const [confirmSubmitOpen, setConfirmSubmitOpen] = useState(false);
   const [confirmResetOpen, setConfirmResetOpen] = useState(false);
   const [newFileDialogOpen, setNewFileDialogOpen] = useState(false);
   const [newFileName, setNewFileName] = useState('');
 
   // Execution hooks
-  const { execute, isRunning: isExecuting, result: execResult, error: execError } = useCodeExecution();
+  const { execute, isRunning: isExecuting, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
   const { runTests, isRunning: isTestsRunning, results: testResults, progress: testProgress } = useTestCaseRunner();
 
   // Auto-save
@@ -219,8 +220,24 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
   const course = courses?.find((c) => c.id === courseId);
   const latestSubmission = submissions && submissions.length > 0 ? submissions[0] : null;
-  const assignmentRubrics = assignment?.rubric ?? [];
-  const rubricTotalPoints = assignmentRubrics.reduce((sum, rubric) => sum + (rubric.maxPoints ?? 0), 0);
+  const sectionWeightPercent = (weight?: number | null) => {
+    if (weight == null || Number.isNaN(weight)) return 100;
+    return weight <= 1.5 ? weight * 100 : weight;
+  };
+  const rubricSections = assignment?.rubric ?? [];
+  const rubricTotalPoints = rubricSections.reduce((sum, section: any) => sum + ((section.criteria || []).reduce((sectionSum: number, crit: any) => sectionSum + (crit.maxPoints ?? 0), 0)), 0);
+  const getSectionFallbackPoints = (section: any) => {
+    const assignmentMaxPoints = assignment?.maxPoints ?? 0;
+    if (assignmentMaxPoints <= 0) return null;
+    if (rubricSections.length === 1) return assignmentMaxPoints;
+    if (isWeightedRubric) return Math.round((assignmentMaxPoints * sectionWeightPercent(section.weight)) / 100);
+    return null;
+  };
+  const inferredWeightedRubric = rubricSections.some((section: any) => 
+    Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 || 
+    (section.criteria || []).some((crit: any) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
+  );
+  const isWeightedRubric = assignment?.rubricMode === 'weighted' || inferredWeightedRubric;
 
   // File upload handlers
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -236,7 +253,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     }
   }, []);
 
-  // Detect common stdin patterns by language to offer input dialog automatically.
+  // Detect common stdin patterns by language to offer inline input automatically.
   const codeUsesInput = (codeStr: string, lang: string) => {
     const lines = codeStr.split('\n');
     for (const line of lines) {
@@ -258,23 +275,29 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
   // Run code
   const handleRunCode = async () => {
+    setOutputOpen(true);
     if (codeUsesInput(code, language)) {
-      setStdinDialogOpen(true);
+      if (!showInlineInput) {
+        setShowInlineInput(true);
+        return; // open input area on first click; user types then clicks Run inside
+      }
+      // input area already open — run with whatever is currently in stdinValue
+      await execute(code, language, stdinValue);
       return;
     }
-
-    setOutputOpen(true);
+    setShowInlineInput(false);
     await execute(code, language);
   };
 
-  const handleOpenStdinDialog = () => {
-    setStdinDialogOpen(true);
+  const handleOpenInlineInput = () => {
+    setOutputOpen(true);
+    setShowInlineInput(true);
   };
 
   // Run with stdin
   const handleRunWithStdin = async () => {
-    setStdinDialogOpen(false);
     setOutputOpen(true);
+    setShowInlineInput(true);
     await execute(code, language, stdinValue);
   };
 
@@ -523,7 +546,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
               </button>
 
               <button
-                onClick={handleOpenStdinDialog}
+                onClick={handleOpenInlineInput}
                 disabled={isExecuting || isTestsRunning}
                 style={{
                   padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
@@ -604,15 +627,28 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
             {/* Output Panel (collapsible, matching codelab) */}
             <div style={{
-              height: outputOpen ? 280 : 0,
+              height: outputOpen ? outputPanelHeight : 0,
               background: 'var(--color-surface)',
               borderTop: outputOpen ? '1px solid var(--color-border)' : 'none',
               overflow: 'hidden',
-              transition: 'height .3s ease',
               flexShrink: 0,
               display: 'flex',
               flexDirection: 'column' as const,
             }}>
+              {/* Drag-to-resize handle */}
+              <div
+                onMouseDown={(e) => {
+                  const startY = e.clientY;
+                  const startH = outputPanelHeight;
+                  const onMove = (ev: MouseEvent) => setOutputPanelHeight(Math.max(120, Math.min(700, startH + (startY - ev.clientY))));
+                  const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+                  window.addEventListener('mousemove', onMove);
+                  window.addEventListener('mouseup', onUp);
+                }}
+                style={{ height: 5, cursor: 'ns-resize', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-surface-elevated)' }}
+              >
+                <div style={{ width: 28, height: 3, borderRadius: 2, background: 'var(--color-border)' }} />
+              </div>
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '6px 14px', background: 'var(--color-surface-elevated)',
@@ -633,7 +669,17 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                 </button>
               </div>
               <div className="flex-1 min-h-0">
-                <OutputPanel result={execResult} isRunning={isExecuting} error={execError} />
+                <OutputPanel
+                  result={execResult}
+                  isRunning={isExecuting}
+                  error={execError}
+                  stdinInput={lastStdinInput}
+                  showInputEditor={showInlineInput}
+                  inputDraft={stdinValue}
+                  onInputDraftChange={setStdinValue}
+                  onRunWithInput={handleRunWithStdin}
+                  isRunWithInputDisabled={isExecuting || isTestsRunning}
+                />
               </div>
             </div>
 
@@ -655,12 +701,40 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
             <div
               className="flex flex-col overflow-hidden shrink-0"
               style={{
-                width: 360, minWidth: 360,
+                width: infoPanelWidth, minWidth: infoPanelWidth,
                 background: 'var(--color-surface)',
                 borderLeft: '1px solid var(--color-border)',
                 transition: 'width .3s ease, min-width .3s ease, opacity .25s ease',
+                position: 'relative',
               }}
             >
+              <div
+                onMouseDown={(e) => {
+                  const startX = e.clientX;
+                  const startWidth = infoPanelWidth;
+                  const onMove = (ev: MouseEvent) => {
+                    const next = Math.max(300, Math.min(760, startWidth + (startX - ev.clientX)));
+                    setInfoPanelWidth(next);
+                  };
+                  const onUp = () => {
+                    window.removeEventListener('mousemove', onMove);
+                    window.removeEventListener('mouseup', onUp);
+                  };
+                  window.addEventListener('mousemove', onMove);
+                  window.addEventListener('mouseup', onUp);
+                }}
+                title="Drag to resize panel"
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 6,
+                  cursor: 'col-resize',
+                  zIndex: 20,
+                  background: 'transparent',
+                }}
+              />
               {/* Tabs */}
               <div style={{ display: 'flex', padding: '8px 10px 0', gap: 4, flexShrink: 0, flexWrap: 'wrap' as const }}>
                 {(['desc', 'rubric', 'tests', 'submit'] as const).map(tab => (
@@ -775,35 +849,113 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                       📊 Rubric &amp; Points
                     </h2>
 
-                    {assignmentRubrics.length > 0 ? (
-                      <>
-                        <div style={{
-                          borderRadius: 8,
-                          overflow: 'hidden',
-                          border: '1px solid var(--color-border)',
-                          background: 'var(--color-surface-elevated)',
-                          marginBottom: 12,
-                        }}>
-                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-                            <thead>
-                              <tr style={{ background: 'var(--color-surface)' }}>
-                                <th style={{ textAlign: 'left', padding: '10px 12px', color: 'var(--color-text-light)', fontWeight: 700 }}>Criteria</th>
-                                <th style={{ textAlign: 'center', width: 80, padding: '10px 12px', color: 'var(--color-text-light)', fontWeight: 700 }}>Points</th>
-                                <th style={{ textAlign: 'left', padding: '10px 12px', color: 'var(--color-text-light)', fontWeight: 700 }}>Description</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {assignmentRubrics.map((rubric, idx) => (
-                                <tr key={rubric.id} style={{ borderTop: idx === 0 ? 'none' : '1px solid var(--color-border)' }}>
-                                  <td style={{ padding: '10px 12px', color: 'var(--color-text-dark)', fontWeight: 600 }}>{rubric.name}</td>
-                                  <td style={{ padding: '10px 12px', textAlign: 'center', color: isDark ? '#4ade80' : '#16a34a', fontWeight: 700 }}>{rubric.maxPoints ?? 0}</td>
-                                  <td style={{ padding: '10px 12px', color: 'var(--color-text-mid)' }}>{rubric.description || '—'}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
+                    {rubricSections.length > 0 && (
+                      <div style={{ marginBottom: 10 }}>
+                        <span
+                          style={{
+                            display: 'inline-block',
+                            padding: '4px 10px',
+                            borderRadius: 999,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            letterSpacing: '.4px',
+                            textTransform: 'uppercase' as const,
+                            color: isWeightedRubric ? '#6B0000' : '#2D6A2D',
+                            background: isWeightedRubric ? 'rgba(107,0,0,.10)' : 'rgba(45,106,45,.12)',
+                            border: `1px solid ${isWeightedRubric ? 'rgba(107,0,0,.24)' : 'rgba(45,106,45,.24)'}`,
+                          }}
+                        >
+                          {isWeightedRubric ? 'Weighted Rubric' : 'Unweighted Rubric'}
+                        </span>
+                      </div>
+                    )}
 
+                    {rubricSections.length > 0 ? (
+                      <>
+                        {/* Rubric sections */}
+                        {rubricSections.map((section, sectionIdx) => (
+                          <div key={sectionIdx} style={{ marginBottom: 16 }}>
+                            {/* Section header */}
+                            <div style={{
+                              padding: '10px 12px',
+                              background: 'var(--color-surface)',
+                              borderRadius: '6px 6px 0 0',
+                              borderBottom: '1px solid var(--color-border)',
+                              fontWeight: 700,
+                              fontSize: 13,
+                              color: 'var(--color-text-dark)',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}>
+                              <span>{section.name}</span>
+                              {isWeightedRubric && <span style={{ fontSize: 11, color: 'var(--color-text-light)' }}>Weight: {sectionWeightPercent(section.weight).toFixed(1)}%</span>}
+                            </div>
+
+                            {(((section as any).criteria) || []).length > 0 ? (
+                              <table style={{
+                                width: '100%',
+                                borderCollapse: 'collapse' as const,
+                                fontSize: 12,
+                                borderRadius: '0 0 6px 6px',
+                                overflow: 'hidden',
+                                marginBottom: sectionIdx < rubricSections.length - 1 ? 12 : 0,
+                              }}>
+                                <thead>
+                                  <tr style={{ background: 'var(--color-surface-elevated)' }}>
+                                    <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Criteria</th>
+                                    <th style={{ textAlign: 'center', width: 70, padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Points</th>
+                                    {isWeightedRubric && <th style={{ textAlign: 'center', width: 70, padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Weight</th>}
+                                    <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Description</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(((section as any).criteria) || []).map((criterion: any, critIdx: number) => (
+                                    <tr key={critIdx} style={{ borderTop: '1px solid var(--color-border)' }}>
+                                      <td style={{ padding: '10px 12px', color: 'var(--color-text-dark)', fontWeight: 500 }}>{criterion.name}</td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'center', color: isDark ? '#4ade80' : '#16a34a', fontWeight: 700 }}>{criterion.maxPoints ?? 0}</td>
+                                      {isWeightedRubric && <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--color-text-dark)', fontWeight: 600 }}>{((criterion.weight ?? 1) * 100).toFixed(0)}%</td>}
+                                      <td style={{ padding: '10px 12px', color: 'var(--color-text-mid)', fontSize: 11 }}>{criterion.description || '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : (
+                              <div style={{
+                                border: '1px solid var(--color-border)',
+                                borderTop: 'none',
+                                borderRadius: '0 0 6px 6px',
+                                padding: '14px 12px',
+                                background: 'var(--color-surface-elevated)',
+                                marginBottom: sectionIdx < rubricSections.length - 1 ? 12 : 0,
+                              }}>
+                                {section.description ? (
+                                  <p style={{ fontSize: 12, color: 'var(--color-text-mid)', lineHeight: 1.6, marginBottom: isWeightedRubric ? 10 : 0 }}>
+                                    {section.description}
+                                  </p>
+                                ) : (
+                                  <p style={{ fontSize: 12, color: 'var(--color-text-light)', fontStyle: 'italic' }}>
+                                    No criteria were defined for this section.
+                                  </p>
+                                )}
+                                {getSectionFallbackPoints(section) !== null && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12 }}>
+                                    <span style={{ color: 'var(--color-text-light)', fontWeight: 600 }}>Points</span>
+                                    <span style={{ color: isDark ? '#4ade80' : '#16a34a', fontWeight: 700 }}>{getSectionFallbackPoints(section)}</span>
+                                  </div>
+                                )}
+                                {isWeightedRubric && (
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12 }}>
+                                    <span style={{ color: 'var(--color-text-light)', fontWeight: 600 }}>Section Weight</span>
+                                    <span style={{ color: 'var(--color-text-dark)', fontWeight: 700 }}>{sectionWeightPercent(section.weight).toFixed(1)}%</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Total points summary */}
                         <div style={{
                           display: 'flex',
                           justifyContent: 'space-between',
@@ -1072,33 +1224,6 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
               style={{ backgroundColor: 'var(--color-primary)' }}
             >
               <FilePlus className="w-4 h-4 mr-2" /> Create
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Stdin Dialog */}
-      <Dialog open={stdinDialogOpen} onOpenChange={setStdinDialogOpen}>
-        <DialogContent style={{ maxWidth: '500px' }}>
-          <DialogHeader>
-            <DialogTitle>Run with Input</DialogTitle>
-          </DialogHeader>
-          <div className="mt-4">
-            <label className="text-sm font-medium" style={{ color: 'var(--color-text-dark)' }}>
-              Enter program input (stdin):
-            </label>
-            <Textarea
-              value={stdinValue}
-              onChange={(e) => setStdinValue(e.target.value)}
-              placeholder="Type your input here..."
-              className="mt-2 font-mono text-sm"
-              rows={6}
-            />
-          </div>
-          <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setStdinDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleRunWithStdin} className="text-white" style={{ backgroundColor: 'var(--color-success)' }}>
-              <Play className="w-4 h-4 mr-2" /> Run
             </Button>
           </DialogFooter>
         </DialogContent>

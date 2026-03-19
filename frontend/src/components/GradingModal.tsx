@@ -1,11 +1,9 @@
-import { X, CheckCircle, ChevronLeft, ChevronRight, Save, Send, Users, Download, FileText, Eye } from 'lucide-react';
+import { X, CheckCircle, XCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Save, Send, Users, Download, FileText, Play, Zap, Loader2 } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { submissionService } from '@/services/api';
-import { useOverrideSubmissionScore } from '@/hooks/queries';
-import { FilePreview } from './FilePreview';
 
 interface RubricItem {
   name: string;
@@ -54,33 +52,59 @@ export function GradingModal({
   onSaveDraft,
   isGroupAssignment = false,
   groupName,
+  groupMemberNames = [],
+  onApplyToGroup,
   submissionId,
 }: GradingModalProps) {
-  const overrideScoreMutation = useOverrideSubmissionScore();
+  const [expandedTests, setExpandedTests] = useState<Record<string, boolean>>({
+    public: true,
+    private: false,
+  });
 
-
-  const [files, setFiles] = useState<Array<{id: number; filename: string; file_size: number | null}>>([]);
+  const [files, setFiles] = useState<Array<{ id: number; filename: string; file_size: number | null }>>([]);
   const [isLoadingFiles, setIsLoadingFiles] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [selectedFileForPreview, setSelectedFileForPreview] = useState<{id: number; filename: string} | null>(null);
 
-  // Helper function to check if file can be previewed (text/code files only)
-  const canPreviewFile = (filename: string): boolean => {
-    const ext = filename.toLowerCase().match(/\.[^.]+$/);
-    if (!ext) return false;
-    
-    const textExtensions = [
-      '.py', '.js', '.jsx', '.ts', '.tsx', '.java', '.cpp', '.c', '.h', '.hpp',
-      '.cs', '.rb', '.go', '.rs', '.php', '.swift', '.kt', '.scala', '.r', '.m',
-      '.html', '.htm', '.xml', '.css', '.scss', '.sass', '.less', '.sql',
-      '.sh', '.bash', '.zsh', '.yml', '.yaml', '.json', '.md', '.txt', '.log',
-      '.ini', '.cfg', '.conf', '.dockerfile', '.gitignore', '.env'
-    ];
-    
-    return textExtensions.includes(ext[0]);
-  };
+  // Real submission detail: code contents + test results
+  const [submissionCode, setSubmissionCode] = useState<string>('');
+  const [submissionFilename, setSubmissionFilename] = useState<string>('');
+  const [realTestResults, setRealTestResults] = useState<Array<{
+    testcase_id: number;
+    test_name: string;
+    passed: boolean;
+    actual_output: string;
+    expected_output: string;
+    execution_time_ms: number;
+    points: number;
+    points_earned: number;
+    error: string | null;
+  }>>([]);
+  const [hasRealData, setHasRealData] = useState(false);
 
+  // Run Tests / Auto Grade state
+  const [isRunningTests, setIsRunningTests] = useState(false);
+  const [isAutoGrading, setIsAutoGrading] = useState(false);
 
+  // Fallback test results (only used when no backend data available)
+  const testResults = hasRealData
+    ? {
+      all: realTestResults.map((r, i) => ({
+        id: String(r.testcase_id),
+        name: r.test_name || `Test ${i + 1}`,
+        status: r.passed ? 'pass' as const : 'fail' as const,
+        input: '',
+        expected: r.expected_output,
+        actual: r.actual_output,
+        error: r.error,
+      })),
+    }
+    : {
+      all: [
+        { id: '1', name: 'Test Case 1: Basic Input', status: 'pass' as const, input: '5', expected: '25', actual: '25', error: null },
+        { id: '2', name: 'Test Case 2: Zero Input', status: 'pass' as const, input: '0', expected: '0', actual: '0', error: null },
+        { id: '3', name: 'Test Case 3: Negative Input', status: 'fail' as const, input: '-3', expected: '9', actual: 'Error: invalid input', error: null },
+      ],
+    };
 
   const defaultRubric: RubricItem[] = [
     { name: 'Code Correctness', maxPoints: 50 },
@@ -102,6 +126,10 @@ export function GradingModal({
   const [submitted, setSubmitted] = useState(false);
   const [savedDraft, setSavedDraft] = useState(false);
 
+  const toggleTestSection = (section: string) => {
+    setExpandedTests(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
   const getTotalScore = () => rubricScores.reduce((sum, s) => sum + s, 0);
   const getTotalMaxPoints = () => rubricCriteria.reduce((sum, c) => sum + c.maxPoints, 0);
 
@@ -113,13 +141,29 @@ export function GradingModal({
     });
   };
 
-  /* ─── Load submitted files ─── */
+  /* ─── Load submitted files + code content + test results ─── */
   useEffect(() => {
     if (submissionId) {
       setIsLoadingFiles(true);
+      // Fetch file list (for download buttons)
       submissionService.getSubmissionFiles(submissionId)
         .then(setFiles)
-        .catch(err => console.error('Failed to load files:', err))
+        .catch(err => console.error('Failed to load files:', err));
+      // Fetch full submission detail (code contents + test results)
+      submissionService.getSubmissionDetail(submissionId)
+        .then((detail) => {
+          // Use the first file's content as the code to display
+          const firstFile = detail.files.find(f => f.content != null);
+          if (firstFile) {
+            setSubmissionCode(firstFile.content ?? '');
+            setSubmissionFilename(firstFile.filename);
+          }
+          if (detail.results && detail.results.length > 0) {
+            setRealTestResults(detail.results);
+          }
+          setHasRealData(true);
+        })
+        .catch(err => console.error('Failed to load submission detail:', err))
         .finally(() => setIsLoadingFiles(false));
     }
   }, [submissionId]);
@@ -140,6 +184,53 @@ export function GradingModal({
     }
   };
 
+  /* ─── Run Tests ─── */
+  const handleRunTests = async () => {
+    if (!submissionId) return;
+    setIsRunningTests(true);
+    try {
+      await submissionService.runTests(submissionId);
+      // Refresh submission detail to pick up new results
+      const detail = await submissionService.getSubmissionDetail(submissionId);
+      if (detail.results && detail.results.length > 0) {
+        setRealTestResults(detail.results);
+        setHasRealData(true);
+      }
+    } catch (err) {
+      console.error('Failed to run tests:', err);
+      alert('Failed to run tests: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsRunningTests(false);
+    }
+  };
+
+  /* ─── Auto Grade ─── */
+  const handleAutoGrade = async () => {
+    if (!submissionId) return;
+    setIsAutoGrading(true);
+    try {
+      const result = await submissionService.autoGrade(submissionId);
+      // Refresh submission detail to pick up new results + score
+      const detail = await submissionService.getSubmissionDetail(submissionId);
+      if (detail.results && detail.results.length > 0) {
+        setRealTestResults(detail.results);
+        setHasRealData(true);
+      }
+      // Update rubric scores from auto-graded score
+      if (result.score != null && rubricCriteria.length > 0) {
+        const totalMax = rubricCriteria.reduce((s, c) => s + c.maxPoints, 0);
+        if (totalMax > 0) {
+          setRubricScores(rubricCriteria.map(c => Math.round((result.score / totalMax) * c.maxPoints)));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to auto-grade:', err);
+      alert('Failed to auto-grade: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setIsAutoGrading(false);
+    }
+  };
+
   /* ─── Save grade to backend ─── */
   const handleSaveGradeToBackend = async () => {
     if (!submissionId) {
@@ -150,10 +241,9 @@ export function GradingModal({
 
     setIsSaving(true);
     try {
-      await overrideScoreMutation.mutateAsync({
-        submissionId,
+      await submissionService.overrideSubmissionScore(submissionId, {
         score: getTotalScore(),
-        maxScore: getTotalMaxPoints(),
+        max_score: getTotalMaxPoints(),
         feedback: feedback || undefined,
       });
       setSubmitted(true);
@@ -278,49 +368,130 @@ export function GradingModal({
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                          {canPreviewFile(file.filename) && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setSelectedFileForPreview({ id: file.id, filename: file.filename })}
-                              className="flex items-center gap-1"
-                              title="Preview file"
-                            >
-                              <Eye className="w-4 h-4" />
-                              <span className="text-xs">Preview</span>
-                            </Button>
-                          )}
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => handleDownloadFile(file.id, file.filename)}
-                            title="Download file"
-                          >
-                            <Download className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDownloadFile(file.id, file.filename)}
+                          className="flex-shrink-0 ml-2"
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
                       </div>
                     ))}
-                  </div>
-                )}
-                
-                {/* File Preview Section */}
-                {selectedFileForPreview && (
-                  <div className="mt-4">
-                    <FilePreview
-                      fileId={selectedFileForPreview.id}
-                      filename={selectedFileForPreview.filename}
-                      onClose={() => setSelectedFileForPreview(null)}
-                    />
                   </div>
                 )}
               </div>
             )}
 
+            {/* Code Viewer */}
+            <div className="p-6">
+              <h3 className="mb-3" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                Student Code {submissionFilename && <span className="text-sm font-normal" style={{ color: 'var(--color-text-mid)' }}>— {submissionFilename}</span>}
+              </h3>
+              <div
+                className="rounded-lg p-4 overflow-x-auto"
+                style={{
+                  backgroundColor: '#1E1E1E',
+                  fontFamily: 'JetBrains Mono, monospace',
+                  fontSize: '13px',
+                  lineHeight: '20px'
+                }}
+              >
+                <pre className="text-white">
+                  {submissionCode || (isLoadingFiles ? 'Loading...' : 'No code submitted')}
+                </pre>
+              </div>
+            </div>
 
+            {/* Test Results */}
+            <div className="px-6 pb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                  Test Results
+                </h3>
+                {submissionId && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRunTests}
+                      disabled={isRunningTests || isAutoGrading}
+                      className="text-xs"
+                    >
+                      {isRunningTests ? (
+                        <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Running...</>
+                      ) : (
+                        <><Play className="w-3 h-3 mr-1" /> Run Tests</>
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleAutoGrade}
+                      disabled={isRunningTests || isAutoGrading}
+                      className="text-xs text-white"
+                      style={{ backgroundColor: 'var(--color-primary)' }}
+                    >
+                      {isAutoGrading ? (
+                        <><Loader2 className="w-3 h-3 mr-1 animate-spin" /> Grading...</>
+                      ) : (
+                        <><Zap className="w-3 h-3 mr-1" /> Auto Grade</>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Test Cases */}
+              <div className="mb-4">
+                <button
+                  onClick={() => toggleTestSection('public')}
+                  className="w-full flex items-center justify-between p-3 rounded-t-lg transition-colors hover:bg-[var(--color-primary-bg)]"
+                  style={{ backgroundColor: 'var(--color-primary-bg)' }}
+                >
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>
+                    Test Cases ({testResults.all.filter(t => t.status === 'pass').length}/{testResults.all.length} passed)
+                  </span>
+                  {expandedTests.public ? (
+                    <ChevronUp className="w-5 h-5 text-[var(--color-primary)]" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-[var(--color-primary)]" />
+                  )}
+                </button>
+
+                {expandedTests.public && (
+                  <div className="border border-t-0 rounded-b-lg" style={{ borderColor: 'var(--color-border)' }}>
+                    {testResults.all.length === 0 ? (
+                      <div className="p-4 text-sm" style={{ color: 'var(--color-text-mid)' }}>
+                        No test results available yet. Run automated grading to see results.
+                      </div>
+                    ) : (
+                      testResults.all.map((test) => (
+                        <div key={test.id} className="p-4 border-b last:border-b-0" style={{ borderColor: 'var(--color-border)' }}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                              {test.name}
+                            </span>
+                            {test.status === 'pass' ? (
+                              <CheckCircle className="w-5 h-5 text-[var(--color-success)]" />
+                            ) : (
+                              <XCircle className="w-5 h-5 text-[var(--color-error)]" />
+                            )}
+                          </div>
+                          <div className="space-y-1" style={{ fontSize: '12px', color: 'var(--color-text-mid)' }}>
+                            {test.expected && <div><strong>Expected:</strong> {test.expected}</div>}
+                            {test.actual && <div><strong>Actual:</strong> {test.actual}</div>}
+                            {test.error && <div style={{ color: 'var(--color-error)' }}><strong>Error:</strong> {test.error}</div>}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Right Panel: Rubric & Feedback (40%) */}
@@ -337,7 +508,9 @@ export function GradingModal({
                     <span style={{ fontSize: '14px', color: '#595959' }}>({autoScorePct}%)</span>
                   )}
                 </div>
-
+                <p style={{ fontSize: '12px', color: '#1A4D7A', marginTop: '6px' }}>
+                  Tests Passed: {testResults.all.filter(t => t.status === 'pass').length} / {testResults.all.length}
+                </p>
               </div>
 
               {/* Rubric Grading */}
@@ -399,7 +572,7 @@ export function GradingModal({
                   className="border-[var(--color-border)]"
                   maxLength={500}
                 />
-                <p className="text-right mt-1" style={{ fontSize: '11px', color: feedback.length >= 450 ? '#8B0000' : '#8A8A8A' }}>
+                <p className="text-right mt-1" style={{ fontSize: '11px', color: feedback.length >= 450 ? 'var(--color-error)' : 'var(--color-text-light)' }}>
                   {feedback.length} / 500
                 </p>
               </div>
@@ -409,13 +582,13 @@ export function GradingModal({
             <div className="border-t p-6" style={{ borderColor: 'var(--color-border)' }}>
               {/* Group Assignment Banner */}
               {isGroupAssignment && groupName && groupMemberNames.length > 0 && (
-                <div className="mb-4 p-3 rounded-lg flex items-start gap-3" style={{ backgroundColor: '#F5EDED', border: '1px solid #6B0000' }}>
-                  <Users className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#6B0000' }} />
+                <div className="mb-4 p-3 rounded-lg flex items-start gap-3" style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-primary)' }}>
+                  <Users className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-primary)' }} />
                   <div className="flex-1">
-                    <p style={{ fontSize: '13px', fontWeight: 600, color: '#6B0000' }}>
+                    <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-primary)' }}>
                       Group Assignment — {groupName}
                     </p>
-                    <p style={{ fontSize: '12px', color: '#595959', marginTop: '2px' }}>
+                    <p style={{ fontSize: '12px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
                       Other members: {groupMemberNames.join(', ')}
                     </p>
                   </div>
@@ -423,7 +596,7 @@ export function GradingModal({
               )}
 
               <div className="flex items-center justify-between mb-3">
-                <button className="hover:underline" style={{ fontSize: '13px', color: '#6B0000' }}>
+                <button className="hover:underline" style={{ fontSize: '13px', color: 'var(--color-primary)' }}>
                   Request Resubmission
                 </button>
               </div>
@@ -444,7 +617,7 @@ export function GradingModal({
                 <Button
                   type="submit"
                   className="flex-1 text-white"
-                  style={{ backgroundColor: submitted ? '#2D6A2D' : 'var(--color-primary)' }}
+                  style={{ backgroundColor: submitted ? 'var(--color-success)' : 'var(--color-primary)' }}
                   disabled={isSaving}
                   onClick={() => {
                     handleSaveGradeToBackend();
@@ -465,7 +638,7 @@ export function GradingModal({
                 <Button
                   type="button"
                   className="w-full mt-3 text-white"
-                  style={{ backgroundColor: '#2D6A2D' }}
+                  style={{ backgroundColor: 'var(--color-success)' }}
                   onClick={() => onApplyToGroup(getTotalScore())}
                 >
                   <Users className="w-4 h-4 mr-2" />

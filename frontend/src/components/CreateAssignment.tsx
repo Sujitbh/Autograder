@@ -296,11 +296,8 @@ export function CreateAssignment() {
             rubricCriteria.forEach((c, i) => {
                 if (!c.name.trim()) newErrors[`rubric_name_${i}`] = `Criterion ${i + 1} needs a name`;
                 if (c.points < 0) newErrors[`rubric_points_${i}`] = 'Points cannot be negative';
+                if (isWeightedRubric && c.weight < 0) newErrors[`rubric_weight_${i}`] = 'Weight cannot be negative';
             });
-            if (isWeightedRubric) {
-                const totalWeight = rubricCriteria.reduce((s, c) => s + c.weight, 0);
-                if (totalWeight !== 100) newErrors.rubricWeight = `Weights must total 100% (currently ${totalWeight}%)`;
-            }
         }
 
         setErrors(newErrors);
@@ -363,11 +360,11 @@ export function CreateAssignment() {
        ════════════════════════════════════════════════════════ */
 
     const addRubricCriterion = () => {
-        setRubricCriteria([...rubricCriteria, { id: Date.now().toString(), name: '', description: '', points: 10, weight: 10 }]);
+        setRubricCriteria([...rubricCriteria, { id: Date.now().toString(), name: '', description: '', points: 10, weight: 1 }]);
     };
 
     const removeRubricCriterion = (id: string) => {
-        if (rubricCriteria.length > 1) setRubricCriteria(rubricCriteria.filter(c => c.id !== id));
+        setRubricCriteria(rubricCriteria.filter(c => c.id !== id));
     };
 
     const updateRubricCriterion = (id: string, field: keyof RubricCriterion, value: string | number) => {
@@ -825,7 +822,7 @@ export function CreateAssignment() {
                                         <div className="flex items-center justify-between">
                                             <div>
                                                 <label style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Weighted Rubric</label>
-                                                <p style={{ fontSize: '12px', color: '#595959', marginTop: '2px' }}>Criteria weights must total 100%</p>
+                                                <p style={{ fontSize: '12px', color: '#595959', marginTop: '2px' }}>Use any positive weights that fit your grading style.</p>
                                             </div>
                                             <Switch checked={isWeightedRubric} onCheckedChange={setIsWeightedRubric} />
                                         </div>
@@ -867,13 +864,14 @@ export function CreateAssignment() {
                                                             </div>
                                                         )}
                                                     </div>
+                                                    {isWeightedRubric && errors[`rubric_weight_${index}`] && (
+                                                        <FieldError error={errors[`rubric_weight_${index}`]} />
+                                                    )}
                                                     <Input value={criterion.description} onChange={e => updateRubricCriterion(criterion.id, 'description', e.target.value)} placeholder="Description (optional)" className="border-[var(--color-border)]" />
                                                 </div>
-                                                {rubricCriteria.length > 1 && (
-                                                    <Button type="button" variant="ghost" size="sm" onClick={() => removeRubricCriterion(criterion.id)}>
-                                                        <Trash2 className="w-4 h-4" style={{ color: '#B91C1C' }} />
-                                                    </Button>
-                                                )}
+                                                <Button type="button" variant="ghost" size="sm" onClick={() => removeRubricCriterion(criterion.id)}>
+                                                    <Trash2 className="w-4 h-4" style={{ color: '#B91C1C' }} />
+                                                </Button>
                                             </div>
                                         </div>
                                     ))}
@@ -891,10 +889,9 @@ export function CreateAssignment() {
                                     {isWeightedRubric && (
                                         <div className="flex justify-between items-center mt-2">
                                             <span style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>Total Weight:</span>
-                                            <span style={{ fontSize: '18px', fontWeight: 700, color: getTotalWeight() === 100 ? '#2D6A2D' : '#B91C1C' }}>{getTotalWeight()}%</span>
+                                            <span style={{ fontSize: '18px', fontWeight: 700, color: '#6B0000' }}>{getTotalWeight()}%</span>
                                         </div>
                                     )}
-                                    <FieldError error={errors.rubricWeight} />
                                 </div>
                             </div>
                         )}

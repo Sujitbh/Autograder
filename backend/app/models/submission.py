@@ -26,4 +26,3 @@ class Submission(Base):
     student = relationship("User", back_populates="submissions", foreign_keys=[student_id])
     files = relationship("SubmissionFile", back_populates="submission", cascade="all, delete-orphan")
     results = relationship("SubmissionResult", back_populates="submission", cascade="all, delete-orphan")
-    rubric_scores = relationship("SubmissionRubricScore", back_populates="submission", cascade="all, delete-orphan")

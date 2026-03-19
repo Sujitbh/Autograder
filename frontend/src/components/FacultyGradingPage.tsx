@@ -9,9 +9,6 @@ import { PageLayout } from './PageLayout';
 import { TopNav } from './TopNav';
 import { CodeEditor } from './CodeEditor';
 import { OutputPanel } from './OutputPanel';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { Textarea } from './ui/textarea';
-import { Button } from './ui/button';
 import { useCodeExecution } from '@/hooks/useCodeExecution';
 import { submissionService } from '@/services/api';
 import {
@@ -80,12 +77,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     });
 
     const gradeMutation = useMutation({
-        mutationFn: (payload: {
-            score: number;
-            max_score: number;
-            feedback?: string;
-            rubric_breakdown?: Array<{ rubric_id: number; score_awarded: number; feedback?: string | null }>;
-        }) =>
+        mutationFn: (payload: { score: number; max_score: number; feedback?: string }) =>
             submissionService.overrideSubmissionScore(submissionId, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['faculty-submission-detail', submissionId] });
@@ -100,7 +92,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         mutationFn: () => submissionService.runTests(submissionId),
     });
 
-    const { execute, isRunning: isExecutingCode, result: execResult, error: execError } = useCodeExecution();
+    const { execute, isRunning: isExecutingCode, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
 
     const [activeFileIndex, setActiveFileIndex] = useState(0);
     const [rubricScores, setRubricScores] = useState<number[]>([]);
@@ -108,10 +100,12 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const [expandedTests, setExpandedTests] = useState<Set<number>>(new Set());
     const [showExplorer, setShowExplorer] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
+    const [infoPanelWidth, setInfoPanelWidth] = useState(380);
     const [outputOpen, setOutputOpen] = useState(false);
-    const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading' | 'integrity'>('grading');
-    const [stdinDialogOpen, setStdinDialogOpen] = useState(false);
+    const [outputPanelHeight, setOutputPanelHeight] = useState(280);
+    const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading' | 'rubric' | 'integrity'>('grading');
     const [stdinValue, setStdinValue] = useState('');
+    const [showInlineInput, setShowInlineInput] = useState(false);
     const [autoGradeResult, setAutoGradeResult] = useState<any>(null);
     const [liveTestResults, setLiveTestResults] = useState<any[] | null>(null);
 
@@ -121,32 +115,62 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         enabled: !!detail?.assignment?.id,
     });
 
+    const { data: assignmentTestcases = [] } = useQuery({
+        queryKey: ['faculty-assignment-testcases', detail?.assignment?.id],
+        queryFn: () => submissionService.getAssignmentTestcases(String(detail!.assignment.id)),
+        enabled: !!detail?.assignment?.id,
+    });
+
+    // Helper: flatten rubric sections into flat array of criteria for scoring
+    const flattenRubrics = (sections: any[]) => {
+        return sections.flatMap((section) => (section.criteria || []).map((crit: any) => ({
+            ...crit,
+            section_name: section.name,
+            section_weight: section.weight ?? 1,
+        })));
+    };
+
+    const sectionWeightPercent = (weight?: number | null) => {
+        if (weight == null || Number.isNaN(weight)) return 100;
+        return weight <= 1.5 ? weight * 100 : weight;
+    };
+
     // Initialise form when detail loads
     useEffect(() => {
         if (!detail) return;
         setFeedback(detail.feedback || '');
-        const rubrics = detail.rubrics ?? [];
-        if (rubrics.length > 0) {
-            const existingByRubric = new Map(
-                (detail.rubric_scores ?? []).map((rs: any) => [rs.rubric_id, Number(rs.score_awarded) || 0])
-            );
-
-            if (existingByRubric.size > 0) {
-                setRubricScores(rubrics.map((r) => existingByRubric.get(r.id) ?? 0));
-            } else if (detail.score != null) {
-                const totalMax = rubrics.reduce((s, r) => s + r.max_points, 0);
-                setRubricScores(rubrics.map(r =>
-                    totalMax > 0 ? Math.round((detail.score! / totalMax) * r.max_points) : 0
+        const rubricSections = detail.rubrics ?? [];
+        const flatRubrics = flattenRubrics(rubricSections);
+        
+        if (flatRubrics.length > 0) {
+            // If already graded, distribute score proportionally across criteria
+            if (detail.score != null && flatRubrics.length > 0) {
+                const totalMax = flatRubrics.reduce((s: number, r: any) => s + (r.max_points || 0), 0);
+                setRubricScores(flatRubrics.map((r: any) =>
+                    totalMax > 0 ? Math.round((detail.score! / totalMax) * (r.max_points || 0)) : 0
                 ));
             } else {
-                setRubricScores(rubrics.map(() => 0));
+                setRubricScores(flatRubrics.map(() => 0));
             }
         }
     }, [detail?.id]);
 
-    const rubrics = detail?.rubrics ?? [];
+    const rubricSections = detail?.rubrics ?? [];
+    const rubrics = flattenRubrics(rubricSections);
+    const inferredWeightedRubric = rubricSections.some((section: any) => 
+        Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 || 
+        (section.criteria || []).some((crit: any) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
+    );
+    const isWeightedRubric = detail?.assignment?.rubric_mode === 'weighted' || inferredWeightedRubric;
+    const getSectionFallbackPoints = (section: any) => {
+        const assignmentMaxPoints = detail?.assignment?.max_points ?? 0;
+        if (assignmentMaxPoints <= 0) return null;
+        if (rubricSections.length === 1) return assignmentMaxPoints;
+        if (isWeightedRubric) return Math.round((assignmentMaxPoints * sectionWeightPercent(section.weight)) / 100);
+        return null;
+    };
     const getTotalScore = () => rubricScores.reduce((s, n) => s + (Number(n) || 0), 0);
-    const getTotalMax = () => rubrics.reduce((s, r) => s + r.max_points, 0);
+    const getTotalMax = () => rubrics.reduce((s: number, r: any) => s + (r.max_points || 0), 0);
     const resultPointsTotal = (detail?.results ?? []).reduce((s, r) => s + (r.points || 0), 0);
     const resolvedMaxPoints = getTotalMax() || detail?.max_score || resultPointsTotal || detail?.assignment?.max_points || 100;
 
@@ -187,18 +211,11 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
             const result = await autoGradeMutation.mutateAsync();
             setAutoGradeResult(result);
             // Populate score fields
-            if (rubrics.length > 0) {
-                const evalMap = new Map(
-                    (result?.rubric_results?.evaluations ?? []).map((e: any) => [e.rubric_id, Number(e.earned_points) || 0])
-                );
-                if (evalMap.size > 0) {
-                    setRubricScores(rubrics.map((r: any) => evalMap.get(r.id) ?? 0));
-                } else if (result.score != null) {
-                    const totalMax = rubrics.reduce((s: number, r: any) => s + r.max_points, 0);
-                    setRubricScores(rubrics.map((r: any) =>
-                        totalMax > 0 ? Math.round((result.score / totalMax) * r.max_points) : 0
-                    ));
-                }
+            if (result.score != null && rubrics.length > 0) {
+                const totalMax = rubrics.reduce((s: number, r: any) => s + r.max_points, 0);
+                setRubricScores(rubrics.map((r: any) =>
+                    totalMax > 0 ? Math.round((result.score / totalMax) * r.max_points) : 0
+                ));
             }
             if (result.feedback) setFeedback(result.feedback);
             // Update live test results
@@ -207,6 +224,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                     id: r.id ?? i,
                     testcase_id: r.testcase_id ?? null,
                     testcase_name: r.testcase_name ?? null,
+                    input_data: r.input_data ?? null,
+                    expected_output: r.expected_output ?? null,
                     passed: r.passed,
                     output: r.output ?? null,
                     error_output: r.error_output ?? r.error ?? null,
@@ -235,6 +254,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                     id: r.id ?? r.testcase_id ?? i,
                     testcase_id: r.testcase_id ?? null,
                     testcase_name: r.testcase_name ?? null,
+                    input_data: r.input_data ?? null,
+                    expected_output: r.expected_output ?? null,
                     passed: !!r.passed,
                     output: r.output ?? r.actual_output ?? null,
                     error_output: r.error_output ?? r.stderr ?? null,
@@ -251,17 +272,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         const normalizedScore = Math.max(0, Math.min(Math.round(rawScore), resolvedMaxPoints));
         const normalizedMax = Math.max(1, Math.round(resolvedMaxPoints));
         const feedbackToSave = feedback.trim() || 'Reviewed by instructor.';
-        const rubricBreakdown = rubrics.map((rubric, idx) => ({
-            rubric_id: rubric.id,
-            score_awarded: Math.max(0, Math.min(Number(rubricScores[idx]) || 0, rubric.max_points || 0)),
-            feedback: null,
-        }));
-        await gradeMutation.mutateAsync({
-            score: normalizedScore,
-            max_score: normalizedMax,
-            feedback: feedbackToSave,
-            rubric_breakdown: rubricBreakdown,
-        });
+        await gradeMutation.mutateAsync({ score: normalizedScore, max_score: normalizedMax, feedback: feedbackToSave });
         if (!isDraft) {
             if (moveToNext && nextSubmissionId) {
                 router.push(`/courses/${courseId}/submissions/${nextSubmissionId}/grade`);
@@ -288,19 +299,28 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         if (!detail) return;
         const lang = (detail.assignment.language || 'python').toLowerCase();
         const code = detail.files[activeFileIndex]?.content ?? '';
-        if (codeUsesInput(code, lang)) { setStdinDialogOpen(true); return; }
         setOutputOpen(true);
+        if (codeUsesInput(code, lang)) {
+            if (!showInlineInput) {
+                setShowInlineInput(true);
+                return;
+            }
+            await execute(code, lang, stdinValue);
+            return;
+        }
+        setShowInlineInput(false);
         await execute(code, lang);
     };
-    const handleOpenStdinDialog = () => {
-        setStdinDialogOpen(true);
+    const handleOpenInlineInput = () => {
+        setOutputOpen(true);
+        setShowInlineInput(true);
     };
     const handleRunWithStdin = async () => {
         if (!detail) return;
         const lang = (detail.assignment.language || 'python').toLowerCase();
         const code = detail.files[activeFileIndex]?.content ?? '';
-        setStdinDialogOpen(false);
         setOutputOpen(true);
+        setShowInlineInput(true);
         await execute(code, lang, stdinValue);
     };
 
@@ -341,17 +361,47 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const language = (detail.assignment.language || 'python').toLowerCase();
     const activeFile = detail.files[activeFileIndex];
     const code = activeFile?.content || '';
-    const displayTests = liveTestResults ?? (detail.results.length > 0
-        ? detail.results.map((r, i) => ({
-            id: i,
-            testcase_id: r.testcase_id,
-            testcase_name: r.test_name,
-            passed: r.passed,
-            output: r.actual_output,
-            error_output: r.error,
-            points_awarded: r.points_earned,
-        }))
-        : null);
+    const displayTests = (() => {
+        const latestResults = liveTestResults ?? (detail.results.length > 0
+            ? detail.results.map((r, i) => ({
+                id: i,
+                testcase_id: r.testcase_id,
+                testcase_name: r.test_name,
+                input_data: r.input_data,
+                expected_output: r.expected_output,
+                passed: r.passed,
+                output: r.actual_output,
+                error_output: r.error,
+                points_awarded: r.points_earned,
+            }))
+            : null);
+
+        if (assignmentTestcases.length === 0) {
+            return latestResults;
+        }
+
+        const byTestcaseId = new Map<number, any>();
+        (latestResults || []).forEach((r: any) => {
+            if (typeof r.testcase_id === 'number') byTestcaseId.set(r.testcase_id, r);
+        });
+
+        return assignmentTestcases.map((tc: any) => {
+            const r = byTestcaseId.get(tc.id);
+            return {
+                id: tc.id,
+                testcase_id: tc.id,
+                testcase_name: tc.name,
+                input_data: r?.input_data ?? tc.input_data,
+                expected_output: r?.expected_output ?? tc.expected_output,
+                passed: r?.passed ?? false,
+                has_result: Boolean(r),
+                is_public: tc.is_public,
+                output: r?.output ?? null,
+                error_output: r?.error_output ?? null,
+                points_awarded: r?.points_awarded ?? null,
+            };
+        });
+    })();
 
     return (
         <PageLayout>
@@ -421,7 +471,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                 {isExecutingCode ? '⏳ Running...' : '▶ Run Code'}
                             </button>
                             <button
-                                onClick={handleOpenStdinDialog}
+                                onClick={handleOpenInlineInput}
                                 disabled={isExecutingCode || autoGradeMutation.isPending}
                                 style={{
                                     padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
@@ -472,7 +522,21 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                         </div>
 
                         {/* Output Panel */}
-                        <div style={{ height: outputOpen ? 280 : 0, background: 'var(--color-surface)', borderTop: outputOpen ? '1px solid var(--color-border)' : 'none', overflow: 'hidden', transition: 'height .3s ease', flexShrink: 0, display: 'flex', flexDirection: 'column' as const }}>
+                        <div style={{ height: outputOpen ? outputPanelHeight : 0, background: 'var(--color-surface)', borderTop: outputOpen ? '1px solid var(--color-border)' : 'none', overflow: 'hidden', flexShrink: 0, display: 'flex', flexDirection: 'column' as const }}>
+                            {/* Drag-to-resize handle */}
+                            <div
+                                onMouseDown={(e) => {
+                                    const startY = e.clientY;
+                                    const startH = outputPanelHeight;
+                                    const onMove = (ev: MouseEvent) => setOutputPanelHeight(Math.max(120, Math.min(700, startH + (startY - ev.clientY))));
+                                    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+                                    window.addEventListener('mousemove', onMove);
+                                    window.addEventListener('mouseup', onUp);
+                                }}
+                                style={{ height: 5, cursor: 'ns-resize', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-surface-elevated)' }}
+                            >
+                                <div style={{ width: 28, height: 3, borderRadius: 2, background: 'var(--color-border)' }} />
+                            </div>
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 14px', background: 'var(--color-surface-elevated)', borderBottom: '1px solid var(--color-border)', fontSize: 11, fontWeight: 600, color: 'var(--color-text-light)', flexShrink: 0 }}>
                                 <span>⬤ TERMINAL OUTPUT</span>
                                 <button onClick={() => setOutputOpen(false)} style={{ fontSize: 14, color: 'var(--color-text-light)', padding: '2px 6px', borderRadius: 3, background: 'transparent', border: 'none', cursor: 'pointer' }}
@@ -480,7 +544,17 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                     onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>✕</button>
                             </div>
                             <div className="flex-1 min-h-0">
-                                <OutputPanel result={execResult} isRunning={isExecutingCode} error={execError} />
+                                <OutputPanel
+                                    result={execResult}
+                                    isRunning={isExecutingCode}
+                                    error={execError}
+                                    stdinInput={lastStdinInput}
+                                    showInputEditor={showInlineInput}
+                                    inputDraft={stdinValue}
+                                    onInputDraftChange={setStdinValue}
+                                    onRunWithInput={handleRunWithStdin}
+                                    isRunWithInputDisabled={isExecutingCode || autoGradeMutation.isPending}
+                                />
                             </div>
                         </div>
                     </div>
@@ -488,15 +562,42 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                     {/* ── RIGHT: Info Panel ── */}
                     {showInfoPanel && (
                         <div className="flex flex-col overflow-hidden shrink-0"
-                            style={{ width: 380, minWidth: 380, background: 'var(--color-surface)', borderLeft: '1px solid var(--color-border)' }}>
+                            style={{ width: infoPanelWidth, minWidth: infoPanelWidth, background: 'var(--color-surface)', borderLeft: '1px solid var(--color-border)', position: 'relative' }}>
+                            <div
+                                onMouseDown={(e) => {
+                                    const startX = e.clientX;
+                                    const startWidth = infoPanelWidth;
+                                    const onMove = (ev: MouseEvent) => {
+                                        const next = Math.max(300, Math.min(760, startWidth + (startX - ev.clientX)));
+                                        setInfoPanelWidth(next);
+                                    };
+                                    const onUp = () => {
+                                        window.removeEventListener('mousemove', onMove);
+                                        window.removeEventListener('mouseup', onUp);
+                                    };
+                                    window.addEventListener('mousemove', onMove);
+                                    window.addEventListener('mouseup', onUp);
+                                }}
+                                title="Drag to resize panel"
+                                style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: 6,
+                                    cursor: 'col-resize',
+                                    zIndex: 20,
+                                    background: 'transparent',
+                                }}
+                            />
                             {/* Tabs */}
                             <div style={{ display: 'flex', padding: '8px 10px 0', gap: 4, flexShrink: 0 }}>
-                                {(['desc', 'tests', 'grading', 'integrity'] as const).map(tab => (
+                                {(['desc', 'tests', 'grading', 'rubric', 'integrity'] as const).map(tab => (
                                     <button key={tab} onClick={() => setInfoTab(tab)}
                                         style={{ padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' as const, transition: 'all .2s', background: infoTab === tab ? '#7f1d1d' : 'transparent', color: infoTab === tab ? '#fff' : 'var(--color-text-light)', border: 'none', cursor: 'pointer' }}
                                         onMouseEnter={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'var(--color-surface-elevated)'; e.currentTarget.style.color = 'var(--color-text-mid)'; } }}
                                         onMouseLeave={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-light)'; } }}>
-                                        {tab === 'desc' ? '📋 Info' : tab === 'tests' ? '🧪 Tests' : tab === 'grading' ? '📊 Grading' : '🛡 Integrity'}
+                                        {tab === 'desc' ? '📋 Info' : tab === 'tests' ? '🧪 Tests' : tab === 'grading' ? '📊 Grading' : tab === 'rubric' ? '📚 Rubric' : '🛡 Integrity'}
                                     </button>
                                 ))}
                             </div>
@@ -566,7 +667,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                 );
                                                 return <p style={{ fontSize: 13, color: 'var(--color-text-mid)' }}>No test results yet. Run tests to see output.</p>;
                                             }
-                                            const passed = displayTests.filter((t: any) => t.passed).length;
+                                            const passed = displayTests.filter((t: any) => t.has_result && t.passed).length;
                                             return (
                                                 <div>
                                                     <span className="px-2.5 py-1 rounded-full mb-4 inline-block"
@@ -583,6 +684,21 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                     <div className="flex items-center gap-2">
                                                                         {test.passed ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#059669' }} /> : <XCircle className="w-3.5 h-3.5" style={{ color: '#DC2626' }} />}
                                                                         <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>{test.testcase_name || `Test #${test.testcase_id}`}</span>
+                                                                        {typeof test.is_public === 'boolean' && (
+                                                                            <span
+                                                                                style={{
+                                                                                    fontSize: '10px',
+                                                                                    fontWeight: 700,
+                                                                                    padding: '2px 6px',
+                                                                                    borderRadius: 999,
+                                                                                    border: '1px solid var(--color-border)',
+                                                                                    color: test.is_public ? '#065F46' : '#7C2D12',
+                                                                                    backgroundColor: test.is_public ? '#D1FAE5' : '#FFEDD5',
+                                                                                }}
+                                                                            >
+                                                                                {test.is_public ? 'Public' : 'Private'}
+                                                                            </span>
+                                                                        )}
                                                                     </div>
                                                                     <div className="flex items-center gap-2">
                                                                         {test.points_awarded != null && <span style={{ fontSize: '11px', color: 'var(--color-text-mid)' }}>{test.points_awarded} pts</span>}
@@ -591,6 +707,18 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                 </button>
                                                                 {expandedTests.has(test.id) && (
                                                                     <div className="px-3 py-2 border-t" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-primary-bg)' }}>
+                                                                        {test.input_data && (
+                                                                            <div className="mb-2">
+                                                                                <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>Input:</p>
+                                                                                <pre className="p-2 rounded text-xs overflow-x-auto" style={{ backgroundColor: '#111827', color: '#E5E7EB', fontFamily: 'monospace', maxHeight: '120px' }}>{test.input_data}</pre>
+                                                                            </div>
+                                                                        )}
+                                                                        {test.expected_output && (
+                                                                            <div className="mb-2">
+                                                                                <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>Expected Output:</p>
+                                                                                <pre className="p-2 rounded text-xs overflow-x-auto" style={{ backgroundColor: '#111827', color: '#E5E7EB', fontFamily: 'monospace', maxHeight: '120px' }}>{test.expected_output}</pre>
+                                                                            </div>
+                                                                        )}
                                                                         {test.output && (
                                                                             <div className="mb-2">
                                                                                 <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>Output:</p>
@@ -603,7 +731,11 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                                 <pre className="p-2 rounded text-xs overflow-x-auto" style={{ backgroundColor: '#FEF2F2', color: '#991B1B', fontFamily: 'monospace', maxHeight: '120px' }}>{test.error_output}</pre>
                                                                             </div>
                                                                         )}
-                                                                        {!test.output && !test.error_output && <p style={{ fontSize: '11px', color: 'var(--color-text-light)', fontStyle: 'italic' }}>No output recorded</p>}
+                                                                        {!test.output && !test.error_output && (
+                                                                            <p style={{ fontSize: '11px', color: 'var(--color-text-light)', fontStyle: 'italic' }}>
+                                                                                {test.has_result ? 'No output recorded' : 'Not executed yet. Click Run All Tests.'}
+                                                                            </p>
+                                                                        )}
                                                                     </div>
                                                                 )}
                                                             </div>
@@ -612,6 +744,96 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                 </div>
                                             );
                                         })()}
+                                    </div>
+                                )}
+
+                                {/* ── Integrity Tab ── */}
+                                {infoTab === 'rubric' && (
+                                    <div>
+                                        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: 12 }}>📚 Rubric &amp; Points</h2>
+
+                                        {rubricSections.length > 0 ? (
+                                            <div className="space-y-4">
+                                                {rubricSections.map((section: any, sectionIdx: number) => (
+                                                    <div key={sectionIdx}>
+                                                        {/* Section header */}
+                                                        <div style={{
+                                                            padding: '10px 12px',
+                                                            background: 'var(--color-surface)',
+                                                            borderRadius: '6px 6px 0 0',
+                                                            borderBottom: '1px solid var(--color-border)',
+                                                            fontWeight: 700,
+                                                            fontSize: 13,
+                                                            color: 'var(--color-text-dark)',
+                                                            display: 'flex',
+                                                            justifyContent: 'space-between',
+                                                            alignItems: 'center',
+                                                        }}>
+                                                            <span>{section.name}</span>
+                                                            {isWeightedRubric && <span style={{ fontSize: 11, color: 'var(--color-text-light)' }}>Weight: {sectionWeightPercent(section.weight).toFixed(1)}%</span>}
+                                                        </div>
+
+                                                        {/* Criteria for this section */}
+                                                        <div style={{
+                                                            borderRadius: '0 0 6px 6px',
+                                                            overflow: 'hidden',
+                                                            marginBottom: sectionIdx < rubricSections.length - 1 ? 16 : 0,
+                                                            border: '1px solid var(--color-border)',
+                                                            borderTop: 'none',
+                                                        }}>
+                                                            {(section.criteria || []).length > 0 ? (
+                                                                (section.criteria || []).map((criterion: any, critIdx: number) => {
+                                                                    const flatIdx = rubrics.findIndex((r: any) => 
+                                                                        r.name === criterion.name && r.section_name === section.name
+                                                                    );
+                                                                    return (
+                                                                        <div
+                                                                            key={critIdx}
+                                                                            className="rounded-lg p-3"
+                                                                            style={{
+                                                                                borderBottom: critIdx < ((section.criteria || []).length - 1) ? '1px solid var(--color-border)' : 'none',
+                                                                                backgroundColor: 'var(--color-surface-elevated)',
+                                                                            }}
+                                                                        >
+                                                                            <div className="flex items-start justify-between gap-3">
+                                                                                <div style={{ flex: 1 }}>
+                                                                                    <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{criterion.name}</p>
+                                                                                    {criterion.description && <p style={{ fontSize: '11px', color: 'var(--color-text-mid)', marginTop: 2 }}>{criterion.description}</p>}
+                                                                                    {isWeightedRubric && <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: 3 }}>
+                                                                                        Weight: {((criterion.weight ?? 1) * 100).toFixed(0)}%
+                                                                                    </p>}
+                                                                                </div>
+                                                                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', flexShrink: 0 }}>
+                                                                                    {criterion.max_points} pts
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })
+                                                            ) : (
+                                                                <div style={{ padding: '12px 14px', backgroundColor: 'var(--color-surface-elevated)' }}>
+                                                                    <p style={{ fontSize: '12px', color: 'var(--color-text-mid)', lineHeight: 1.6 }}>
+                                                                        {section.description || 'No criteria were defined for this section.'}
+                                                                    </p>
+                                                                    {getSectionFallbackPoints(section) !== null && (
+                                                                        <p style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 700, marginTop: 8 }}>
+                                                                            Points: {getSectionFallbackPoints(section)}
+                                                                        </p>
+                                                                    )}
+                                                                    {isWeightedRubric && (
+                                                                        <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: 8 }}>
+                                                                            Section Weight: {sectionWeightPercent(section.weight).toFixed(1)}%
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p style={{ fontSize: 13, color: 'var(--color-text-mid)' }}>No rubric has been configured for this assignment.</p>
+                                        )}
                                     </div>
                                 )}
 
@@ -738,26 +960,90 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                         {/* Per-criterion rubric scoring */}
                                         {rubrics.length > 0 ? (
                                             <div className="mb-5">
-                                                <h3 style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 700, color: 'var(--color-text-mid)', marginBottom: 10 }}>
-                                                    Rubric Grading
-                                                </h3>
-                                                <div className="space-y-3">
-                                                    {rubrics.map((rubric, idx) => (
-                                                        <div key={rubric.id} className="rounded-lg p-3" style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface-elevated)' }}>
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <div>
-                                                                    <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{rubric.name}</p>
-                                                                    {rubric.description && <p style={{ fontSize: '11px', color: 'var(--color-text-mid)', marginTop: 2 }}>{rubric.description}</p>}
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h3 style={{ fontSize: '12px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 700, color: 'var(--color-text-mid)' }}>
+                                                        Rubric Grading
+                                                    </h3>
+                                                    <span
+                                                        style={{
+                                                            fontSize: 11,
+                                                            fontWeight: 700,
+                                                            letterSpacing: '.35px',
+                                                            textTransform: 'uppercase' as const,
+                                                            color: isWeightedRubric ? '#6B0000' : '#2D6A2D',
+                                                            backgroundColor: isWeightedRubric ? 'rgba(107,0,0,.10)' : 'rgba(45,106,45,.12)',
+                                                            border: `1px solid ${isWeightedRubric ? 'rgba(107,0,0,.24)' : 'rgba(45,106,45,.24)'}`,
+                                                            borderRadius: 999,
+                                                            padding: '3px 9px',
+                                                        }}
+                                                    >
+                                                        {isWeightedRubric ? 'Weighted' : 'Unweighted'}
+                                                    </span>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    {rubricSections.map((section: any, sectionIdx: number) => (
+                                                        <div key={sectionIdx}>
+                                                            {/* Section header */}
+                                                            {sectionIdx === 0 || rubricSections[sectionIdx - 1].name !== section.name ? (
+                                                                <div style={{
+                                                                    padding: '8px 12px',
+                                                                    background: 'var(--color-surface)',
+                                                                    borderRadius: '6px 6px 0 0',
+                                                                    fontWeight: 700,
+                                                                    fontSize: 13,
+                                                                    color: 'var(--color-text-dark)',
+                                                                    marginBottom: 8,
+                                                                    display: 'flex',
+                                                                    justifyContent: 'space-between',
+                                                                    alignItems: 'center',
+                                                                }}>
+                                                                    <span>{section.name}</span>
+                                                                    {isWeightedRubric && <span style={{ fontSize: 11, color: 'var(--color-text-light)' }}>Weight: {(section.weight ?? 1).toFixed(2)}x</span>}
                                                                 </div>
-                                                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', flexShrink: 0, marginLeft: 8 }}>
-                                                                    {rubricScores[idx] ?? 0} / {rubric.max_points}
-                                                                </span>
+                                                            ) : null}
+
+                                                            {/* Criteria in this section */}
+                                                            <div style={{
+                                                                background: 'var(--color-surface-elevated)',
+                                                                borderRadius: '6px',
+                                                                border: '1px solid var(--color-border)',
+                                                                marginBottom: sectionIdx < rubricSections.length - 1 ? 12 : 0,
+                                                                overflow: 'hidden',
+                                                            }}>
+                                                                {(section.criteria || []).map((criterion: any, critIdx: number, critArray: any[]) => {
+                                                                    // Find the index in the flattened rubrics array
+                                                                    const flatIdx = rubrics.findIndex((r: any) => 
+                                                                        r.name === criterion.name && r.section_name === section.name
+                                                                    );
+                                                                    return (
+                                                                        <div
+                                                                            key={critIdx}
+                                                                            className="p-3"
+                                                                            style={{
+                                                                                borderBottom: critIdx < critArray.length - 1 ? '1px solid var(--color-border)' : 'none',
+                                                                            }}
+                                                                        >
+                                                                            <div className="flex items-center justify-between mb-2">
+                                                                                <div style={{ flex: 1 }}>
+                                                                                    <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{criterion.name}</p>
+                                                                                    {criterion.description && <p style={{ fontSize: '11px', color: 'var(--color-text-mid)', marginTop: 2 }}>{criterion.description}</p>}
+                                                                                    {isWeightedRubric && <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: 3 }}>
+                                                                                        Weight: {((criterion.weight ?? 1) * 100).toFixed(0)}%
+                                                                                    </p>}
+                                                                                </div>
+                                                                                <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', flexShrink: 0, marginLeft: 8 }}>
+                                                                                    {rubricScores[flatIdx] ?? 0} / {criterion.max_points}
+                                                                                </span>
+                                                                            </div>
+                                                                            <input type="number" min={0} max={criterion.max_points}
+                                                                                value={rubricScores[flatIdx] ?? 0}
+                                                                                onChange={e => flatIdx >= 0 && updateRubricScore(flatIdx, e.target.value)}
+                                                                                className="w-full px-3 py-1.5 rounded-md focus:outline-none transition-shadow"
+                                                                                style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-dark)' }} />
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
-                                                            <input type="number" min={0} max={rubric.max_points}
-                                                                value={rubricScores[idx] ?? 0}
-                                                                onChange={e => updateRubricScore(idx, e.target.value)}
-                                                                className="w-full px-3 py-1.5 rounded-md focus:outline-none transition-shadow"
-                                                                style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-dark)' }} />
                                                         </div>
                                                     ))}
                                                 </div>
@@ -858,22 +1144,6 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                 </div>
             </div>
 
-            {/* Stdin Dialog */}
-            <Dialog open={stdinDialogOpen} onOpenChange={setStdinDialogOpen}>
-                <DialogContent style={{ maxWidth: '500px' }}>
-                    <DialogHeader><DialogTitle>Run with Input</DialogTitle></DialogHeader>
-                    <div className="mt-4">
-                        <label className="text-sm font-medium" style={{ color: 'var(--color-text-dark)' }}>Enter program input (stdin):</label>
-                        <Textarea value={stdinValue} onChange={e => setStdinValue(e.target.value)} placeholder="Type your input here..." className="mt-2 font-mono text-sm" rows={6} />
-                    </div>
-                    <DialogFooter className="mt-4">
-                        <Button variant="outline" onClick={() => setStdinDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleRunWithStdin} className="text-white" style={{ backgroundColor: 'var(--color-success)' }}>
-                            <Play className="w-4 h-4 mr-2" /> Run
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </PageLayout>
     );
 }

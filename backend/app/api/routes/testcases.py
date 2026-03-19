@@ -40,12 +40,6 @@ def get_assignment_testcases(
     return query.all()
 
 
-@router.get("/assignment/{assignment_id}", response_model=List[TestCaseOut])
-def list_testcases_by_assignment(assignment_id: int, db: Session = Depends(get_db)):
-    """Get all test cases for a specific assignment."""
-    return db.query(TestCase).filter(TestCase.assignment_id == assignment_id).all()
-
-
 @router.post("/", response_model=TestCaseOut)
 def create_testcase(
     payload: TestCaseCreate,

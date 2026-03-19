@@ -12,10 +12,6 @@ from app.core.permissions import require_course_role
 from app.models.user import User
 from app.models.assignment import Assignment
 from app.models.submission import Submission
-from app.models.rubric import Rubric
-from app.models.enrollment import Enrollment
-from app.models.ta_permission import TAPermission
-from app.models.submission_rubric_score import SubmissionRubricScore
 from app.models.testcase import TestCase
 from app.models.submission_result import SubmissionResult
 from app.services.grading_service import GradingService
@@ -52,70 +48,6 @@ class ManualScoreUpdateRequest(BaseModel):
     score: int
     max_score: Optional[int] = None
     feedback: Optional[str] = None
-    rubric_breakdown: Optional[list[dict]] = None
-
-
-def _enforce_ta_can_grade(db: Session, user: User, course_id: int) -> None:
-    """If user is a TA in the course, require can_grade permission."""
-    enrollment = db.query(Enrollment).filter(
-        Enrollment.user_id == user.id,
-        Enrollment.course_id == course_id,
-        Enrollment.role == "ta",
-    ).first()
-    if not enrollment:
-        return
-
-    perm = db.query(TAPermission).filter(
-        TAPermission.enrollment_id == enrollment.id
-    ).first()
-    if perm and not perm.can_grade:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permission denied: cannot grade submissions",
-        )
-
-
-def _persist_manual_rubric_breakdown(
-    db: Session,
-    submission_id: int,
-    rubric_breakdown: Optional[list[dict]],
-    grader_id: int,
-) -> None:
-    """Persist user-provided per-rubric criterion scores."""
-    if rubric_breakdown is None:
-        return
-
-    db.query(SubmissionRubricScore).filter(
-        SubmissionRubricScore.submission_id == submission_id
-    ).delete()
-
-    for item in rubric_breakdown:
-        rubric_id = item.get("rubric_id")
-        if rubric_id is None:
-            continue
-
-        rubric = db.query(Rubric).filter(Rubric.id == rubric_id).first()
-        if not rubric:
-            continue
-
-        max_pts = int(rubric.max_points or 0)
-        score_awarded = int(item.get("score_awarded") or 0)
-        if max_pts > 0:
-            score_awarded = max(0, min(score_awarded, max_pts))
-        else:
-            score_awarded = max(0, score_awarded)
-
-        db.add(
-            SubmissionRubricScore(
-                submission_id=submission_id,
-                rubric_id=rubric_id,
-                grader_id=grader_id,
-                score_awarded=score_awarded,
-                feedback=item.get("feedback"),
-            )
-        )
-
-    db.flush()
 
 
 # ==================== Code Execution ====================
@@ -201,7 +133,6 @@ def grade_submission(
         course_id=assignment.course_id,
         allowed_roles=["instructor", "ta"],
     )
-    _enforce_ta_can_grade(db=db, user=user, course_id=assignment.course_id)
 
     # Update submission status
     submission.status = "grading"
@@ -213,7 +144,6 @@ def grade_submission(
             submission_id=submission_id,
             run_tests=run_tests,
             apply_rubric=apply_rubric,
-            grader_id=user.id,
         )
 
         # Update submission with results
@@ -343,7 +273,7 @@ def grade_all_submissions(
     user: User = Depends(get_current_user),
 ):
     """
-    Execute grading across the latest submission from each student in an assignment.
+    Grade all pending submissions for an assignment (faculty/admin).
     """
     assignment = db.query(Assignment).filter(Assignment.id == assignment_id).first()
     if not assignment:
@@ -354,14 +284,16 @@ def grade_all_submissions(
         course_id=assignment.course_id,
         allowed_roles=["instructor", "ta"],
     )
-    _enforce_ta_can_grade(db=db, user=user, course_id=assignment.course_id)
 
-    submissions = GradingService.get_latest_submissions_for_assignment(db, assignment_id)
+    submissions = db.query(Submission).filter(
+        Submission.assignment_id == assignment_id,
+        Submission.status == "pending",
+    ).all()
 
     results = []
     for sub in submissions:
         try:
-            result = GradingService.grade_submission(db, sub.id, grader_id=user.id)
+            result = GradingService.grade_submission(db, sub.id)
             sub.status = "graded"
             sub.score = result["total_score"]
             sub.max_score = result["max_score"]
@@ -374,7 +306,6 @@ def grade_all_submissions(
 
     return {
         "assignment_id": assignment_id,
-        "total_considered": len(submissions),
         "total_graded": len([r for r in results if r["status"] == "graded"]),
         "total_errors": len([r for r in results if r["status"] == "error"]),
         "results": results,
@@ -401,7 +332,6 @@ def manual_score_submission(
         course_id=assignment.course_id,
         allowed_roles=["instructor", "ta"],
     )
-    _enforce_ta_can_grade(db=db, user=user, course_id=assignment.course_id)
 
     if payload.score < 0:
         raise HTTPException(status_code=400, detail="score must be >= 0")
@@ -415,14 +345,6 @@ def manual_score_submission(
         submission.max_score = payload.max_score
     if payload.feedback is not None:
         submission.feedback = payload.feedback
-
-    _persist_manual_rubric_breakdown(
-        db=db,
-        submission_id=submission.id,
-        rubric_breakdown=payload.rubric_breakdown,
-        grader_id=user.id,
-    )
-
     submission.status = "graded"
 
     from datetime import datetime
@@ -465,8 +387,15 @@ def get_assignment_class_performance(
         allowed_roles=["instructor", "ta"],
     )
 
-    latest_submissions = GradingService.get_latest_submissions_for_assignment(db, assignment_id)
-    latest_by_student = {sub.student_id: sub for sub in latest_submissions}
+    # Latest submission per student
+    submissions = db.query(Submission).filter(
+        Submission.assignment_id == assignment_id,
+    ).order_by(Submission.created_at.desc()).all()
+
+    latest_by_student = {}
+    for sub in submissions:
+        if sub.student_id not in latest_by_student:
+            latest_by_student[sub.student_id] = sub
 
     # Include all enrolled students in the course
     from app.models.enrollment import Enrollment

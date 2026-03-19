@@ -13,10 +13,9 @@ from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
 from app.models.submission_result import SubmissionResult
-from app.models.submission_rubric_score import SubmissionRubricScore
 from app.models.enrollment import Enrollment
 from app.models.testcase import TestCase
-from app.models.rubric import Rubric
+from app.models.rubric_section import RubricSection
 from app.models.ta_permission import TAPermission
 from app.services.execution_service import ExecutionService
 from app.services.grading_service import GradingService
@@ -413,6 +412,8 @@ def get_submission_detail(
                 "id": tr.id,
                 "testcase_id": tr.testcase_id,
                 "testcase_name": tc.name if tc else None,
+                "input_data": tc.input_data if tc else None,
+                "expected_output": tc.expected_output if tc else None,
                 "passed": tr.passed,
                 "output": tr.output,
                 "error_output": tr.error_output,
@@ -420,32 +421,28 @@ def get_submission_detail(
                 "execution_time_ms": tr.execution_time_ms,
             })
 
-        # Get rubrics for this assignment
-        rubrics = db.query(Rubric).filter(
-            Rubric.assignment_id == submission.assignment_id,
-        ).order_by(Rubric.order).all()
+        # Get rubric sections + criteria for this assignment
+        sections = db.query(RubricSection).filter(
+            RubricSection.assignment_id == submission.assignment_id,
+        ).order_by(RubricSection.order.asc(), RubricSection.id.asc()).all()
 
         rubrics_data = [{
-            "id": r.id,
-            "name": r.name,
-            "description": r.description,
-            "weight": float(r.weight) if r.weight is not None else None,
-            "max_points": float(r.max_points) if r.max_points is not None else None,
-            "order": r.order,
-        } for r in rubrics]
-
-        rubric_scores_data = [
-            {
-                "id": rs.id,
-                "rubric_id": rs.rubric_id,
-                "score_awarded": rs.score_awarded,
-                "feedback": rs.feedback,
-                "grader_id": rs.grader_id,
-            }
-            for rs in db.query(SubmissionRubricScore).filter(
-                SubmissionRubricScore.submission_id == submission.id
-            ).all()
-        ]
+            "id": s.id,
+            "assignment_id": s.assignment_id,
+            "name": s.name,
+            "description": s.description,
+            "weight": float(s.weight) if s.weight is not None else None,
+            "criteria": [{
+                "id": c.id,
+                "section_id": c.section_id,
+                "name": c.name,
+                "description": c.description,
+                "weight": float(c.weight) if c.weight is not None else None,
+                "max_points": float(c.max_points) if c.max_points is not None else None,
+                "grading_method": c.grading_method,
+                "order": c.order,
+            } for c in sorted((s.criteria or []), key=lambda c: (c.order or 0, c.id))],
+        } for s in sections]
 
         # Get submission files
         files_data = []
@@ -487,6 +484,7 @@ def get_submission_detail(
                 "due_date": assignment.due_date.isoformat() if assignment.due_date else None,
                 "max_submissions": assignment.max_submissions,
                 "allowed_languages": assignment.allowed_languages,
+                    "rubric_mode": assignment.rubric_mode if assignment else None,
             },
             "status": submission.status,
             "score": float(submission.score) if submission.score is not None else None,
@@ -497,7 +495,6 @@ def get_submission_detail(
             "files": files_data,
             "test_results": results_data,
             "rubrics": rubrics_data,
-            "rubric_scores": rubric_scores_data,
             "permissions": permissions,
         }
     except HTTPException:
@@ -603,6 +600,8 @@ def ta_run_tests(
                 "testcase_id": tr.testcase_id,
                 "testcase_name": tc.name if tc else None,
                 "is_public": tc.is_public if tc else None,
+                "input_data": tc.input_data if tc else None,
+                "expected_output": tc.expected_output if tc else None,
                 "passed": tr.passed,
                 "output": tr.output,
                 "error_output": tr.error_output,
@@ -666,7 +665,6 @@ def ta_auto_grade(
             submission_id=submission.id,
             run_tests=True,
             apply_rubric=True,
-            grader_id=user.id,
         )
 
         # Update submission with grading results
@@ -691,6 +689,8 @@ def ta_auto_grade(
                 "id": tr.id,
                 "testcase_id": tr.testcase_id,
                 "testcase_name": tc.name if tc else None,
+                "input_data": tc.input_data if tc else None,
+                "expected_output": tc.expected_output if tc else None,
                 "passed": tr.passed,
                 "output": tr.output,
                 "error_output": tr.error_output,
@@ -785,7 +785,6 @@ def grade_submission(
     max_score = payload.get("max_score")
     feedback = payload.get("feedback", "")
     is_draft = payload.get("is_draft", False)
-    rubric_breakdown = payload.get("rubric_breakdown")
 
     if score is not None:
         submission.score = score
@@ -793,37 +792,6 @@ def grade_submission(
         submission.max_score = max_score
     if feedback:
         submission.feedback = feedback
-
-    if rubric_breakdown is not None:
-        db.query(SubmissionRubricScore).filter(
-            SubmissionRubricScore.submission_id == submission.id
-        ).delete()
-
-        for item in rubric_breakdown:
-            rubric_id = item.get("rubric_id")
-            if rubric_id is None:
-                continue
-
-            rubric = db.query(Rubric).filter(Rubric.id == rubric_id).first()
-            if not rubric:
-                continue
-
-            max_pts = int(rubric.max_points or 0)
-            score_awarded = int(item.get("score_awarded") or 0)
-            if max_pts > 0:
-                score_awarded = max(0, min(score_awarded, max_pts))
-            else:
-                score_awarded = max(0, score_awarded)
-
-            db.add(
-                SubmissionRubricScore(
-                    submission_id=submission.id,
-                    rubric_id=rubric_id,
-                    grader_id=user.id,
-                    score_awarded=score_awarded,
-                    feedback=item.get("feedback"),
-                )
-            )
 
     submission.status = "grading" if is_draft else "graded"
 
