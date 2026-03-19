@@ -266,6 +266,21 @@ export const submissionService = {
     return data;
   },
 
+  /** Get all testcases configured for an assignment (faculty/instructor see public + private). */
+  async getAssignmentTestcases(assignmentId: string): Promise<Array<{
+    id: number;
+    name: string;
+    input_data: string;
+    expected_output: string;
+    is_public: boolean;
+    points: number;
+  }>> {
+    const { data } = await withRetry(() =>
+      api.get(`/testcases/by-assignment/${assignmentId}`)
+    );
+    return data;
+  },
+
   /** Instructor/TA ZIP download of all submissions for assignment. */
   async downloadAssignmentZip(assignmentId: string): Promise<Blob> {
     const { data } = await api.get(`/faculty/assignments/${assignmentId}/download-zip`, {
