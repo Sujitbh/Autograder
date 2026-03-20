@@ -59,3 +59,14 @@ class PasswordChange(BaseModel):
     """Schema for changing password."""
     current_password: str
     new_password: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Schema for requesting a password reset link."""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Schema for resetting password with a token."""
+    token: str
+    new_password: str

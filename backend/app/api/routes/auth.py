@@ -2,7 +2,9 @@
 Authentication and user management routes.
 """
 
+import secrets
 import uuid
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List
 
@@ -29,8 +31,11 @@ from app.schemas.auth import (
     UserUpdate,
     RoleUpdate,
     PasswordChange,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
 )
 from app.services.user_service import UserService
+from app.services.email_service import EmailService
 from app.settings import settings
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
@@ -164,6 +169,74 @@ def change_password(
     db.add(user)
     db.commit()
     return {"message": "Password changed successfully"}
+
+
+# ==================== Password Reset ====================
+
+@router.post("/forgot-password")
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Request a password reset. Generates a one-time token and emails a reset
+    link. Always returns 200 to avoid leaking whether the email exists.
+    """
+    user = UserService.get_by_email(db, payload.email)
+    if user and user.is_active:
+        token = secrets.token_urlsafe(48)
+        user.password_reset_token = token
+        user.password_reset_expires = datetime.now(timezone.utc) + timedelta(
+            minutes=settings.PASSWORD_RESET_EXPIRE_MINUTES
+        )
+        db.add(user)
+        db.commit()
+
+        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        EmailService.send_password_reset_email(user.email, reset_url)
+
+    return {"message": "If that email is registered, a reset link has been sent."}
+
+
+@router.post("/reset-password")
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Reset a password using a valid reset token.
+    """
+    user = (
+        db.query(User)
+        .filter(User.password_reset_token == payload.token)
+        .first()
+    )
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token.",
+        )
+
+    if (
+        user.password_reset_expires is None
+        or user.password_reset_expires.replace(tzinfo=timezone.utc)
+        < datetime.now(timezone.utc)
+    ):
+        user.password_reset_token = None
+        user.password_reset_expires = None
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired. Please request a new one.",
+        )
+
+    if len(payload.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters.",
+        )
+
+    user.password_hash = hash_password(payload.new_password)
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    db.add(user)
+    db.commit()
+
+    return {"message": "Password has been reset successfully. You can now sign in."}
 
 
 # ==================== Profile Photo ====================

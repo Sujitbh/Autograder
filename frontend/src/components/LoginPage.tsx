@@ -225,9 +225,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   Remember me
                 </label>
               </div>
-              <a href="#" className="hover:underline" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-primary)' }}>
+              <button type="button" onClick={() => router.push('/forgot-password')} className="hover:underline" style={{ fontSize: '13px', lineHeight: '18px', color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer' }}>
                 Forgot password?
-              </a>
+              </button>
             </div>
 
             {/* Sign In Button */}

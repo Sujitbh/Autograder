@@ -21,6 +21,9 @@ class User(Base):
     # Filename of the uploaded profile photo (stored in DATA_ROOT/profile_photos/)
     profile_photo = Column(String, nullable=True)
 
+    password_reset_token = Column(String, nullable=True)
+    password_reset_expires = Column(DateTime(timezone=True), nullable=True)
+
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

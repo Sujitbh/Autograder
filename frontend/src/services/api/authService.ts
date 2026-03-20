@@ -116,6 +116,21 @@ export const authService = {
         return mapUser(data);
     },
 
+    /** Request a password reset email. */
+    async forgotPassword(email: string): Promise<{ message: string }> {
+        const { data } = await api.post<{ message: string }>('/auth/forgot-password', { email });
+        return data;
+    },
+
+    /** Reset password using a token from the reset email. */
+    async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+        const { data } = await api.post<{ message: string }>('/auth/reset-password', {
+            token,
+            new_password: newPassword,
+        });
+        return data;
+    },
+
     /** Refresh the JWT token. */
     async refreshToken(refreshToken?: string): Promise<string> {
         const token = refreshToken || (typeof window !== 'undefined' ? localStorage.getItem('autograde_refresh_token') : null);
