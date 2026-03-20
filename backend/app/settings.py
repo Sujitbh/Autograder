@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change-me-now"
     JWT_ALG: str = "HS256"
     ACCESS_TOKEN_MINUTES: int = 60
+    PASSWORD_RESET_EXPIRE_MINUTES: int = 60
+
+    FRONTEND_URL: str = "http://localhost:3000"
     
     # Store data relative to the backend folder robustly
     DATA_ROOT: str = str(Path(__file__).parent.parent / "data")
