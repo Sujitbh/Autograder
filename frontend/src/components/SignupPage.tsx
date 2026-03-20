@@ -6,14 +6,17 @@ import { Checkbox } from './ui/checkbox';
 import { useRouter } from 'next/navigation';
 import { authService } from '@/services/api/authService';
 
-type SelectedRole = 'student' | 'faculty' | 'admin';
-
 interface SignupPageProps {
-  role: SelectedRole;
   onSignup: () => void;
 }
 
-export function SignupPage({ role, onSignup }: SignupPageProps) {
+function roleFromEmail(email: string): 'student' | 'faculty' {
+  const lower = email.toLowerCase().trim();
+  if (lower.endsWith('@warhawks.ulm.edu')) return 'student';
+  return 'faculty';
+}
+
+export function SignupPage({ onSignup }: SignupPageProps) {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -30,23 +33,12 @@ export function SignupPage({ role, onSignup }: SignupPageProps) {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const validateEmail = (email: string, role: SelectedRole) => {
+  const validateEmail = (email: string) => {
     const emailLower = email.toLowerCase().trim();
-
-    if (role === 'student') {
-      if (!emailLower.endsWith('@warhawks.ulm.edu')) {
-        return 'Student email must be a valid @warhawks.ulm.edu address';
-      }
-    } else {
-      if (!emailLower.endsWith('@ulm.edu')) {
-        return 'Faculty/Admin email must be a valid @ulm.edu address';
-      }
-      if (emailLower.endsWith('@warhawks.ulm.edu')) {
-        return 'Faculty/Admin email must be a valid @ulm.edu address';
-      }
+    if (emailLower.endsWith('@warhawks.ulm.edu') || emailLower.endsWith('@ulm.edu')) {
+      return null;
     }
-
-    return null;
+    return 'Please use your @warhawks.ulm.edu or @ulm.edu email';
   };
 
   const handlePasswordChange = (password: string) => {
@@ -70,7 +62,7 @@ export function SignupPage({ role, onSignup }: SignupPageProps) {
     setFormError(null);
     setEmailError(null);
 
-    const emailValidationError = validateEmail(formData.email, role);
+    const emailValidationError = validateEmail(formData.email);
     if (emailValidationError) {
       setEmailError(emailValidationError);
       return;
@@ -101,21 +93,22 @@ export function SignupPage({ role, onSignup }: SignupPageProps) {
       return;
     }
 
+    const detectedRole = roleFromEmail(formData.email);
+
     const registerPayload = {
       name: `${formData.firstName} ${formData.lastName}`,
       email: formData.email.toLowerCase(),
       password: formData.password,
-      role,
+      role: detectedRole,
     };
 
     authService.register(registerPayload)
       .then((user) => {
-        sessionStorage.setItem('autograde_current_user', JSON.stringify(user));
+        localStorage.setItem('autograde_current_user', JSON.stringify(user));
         if (typeof onSignup === 'function') {
           onSignup();
         }
-        const redirectPath = role === 'student' ? '/student' : role === 'admin' ? '/admin' : '/courses';
-        router.push(`${redirectPath}?signup=success`);
+        router.push('/login?signup=success');
       })
       .catch((err) => {
         setFormError(err?.response?.data?.detail || 'Registration failed.');
@@ -190,14 +183,10 @@ export function SignupPage({ role, onSignup }: SignupPageProps) {
 
           <div className="mb-8">
             <h2 className="mb-2" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px', color: 'var(--color-text-dark)' }}>
-              Create {role === 'student' ? 'Student' : role === 'admin' ? 'Admin' : 'Faculty'} Account
+              Create Your Account
             </h2>
             <p style={{ fontSize: '14px', lineHeight: '22px', color: 'var(--color-text-mid)' }}>
-              {role === 'student'
-                ? 'Submit assignments and track your progress'
-                : role === 'admin'
-                  ? 'Manage users, courses, and platform settings'
-                  : 'Create courses and manage assignments'}
+              Your role will be detected automatically from your email
             </p>
           </div>
 
@@ -214,7 +203,7 @@ export function SignupPage({ role, onSignup }: SignupPageProps) {
                 <Input
                   id="firstName"
                   type="text"
-                  placeholder="John"
+                  placeholder=""
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                   className="h-11 border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]"
@@ -232,7 +221,7 @@ export function SignupPage({ role, onSignup }: SignupPageProps) {
                 <Input
                   id="lastName"
                   type="text"
-                  placeholder="Doe"
+                  placeholder=""
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                   className="h-11 border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]"
@@ -252,18 +241,19 @@ export function SignupPage({ role, onSignup }: SignupPageProps) {
               <Input
                 id="email"
                 type="email"
-                placeholder={role === 'student' ? 'student@warhawks.ulm.edu' : role === 'admin' ? 'admin@ulm.edu' : 'professor@ulm.edu'}
+                placeholder=""
                 value={formData.email}
                 onChange={(e) => {
                   setFormData({ ...formData, email: e.target.value });
                   setEmailError(null);
                 }}
                 onBlur={(e) => {
-                  const error = validateEmail(e.target.value, role);
-                  setEmailError(error);
+                  if (e.target.value.trim()) {
+                    const error = validateEmail(e.target.value);
+                    setEmailError(error);
+                  }
                 }}
-                className={`h-11 border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)] ${emailError ? 'border-[var(--color-error)]' : ''
-                  }`}
+                className={`h-11 border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)] ${emailError ? 'border-[var(--color-error)]' : ''}`}
                 required
               />
               {emailError ? (
@@ -272,7 +262,7 @@ export function SignupPage({ role, onSignup }: SignupPageProps) {
                 </p>
               ) : (
                 <p className="mt-1 text-[var(--color-text-light)]" style={{ fontSize: '12px' }}>
-                  Must be a {role === 'student' ? '@warhawks.ulm.edu' : '@ulm.edu'} email address
+                  Use your @warhawks.ulm.edu (student) or @ulm.edu (faculty) email
                 </p>
               )}
             </div>
@@ -289,7 +279,7 @@ export function SignupPage({ role, onSignup }: SignupPageProps) {
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Create a strong password"
+                  placeholder=""
                   value={formData.password}
                   onChange={(e) => handlePasswordChange(e.target.value)}
                   className="h-11 pr-12 border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]"
@@ -343,7 +333,7 @@ export function SignupPage({ role, onSignup }: SignupPageProps) {
                 <Input
                   id="confirmPassword"
                   type={showConfirmPassword ? 'text' : 'password'}
-                  placeholder="Re-enter your password"
+                  placeholder=""
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                   className="h-11 pr-12 border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)]"

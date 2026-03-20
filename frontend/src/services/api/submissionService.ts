@@ -85,7 +85,7 @@ export const submissionService = {
     files.forEach((file) => formData.append('files', file));
 
     // Use fetch directly to avoid axios Content-Type header interference with FormData
-    const token = typeof window !== 'undefined' ? sessionStorage.getItem('autograde_token') : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('autograde_token') : null;
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 

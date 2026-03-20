@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
     User, Shield, Bell, Palette, Link2, Eye, Monitor, AlertTriangle,
     Camera, Trash2, Phone, MapPin, Building2, Briefcase, CheckCircle2,
     Info, EyeOff, Copy, ExternalLink, Smartphone, Laptop, X,
     ChevronDown, Clock, Download, FileText, Globe, Sun, Moon, Type,
-    ToggleLeft, ToggleRight,
+    ToggleLeft, ToggleRight, Loader2,
 } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
@@ -12,6 +12,8 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
+import { useAuth } from '@/utils/AuthContext';
+import { authService } from '@/services/api';
 import {
     Select,
     SelectContent,
@@ -171,14 +173,28 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
    ═══════════════════════════════════════════ */
 
 export function AccountSettings() {
+    const { user, updateUser } = useAuth();
+    const photoInputRef = useRef<HTMLInputElement>(null);
     const [activeSection, setActiveSection] = useState<SectionId>('profile');
     const [hasChanges, setHasChanges] = useState(false);
     const [saving, setSaving] = useState(false);
     const [toast, setToast] = useState<string | null>(null);
+    const [photoLoading, setPhotoLoading] = useState(false);
+
+    /* ── Build initial profile from auth user, falling back to stored/default ── */
+    const initialProfile = useMemo<ProfileData>(() => {
+        const stored = loadProfile();
+        const firstName = (user as any)?.firstName ?? '';
+        const lastName = (user as any)?.lastName ?? '';
+        if (firstName || lastName) {
+            return { ...stored, firstName: firstName || stored.firstName, lastName: lastName || stored.lastName };
+        }
+        return stored;
+    }, [user]);
 
     /* ── Profile state ── */
-    const [profile, setProfile] = useState<ProfileData>(loadProfile);
-    const originalProfile = useRef<ProfileData>(loadProfile());
+    const [profile, setProfile] = useState<ProfileData>(initialProfile);
+    const originalProfile = useRef<ProfileData>(initialProfile);
 
     /* ── Security state ── */
     const [currentPw, setCurrentPw] = useState('');
@@ -317,6 +333,36 @@ export function AccountSettings() {
         setToast('All other devices signed out');
     };
 
+    /* ── Photo helpers ── */
+    const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setPhotoLoading(true);
+        try {
+            const updated = await authService.uploadPhoto(file);
+            updateUser({ profilePhoto: updated.profilePhoto });
+            setToast('Profile photo updated');
+        } catch (err: any) {
+            setToast(err?.response?.data?.detail || 'Failed to upload photo');
+        } finally {
+            setPhotoLoading(false);
+            if (photoInputRef.current) photoInputRef.current.value = '';
+        }
+    };
+
+    const handlePhotoDelete = async () => {
+        setPhotoLoading(true);
+        try {
+            await authService.deletePhoto();
+            updateUser({ profilePhoto: undefined });
+            setToast('Photo removed');
+        } catch (err: any) {
+            setToast(err?.response?.data?.detail || 'Failed to remove photo');
+        } finally {
+            setPhotoLoading(false);
+        }
+    };
+
     /* ═══════════════════════════════════════════
        Card wrapper
        ═══════════════════════════════════════════ */
@@ -355,24 +401,44 @@ export function AccountSettings() {
             {/* Avatar Section */}
             <Card title="Profile Photo">
                 <div className="flex items-center gap-6">
-                    <div
-                        className="rounded-full flex items-center justify-center text-white flex-shrink-0"
-                        style={{ width: '120px', height: '120px', backgroundColor: 'var(--color-primary)', fontSize: '36px', fontWeight: 700, border: '2px solid #D9D9D9' }}
-                    >
-                        {getInitials(profile.firstName, profile.lastName)}
-                    </div>
+                    {user?.profilePhoto ? (
+                        <img
+                            src={user.profilePhoto}
+                            alt="Profile"
+                            className="rounded-full flex-shrink-0 object-cover"
+                            style={{ width: '120px', height: '120px', border: '2px solid #D9D9D9' }}
+                        />
+                    ) : (
+                        <div
+                            className="rounded-full flex items-center justify-center text-white flex-shrink-0"
+                            style={{ width: '120px', height: '120px', backgroundColor: 'var(--color-primary)', fontSize: '36px', fontWeight: 700, border: '2px solid #D9D9D9' }}
+                        >
+                            {getInitials(profile.firstName, profile.lastName)}
+                        </div>
+                    )}
                     <div>
                         <p style={{ fontSize: '13px', color: 'var(--color-text-mid)', marginBottom: '12px' }}>Your photo helps students recognize you</p>
+                        <input
+                            ref={photoInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/gif,image/webp"
+                            className="hidden"
+                            onChange={handlePhotoUpload}
+                        />
                         <div className="flex gap-3">
-                            <Button variant="outline" size="sm" onClick={() => setToast('Photo upload coming soon')}>
-                                <Camera className="w-4 h-4 mr-2" />Change Photo
+                            <Button variant="outline" size="sm" disabled={photoLoading} onClick={() => photoInputRef.current?.click()}>
+                                {photoLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Camera className="w-4 h-4 mr-2" />}
+                                {user?.profilePhoto ? 'Change Photo' : 'Upload Photo'}
                             </Button>
-                            <button
-                                onClick={() => setToast('Photo removed')}
-                                style={{ fontSize: '13px', color: '#8B0000', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
-                            >
-                                Remove Photo
-                            </button>
+                            {user?.profilePhoto && (
+                                <button
+                                    onClick={handlePhotoDelete}
+                                    disabled={photoLoading}
+                                    style={{ fontSize: '13px', color: '#8B0000', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
+                                >
+                                    Remove Photo
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -444,7 +510,7 @@ export function AccountSettings() {
                     <div className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
                         <span style={readOnlyLabel}>Email</span>
                         <div className="flex items-center gap-2">
-                            <span style={{ fontSize: '14px', color: 'var(--color-text-dark)' }}>sjohnson@ulm.edu</span>
+                            <span style={{ fontSize: '14px', color: 'var(--color-text-dark)' }}>{user?.email ?? 'N/A'}</span>
                             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: '#dcfce7', fontSize: '11px', fontWeight: 600, color: '#166534' }}>
                                 <CheckCircle2 className="w-3 h-3" />Verified
                             </span>
@@ -977,7 +1043,7 @@ export function AccountSettings() {
                             <div>
                                 <div className="space-y-1 mb-3" style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
                                     <p>Connected to: <span style={{ color: 'var(--color-text-dark)', fontWeight: 500 }}>canvas.ulm.edu</span></p>
-                                    <p>Account: <span style={{ color: 'var(--color-text-dark)', fontWeight: 500 }}>sjohnson@ulm.edu</span></p>
+                                    <p>Account: <span style={{ color: 'var(--color-text-dark)', fontWeight: 500 }}>{user?.email ?? 'N/A'}</span></p>
                                     <p>Last synced: <span style={{ color: 'var(--color-text-dark)', fontWeight: 500 }}>February 19, 2026 at 10:30 AM</span></p>
                                 </div>
                                 <div className="flex gap-3">
@@ -1519,7 +1585,7 @@ export function AccountSettings() {
                                     <li>Transferring course ownership to another faculty member</li>
                                 </ul>
                                 <p className="font-medium pt-2">To proceed, type your email address below:</p>
-                                <Input value={deleteEmail} onChange={e => setDeleteEmail(e.target.value)} placeholder="sjohnson@ulm.edu" />
+                                <Input value={deleteEmail} onChange={e => setDeleteEmail(e.target.value)} placeholder={user?.email ?? 'your@email.edu'} />
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input type="checkbox" checked={deleteConfirm} onChange={e => setDeleteConfirm(e.target.checked)} style={{ accentColor: '#dc2626' }} />
                                     <span style={{ fontSize: '13px', color: 'var(--color-text-dark)' }}>I understand this action is permanent and cannot be undone</span>
@@ -1530,11 +1596,11 @@ export function AccountSettings() {
                     <DialogFooter className="mt-4">
                         <Button variant="outline" onClick={() => { setDeleteOpen(false); setDeleteEmail(''); setDeleteConfirm(false); }}>Cancel</Button>
                         <Button
-                            disabled={deleteEmail !== 'sjohnson@ulm.edu' || !deleteConfirm}
+                            disabled={deleteEmail !== (user?.email ?? '') || !deleteConfirm}
                             onClick={() => { setDeleteOpen(false); setDeleteEmail(''); setDeleteConfirm(false); setToast('Account deletion scheduled. You have 30 days to cancel via email.'); }}
                             style={{
-                                backgroundColor: (deleteEmail === 'sjohnson@ulm.edu' && deleteConfirm) ? '#dc2626' : undefined,
-                                color: (deleteEmail === 'sjohnson@ulm.edu' && deleteConfirm) ? 'white' : undefined,
+                                backgroundColor: (deleteEmail === (user?.email ?? '') && deleteConfirm) ? '#dc2626' : undefined,
+                                color: (deleteEmail === (user?.email ?? '') && deleteConfirm) ? 'white' : undefined,
                             }}
                         >
                             <Trash2 className="w-4 h-4 mr-2" />Delete My Account Forever

@@ -23,16 +23,8 @@ function LoginContent() {
         if (isAuthenticated && role) router.replace(dashboardForRole(role));
     }, [isAuthenticated, role, router]);
 
-    return <LoginPage onLogin={(userData, token) => {
-        // authService already stored the JWT in localStorage.
-        // Now persist user info in AuthContext so the app knows who is logged in.
-        login({
-            id: userData.id,
-            firstName: userData.name?.split(' ')[0] ?? '',
-            lastName: userData.name?.split(' ').slice(1).join(' ') ?? '',
-            email: userData.email,
-            role: userData.role as any,
-        }, token);
+    return <LoginPage onLogin={(userData, token, rememberMe) => {
+        login(userData, token, rememberMe);
         router.push(dashboardForRole(userData.role));
     }} />;
 }

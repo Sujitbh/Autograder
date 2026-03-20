@@ -5,6 +5,7 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { config } from '@/config/env';
 import type { ApiResponse } from '@/types';
+import { clearAllAuth } from '@/utils/authStorage';
 
 // ── Custom error classes ────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ const api = axios.create({
 
 api.interceptors.request.use((req: InternalAxiosRequestConfig) => {
     if (typeof window !== 'undefined') {
-        const token = sessionStorage.getItem('autograde_token');
+        const token = localStorage.getItem('autograde_token');
         if (token && req.headers) {
             req.headers.Authorization = `Bearer ${token}`;
         }
@@ -89,10 +90,7 @@ api.interceptors.response.use(
             // Wrong credentials on login should not trigger global signout + page reset.
             // Keep user on the login form and surface the error locally.
             if (!isLoginRequest && typeof window !== 'undefined') {
-                // Token expired / invalid on authenticated endpoints.
-                sessionStorage.removeItem('autograde_token');
-                sessionStorage.removeItem('autograde_auth');
-                sessionStorage.removeItem('autograde_current_user');
+                clearAllAuth();
                 window.dispatchEvent(new Event('auth:signout'));
             }
             throw new AuthError(backendMessage ?? 'Unauthorized');
