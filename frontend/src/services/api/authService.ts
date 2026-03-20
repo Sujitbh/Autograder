@@ -5,6 +5,7 @@
 
 import api, { withRetry } from './client';
 import type { RegisterData, User } from '@/types';
+import { clearAllAuth } from '@/utils/authStorage';
 
 interface BackendTokenResponse {
     access_token: string;
@@ -19,7 +20,14 @@ interface BackendUser {
     email: string;
     role: string;
     is_active: boolean;
+    profile_photo?: string | null;
     created_at?: string;
+}
+
+function photoUrl(filename?: string | null): string | undefined {
+    if (!filename) return undefined;
+    const base = (api.defaults.baseURL ?? '').replace(/\/+$/, '');
+    return `${base}/auth/photos/${filename}`;
 }
 
 function mapUser(u: BackendUser): User {
@@ -34,6 +42,7 @@ function mapUser(u: BackendUser): User {
             sisUserId: '',
             sisLoginId: '',
             enrolledCourses: [],
+            profilePhoto: photoUrl(u.profile_photo),
             role: 'student',
         };
     }
@@ -44,6 +53,7 @@ function mapUser(u: BackendUser): User {
         email: u.email,
         title: '',
         department: '',
+        profilePhoto: photoUrl(u.profile_photo),
         role: u.role === 'admin' ? 'admin' : 'faculty',
     };
 }
@@ -51,25 +61,22 @@ function mapUser(u: BackendUser): User {
 export const authService = {
     /** Sign in with email + password. Returns user & stores token. */
     async login(email: string, password: string): Promise<{ user: User; token: string }> {
-        // Backend returns { access_token, refresh_token, token_type, expires_in }
         const { data } = await api.post<BackendTokenResponse>(
             '/auth/login',
             { email, password }
         );
         if (data.access_token && typeof window !== 'undefined') {
-            sessionStorage.setItem('autograde_token', data.access_token);
+            localStorage.setItem('autograde_token', data.access_token);
             if (data.refresh_token) {
-                sessionStorage.setItem('autograde_refresh_token', data.refresh_token);
+                localStorage.setItem('autograde_refresh_token', data.refresh_token);
             }
         }
-        // Fetch user profile after login
         const user = await authService.getCurrentUser();
         return { user, token: data.access_token };
     },
 
     /** Register a new account (faculty or student). */
     async register(userData: RegisterData): Promise<User> {
-        // Backend returns UserOut directly
         const { data } = await api.post<BackendUser>(
             '/auth/register',
             userData
@@ -83,10 +90,7 @@ export const authService = {
             await api.post('/auth/logout');
         } catch { /* backend may not have a logout endpoint */ }
         if (typeof window !== 'undefined') {
-            sessionStorage.removeItem('autograde_token');
-            sessionStorage.removeItem('autograde_refresh_token');
-            sessionStorage.removeItem('autograde_auth');
-            sessionStorage.removeItem('autograde_current_user');
+            clearAllAuth();
         }
     },
 
@@ -98,17 +102,31 @@ export const authService = {
         return mapUser(data);
     },
 
+    /** Upload a profile photo. Returns the updated user. */
+    async uploadPhoto(file: File): Promise<User> {
+        const form = new FormData();
+        form.append('file', file);
+        const { data } = await api.post<BackendUser>('/auth/me/photo', form);
+        return mapUser(data);
+    },
+
+    /** Remove the profile photo. Returns the updated user. */
+    async deletePhoto(): Promise<User> {
+        const { data } = await api.delete<BackendUser>('/auth/me/photo');
+        return mapUser(data);
+    },
+
     /** Refresh the JWT token. */
     async refreshToken(refreshToken?: string): Promise<string> {
-        const token = refreshToken || (typeof window !== 'undefined' ? sessionStorage.getItem('autograde_refresh_token') : null);
+        const token = refreshToken || (typeof window !== 'undefined' ? localStorage.getItem('autograde_refresh_token') : null);
         const { data } = await api.post<BackendTokenResponse>(
             '/auth/refresh',
             { refresh_token: token }
         );
         if (typeof window !== 'undefined') {
-            sessionStorage.setItem('autograde_token', data.access_token);
+            localStorage.setItem('autograde_token', data.access_token);
             if (data.refresh_token) {
-                sessionStorage.setItem('autograde_refresh_token', data.refresh_token);
+                localStorage.setItem('autograde_refresh_token', data.refresh_token);
             }
         }
         return data.access_token;

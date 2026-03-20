@@ -63,6 +63,7 @@ try:
     with engine.connect() as conn:
         # Backward-compatible schema patch for existing databases.
         conn.execute(text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS rubric_mode VARCHAR NOT NULL DEFAULT 'unweighted'"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo VARCHAR"))
         conn.execute(text("SELECT 1"))
         conn.commit()
     logger.info(f"Database connection OK: {settings.DATABASE_URL.split('@')[1]}")

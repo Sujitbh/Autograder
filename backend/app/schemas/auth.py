@@ -37,6 +37,7 @@ class UserOut(BaseModel):
     email: EmailStr
     role: str
     is_active: bool
+    profile_photo: Optional[str] = None
     created_at: Optional[datetime] = None
 
     class Config:

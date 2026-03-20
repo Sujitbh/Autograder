@@ -2,8 +2,12 @@
 Authentication and user management routes.
 """
 
+import uuid
+from pathlib import Path
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user
@@ -27,6 +31,15 @@ from app.schemas.auth import (
     PasswordChange,
 )
 from app.services.user_service import UserService
+from app.settings import settings
+
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+
+def _photo_dir() -> Path:
+    d = Path(settings.DATA_ROOT) / "profile_photos"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -151,6 +164,68 @@ def change_password(
     db.add(user)
     db.commit()
     return {"message": "Password changed successfully"}
+
+
+# ==================== Profile Photo ====================
+
+@router.post("/me/photo", response_model=UserOut)
+async def upload_profile_photo(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Upload or replace the current user's profile photo."""
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File type '{ext}' not allowed. Use: {', '.join(ALLOWED_EXTENSIONS)}",
+        )
+
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File too large. Maximum size is 5 MB.",
+        )
+
+    # Delete old photo file if it exists
+    if user.profile_photo:
+        old_path = _photo_dir() / user.profile_photo
+        old_path.unlink(missing_ok=True)
+
+    filename = f"{user.id}_{uuid.uuid4().hex[:8]}{ext}"
+    (_photo_dir() / filename).write_bytes(contents)
+
+    user.profile_photo = filename
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.delete("/me/photo", response_model=UserOut)
+def delete_profile_photo(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Remove the current user's profile photo."""
+    if user.profile_photo:
+        (path := _photo_dir() / user.profile_photo) and path.unlink(missing_ok=True)
+        user.profile_photo = None
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
+
+
+@router.get("/photos/{filename}")
+def serve_profile_photo(filename: str):
+    """Serve a profile photo by filename."""
+    path = _photo_dir() / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return FileResponse(path)
 
 
 # ==================== User Management (Admin) ====================

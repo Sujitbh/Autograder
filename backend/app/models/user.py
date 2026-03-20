@@ -18,6 +18,9 @@ class User(Base):
     # SIS identifier (e.g., Canvas SIS User ID / CWID)
     sis_user_id = Column(String, nullable=True)
 
+    # Filename of the uploaded profile photo (stored in DATA_ROOT/profile_photos/)
+    profile_photo = Column(String, nullable=True)
+
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
