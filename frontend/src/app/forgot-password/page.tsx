@@ -50,9 +50,6 @@ export default function ForgotPassword() {
           <div className="mb-8 flex justify-center">
             <img src="/images/axiom-logo.png" alt="Axiom" className="w-32 h-32 object-contain" />
           </div>
-          <h1 className="text-[#FFFFFF] mb-4" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px' }}>
-            Axiom
-          </h1>
           <p className="text-[#FFFFFF]/80" style={{ fontSize: '18px', lineHeight: '26px' }}>
             University of Louisiana Monroe
           </p>
@@ -68,9 +65,6 @@ export default function ForgotPassword() {
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
             <img src="/images/axiom-logo.png" alt="Axiom" className="w-16 h-16 object-contain mx-auto mb-4" />
-            <h2 style={{ fontSize: '22px', fontWeight: 600, lineHeight: '30px', color: 'var(--color-text-dark)' }}>
-              Axiom
-            </h2>
           </div>
 
           {success ? (

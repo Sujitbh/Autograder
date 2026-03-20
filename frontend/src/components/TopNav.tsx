@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronDown, GraduationCap, LogOut, User, MessageSquare, BookOpen, Moon, Sun, StickyNote, CalendarDays, ArrowLeftRight } from 'lucide-react';
+import { ChevronRight, ChevronDown, LogOut, User, MessageSquare, BookOpen, Moon, Sun, StickyNote, CalendarDays, ArrowLeftRight } from 'lucide-react';
 import { LiveClock } from './LiveClock';
 import {
   DropdownMenu,
@@ -167,26 +167,14 @@ export function TopNav({
         aria-label="Go to courses"
         style={{ background: 'none', border: 'none', padding: 0 }}
       >
-        <GraduationCap
-          className="text-white"
+        <img
+          src="/images/axiom-logo.png"
+          alt="Axiom"
           style={{
             width: '32px',
             height: '32px',
-            marginRight: '12px',
-            color: navFg,
           }}
         />
-        <span
-          className="text-white"
-          style={{
-            fontSize: '18px',
-            fontWeight: 700,
-            letterSpacing: '0.5px',
-            color: navFg,
-          }}
-        >
-          Axiom
-        </span>
       </button>
 
       {/* Center Zone: Breadcrumb Trail (hidden on top-level pages) */}

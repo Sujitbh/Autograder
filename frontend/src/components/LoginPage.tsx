@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, EyeOff, GraduationCap, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
@@ -70,13 +70,8 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       >
         <div className="text-center z-10 px-8">
           <div className="mb-8 flex justify-center">
-            <div className="w-32 h-32 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-              <GraduationCap className="w-20 h-20 text-[#FFFFFF]" />
-            </div>
+            <img src="/images/axiom-logo.png" alt="Axiom" className="w-32 h-32 object-contain" />
           </div>
-          <h1 className="text-[#FFFFFF] mb-4" style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px' }}>
-            Axiom
-          </h1>
           <p className="text-[#FFFFFF]/80" style={{ fontSize: '18px', lineHeight: '26px' }}>
             University of Louisiana Monroe
           </p>
@@ -91,12 +86,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ backgroundColor: 'var(--color-primary)' }}>
-              <GraduationCap className="w-10 h-10 text-[#FFFFFF]" />
-            </div>
-            <h2 style={{ fontSize: '22px', fontWeight: 600, lineHeight: '30px', color: 'var(--color-text-dark)' }}>
-              Axiom
-            </h2>
+            <img src="/images/axiom-logo.png" alt="Axiom" className="w-16 h-16 object-contain mx-auto mb-4" />
           </div>
 
           <div className="mb-8">

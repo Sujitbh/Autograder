@@ -1,6 +1,5 @@
 'use client';
 
-import { GraduationCap } from 'lucide-react';
 
 const platformLinks = [
   { label: 'Features', href: '#features' },
@@ -34,26 +33,12 @@ export default function LandingFooter() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-1 flex flex-col items-start">
             <div className="flex items-center gap-2.5 mb-5">
-              <div
-                className="flex items-center justify-center rounded-xl"
-                style={{
-                  width: 36,
-                  height: 36,
-                  background: 'linear-gradient(135deg, var(--landing-primary) 0%, var(--landing-primary-dark) 100%)',
-                }}
-              >
-                <GraduationCap size={18} color="#fff" strokeWidth={1.8} />
-              </div>
-              <span
-                style={{
-                  fontFamily: "'Cormorant Garamond', serif",
-                  fontSize: 24,
-                  fontWeight: 700,
-                  color: '#fff',
-                }}
-              >
-                Axiom
-              </span>
+              <img
+                src="/images/axiom-logo.png"
+                alt="Axiom"
+                className="rounded-full"
+                style={{ width: 36, height: 36 }}
+              />
             </div>
             <p
               style={{

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { GraduationCap } from 'lucide-react';
 
 const navLinks = [
   { label: 'Features', href: '#features' },
@@ -40,30 +39,11 @@ export default function LandingNav() {
       <div className="mx-auto flex items-center justify-between px-8 lg:px-16 py-4" style={{ maxWidth: 1280 }}>
         {/* Logo */}
         <a href="#" className="flex items-center gap-3 no-underline">
-          <div
-            className="flex items-center justify-center"
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, var(--landing-primary) 0%, var(--landing-primary-dark) 100%)',
-              boxShadow: '0 2px 8px rgba(123,13,13,0.2)',
-            }}
-          >
-            <GraduationCap size={21} color="#fff" strokeWidth={1.7} />
-          </div>
-          <span
-            style={{
-              fontFamily: "'Cormorant Garamond', serif",
-              fontSize: 28,
-              fontWeight: 700,
-              color: logoColor,
-              letterSpacing: '-0.01em',
-              transition: 'color 0.4s ease',
-            }}
-          >
-            Axiom
-          </span>
+          <img
+            src="/images/axiom-logo.png"
+            alt="Axiom"
+            style={{ width: 40, height: 40, borderRadius: '50%' }}
+          />
         </a>
 
         {/* Center links */}
