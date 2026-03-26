@@ -43,8 +43,17 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
     setIsSubmitting(true);
     try {
-      const { user, token } = await authService.login(email.trim(), password);
-      onLogin(user as any, token, rememberMe);
+      const result = await authService.login(email.trim(), password);
+
+      if (result.mfaRequired) {
+        // MFA enabled — redirect to OTP verification screen
+        router.push(
+          `/verify-otp?mfa_token=${encodeURIComponent(result.mfaToken)}&expires_in=${result.expiresIn}`
+        );
+        return;
+      }
+
+      onLogin(result.user as any, result.token, rememberMe);
     } catch (err: any) {
       const msg = err?.response?.data?.detail ?? err?.message ?? 'Login failed';
       if (msg === 'Invalid credentials' || msg === 'Unauthorized') {

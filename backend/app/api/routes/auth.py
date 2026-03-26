@@ -18,6 +18,8 @@ from app.core.security import (
     verify_password,
     create_access_token,
     create_refresh_token,
+    create_mfa_pending_token,
+    verify_mfa_pending_token,
     verify_refresh_token,
 )
 from app.core.permissions import require_role
@@ -33,9 +35,13 @@ from app.schemas.auth import (
     PasswordChange,
     ForgotPasswordRequest,
     ResetPasswordRequest,
+    MFARequiredResponse,
+    OTPVerifyRequest,
+    OTPResendRequest,
 )
 from app.services.user_service import UserService
 from app.services.email_service import EmailService
+from app.services import otp_service
 from app.settings import settings
 
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
@@ -47,6 +53,15 @@ def _photo_dir() -> Path:
     return d
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _requires_mfa(email: str) -> bool:
+    """Check if this account requires MFA or is bypass-listed via env config."""
+    if settings.MFA_BYPASS_ENABLED and settings.MFA_BYPASS_ACCOUNTS:
+        bypass_list = [a.strip().lower() for a in settings.MFA_BYPASS_ACCOUNTS.split(",")]
+        if email.strip().lower() in bypass_list:
+            return False
+    return True
 
 
 # ==================== Authentication ====================
@@ -63,18 +78,32 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     return user
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     """
     Login with email and password.
-    
-    Returns access token and refresh token.
+
+    If MFA is enabled, returns an mfa_token and sends an OTP to the
+    user's email. The client must call /verify-otp to complete login.
+    If MFA is disabled, returns access + refresh tokens directly.
     """
     user = UserService.authenticate(db, payload.email, payload.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
+        )
+
+    if settings.MFA_ENABLED and _requires_mfa(user.email):
+        # Opportunistic cleanup of stale OTP rows
+        otp_service.cleanup_expired(db)
+
+        mfa_token = create_mfa_pending_token(user.id, user.email)
+        otp_service.create_and_send_otp(db, user.id, user.email)
+
+        return MFARequiredResponse(
+            mfa_token=mfa_token,
+            expires_in=settings.OTP_TTL_MINUTES * 60,
         )
 
     access_token = create_access_token(subject=user.email, role=user.role)
@@ -85,6 +114,84 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         refresh_token=refresh_token,
         expires_in=3600,
     )
+
+
+# ==================== MFA / OTP ====================
+
+@router.post("/verify-otp")
+def verify_otp_endpoint(
+    payload: OTPVerifyRequest, db: Session = Depends(get_db)
+):
+    """
+    Verify a 6-digit OTP and issue full session tokens.
+    The mfa_token (from /login) proves the user already passed password auth.
+    """
+    try:
+        token_data = verify_mfa_pending_token(payload.mfa_token)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired MFA session. Please log in again.",
+        )
+
+    user_id = token_data["user_id"]
+    email = token_data["sub"]
+
+    result = otp_service.verify_otp(db, user_id, payload.otp_code)
+
+    if result == "ok":
+        user = UserService.get_by_email(db, email)
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found or inactive.",
+            )
+        access_token = create_access_token(subject=user.email, role=user.role)
+        refresh_token = create_refresh_token(subject=user.email, role=user.role)
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=3600,
+        )
+
+    detail_map = {
+        "invalid": "Incorrect verification code.",
+        "expired": "Verification code has expired. Please request a new one.",
+        "max_attempts": "Too many failed attempts. Please log in again.",
+        "no_otp": "No pending verification code found. Please log in again.",
+    }
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=detail_map.get(result, "Verification failed."),
+    )
+
+
+@router.post("/resend-otp")
+def resend_otp_endpoint(
+    payload: OTPResendRequest, db: Session = Depends(get_db)
+):
+    """
+    Resend the OTP email. Rate-limited to one request per 60 seconds.
+    """
+    try:
+        token_data = verify_mfa_pending_token(payload.mfa_token)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired MFA session. Please log in again.",
+        )
+
+    user_id = token_data["user_id"]
+    email = token_data["sub"]
+
+    if not otp_service.can_resend(db, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Please wait 60 seconds before requesting a new code.",
+        )
+
+    otp_service.create_and_send_otp(db, user_id, email)
+    return {"message": "A new verification code has been sent to your email."}
 
 
 @router.post("/refresh", response_model=TokenResponse)

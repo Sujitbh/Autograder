@@ -19,6 +19,23 @@ class Settings(BaseSettings):
     PASSWORD_RESET_EXPIRE_MINUTES: int = 60
 
     FRONTEND_URL: str = "http://localhost:3000"
+
+    # MFA / OTP settings
+    MFA_ENABLED: bool = True
+    MFA_BYPASS_ENABLED: bool = True
+    MFA_BYPASS_ACCOUNTS: str = ""
+    OTP_TTL_MINUTES: int = 5
+    OTP_MAX_ATTEMPTS: int = 5
+    OTP_RESEND_COOLDOWN_SECONDS: int = 60
+
+    # Email provider: "sendgrid", "mailgun", or "console" (dev logging)
+    MAIL_PROVIDER: str = "console"
+    MAIL_FROM_ADDRESS: str = "noreply@axiom.ulm.edu"
+    # Display name in inbox (must still match a verified SendGrid sender identity)
+    MAIL_FROM_NAME: str = "Axiom"
+    SENDGRID_API_KEY: str = ""
+    MAILGUN_API_KEY: str = ""
+    MAILGUN_DOMAIN: str = ""
     
     # Store data relative to the backend folder robustly
     DATA_ROOT: str = str(Path(__file__).parent.parent / "data")

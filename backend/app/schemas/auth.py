@@ -70,3 +70,21 @@ class ResetPasswordRequest(BaseModel):
     """Schema for resetting password with a token."""
     token: str
     new_password: str
+
+
+class MFARequiredResponse(BaseModel):
+    """Returned by /login when credentials are valid but OTP is needed."""
+    mfa_required: bool = True
+    mfa_token: str
+    expires_in: int = 300
+
+
+class OTPVerifyRequest(BaseModel):
+    """Schema for submitting the 6-digit OTP code."""
+    mfa_token: str
+    otp_code: str
+
+
+class OTPResendRequest(BaseModel):
+    """Schema for requesting a new OTP code."""
+    mfa_token: str

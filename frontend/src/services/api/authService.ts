@@ -14,6 +14,18 @@ interface BackendTokenResponse {
     expires_in: number;
 }
 
+interface MFARequiredResponse {
+    mfa_required: boolean;
+    mfa_token: string;
+    expires_in: number;
+}
+
+type LoginResponse = BackendTokenResponse | MFARequiredResponse;
+
+function isMFARequired(data: LoginResponse): data is MFARequiredResponse {
+    return 'mfa_required' in data && data.mfa_required === true;
+}
+
 interface BackendUser {
     id: number;
     name: string;
@@ -59,12 +71,28 @@ function mapUser(u: BackendUser): User {
 }
 
 export const authService = {
-    /** Sign in with email + password. Returns user & stores token. */
-    async login(email: string, password: string): Promise<{ user: User; token: string }> {
-        const { data } = await api.post<BackendTokenResponse>(
+    /**
+     * Sign in with email + password.
+     * If MFA is enabled, returns { mfaRequired, mfaToken, expiresIn }.
+     * If MFA is disabled, returns { user, token }.
+     */
+    async login(email: string, password: string): Promise<
+        { user: User; token: string; mfaRequired?: false } |
+        { mfaRequired: true; mfaToken: string; expiresIn: number }
+    > {
+        const { data } = await api.post<LoginResponse>(
             '/auth/login',
             { email, password }
         );
+
+        if (isMFARequired(data)) {
+            return {
+                mfaRequired: true,
+                mfaToken: data.mfa_token,
+                expiresIn: data.expires_in,
+            };
+        }
+
         if (data.access_token && typeof window !== 'undefined') {
             localStorage.setItem('autograde_token', data.access_token);
             if (data.refresh_token) {
@@ -72,7 +100,31 @@ export const authService = {
             }
         }
         const user = await authService.getCurrentUser();
-        return { user, token: data.access_token };
+        return { user, token: data.access_token, mfaRequired: false };
+    },
+
+    /** Verify OTP code and get full session tokens. */
+    async verifyOtp(mfaToken: string, otpCode: string): Promise<BackendTokenResponse> {
+        const { data } = await api.post<BackendTokenResponse>(
+            '/auth/verify-otp',
+            { mfa_token: mfaToken, otp_code: otpCode }
+        );
+        if (data.access_token && typeof window !== 'undefined') {
+            localStorage.setItem('autograde_token', data.access_token);
+            if (data.refresh_token) {
+                localStorage.setItem('autograde_refresh_token', data.refresh_token);
+            }
+        }
+        return data;
+    },
+
+    /** Request a new OTP code. */
+    async resendOtp(mfaToken: string): Promise<{ message: string }> {
+        const { data } = await api.post<{ message: string }>(
+            '/auth/resend-otp',
+            { mfa_token: mfaToken }
+        );
+        return data;
     },
 
     /** Register a new account (faculty or student). */
