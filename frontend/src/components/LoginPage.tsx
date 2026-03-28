@@ -5,9 +5,10 @@ import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { authService } from '@/services/api';
+import type { User } from '@/types';
 
 interface LoginPageProps {
-  onLogin: (user: { id: string; name: string; email: string; role: string }, token: string, rememberMe: boolean) => void;
+  onLogin: (user: User, token: string, rememberMe: boolean) => void;
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
@@ -53,7 +54,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         return;
       }
 
-      onLogin(result.user as any, result.token, rememberMe);
+      onLogin(result.user, result.token, rememberMe);
     } catch (err: any) {
       const msg = err?.response?.data?.detail ?? err?.message ?? 'Login failed';
       if (msg === 'Invalid credentials' || msg === 'Unauthorized') {

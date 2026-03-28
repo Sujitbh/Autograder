@@ -4,9 +4,10 @@ import { LoginPage } from '@/components/LoginPage';
 import { useAuth } from '@/utils/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
+import type { UserRole } from '@/types';
 
 /** Return the dashboard path for a given role. */
-function dashboardForRole(role: string): string {
+function dashboardForRole(role: UserRole): string {
     switch (role) {
         case 'student': return '/student';
         case 'admin': return '/admin';

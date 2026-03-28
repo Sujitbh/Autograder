@@ -17,6 +17,7 @@ import { useCodeExecution } from '@/hooks/useCodeExecution';
 import { useTestCaseRunner } from '@/hooks/useTestCaseRunner';
 import { useAuth } from '@/utils/AuthContext';
 import { submissionService } from '@/services/api';
+import { normalizeRubricToSections } from '@/utils/rubric';
 import {
   Play,
   RotateCcw,
@@ -224,9 +225,12 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     if (weight == null || Number.isNaN(weight)) return 100;
     return weight <= 1.5 ? weight * 100 : weight;
   };
-  const rubricSections = assignment?.rubric ?? [];
-  const rubricTotalPoints = rubricSections.reduce((sum, section) => 
-    sum + (section.criteria || []).reduce((sectionSum, crit) => sectionSum + (crit.maxPoints ?? 0), 0), 0);
+  const rubricSections = normalizeRubricToSections(assignment?.rubric);
+  const rubricTotalPoints = rubricSections.reduce(
+    (sum, section) =>
+      sum + section.criteria.reduce((sectionSum, crit) => sectionSum + (crit.maxPoints ?? 0), 0),
+    0
+  );
   const getSectionFallbackPoints = (section: any) => {
     const assignmentMaxPoints = assignment?.maxPoints ?? 0;
     if (assignmentMaxPoints <= 0) return null;
@@ -236,7 +240,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   };
   const inferredWeightedRubric = rubricSections.some((section) => 
     Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 || 
-    (section.criteria || []).some((crit) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
+    section.criteria.some((crit) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
   );
   const isWeightedRubric = assignment?.rubricMode === 'weighted' || inferredWeightedRubric;
 
