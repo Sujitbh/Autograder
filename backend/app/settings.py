@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     OTP_MAX_ATTEMPTS: int = 5
     OTP_RESEND_COOLDOWN_SECONDS: int = 60
 
-    # Email provider: "sendgrid", "mailgun", or "console" (dev logging)
+    # Email provider: "smtp", "sendgrid", "mailgun", or "console" (dev logging)
     MAIL_PROVIDER: str = "console"
     MAIL_FROM_ADDRESS: str = "noreply@axiom.ulm.edu"
     # Display name in inbox (must still match a verified SendGrid sender identity)
@@ -36,10 +36,20 @@ class Settings(BaseSettings):
     SENDGRID_API_KEY: str = ""
     MAILGUN_API_KEY: str = ""
     MAILGUN_DOMAIN: str = ""
+    # SMTP (e.g., Gmail App Password auth)
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    SMTP_FROM: str = ""
+    SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
     
     # Store data relative to the backend folder robustly
     DATA_ROOT: str = str(Path(__file__).parent.parent / "data")
-    
+    # AI detector configuration
+    AI_DETECTOR_MODEL_ROOT: str = str(Path(__file__).resolve().parents[3] / "ai_detector" / "models")
+    AI_DETECTOR_DEFAULT_THRESHOLD: float = 0.65
     # CORS origins for frontend development
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",

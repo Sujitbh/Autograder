@@ -2,7 +2,7 @@
 Email abstraction layer.
 
 Provides a unified interface for sending transactional emails.
-The concrete provider (SendGrid, Mailgun, or console logger) is
+The concrete provider (SMTP, SendGrid, Mailgun, or console logger) is
 selected by the MAIL_PROVIDER env var. Swapping providers requires
 zero code changes — just update the config value and API key.
 
@@ -13,7 +13,12 @@ Why SendGrid as the recommended production provider:
 """
 
 import logging
+import smtplib
 from abc import ABC, abstractmethod
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.utils import formataddr
+from functools import lru_cache
 
 from app.settings import settings
 
@@ -52,6 +57,87 @@ class ConsoleMailProvider(MailProvider):
             logger.info("--- PLAIN ---\n%s", plain_body)
         logger.info("--- HTML ---\n%s", html_body)
         logger.info("=" * 60)
+
+
+def _smtp_missing_config_fields() -> list[str]:
+    missing: list[str] = []
+    if not settings.SMTP_HOST.strip():
+        missing.append("SMTP_HOST")
+    if not settings.SMTP_USER.strip():
+        missing.append("SMTP_USER")
+    if not settings.SMTP_PASS.strip():
+        missing.append("SMTP_PASS")
+
+    from_address = (settings.SMTP_FROM or settings.MAIL_FROM_ADDRESS).strip()
+    if not from_address:
+        missing.append("SMTP_FROM (or MAIL_FROM_ADDRESS)")
+
+    return missing
+
+
+class SMTPMailProvider(MailProvider):
+    """
+    SMTP provider using Python stdlib only (smtplib + email.mime).
+    Suitable for Gmail App Password auth with STARTTLS on port 587.
+    """
+
+    def send(
+        self,
+        to: str,
+        subject: str,
+        html_body: str,
+        plain_body: str | None = None,
+    ) -> None:
+        missing = _smtp_missing_config_fields()
+        if missing:
+            logger.warning(
+                "SMTP disabled: missing required settings (%s). Email to %s was not sent.",
+                ", ".join(missing),
+                to,
+            )
+            return
+
+        smtp_host = settings.SMTP_HOST.strip()
+        smtp_port = settings.SMTP_PORT
+        smtp_user = settings.SMTP_USER.strip()
+        smtp_pass = settings.SMTP_PASS
+        from_addr = (settings.SMTP_FROM or settings.MAIL_FROM_ADDRESS).strip()
+        from_name = (settings.MAIL_FROM_NAME or "Axiom").strip()
+
+        message = MIMEMultipart("alternative")
+        message["Subject"] = subject
+        message["From"] = formataddr((from_name, from_addr))
+        message["To"] = to.strip()
+
+        plain_content = (
+            plain_body
+            or "Open the HTML version of this email for the full content."
+        )
+        message.attach(MIMEText(plain_content, "plain", "utf-8"))
+        message.attach(MIMEText(html_body, "html", "utf-8"))
+
+        smtp = None
+        try:
+            if settings.SMTP_USE_SSL:
+                smtp = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20)
+            else:
+                smtp = smtplib.SMTP(smtp_host, smtp_port, timeout=20)
+                smtp.ehlo()
+                if settings.SMTP_USE_TLS:
+                    smtp.starttls()
+                    smtp.ehlo()
+
+            smtp.login(smtp_user, smtp_pass)
+            smtp.sendmail(from_addr, [to.strip()], message.as_string())
+            logger.info("SMTP email sent successfully to %s", to)
+        except Exception:
+            logger.exception("SMTP email send failed to %s (subject=%s)", to, subject)
+        finally:
+            if smtp is not None:
+                try:
+                    smtp.quit()
+                except Exception:
+                    pass
 
 
 class SendGridMailProvider(MailProvider):
@@ -147,17 +233,61 @@ class MailgunMailProvider(MailProvider):
 
 _PROVIDERS = {
     "console": ConsoleMailProvider,
+    "smtp": SMTPMailProvider,
     "sendgrid": SendGridMailProvider,
     "mailgun": MailgunMailProvider,
 }
 
 
+def _resolve_mail_provider_name() -> str:
+    provider = (settings.MAIL_PROVIDER or "console").strip().lower()
+    smtp_missing = _smtp_missing_config_fields()
+    smtp_ready = len(smtp_missing) == 0
+
+    if provider == "console" and smtp_ready:
+        logger.info(
+            "SMTP enabled via environment (host=%s, port=%s, tls=%s, ssl=%s). "
+            "Using SMTP mail provider.",
+            settings.SMTP_HOST.strip(),
+            settings.SMTP_PORT,
+            settings.SMTP_USE_TLS,
+            settings.SMTP_USE_SSL,
+        )
+        return "smtp"
+
+    if provider == "smtp":
+        if smtp_ready:
+            logger.info(
+                "SMTP enabled (host=%s, port=%s, tls=%s, ssl=%s).",
+                settings.SMTP_HOST.strip(),
+                settings.SMTP_PORT,
+                settings.SMTP_USE_TLS,
+                settings.SMTP_USE_SSL,
+            )
+        else:
+            logger.warning(
+                "SMTP provider selected but configuration is incomplete (%s). "
+                "Emails will be skipped until SMTP settings are completed.",
+                ", ".join(smtp_missing),
+            )
+        return "smtp"
+
+    if provider == "console":
+        logger.info("SMTP disabled. Using console mail provider.")
+    else:
+        logger.info("Using mail provider: %s", provider)
+
+    return provider
+
+
+@lru_cache(maxsize=1)
 def get_mail_provider() -> MailProvider:
     """Factory — returns the configured provider instance."""
-    cls = _PROVIDERS.get(settings.MAIL_PROVIDER)
+    provider_name = _resolve_mail_provider_name()
+    cls = _PROVIDERS.get(provider_name)
     if cls is None:
         raise ValueError(
-            f"Unknown MAIL_PROVIDER '{settings.MAIL_PROVIDER}'. "
+            f"Unknown MAIL_PROVIDER '{provider_name}'. "
             f"Choose from: {', '.join(_PROVIDERS)}"
         )
     return cls()
