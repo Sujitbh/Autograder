@@ -274,6 +274,7 @@ function OTPContent() {
                   <input
                     key={i}
                     ref={(el) => { inputRefs.current[i] = el; }}
+                    aria-label={`OTP digit ${i + 1}`}
                     type="text"
                     inputMode="numeric"
                     maxLength={i === 0 ? 6 : 1}
@@ -286,14 +287,16 @@ function OTPContent() {
                       width: '52px',
                       height: '60px',
                       fontSize: '24px',
+                      fontVariantNumeric: 'tabular-nums',
                       borderRadius: '10px',
                       border: error ? '2px solid var(--color-error)' : '2px solid var(--color-border)',
-                      color: 'var(--color-text-dark)',
-                      backgroundColor: timeLeft === 0 ? '#f5f5f5' : '#fff',
+                      color: digit ? 'var(--color-primary)' : 'var(--color-text-dark)',
+                      caretColor: 'var(--color-primary)',
+                      backgroundColor: timeLeft === 0 ? 'var(--color-surface-elevated)' : 'var(--color-input-background)',
                     }}
                     onFocus={(e) => {
-                      e.target.style.borderColor = '#7B0D0D';
-                      e.target.style.boxShadow = '0 0 0 3px rgba(123,13,13,0.1)';
+                      e.target.style.borderColor = 'var(--color-primary)';
+                      e.target.style.boxShadow = '0 0 0 3px rgba(107,0,0,0.16)';
                     }}
                     onBlur={(e) => {
                       e.target.style.borderColor = error ? 'var(--color-error)' : 'var(--color-border)';

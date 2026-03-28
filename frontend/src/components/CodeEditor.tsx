@@ -4,6 +4,7 @@ import { useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useTheme } from '@/utils/ThemeContext';
 import { Loader2 } from 'lucide-react';
+import type { editor as MonacoEditorNS } from 'monaco-editor';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react').then(mod => mod.default), {
   ssr: false,
@@ -23,6 +24,8 @@ const LANGUAGE_MAP: Record<string, string> = {
   javascript: 'javascript',
   js: 'javascript',
 };
+
+const MONACO_FONT_FAMILY = "'JetBrains Mono', 'Fira Code', 'Consolas', 'Courier New', monospace";
 
 interface CodeEditorProps {
   readonly language: string;
@@ -108,6 +111,7 @@ function defineAxiomThemes(monaco: typeof import('monaco-editor')) {
 export function CodeEditor({ language, value = '', onChange, readOnly = false, height = '100%' }: Readonly<CodeEditorProps>) {
   const { isDark } = useTheme();
   const themesDefinedRef = useRef(false);
+  const editorRef = useRef<MonacoEditorNS.IStandaloneCodeEditor | null>(null);
 
   const handleChange = useCallback(
     (val: string | undefined) => {
@@ -125,6 +129,33 @@ export function CodeEditor({ language, value = '', onChange, readOnly = false, h
     }
   }, []);
 
+  const applyEditorMetrics = useCallback((editor: MonacoEditorNS.IStandaloneCodeEditor) => {
+    editor.updateOptions({
+      fontFamily: MONACO_FONT_FAMILY,
+      fontSize: 14,
+      lineHeight: 22,
+      letterSpacing: 0,
+      fontLigatures: false,
+    });
+    editor.layout();
+  }, []);
+
+  const handleMount = useCallback(
+    (editor: MonacoEditorNS.IStandaloneCodeEditor) => {
+      editorRef.current = editor;
+      applyEditorMetrics(editor);
+
+      if (typeof document !== 'undefined' && 'fonts' in document) {
+        void document.fonts.ready.then(() => {
+          if (editorRef.current === editor) {
+            applyEditorMetrics(editor);
+          }
+        });
+      }
+    },
+    [applyEditorMetrics],
+  );
+
   const monacoLanguage = LANGUAGE_MAP[language.toLowerCase()] ?? 'plaintext';
   const monacoTheme = isDark ? 'axiom-dark' : 'axiom-light';
 
@@ -136,10 +167,14 @@ export function CodeEditor({ language, value = '', onChange, readOnly = false, h
       value={value}
       onChange={handleChange}
       beforeMount={handleBeforeMount}
+      onMount={handleMount}
       options={{
         readOnly,
         fontSize: 14,
-        fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+        fontFamily: MONACO_FONT_FAMILY,
+        lineHeight: 22,
+        letterSpacing: 0,
+        fontLigatures: false,
         lineNumbers: 'on',
         minimap: { enabled: true, scale: 1 },
         automaticLayout: true,

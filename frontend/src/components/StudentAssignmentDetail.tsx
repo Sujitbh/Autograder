@@ -177,7 +177,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const [newFileName, setNewFileName] = useState('');
 
   // Execution hooks
-  const { execute, isRunning: isExecuting, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
+  const { execute, compile, isRunning: isExecuting, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
   const { runTests, isRunning: isTestsRunning, results: testResults, progress: testProgress } = useTestCaseRunner();
 
   // Auto-save
@@ -292,6 +292,16 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     }
     setShowInlineInput(false);
     await execute(code, language);
+  };
+
+  const supportsCompileCheck = language === 'python' || language === 'java';
+  const compileButtonLabel = language === 'java' ? 'Compile' : 'Check Syntax';
+
+  const handleCompileCode = async () => {
+    if (!supportsCompileCheck) return;
+    setOutputOpen(true);
+    setShowInlineInput(false);
+    await compile(code, language);
   };
 
   const handleOpenInlineInput = () => {
@@ -549,6 +559,25 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
               >
                 {isExecuting ? '⏳ Running...' : '▶ Run'}
               </button>
+
+              {supportsCompileCheck && (
+                <button
+                  onClick={handleCompileCode}
+                  disabled={isExecuting || isTestsRunning}
+                  style={{
+                    padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                    background: '#7B0D0D', color: '#fff', letterSpacing: '.3px',
+                    transition: 'background .15s, box-shadow .2s',
+                    opacity: isExecuting || isTestsRunning ? 0.7 : 1,
+                    cursor: isExecuting || isTestsRunning ? 'not-allowed' : 'pointer',
+                    border: 'none',
+                  }}
+                  onMouseEnter={e => { if (!isExecuting && !isTestsRunning) { e.currentTarget.style.background = '#5C0909'; e.currentTarget.style.boxShadow = '0 0 10px rgba(123,13,13,.45)'; } }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#7B0D0D'; e.currentTarget.style.boxShadow = 'none'; }}
+                >
+                  {compileButtonLabel}
+                </button>
+              )}
 
               <button
                 onClick={handleOpenInlineInput}
