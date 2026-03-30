@@ -76,6 +76,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         queryFn: () => submissionService.getSubmissionDetail(submissionId),
     });
 
+    const anonymizedStudentLabel = detail
+        ? `Student #${detail.student?.id ?? submissionId}`
+        : `Student #${submissionId}`;
+
     const gradeMutation = useMutation({
         mutationFn: (payload: { score: number; max_score: number; feedback?: string }) =>
             submissionService.overrideSubmissionScore(submissionId, payload),
@@ -139,26 +143,6 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         return weight <= 1.5 ? weight * 100 : weight;
     };
 
-    // Initialise form when detail loads
-    useEffect(() => {
-        if (!detail) return;
-        setFeedback(detail.feedback || '');
-        const rubricSections = detail.rubrics ?? [];
-        const flatRubrics = flattenRubrics(rubricSections);
-        
-        if (flatRubrics.length > 0) {
-            // If already graded, distribute score proportionally across criteria
-            if (detail.score != null && flatRubrics.length > 0) {
-                const totalMax = flatRubrics.reduce((s: number, r: any) => s + (r.max_points || 0), 0);
-                setRubricScores(flatRubrics.map((r: any) =>
-                    totalMax > 0 ? Math.round((detail.score! / totalMax) * (r.max_points || 0)) : 0
-                ));
-            } else {
-                setRubricScores(flatRubrics.map(() => 0));
-            }
-        }
-    }, [detail?.id]);
-
     const rubricSections = detail?.rubrics ?? [];
     const rubrics = flattenRubrics(rubricSections);
     const inferredWeightedRubric = rubricSections.some((section: any) => 
@@ -204,6 +188,37 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const resultPointsTotal = (detail?.results ?? []).reduce((s, r) => s + (r.points || 0), 0);
     const resolvedMaxPoints = detail?.assignment?.max_points || unweightedMaxTotal || detail?.max_score || resultPointsTotal || 100;
 
+    const distributeScoreAcrossRubrics = useCallback((totalScore: number, flatRubrics: any[]) => {
+        if (flatRubrics.length === 0) return [] as number[];
+        const rubricMaxTotal = flatRubrics.reduce((s: number, r: any) => s + (Number(r.max_points) || 0), 0);
+        const safeDenominator = isWeightedRubric
+            ? Math.max(1, Number(resolvedMaxPoints) || 1)
+            : Math.max(1, rubricMaxTotal);
+
+        return flatRubrics.map((r: any) => {
+            const maxPoints = Number(r.max_points) || 0;
+            const scaled = (Math.max(0, Number(totalScore) || 0) / safeDenominator) * maxPoints;
+            return Math.max(0, Math.min(Math.round(scaled), maxPoints));
+        });
+    }, [isWeightedRubric, resolvedMaxPoints]);
+
+    // Initialise form when detail loads
+    useEffect(() => {
+        if (!detail) return;
+        setFeedback(detail.feedback || '');
+        const rubricSections = detail.rubrics ?? [];
+        const flatRubrics = flattenRubrics(rubricSections);
+
+        if (flatRubrics.length > 0) {
+            // If already graded, distribute score proportionally across criteria
+            if (detail.score != null && flatRubrics.length > 0) {
+                setRubricScores(distributeScoreAcrossRubrics(detail.score, flatRubrics));
+            } else {
+                setRubricScores(flatRubrics.map(() => 0));
+            }
+        }
+    }, [detail?.id, distributeScoreAcrossRubrics]);
+
     const updateRubricScore = (idx: number, val: string) => {
         const num = Math.max(0, Math.min(Number(val) || 0, rubrics[idx]?.max_points ?? 0));
         setRubricScores(prev => { const next = [...prev]; next[idx] = num; return next; });
@@ -242,10 +257,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
             setAutoGradeResult(result);
             // Populate score fields
             if (result.score != null && rubrics.length > 0) {
-                const totalMax = rubrics.reduce((s: number, r: any) => s + r.max_points, 0);
-                setRubricScores(rubrics.map((r: any) =>
-                    totalMax > 0 ? Math.round((result.score / totalMax) * r.max_points) : 0
-                ));
+                setRubricScores(distributeScoreAcrossRubrics(result.score, rubrics));
             }
             if (result.feedback) setFeedback(result.feedback);
             // Update live test results
@@ -263,7 +275,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                 })));
             }
         } catch (e) { /* handled by mutation state */ }
-    }, [rubrics, autoGradeMutation]);
+    }, [rubrics, autoGradeMutation, distributeScoreAcrossRubrics]);
 
     const sortedAssignmentSubmissions = [...assignmentSubmissions].sort(
         (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
@@ -303,12 +315,22 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         const normalizedMax = Math.max(1, Math.round(resolvedMaxPoints));
         const feedbackToSave = feedback.trim() || 'Reviewed by instructor.';
         await gradeMutation.mutateAsync({ score: normalizedScore, max_score: normalizedMax, feedback: feedbackToSave });
+
+        // Keep assignment list and gradebook views in sync immediately after manual grading.
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['faculty-submission-detail', submissionId] }),
+            queryClient.invalidateQueries({ queryKey: ['submissions'] }),
+            queryClient.invalidateQueries({ queryKey: ['faculty-assignment-submissions'] }),
+            queryClient.invalidateQueries({ queryKey: ['grades'] }),
+        ]);
+
         if (!isDraft) {
             if (moveToNext && nextSubmissionId) {
                 router.push(`/courses/${courseId}/submissions/${nextSubmissionId}/grade`);
                 return;
             }
-            router.push(`/courses/${courseId}/assignments/${detail?.assignment.id}/grading`);
+            router.replace(`/courses/${courseId}/assignments/${detail?.assignment.id}/grading`);
+            router.refresh();
         }
     };
 
@@ -642,8 +664,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                 <User className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
                                             </div>
                                             <div>
-                                                <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{detail.student.name}</p>
-                                                <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>{detail.student.email}</p>
+                                                <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{anonymizedStudentLabel}</p>
+                                                <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>Identity hidden for blind grading</p>
                                             </div>
                                         </div>
                                         <div className="space-y-3">

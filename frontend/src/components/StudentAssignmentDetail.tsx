@@ -912,7 +912,6 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                               alignItems: 'center',
                             }}>
                               <span>{section.name}</span>
-                              {isWeightedRubric && <span style={{ fontSize: 11, color: 'var(--color-text-light)' }}>Weight: {sectionWeightPercent(section.weight).toFixed(1)}%</span>}
                             </div>
 
                             {(section.criteria || []).length > 0 ? (
@@ -965,12 +964,6 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12 }}>
                                     <span style={{ color: 'var(--color-text-light)', fontWeight: 600 }}>Points</span>
                                     <span style={{ color: isDark ? '#4ade80' : '#16a34a', fontWeight: 700 }}>{getSectionFallbackPoints(section)}</span>
-                                  </div>
-                                )}
-                                {isWeightedRubric && (
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12 }}>
-                                    <span style={{ color: 'var(--color-text-light)', fontWeight: 600 }}>Section Weight</span>
-                                    <span style={{ color: 'var(--color-text-dark)', fontWeight: 700 }}>{sectionWeightPercent(section.weight).toFixed(1)}%</span>
                                   </div>
                                 )}
                               </div>

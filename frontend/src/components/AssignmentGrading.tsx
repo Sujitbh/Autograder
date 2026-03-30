@@ -23,7 +23,7 @@ import {
 
 import { useAssignment } from '@/hooks/queries';
 import { useSubmissions } from '@/hooks/queries/useSubmissions';
-import { submissionService } from '@/services/api';
+import { courseService, submissionService } from '@/services/api';
 
 /* ─── Rubric criterion ─── */
 interface RubricCriterion {
@@ -70,6 +70,17 @@ interface StudentSubmission {
 type SortField = 'studentName' | 'submittedAt' | 'autoScore' | 'finalGrade';
 type SortOrder = 'asc' | 'desc';
 
+function getDisplayStudentName(sub: StudentSubmission): string {
+    if (sub.status === 'not-submitted') return sub.studentName;
+    const token = (sub.studentId || sub.id || '').replace(/^missing-/, '');
+    return `Student #${token}`;
+}
+
+function getDisplayAvatarInitials(sub: StudentSubmission): string {
+    if (sub.status === 'not-submitted') return sub.avatarInitials;
+    return '';
+}
+
 function scoreColor(score: number, max: number): string {
     const pct = (score / max) * 100;
     if (pct >= 90) return '#2D6A2D';
@@ -85,6 +96,53 @@ export function AssignmentGrading() {
     // Fetch from API
     const { data: apiAssignment, isLoading: isLoadingAssignment } = useAssignment(courseId, assignmentId);
     const { data: apiSubmissions, isLoading: isLoadingSubmissions, refetch: refetchSubmissions } = useSubmissions(assignmentId);
+    const [rosterStudents, setRosterStudents] = useState<Array<{
+        id: string;
+        name: string;
+        sisUserId: string;
+        avatarInitials: string;
+    }>>([]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadRoster = async () => {
+            if (!courseId) return;
+            try {
+                const enrollments = await courseService.getEnrollments(courseId);
+                const students = enrollments
+                    .filter((enrollment) => enrollment.role === 'student' && enrollment.user)
+                    .map((enrollment) => {
+                        const userId = String(enrollment.user?.id ?? enrollment.user_id ?? '');
+                        const name = enrollment.user?.name ?? 'Student';
+                        const initials = name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')
+                            .toUpperCase()
+                            .slice(0, 2);
+                        return {
+                            id: userId,
+                            name,
+                            sisUserId: enrollment.user?.sis_user_id ?? userId,
+                            avatarInitials: initials,
+                        };
+                    });
+                if (isMounted) {
+                    setRosterStudents(students);
+                }
+            } catch {
+                if (isMounted) {
+                    setRosterStudents([]);
+                }
+            }
+        };
+
+        loadRoster();
+        return () => {
+            isMounted = false;
+        };
+    }, [courseId]);
 
     // Derive assignment metadata from API data or localStorage fallback
     const meta: AssignmentMeta | undefined = useMemo(() => {
@@ -169,29 +227,35 @@ export function AssignmentGrading() {
                 .toUpperCase()
                 .slice(0, 2);
 
-        // Keep only the latest submission per student
+        // Keep only the latest submission per student when a stable student id exists.
+        // If missing, fall back to submission id so entries remain gradeable.
         const latestByStudent = new Map<string, any>();
         for (const sub of apiSubmissions as any[]) {
             const uid = String(sub.student?.id ?? sub.studentId ?? sub.student_id ?? '');
-            const existing = latestByStudent.get(uid);
+            const key = uid || `submission-${String(sub.id ?? '')}`;
+            const existing = latestByStudent.get(key);
             if (!existing) {
-                latestByStudent.set(uid, sub);
+                latestByStudent.set(key, sub);
             } else {
                 const existingTime = new Date(existing.created_at ?? existing.submittedAt ?? 0).getTime();
                 const newTime = new Date(sub.created_at ?? sub.submittedAt ?? 0).getTime();
-                if (newTime > existingTime) latestByStudent.set(uid, sub);
+                if (newTime > existingTime) latestByStudent.set(key, sub);
             }
         }
 
-        return Array.from(latestByStudent.values()).map((sub: any) => {
-            const studentName = sub.student?.name ?? 'Student';
-            const studentIdentifier = sub.student?.student_id ?? String(sub.studentId ?? sub.student_id ?? sub.student?.id ?? '');
+        const rows: StudentSubmission[] = [];
+        const studentsWithSubmission = new Set<string>();
+
+        Array.from(latestByStudent.values()).forEach((sub: any) => {
+            const studentName = sub.student?.name ?? sub.studentName ?? 'Student';
+            const studentUid = String(sub.student?.id ?? sub.studentId ?? sub.student_id ?? '');
+            const studentIdentifier = (sub.student?.student_id ?? sub.student?.sis_user_id ?? studentUid) || String(sub.id ?? '');
             const submittedAt = sub.created_at ?? sub.submittedAt ?? null;
             const score = sub.score ?? sub.grade?.totalScore ?? null;
             const maxScore = sub.max_score ?? sub.grade?.maxScore ?? meta?.totalPoints ?? 100;
             const status = sub.status === 'graded' || score != null ? 'graded' : 'submitted';
 
-            return {
+            const row = {
                 id: String(sub.id),
                 studentName,
                 studentId: studentIdentifier,
@@ -204,8 +268,32 @@ export function AssignmentGrading() {
                 late: false,
                 flagged: false,
             } as StudentSubmission;
+
+            if (studentUid) {
+                studentsWithSubmission.add(studentUid);
+            }
+            rows.push(row);
         });
-    }, [apiSubmissions, isLoadingSubmissions, meta]);
+
+        for (const student of rosterStudents) {
+            if (studentsWithSubmission.has(student.id)) continue;
+            rows.push({
+                id: `missing-${student.id}`,
+                studentName: student.name,
+                studentId: student.sisUserId,
+                avatarInitials: student.avatarInitials,
+                submittedAt: null,
+                autoScore: null,
+                finalGrade: null,
+                maxPoints: meta?.totalPoints ?? 100,
+                status: 'not-submitted',
+                late: false,
+                flagged: false,
+            });
+        }
+
+        return rows;
+    }, [apiSubmissions, isLoadingSubmissions, meta, rosterStudents]);
 
     const [submissionsState, setSubmissionsState] = useState<StudentSubmission[]>(submissions);
     // Update local state when API data changes
@@ -339,7 +427,7 @@ export function AssignmentGrading() {
             if (activeTab !== 'all' && s.status !== activeTab) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                return s.studentName.toLowerCase().includes(q) || s.studentId.includes(q);
+                return getDisplayStudentName(s).toLowerCase().includes(q) || s.studentId.includes(q);
             }
             return true;
         });
@@ -350,7 +438,7 @@ export function AssignmentGrading() {
         return [...filtered].sort((a, b) => {
             let cmp = 0;
             switch (sortField) {
-                case 'studentName': cmp = a.studentName.localeCompare(b.studentName); break;
+                case 'studentName': cmp = getDisplayStudentName(a).localeCompare(getDisplayStudentName(b)); break;
                 case 'submittedAt':
                     cmp = (a.submittedAt ? new Date(a.submittedAt).getTime() : Infinity) - (b.submittedAt ? new Date(b.submittedAt).getTime() : Infinity);
                     break;
@@ -743,6 +831,8 @@ export function AssignmentGrading() {
                                         <tbody>
                                             {sorted.map((sub) => {
                                                 const rowFlagged = sub.flagged;
+                                                const displayStudentName = getDisplayStudentName(sub);
+                                                const displayAvatarInitials = getDisplayAvatarInitials(sub);
                                                 return (
                                                     <tr
                                                         key={sub.id}
@@ -763,13 +853,15 @@ export function AssignmentGrading() {
                                                     >
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: '11px', fontWeight: 700 }}>
-                                                                    {sub.avatarInitials}
-                                                                </div>
+                                                                {displayAvatarInitials && (
+                                                                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: '11px', fontWeight: 700 }}>
+                                                                        {displayAvatarInitials}
+                                                                    </div>
+                                                                )}
                                                                 <div>
                                                                     <div className="flex items-center gap-2">
                                                                         {rowFlagged && <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#FF6B00' }} />}
-                                                                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>{sub.studentName}</span>
+                                                                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>{displayStudentName}</span>
                                                                     </div>
                                                                     {meta.isGroupAssignment && (
                                                                         <span style={{ fontSize: '11px', color: '#6B0000', fontWeight: 500 }}>
