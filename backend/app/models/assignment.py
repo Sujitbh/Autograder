@@ -32,3 +32,13 @@ class Assignment(Base):
     testcases = relationship("TestCase", back_populates="assignment", cascade="all, delete-orphan")
     rubrics = relationship("Rubric", back_populates="assignment", cascade="all, delete-orphan")
     rubric_sections = relationship("RubricSection", back_populates="assignment", cascade="all, delete-orphan")
+
+    @property
+    def rubrics_out(self):
+        """Preferred rubric payload for API responses.
+
+        New assignments store rubric data in `rubric_sections`; legacy data lives
+        in `rubrics`. Expose a single attribute so response schemas can map
+        consistently regardless of storage format.
+        """
+        return self.rubric_sections if self.rubric_sections else self.rubrics

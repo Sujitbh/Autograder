@@ -13,6 +13,7 @@ import { useAssignment } from '@/hooks/queries/useAssignments';
 import { useSubmissions } from '@/hooks/queries/useSubmissions';
 import { useCourses } from '@/hooks/queries/useCourses';
 import { useAssignmentTestCases } from '@/hooks/queries/useTestCases';
+import { useAssignmentRubrics } from '@/hooks/queries/useRubrics';
 import { useCodeExecution } from '@/hooks/useCodeExecution';
 import { useTestCaseRunner } from '@/hooks/useTestCaseRunner';
 import { useAuth } from '@/utils/AuthContext';
@@ -132,6 +133,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const { data: assignment, isLoading: assignmentLoading } = useAssignment(courseId, assignmentId);
   const { data: submissions, isLoading: submissionsLoading, refetch: refetchSubmissions } = useSubmissions(assignmentId);
   const { data: testCases } = useAssignmentTestCases(assignmentId);
+  const { data: legacyRubrics } = useAssignmentRubrics(assignmentId);
 
   // Determine language from assignment
   const assignmentLang = assignment?.language ?? (assignment as any)?.allowed_languages ?? 'python';
@@ -224,7 +226,27 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     if (weight == null || Number.isNaN(weight)) return 100;
     return weight <= 1.5 ? weight * 100 : weight;
   };
-  const rubricSections = assignment?.rubric ?? [];
+  const criterionWeightPercent = (weight?: number | null) => {
+    if (weight == null || Number.isNaN(weight)) return 100;
+    return weight <= 1.5 ? weight * 100 : weight;
+  };
+  const assignmentRubricSections = assignment?.rubric ?? [];
+  const rubricSections = assignmentRubricSections.length > 0
+    ? assignmentRubricSections
+    : ((legacyRubrics ?? []).length > 0
+      ? [{
+          name: 'Rubric',
+          description: 'Published grading rubric',
+          weight: 100,
+          criteria: (legacyRubrics ?? []).map((r) => ({
+            name: r.name,
+            description: r.description ?? '',
+            maxPoints: r.max_points ?? 0,
+            weight: r.weight ?? 1,
+            gradingMethod: 'manual' as const,
+          })),
+        }]
+      : []);
   const rubricTotalPoints = rubricSections.reduce((sum, section) => 
     sum + (section.criteria || []).reduce((sectionSum, crit) => sectionSum + (crit.maxPoints ?? 0), 0), 0);
   const getSectionFallbackPoints = (section: any) => {
@@ -236,7 +258,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   };
   const inferredWeightedRubric = rubricSections.some((section) => 
     Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 || 
-    (section.criteria || []).some((crit) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
+    (section.criteria || []).some((crit) => Math.abs(criterionWeightPercent(crit.weight) - 100) > 0.0001)
   );
   const isWeightedRubric = assignment?.rubricMode === 'weighted' || inferredWeightedRubric;
 
@@ -915,7 +937,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                     <tr key={critIdx} style={{ borderTop: '1px solid var(--color-border)' }}>
                                       <td style={{ padding: '10px 12px', color: 'var(--color-text-dark)', fontWeight: 500 }}>{criterion.name}</td>
                                       <td style={{ padding: '10px 12px', textAlign: 'center', color: isDark ? '#4ade80' : '#16a34a', fontWeight: 700 }}>{criterion.maxPoints ?? 0}</td>
-                                      {isWeightedRubric && <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--color-text-dark)', fontWeight: 600 }}>{((criterion.weight ?? 1) * 100).toFixed(0)}%</td>}
+                                      {isWeightedRubric && <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--color-text-dark)', fontWeight: 600 }}>{criterionWeightPercent(criterion.weight).toFixed(0)}%</td>}
                                       <td style={{ padding: '10px 12px', color: 'var(--color-text-mid)', fontSize: 11 }}>{criterion.description || '—'}</td>
                                     </tr>
                                   ))}

@@ -36,7 +36,7 @@ from app.models.submission_result import SubmissionResult
 
 # ── Demo students ─────────────────────────────────────────────────────────────
 DEMO_STUDENTS = [
-    {"name": "Emma Johnson",     "email": "ejohnson@warhawks.ulm.edu",  "sis": "10000001"},
+    {"name": "Emma Johnson",     "email": "ejohnsonh@warhawks.ulm.edu",  "sis": "10000001"},
     {"name": "Lucas Williams",   "email": "lwilliams@warhawks.ulm.edu", "sis": "10000002"},
     {"name": "Olivia Brown",     "email": "obrown@warhawks.ulm.edu",    "sis": "10000003"},
     {"name": "Noah Davis",       "email": "ndavis@warhawks.ulm.edu",    "sis": "10000004"},

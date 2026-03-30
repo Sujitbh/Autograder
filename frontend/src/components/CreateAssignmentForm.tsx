@@ -91,8 +91,17 @@ interface RubricTemplate {
 // Backward-compatible normalization: legacy values used 1.0 as 100%.
 function toSectionWeightPercent(weight?: number | null): number {
     if (weight == null || Number.isNaN(weight)) return 100;
-    if (weight <= 1.5) return weight * 100;
+    // Legacy payloads may store section weight as 0..1 fraction; UI uses 0..100.
+    if (weight >= 0 && weight <= 1) return weight * 100;
     return weight;
+}
+
+function toCriterionWeightPercent(weight?: number | string | null): number {
+    if (weight == null) return 0;
+    const numeric = typeof weight === 'number' ? weight : Number.parseFloat(String(weight).replace('%', '').trim());
+    if (!Number.isFinite(numeric)) return 0;
+    if (numeric >= 0 && numeric <= 1.5) return numeric * 100;
+    return numeric;
 }
 
 const NO_RUBRIC_TEMPLATE_ID = 'none';
@@ -272,6 +281,15 @@ interface CreateAssignmentFormProps {
     initialData?: Partial<AssignmentFormData>;
 }
 
+interface RubricSectionEditorProps {
+    sectionIdx: number;
+    watchRubricMode: 'weighted' | 'unweighted';
+    errors: any;
+    register: any;
+    control: any;
+    onRemoveSection: () => void;
+}
+
 // ── Helper ──────────────────────────────────────────────────────────
 
 function getSensitivityLabel(v: number) {
@@ -384,13 +402,14 @@ export function CreateAssignmentForm({
     const watchAutoFlag = watch('autoFlagEnabled');
     const watchLanguage = watch('language');
     const watchRubricMode = watch('rubricMode');
+    const watchRubric = watch('rubric');
 
     useEffect(() => {
         if (watchRubricMode === 'unweighted') {
             const current = getValues('rubric');
             current.forEach((_, idx) => setValue(`rubric.${idx}.weight`, 100));
         }
-    }, [watchRubricMode, getValues, setValue]);
+    }, [watchRubricMode]);
 
     // ── Auto-save to localStorage every 30 seconds ────────────────
 
@@ -402,7 +421,7 @@ export function CreateAssignmentForm({
             }
         }, 30_000);
         return () => clearInterval(interval);
-    }, [courseId, getValues, isDirty]);
+    }, [courseId, isDirty]);
 
     // ── Warn on unsaved changes ───────────────────────────────────
 
@@ -495,7 +514,7 @@ export function CreateAssignmentForm({
                     weight: toSectionWeightPercent(section.weight),
                     criteria: (section.criteria || []).map((c) => ({
                         ...c,
-                        weight: c.weight ?? 1,
+                        weight: c.weight ?? 100,
                     })),
                 }))
             );
@@ -1453,13 +1472,16 @@ export function CreateAssignmentForm({
     // ── Step 5: Rubric ────────────────────────────────────────────
 
     function renderRubric() {
-        const rubricValues = getValues('rubric');
+        const rubricValues = watchRubric ?? [];
         const totalRubricPoints = rubricValues.reduce((sum, section) => {
             const sectionPoints = (section.criteria || []).reduce((s, c) => s + (c.maxPoints || 0), 0);
             return sum + sectionPoints;
         }, 0);
         const totalCriteria = rubricValues.reduce((sum, section) => sum + (section.criteria?.length || 0), 0);
-        const sectionWeightTotal = rubricValues.reduce((sum, section) => sum + toSectionWeightPercent(section.weight), 0);
+        const criteriaWeightTotal = rubricValues.reduce(
+            (sum, section) => sum + (section.criteria || []).reduce((s, c) => s + toCriterionWeightPercent(c.weight), 0),
+            0,
+        );
 
         return (
             <div className="space-y-5">
@@ -1491,7 +1513,7 @@ export function CreateAssignmentForm({
                         </Button>
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
-                        Weighted mode lets you set a weight multiplier for each section and criterion.
+                        Weighted mode lets you set criterion weights directly.
                     </p>
                 </div>
 
@@ -1690,7 +1712,6 @@ export function CreateAssignmentForm({
                         register={register}
                         control={control}
                         onRemoveSection={() => removeRubric(sectionIdx)}
-                        rubricMode={watchRubricMode}
                     />
                 ))}
 
@@ -1703,9 +1724,9 @@ export function CreateAssignmentForm({
                         </div>
                         {watchRubricMode === 'weighted' && (
                             <div className="flex justify-between items-center mt-2">
-                                <span className="text-sm font-semibold text-gray-700">Section Weights Total:</span>
-                                <span className="text-sm font-bold" style={{ color: Math.abs(sectionWeightTotal - 100) < 0.001 ? '#166534' : '#991B1B' }}>
-                                    {sectionWeightTotal.toFixed(1)}%
+                                <span className="text-sm font-semibold text-gray-700">Criteria Weights Total:</span>
+                                <span className="text-sm font-bold" style={{ color: Math.abs(criteriaWeightTotal - 100) < 0.001 ? '#166534' : '#991B1B' }}>
+                                    {criteriaWeightTotal.toFixed(1)}%
                                 </span>
                             </div>
                         )}
@@ -1717,200 +1738,6 @@ export function CreateAssignmentForm({
                         </div>
                     </div>
                 )}
-            </div>
-        );
-    }
-
-    // ── Rubric Section Editor Component ──────────────────────────
-
-    interface RubricSectionEditorProps {
-        sectionIdx: number;
-        watchRubricMode: 'weighted' | 'unweighted';
-        errors: any;
-        register: any;
-        control: any;
-        onRemoveSection: () => void;
-        rubricMode: 'weighted' | 'unweighted';
-    }
-
-    function RubricSectionEditor({
-        sectionIdx,
-        watchRubricMode,
-        errors,
-        register,
-        control,
-        onRemoveSection,
-        rubricMode,
-    }: RubricSectionEditorProps) {
-        const section = getValues(`rubric.${sectionIdx}`);
-        const {
-            fields: criteriaFields,
-            append: appendCriterion,
-            remove: removeCriterion,
-        } = useFieldArray({ control, name: `rubric.${sectionIdx}.criteria` });
-
-        return (
-            <div className="rounded-lg border bg-white p-4 dark:bg-gray-900 dark:border-gray-700 space-y-4">
-                {/* Section header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 grid gap-3 md:grid-cols-3">
-                        <div className="md:col-span-2">
-                            <Label className="text-xs">Section Name *</Label>
-                            <Input
-                                {...register(`rubric.${sectionIdx}.name`)}
-                                placeholder="e.g. Correctness"
-                            />
-                            {errors.rubric?.[sectionIdx]?.name && (
-                                <p className="mt-1 text-xs text-red-600">{errors.rubric[sectionIdx]?.name?.message}</p>
-                            )}
-                        </div>
-                        {watchRubricMode === 'weighted' && (
-                            <div>
-                                <Label className="text-xs">Section Weight (%)</Label>
-                                <div className="flex items-center gap-2">
-                                    <Input
-                                        type="number"
-                                        step="0.1"
-                                        min={0}
-                                        max={100}
-                                        {...register(`rubric.${sectionIdx}.weight`, { valueAsNumber: true })}
-                                    />
-                                    <span className="text-xs text-gray-500">%</span>
-                                </div>
-                                {errors.rubric?.[sectionIdx]?.weight && (
-                                    <p className="mt-1 text-xs text-red-600">{errors.rubric[sectionIdx]?.weight?.message}</p>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-gray-400 hover:text-red-500 mt-6"
-                        onClick={onRemoveSection}
-                        aria-label={`Remove section ${sectionIdx + 1}`}
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                </div>
-
-                {/* Section description */}
-                <div>
-                    <Label className="text-xs">Description</Label>
-                    <Textarea
-                        {...register(`rubric.${sectionIdx}.description`)}
-                        rows={2}
-                        placeholder="What this section evaluates..."
-                        className="text-sm"
-                    />
-                </div>
-
-                {/* Criteria table header */}
-                <div className="mt-4 pt-4 border-t dark:border-gray-700">
-                    <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Criteria</h4>
-
-                    {/* Criteria items */}
-                    <div className="space-y-3 mb-4">
-                        {criteriaFields.map((criterionField, critIdx) => (
-                            <div
-                                key={criterionField.id}
-                                className="rounded-lg border bg-gray-50 dark:bg-gray-800 p-3 dark:border-gray-700"
-                            >
-                                <div className="grid gap-3 md:grid-cols-2">
-                                    <div>
-                                        <Label className="text-xs">Name *</Label>
-                                        <Input
-                                            {...register(`rubric.${sectionIdx}.criteria.${critIdx}.name`)}
-                                            placeholder="e.g. Correctness"
-                                            size={30}
-                                            className="h-8 text-sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs">Max Points *</Label>
-                                        <div className="flex gap-1">
-                                            <Input
-                                                type="number"
-                                                {...register(`rubric.${sectionIdx}.criteria.${critIdx}.maxPoints`, { valueAsNumber: true })}
-                                                className="h-8 text-sm"
-                                            />
-                                            {watchRubricMode === 'weighted' && (
-                                                <Input
-                                                    type="number"
-                                                    step="1"
-                                                    min={0}
-                                                    max={100}
-                                                    {...register(`rubric.${sectionIdx}.criteria.${critIdx}.weight`, { valueAsNumber: true })}
-                                                    placeholder="Weight %"
-                                                    className="h-8 text-sm w-24"
-                                                />
-                                            )}
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-gray-400 hover:text-red-500"
-                                                onClick={() => removeCriterion(critIdx)}
-                                            >
-                                                <Trash2 className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs">Grading Method</Label>
-                                        <Controller
-                                            control={control}
-                                            name={`rubric.${sectionIdx}.criteria.${critIdx}.gradingMethod`}
-                                            render={({ field }) => (
-                                                <Select value={field.value} onValueChange={field.onChange}>
-                                                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="auto">Auto</SelectItem>
-                                                        <SelectItem value="manual">Manual</SelectItem>
-                                                        <SelectItem value="hybrid">Hybrid</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            )}
-                                        />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <Label className="text-xs">Description</Label>
-                                        <Textarea
-                                            {...register(`rubric.${sectionIdx}.criteria.${critIdx}.description`)}
-                                            rows={2}
-                                            placeholder="Describe what this criterion evaluates..."
-                                            className="text-sm"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Add criterion button */}
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                            appendCriterion({
-                                name: '',
-                                description: '',
-                                maxPoints: 10,
-                                weight: 100,
-                                gradingMethod: 'manual',
-                            })
-                        }
-                        className="h-8 text-sm"
-                    >
-                        <Plus className="mr-1 h-3.5 w-3.5" /> Add Criterion
-                    </Button>
-
-                    {criteriaFields.length === 0 && (
-                        <p className="text-xs text-gray-400 italic mt-2">No criteria yet. Click "Add Criterion" to get started.</p>
-                    )}
-                </div>
             </div>
         );
     }
@@ -2529,6 +2356,188 @@ export function CreateAssignmentForm({
                 </DialogContent>
             </Dialog>
         </>
+    );
+}
+
+function RubricSectionEditor({
+    sectionIdx,
+    watchRubricMode,
+    errors,
+    register,
+    control,
+    onRemoveSection,
+}: RubricSectionEditorProps) {
+    const {
+        fields: criteriaFields,
+        append: appendCriterion,
+        remove: removeCriterion,
+    } = useFieldArray({ control, name: `rubric.${sectionIdx}.criteria` });
+
+    return (
+        <div className="rounded-lg border bg-white p-4 dark:bg-gray-900 dark:border-gray-700 space-y-4">
+            {/* Section header */}
+            <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 grid gap-3 md:grid-cols-2">
+                    <div>
+                        <Label className="text-xs">Section Name *</Label>
+                        <Input
+                            {...register(`rubric.${sectionIdx}.name`)}
+                            placeholder="e.g. Correctness"
+                        />
+                        {errors.rubric?.[sectionIdx]?.name && (
+                            <p className="mt-1 text-xs text-red-600">{errors.rubric[sectionIdx]?.name?.message}</p>
+                        )}
+                    </div>
+                </div>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 text-gray-400 hover:text-red-500 mt-6"
+                    onClick={onRemoveSection}
+                    aria-label={`Remove section ${sectionIdx + 1}`}
+                >
+                    <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+            </div>
+
+            {/* Section description */}
+            <div>
+                <Label className="text-xs">Description</Label>
+                <Textarea
+                    {...register(`rubric.${sectionIdx}.description`)}
+                    rows={2}
+                    placeholder="What this section evaluates..."
+                    className="text-sm"
+                />
+            </div>
+
+            {/* Criteria table header */}
+            <div className="mt-4 pt-4 border-t dark:border-gray-700">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Criteria</h4>
+
+                {/* Criteria items */}
+                <div className="space-y-3 mb-4">
+                    {criteriaFields.map((criterionField, critIdx) => (
+                        <div
+                            key={criterionField.id}
+                            className="rounded-lg border bg-gray-50 dark:bg-gray-800 p-3 dark:border-gray-700"
+                        >
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <div>
+                                    <Label className="text-xs">Name *</Label>
+                                    <Input
+                                        {...register(`rubric.${sectionIdx}.criteria.${critIdx}.name`)}
+                                        placeholder="e.g. Correctness"
+                                        size={30}
+                                        className="h-8 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <Label className="text-xs">Max Points *</Label>
+                                    <div className="flex gap-1">
+                                        <Input
+                                            type="number"
+                                            {...register(`rubric.${sectionIdx}.criteria.${critIdx}.maxPoints`, { valueAsNumber: true })}
+                                            className="h-8 text-sm"
+                                        />
+                                        {watchRubricMode === 'weighted' && (
+                                            <Controller
+                                                control={control}
+                                                name={`rubric.${sectionIdx}.criteria.${critIdx}.weight`}
+                                                render={({ field }) => (
+                                                    <Input
+                                                        type="text"
+                                                        inputMode="decimal"
+                                                        value={field.value ?? ''}
+                                                        onChange={(e) => {
+                                                            const raw = e.target.value;
+                                                            const normalized = raw.replace('%', '').trim();
+                                                            if (!normalized) {
+                                                                field.onChange('');
+                                                                return;
+                                                            }
+                                                            const parsed = Number.parseFloat(normalized);
+                                                            field.onChange(Number.isFinite(parsed) ? parsed : raw);
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            const normalized = e.target.value.replace('%', '').trim();
+                                                            const parsed = Number.parseFloat(normalized);
+                                                            field.onChange(Number.isFinite(parsed) ? parsed : 0);
+                                                            field.onBlur();
+                                                        }}
+                                                        placeholder="Criteria Weight %"
+                                                        className="h-8 text-sm w-36"
+                                                    />
+                                                )}
+                                            />
+                                        )}
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-8 w-8 text-gray-400 hover:text-red-500"
+                                            onClick={() => removeCriterion(critIdx)}
+                                        >
+                                            <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label className="text-xs">Grading Method</Label>
+                                    <Controller
+                                        control={control}
+                                        name={`rubric.${sectionIdx}.criteria.${critIdx}.gradingMethod`}
+                                        render={({ field }) => (
+                                            <Select value={field.value} onValueChange={field.onChange}>
+                                                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="auto">Auto</SelectItem>
+                                                    <SelectItem value="manual">Manual</SelectItem>
+                                                    <SelectItem value="hybrid">Hybrid</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <Label className="text-xs">Description</Label>
+                                    <Textarea
+                                        {...register(`rubric.${sectionIdx}.criteria.${critIdx}.description`)}
+                                        rows={2}
+                                        placeholder="Describe what this criterion evaluates..."
+                                        className="text-sm"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* Add criterion button */}
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                        appendCriterion({
+                            name: '',
+                            description: '',
+                            maxPoints: 10,
+                            weight: 100,
+                            gradingMethod: 'manual',
+                        })
+                    }
+                    className="h-8 text-sm"
+                >
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Add Criterion
+                </Button>
+
+                {criteriaFields.length === 0 && (
+                    <p className="text-xs text-gray-400 italic mt-2">No criteria yet. Click "Add Criterion" to get started.</p>
+                )}
+            </div>
+        </div>
     );
 }
 

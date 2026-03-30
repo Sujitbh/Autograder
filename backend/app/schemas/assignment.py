@@ -96,8 +96,8 @@ class AssignmentOut(BaseModel):
     status: str = "published"
     is_active: bool = True
     created_at: Optional[datetime] = None
-    # Keep API key as "rubrics" but source data from Assignment.rubric_sections.
-    rubrics: List[RubricSectionOut] = Field(default_factory=list, validation_alias="rubric_sections")
+    # Keep API key as "rubrics" but source data via Assignment.rubrics_out.
+    rubrics: List[RubricSectionOut] = Field(default_factory=list, validation_alias="rubrics_out")
 
     class Config:
         from_attributes = True
