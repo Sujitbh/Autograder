@@ -71,13 +71,13 @@ type SortField = 'studentName' | 'submittedAt' | 'autoScore' | 'finalGrade';
 type SortOrder = 'asc' | 'desc';
 
 function getDisplayStudentName(sub: StudentSubmission): string {
-    if (sub.status === 'not-submitted') return sub.studentName;
+    if (sub.status === 'not-submitted' || sub.status === 'graded') return sub.studentName;
     const token = (sub.studentId || sub.id || '').replace(/^missing-/, '');
     return `Student #${token}`;
 }
 
 function getDisplayAvatarInitials(sub: StudentSubmission): string {
-    if (sub.status === 'not-submitted') return sub.avatarInitials;
+    if (sub.status === 'not-submitted' || sub.status === 'graded') return sub.avatarInitials;
     return '';
 }
 
