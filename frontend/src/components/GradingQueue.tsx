@@ -18,6 +18,7 @@ import {
 import { useAssignments } from '@/hooks/queries';
 import { submissionService } from '@/services/api';
 import type { Submission as ApiSubmission, Assignment, RubricCriterion, TestCaseResult } from '@/types';
+import { normalizeRubricToCriteria } from '@/utils/rubric';
 
 /** Local UI row — derived from API Submission + Assignment metadata */
 interface QueueSubmission {
@@ -289,7 +290,7 @@ export function GradingQueue() {
         ? assignments.find(a => a.id === gradingSubmissionRow.assignmentId)
         : undefined;
 
-    const gradingRubric: RubricCriterion[] = gradingAssignment?.rubric ?? [];
+    const gradingRubric: RubricCriterion[] = normalizeRubricToCriteria(gradingAssignment?.rubric);
 
     const isLoading = assignmentsLoading || submissionsLoading;
 

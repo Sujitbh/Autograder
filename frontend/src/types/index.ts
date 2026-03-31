@@ -251,7 +251,13 @@ export interface CreateAssignmentDto {
     starterCode?: string;
     publicTests: Omit<TestCase, 'id' | 'assignmentId'>[];
     privateTests: Omit<TestCase, 'id' | 'assignmentId'>[];
-    rubric: Array<Omit<RubricSection, 'id'> | Omit<RubricCriterion, 'id'>>;
+    rubric: CreateRubricSectionDto[] | CreateRubricCriterionDto[];
+}
+
+export interface CreateRubricCriterionDto extends Omit<RubricCriterion, 'id'> {}
+
+export interface CreateRubricSectionDto extends Omit<RubricSection, 'id' | 'criteria'> {
+    criteria: CreateRubricCriterionDto[];
 }
 
 export interface UpdateAssignmentDto extends Partial<CreateAssignmentDto> {

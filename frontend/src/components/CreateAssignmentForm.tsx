@@ -510,11 +510,15 @@ export function CreateAssignmentForm({
         if (template) {
             replaceRubric(
                 template.sections.map((section) => ({
-                    ...section,
+                    name: section.name,
+                    description: section.description ?? '',
                     weight: toSectionWeightPercent(section.weight),
                     criteria: (section.criteria || []).map((c) => ({
-                        ...c,
-                        weight: c.weight ?? 100,
+                        name: c.name,
+                        description: c.description ?? '',
+                        maxPoints: c.maxPoints,
+                        weight: c.weight ?? 1,
+                        gradingMethod: c.gradingMethod,
                     })),
                 }))
             );
@@ -701,7 +705,7 @@ export function CreateAssignmentForm({
             } else {
                 setSelectedRubricTemplateId(NO_RUBRIC_TEMPLATE_ID);
                 // Wrap criteria in a default section, converting multiplier weights to percentages
-                const section: RubricSection = {
+                const section: AssignmentFormData['rubric'][number] = {
                     name: 'Rubric Criteria',
                     description: `Criteria extracted from ${file.name}`,
                     weight: 100,
@@ -847,7 +851,7 @@ export function CreateAssignmentForm({
             } else {
                 setSelectedRubricTemplateId(NO_RUBRIC_TEMPLATE_ID);
                 // Wrap criteria in a default section, converting multiplier weights to percentages
-                const section: RubricSection = {
+                const section: AssignmentFormData['rubric'][number] = {
                     name: 'Rubric Criteria',
                     description: `Criteria extracted from ${file.name}`,
                     weight: 100,
@@ -2019,7 +2023,9 @@ export function CreateAssignmentForm({
         const totalTestPoints =
             values.publicTests.reduce((s, t) => s + t.points, 0) +
             values.privateTests.reduce((s, t) => s + t.points, 0);
-        const totalRubricPoints = values.rubric.reduce((s, c) => s + c.maxPoints, 0);
+        const rubricCriteria = values.rubric.flatMap((section) => section.criteria ?? []);
+        const totalRubricPoints = rubricCriteria.reduce((sum, criterion) => sum + criterion.maxPoints, 0);
+        const rubricGradingMethods = [...new Set(rubricCriteria.map((criterion) => criterion.gradingMethod))];
 
         const sections = [
             {
@@ -2066,10 +2072,10 @@ export function CreateAssignmentForm({
                 step: 5,
                 icon: ClipboardList,
                 items: [
-                    { label: 'Criteria', value: `${values.rubric.length} criterion/criteria` },
+                    { label: 'Criteria', value: `${rubricCriteria.length} criterion/criteria` },
                     { label: 'Total Rubric Points', value: String(totalRubricPoints) },
                     { label: 'Rubric Mode', value: values.rubricMode === 'weighted' ? 'Weighted' : 'Unweighted' },
-                    { label: 'Grading Methods', value: [...new Set(values.rubric.map((c) => c.gradingMethod))].join(', ') || '—' },
+                    { label: 'Grading Methods', value: rubricGradingMethods.join(', ') || '—' },
                 ],
             },
             {
@@ -2150,15 +2156,15 @@ export function CreateAssignmentForm({
                     <div className="rounded-lg border p-4 dark:border-gray-700">
                         <Label className="text-xs text-gray-400 mb-2 block">Rubric Breakdown</Label>
                         <div className="space-y-2">
-                            {values.rubric.map((c, i) => (
+                            {rubricCriteria.map((criterion, i) => (
                                 <div key={i} className="flex items-center justify-between py-1.5 border-b last:border-0 dark:border-gray-700">
                                     <div>
-                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{c.name}</span>
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{criterion.name}</span>
                                         <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-800">
-                                            {c.gradingMethod}
+                                            {criterion.gradingMethod}
                                         </span>
                                     </div>
-                                    <span className="text-sm font-bold text-[#6B0000]">{c.maxPoints} pts</span>
+                                    <span className="text-sm font-bold text-[#6B0000]">{criterion.maxPoints} pts</span>
                                 </div>
                             ))}
                         </div>
@@ -2282,10 +2288,18 @@ export function CreateAssignmentForm({
                                     <Check className="h-3.5 w-3.5 text-green-600" /> {rubricFields.length} rubric criteria
                                 </li>
                                 <li className="flex items-center gap-2 text-xs text-gray-700">
-                                    <Check className="h-3.5 w-3.5 text-green-600" /> Grading methods: {[...new Set(getValues('rubric').map((c) => c.gradingMethod))].join(', ') || '—'}
+                                    <Check className="h-3.5 w-3.5 text-green-600" /> Grading methods: {[
+                                        ...new Set(getValues('rubric').flatMap((section) => section.criteria.map((criterion) => criterion.gradingMethod))),
+                                    ].join(', ') || '—'}
                                 </li>
                                 <li className="flex items-center gap-2 text-xs text-gray-700">
-                                    <Check className="h-3.5 w-3.5 text-green-600" /> Total: {getValues('rubric').reduce((s, c) => s + c.maxPoints, 0)} points
+                                    <Check className="h-3.5 w-3.5 text-green-600" /> Total: {
+                                        getValues('rubric').reduce(
+                                            (sectionSum, section) =>
+                                                sectionSum + section.criteria.reduce((criterionSum, criterion) => criterionSum + criterion.maxPoints, 0),
+                                            0
+                                        )
+                                    } points
                                 </li>
                             </ul>
                         </div>

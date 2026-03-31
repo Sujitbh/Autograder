@@ -85,6 +85,8 @@ export interface TASubmissionDetail {
         due_date: string | null;
         max_submissions: number | null;
         allowed_languages: string | null;
+        max_points?: number | null;
+        rubric_mode?: 'weighted' | 'unweighted' | null;
     };
     status: string;
     score: number | null;
@@ -117,6 +119,14 @@ export interface TASubmissionDetail {
         weight: number | null;
         max_points: number | null;
         order: number | null;
+        criteria?: Array<{
+            id: number;
+            name: string;
+            description: string | null;
+            weight: number | null;
+            max_points: number | null;
+            order?: number | null;
+        }>;
     }>;
     permissions: TAPermissions;
 }

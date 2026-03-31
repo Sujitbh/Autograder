@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronDown, GraduationCap, LogOut, User, MessageSquare, BookOpen, Moon, Sun, StickyNote, CalendarDays, ArrowLeftRight } from 'lucide-react';
+import { ChevronRight, ChevronDown, LogOut, User, MessageSquare, BookOpen, Moon, Sun, StickyNote, CalendarDays, ArrowLeftRight } from 'lucide-react';
 import { LiveClock } from './LiveClock';
 import {
   DropdownMenu,
@@ -109,12 +109,14 @@ export function TopNav({
     }
   };
 
-  const userName = userNameProp ?? (
+  const userFullName = userNameProp ?? (
     currentUser
       ? `${currentUser.firstName} ${currentUser.lastName}`.trim()
-      : 'Dr. Sarah Johnson'
+      : 'User'
   );
-  const userEmail = userEmailProp ?? (currentUser?.email || 'sjohnson@ulm.edu');
+  const userFirstName = currentUser?.firstName || userFullName.split(' ')[0];
+  const userName = userFullName;
+  const userEmail = userEmailProp ?? (currentUser?.email || '');
 
   // Get initials from user name (first + last)
   const getInitials = (name: string) => {
@@ -165,26 +167,14 @@ export function TopNav({
         aria-label="Go to courses"
         style={{ background: 'none', border: 'none', padding: 0 }}
       >
-        <GraduationCap
-          className="text-white"
+        <img
+          src="/images/axiom-logo.png"
+          alt="Axiom"
           style={{
             width: '32px',
             height: '32px',
-            marginRight: '12px',
-            color: navFg,
           }}
         />
-        <span
-          className="text-white"
-          style={{
-            fontSize: '18px',
-            fontWeight: 700,
-            letterSpacing: '0.5px',
-            color: navFg,
-          }}
-        >
-          Axiom
-        </span>
       </button>
 
       {/* Center Zone: Breadcrumb Trail (hidden on top-level pages) */}
@@ -367,21 +357,30 @@ export function TopNav({
         {/* Profile Dropdown Trigger */}
         <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
           <DropdownMenuTrigger className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-            {/* Faculty Avatar with Initials */}
-            <div
-              className="rounded-full flex items-center justify-center text-white"
-              style={{
-                width: '32px',
-                height: '32px',
-                backgroundColor: 'var(--color-gold-accent)', // --color-gold-accent
-                fontSize: '13px',
-                fontWeight: 700
-              }}
-            >
-              {getInitials(userName)}
-            </div>
+            {/* Avatar — photo or initials */}
+            {currentUser?.profilePhoto ? (
+              <img
+                src={currentUser.profilePhoto}
+                alt=""
+                className="rounded-full object-cover"
+                style={{ width: '32px', height: '32px' }}
+              />
+            ) : (
+              <div
+                className="rounded-full flex items-center justify-center text-white"
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  backgroundColor: 'var(--color-gold-accent)',
+                  fontSize: '13px',
+                  fontWeight: 700
+                }}
+              >
+                {getInitials(userName)}
+              </div>
+            )}
 
-            {/* Faculty Name */}
+            {/* First Name Only */}
             <span
               className="text-white truncate"
               style={{
@@ -391,7 +390,7 @@ export function TopNav({
                 color: navFg,
               }}
             >
-              {userName}
+              {userFirstName}
             </span>
 
             {/* Down Chevron */}
@@ -427,18 +426,27 @@ export function TopNav({
                 borderBottom: '1px solid var(--color-border)'
               }}
             >
-              <div
-                className="rounded-full flex items-center justify-center text-white flex-shrink-0"
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  backgroundColor: 'var(--color-gold-accent)',
-                  fontSize: '14px',
-                  fontWeight: 700
-                }}
-              >
-                {getInitials(userName)}
-              </div>
+              {currentUser?.profilePhoto ? (
+                <img
+                  src={currentUser.profilePhoto}
+                  alt=""
+                  className="rounded-full object-cover flex-shrink-0"
+                  style={{ width: '40px', height: '40px' }}
+                />
+              ) : (
+                <div
+                  className="rounded-full flex items-center justify-center text-white flex-shrink-0"
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    backgroundColor: 'var(--color-gold-accent)',
+                    fontSize: '14px',
+                    fontWeight: 700
+                  }}
+                >
+                  {getInitials(userName)}
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <p
                   className="truncate"

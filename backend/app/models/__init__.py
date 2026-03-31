@@ -18,6 +18,7 @@ from .semester import Semester
 from .audit_log import AuditLog
 from .system_setting import SystemSetting
 from .ta_permission import TAPermission
+from .otp import OTP
 
 # Expose symbols for convenience
 __all__ = [
@@ -41,4 +42,5 @@ __all__ = [
 	"AuditLog",
 	"SystemSetting",
 	"TAPermission",
+	"OTP",
 ]

@@ -28,3 +28,28 @@ The Axiom Team
         logger.info(f"Subject: {subject}")
         logger.info(body)
         logger.info("==================================================")
+
+    @staticmethod
+    def send_password_reset_email(to_email: str, reset_url: str):
+        """
+        Sends a password reset email with a link containing the reset token.
+        Currently logs the email; swap with SMTP / SendGrid / SES in production.
+        """
+        subject = "Axiom — Password Reset Request"
+        body = f"""
+Hello,
+
+We received a request to reset the password for your Axiom account ({to_email}).
+
+Click the link below to set a new password (valid for 1 hour):
+{reset_url}
+
+If you did not request this, you can safely ignore this email.
+
+Best regards,
+The Axiom Team
+"""
+        logger.info(f"========== PASSWORD RESET EMAIL TO: {to_email} ==========")
+        logger.info(f"Subject: {subject}")
+        logger.info(body)
+        logger.info("==========================================================")

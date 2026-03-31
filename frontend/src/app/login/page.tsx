@@ -4,9 +4,10 @@ import { LoginPage } from '@/components/LoginPage';
 import { useAuth } from '@/utils/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
+import type { UserRole } from '@/types';
 
 /** Return the dashboard path for a given role. */
-function dashboardForRole(role: string): string {
+function dashboardForRole(role: UserRole): string {
     switch (role) {
         case 'student': return '/student';
         case 'admin': return '/admin';
@@ -23,16 +24,8 @@ function LoginContent() {
         if (isAuthenticated && role) router.replace(dashboardForRole(role));
     }, [isAuthenticated, role, router]);
 
-    return <LoginPage onLogin={(userData, token) => {
-        // authService already stored the JWT in localStorage.
-        // Now persist user info in AuthContext so the app knows who is logged in.
-        login({
-            id: userData.id,
-            firstName: userData.name?.split(' ')[0] ?? '',
-            lastName: userData.name?.split(' ').slice(1).join(' ') ?? '',
-            email: userData.email,
-            role: userData.role as any,
-        }, token);
+    return <LoginPage onLogin={(userData, token, rememberMe) => {
+        login(userData, token, rememberMe);
         router.push(dashboardForRole(userData.role));
     }} />;
 }

@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { User, UserRole, Faculty, Student, RegisterData } from '@/types';
+import { getStore, clearAllAuth, setRememberMe, checkSession } from '@/utils/authStorage';
 
 // ── Context shape ───────────────────────────────────────────────────
 
@@ -22,8 +23,8 @@ interface AuthContextType {
     isAuthenticated: boolean;
     /** True while restoring the session on mount. */
     isLoading: boolean;
-    /** Sign in — stores user in state + localStorage. Token is already in localStorage from authService. */
-    login: (userData?: Partial<User>, token?: string) => void;
+    /** Sign in — stores user in state + storage. Token is already stored by authService. */
+    login: (userData?: Partial<User>, token?: string, rememberMe?: boolean) => void;
     /** Register → same as login for simplicity. */
     signup: (userData?: Partial<User>) => void;
     /** Log out — clears everything. */
@@ -80,11 +81,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
     const queryClient = useQueryClient();
 
-    // Restore session from localStorage on mount
+    // Restore session on mount
     useEffect(() => {
         try {
-            const stored = sessionStorage.getItem('autograde_current_user');
-            const auth = sessionStorage.getItem('autograde_auth');
+            checkSession();
+            const stored = localStorage.getItem('autograde_current_user');
+            const auth = localStorage.getItem('autograde_auth');
             if (stored && auth === 'true') {
                 setUser(JSON.parse(stored));
             }
@@ -97,29 +99,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const persistUser = useCallback((u: User) => {
         setUser(u);
-        sessionStorage.setItem('autograde_current_user', JSON.stringify(u));
-        sessionStorage.setItem('autograde_auth', 'true');
+        localStorage.setItem('autograde_current_user', JSON.stringify(u));
+        localStorage.setItem('autograde_auth', 'true');
+        sessionStorage.setItem('autograde_session_active', 'true');
     }, []);
 
     const login = useCallback(
-        (userData?: Partial<User>, token?: string) => {
-            // STEP 1: Clear ALL previous session state first
-            sessionStorage.removeItem('autograde_current_user');
-            sessionStorage.removeItem('autograde_auth');
-            sessionStorage.removeItem('autograde_token');
-            sessionStorage.removeItem('autograde_refresh_token');
+        (userData?: Partial<User>, token?: string, rememberMe?: boolean) => {
+            clearAllAuth();
+            setRememberMe(rememberMe ?? false);
             setUser(null);
 
-            // STEP 2: Clear React Query cache so old user's data doesn't leak
             queryClient.clear();
 
-            // STEP 3: Build and persist new user
             const u = buildUser(userData);
             persistUser(u);
 
-            // STEP 4: Store JWT token for API calls
             if (token && typeof globalThis.window !== 'undefined') {
-                sessionStorage.setItem('autograde_token', token);
+                localStorage.setItem('autograde_token', token);
             }
         },
         [persistUser, queryClient]
@@ -134,14 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     const logout = useCallback(() => {
-        // Clear all auth state
         setUser(null);
-        sessionStorage.removeItem('autograde_current_user');
-        sessionStorage.removeItem('autograde_auth');
-        sessionStorage.removeItem('autograde_token');
-        sessionStorage.removeItem('autograde_refresh_token');
-
-        // Clear React Query cache so no stale data from this user persists
+        clearAllAuth();
         queryClient.clear();
     }, [queryClient]);
 
@@ -150,10 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser((prev) => {
                 if (!prev) return prev;
                 const updated = { ...prev, ...patch } as User;
-                sessionStorage.setItem(
-                    'autograde_current_user',
-                    JSON.stringify(updated)
-                );
+                localStorage.setItem('autograde_current_user', JSON.stringify(updated));
                 return updated;
             });
         },

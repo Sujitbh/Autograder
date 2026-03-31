@@ -1,5 +1,22 @@
 @custom-variant dark (&:is(.dark *));
 
+/* Landing Page Design Tokens */
+:root {
+  --landing-primary: #7B0D0D;
+  --landing-primary-dark: #550808;
+  --landing-primary-light: #9E1515;
+  --landing-bg: #FAF8F5;
+  --landing-surface: #FFFFFF;
+  --landing-ink: #1A1410;
+  --landing-ink-soft: #3D3028;
+  --landing-muted: #8C7B70;
+  --landing-border: #E8E0D8;
+  --landing-gold: #C49A3C;
+  --landing-gold-light: #E8C06A;
+  --font-display: 'Cormorant Garamond', serif;
+  --font-body: 'Outfit', sans-serif;
+}
+
 :root {
   /* ============================================
      Axiom ULM Design System

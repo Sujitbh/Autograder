@@ -34,37 +34,36 @@ class UserService:
         """
         Register a new user.
         
-        Role determination:
-        - Uses provided role if specified
-        - Defaults to 'faculty' for @ulm.edu domain
-        - Defaults to 'student' otherwise
+        Role is always determined by email domain:
+        - @warhawks.ulm.edu → student
+        - @ulm.edu (non-warhawks) → faculty
+        - Admin accounts can only be created directly in the database.
         
         Raises:
-            HTTPException: If email already exists
+            HTTPException: If email already exists or domain is not allowed
         """
-        existing = UserService.get_by_email(db, payload.email)
+        email_lower = payload.email.lower().strip()
+
+        if email_lower.endswith("@warhawks.ulm.edu"):
+            role = "student"
+        elif email_lower.endswith("@ulm.edu"):
+            role = "faculty"
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only @warhawks.ulm.edu and @ulm.edu email addresses are allowed",
+            )
+
+        existing = UserService.get_by_email(db, email_lower)
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Email already registered",
             )
 
-        # Determine role: use payload role, or infer from domain.
-        # Admin accounts can NEVER be self-registered; they must be seeded directly.
-        requested_role = (payload.role or "").lower()
-        if requested_role == "admin":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin registration is not allowed",
-            )
-        if payload.role:
-            role = requested_role
-        else:
-            role = "faculty" if payload.email.lower().endswith("@ulm.edu") else "student"
-
         user = User(
             name=payload.name,
-            email=payload.email,
+            email=email_lower,
             password_hash=hash_password(payload.password),
             role=role,
         )

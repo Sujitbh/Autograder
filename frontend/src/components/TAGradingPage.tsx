@@ -64,6 +64,81 @@ function getFileIcon(name: string) {
     return FILE_ICONS[ext] ?? '📄';
 }
 
+type TARubricCriterionView = {
+    id: number;
+    name: string;
+    description: string | null;
+    weight: number | null;
+    max_points: number | null;
+    order?: number | null;
+    section_name?: string;
+    section_weight?: number | null;
+};
+
+type TARubricSectionView = {
+    id: number | string;
+    name: string;
+    description: string | null;
+    weight: number | null;
+    criteria: TARubricCriterionView[];
+};
+
+type TASubmissionRubricItem = {
+    id: number;
+    name: string;
+    description: string | null;
+    weight: number | null;
+    max_points: number | null;
+    order: number | null;
+    criteria?: Array<{
+        id: number;
+        name: string;
+        description: string | null;
+        weight: number | null;
+        max_points: number | null;
+        order?: number | null;
+    }>;
+};
+
+function normalizeTARubricSections(rubrics: TASubmissionRubricItem[]): TARubricSectionView[] {
+    if (rubrics.length === 0) return [];
+    const hasSections = rubrics.some((rubric) => Array.isArray(rubric.criteria));
+
+    if (hasSections) {
+        return rubrics.map((section) => ({
+            id: section.id,
+            name: section.name,
+            description: section.description,
+            weight: section.weight,
+            criteria: (section.criteria ?? []).map((criterion) => ({
+                id: criterion.id,
+                name: criterion.name,
+                description: criterion.description,
+                weight: criterion.weight,
+                max_points: criterion.max_points,
+                order: criterion.order ?? null,
+            })),
+        }));
+    }
+
+    return [
+        {
+            id: 'section-rubric',
+            name: 'Rubric Criteria',
+            description: null,
+            weight: 100,
+            criteria: rubrics.map((criterion) => ({
+                id: criterion.id,
+                name: criterion.name,
+                description: criterion.description,
+                weight: criterion.weight,
+                max_points: criterion.max_points,
+                order: criterion.order,
+            })),
+        },
+    ];
+}
+
 export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGradingPageProps>) {
     const router = useRouter();
     const { isDark } = useTheme();
@@ -270,27 +345,23 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         || 'python'
     ).toLowerCase();
 
-    // Helper to flatten rubric sections into a single array
-    const flattenRubrics = (sections: any[]) =>
-        sections.flatMap((section) =>
-            (section.criteria || []).map((criterion) => ({
-                ...criterion,
-                section_name: section.name,
-                section_weight: section.weight,
-            }))
-        );
-
     const sectionWeightPercent = (weight?: number | null) => {
         if (weight == null || Number.isNaN(weight)) return 100;
         return weight <= 1.5 ? weight * 100 : weight;
     };
 
-    const rubricSections = detail.rubrics ?? [];
-    const rubrics = flattenRubrics(rubricSections);
+    const rubricSections = normalizeTARubricSections(detail.rubrics ?? []);
+    const rubrics = rubricSections.flatMap((section) =>
+        section.criteria.map((criterion) => ({
+            ...criterion,
+            section_name: section.name,
+            section_weight: section.weight,
+        }))
+    );
     const inferredWeightedRubric = rubricSections.some(
         (section) =>
             Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 ||
-            (section.criteria || []).some((criterion) => Math.abs((criterion.weight ?? 1) - 1) > 0.0001)
+            section.criteria.some((criterion) => Math.abs((criterion.weight ?? 1) - 1) > 0.0001)
     );
     const isWeightedRubric = detail.assignment?.rubric_mode === 'weighted' || inferredWeightedRubric;
     const getSectionFallbackPoints = (section: any) => {
@@ -981,7 +1052,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                 {(section.criteria || []).length > 0 ? (
                                                                     (section.criteria || []).map((criterion) => {
                                                                         const autoEval = autoGradeResult?.rubric_results?.evaluations?.find(
-                                                                            (e: any) => e.rubric_id === criterion.id
+                                                                            (e) => e.rubric_id === criterion.id
                                                                         );
                                                                         const earned = autoEval ? autoEval.earned_points : null;
                                                                         const max = criterion.max_points || 0;

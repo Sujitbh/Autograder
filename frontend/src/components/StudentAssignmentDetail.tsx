@@ -18,6 +18,7 @@ import { useCodeExecution } from '@/hooks/useCodeExecution';
 import { useTestCaseRunner } from '@/hooks/useTestCaseRunner';
 import { useAuth } from '@/utils/AuthContext';
 import { submissionService } from '@/services/api';
+import { normalizeRubricToSections } from '@/utils/rubric';
 import {
   Play,
   RotateCcw,
@@ -178,7 +179,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const [newFileName, setNewFileName] = useState('');
 
   // Execution hooks
-  const { execute, isRunning: isExecuting, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
+  const { execute, compile, isRunning: isExecuting, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
   const { runTests, isRunning: isTestsRunning, results: testResults, progress: testProgress } = useTestCaseRunner();
 
   // Auto-save
@@ -226,29 +227,24 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     if (weight == null || Number.isNaN(weight)) return 100;
     return weight <= 1.5 ? weight * 100 : weight;
   };
-  const criterionWeightPercent = (weight?: number | null) => {
-    if (weight == null || Number.isNaN(weight)) return 100;
-    return weight <= 1.5 ? weight * 100 : weight;
-  };
-  const assignmentRubricSections = assignment?.rubric ?? [];
-  const rubricSections = assignmentRubricSections.length > 0
-    ? assignmentRubricSections
-    : ((legacyRubrics ?? []).length > 0
-      ? [{
-          name: 'Rubric',
-          description: 'Published grading rubric',
-          weight: 100,
-          criteria: (legacyRubrics ?? []).map((r) => ({
+  const rubricFromAssignment = normalizeRubricToSections(assignment?.rubric);
+  const rubricSections =
+    rubricFromAssignment.length > 0
+      ? rubricFromAssignment
+      : normalizeRubricToSections(
+          (legacyRubrics ?? []).map((r) => ({
             name: r.name,
             description: r.description ?? '',
             maxPoints: r.max_points ?? 0,
             weight: r.weight ?? 1,
             gradingMethod: 'manual' as const,
-          })),
-        }]
-      : []);
-  const rubricTotalPoints = rubricSections.reduce((sum, section) => 
-    sum + (section.criteria || []).reduce((sectionSum, crit) => sectionSum + (crit.maxPoints ?? 0), 0), 0);
+          }))
+        );
+  const rubricTotalPoints = rubricSections.reduce(
+    (sum, section) =>
+      sum + (section.criteria || []).reduce((sectionSum, crit) => sectionSum + (crit.maxPoints ?? 0), 0),
+    0
+  );
   const getSectionFallbackPoints = (section: any) => {
     const assignmentMaxPoints = assignment?.maxPoints ?? 0;
     if (assignmentMaxPoints <= 0) return null;
@@ -256,9 +252,9 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     if (isWeightedRubric) return Math.round((assignmentMaxPoints * sectionWeightPercent(section.weight)) / 100);
     return null;
   };
-  const inferredWeightedRubric = rubricSections.some((section) => 
-    Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 || 
-    (section.criteria || []).some((crit) => Math.abs(criterionWeightPercent(crit.weight) - 100) > 0.0001)
+  const inferredWeightedRubric = rubricSections.some((section) =>
+    Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 ||
+    (section.criteria || []).some((crit) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
   );
   const isWeightedRubric = assignment?.rubricMode === 'weighted' || inferredWeightedRubric;
 
@@ -310,6 +306,16 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     }
     setShowInlineInput(false);
     await execute(code, language);
+  };
+
+  const supportsCompileCheck = language === 'python' || language === 'java';
+  const compileButtonLabel = language === 'java' ? 'Compile' : 'Check Syntax';
+
+  const handleCompileCode = async () => {
+    if (!supportsCompileCheck) return;
+    setOutputOpen(true);
+    setShowInlineInput(false);
+    await compile(code, language);
   };
 
   const handleOpenInlineInput = () => {
@@ -567,6 +573,25 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
               >
                 {isExecuting ? '⏳ Running...' : '▶ Run'}
               </button>
+
+              {supportsCompileCheck && (
+                <button
+                  onClick={handleCompileCode}
+                  disabled={isExecuting || isTestsRunning}
+                  style={{
+                    padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                    background: '#7B0D0D', color: '#fff', letterSpacing: '.3px',
+                    transition: 'background .15s, box-shadow .2s',
+                    opacity: isExecuting || isTestsRunning ? 0.7 : 1,
+                    cursor: isExecuting || isTestsRunning ? 'not-allowed' : 'pointer',
+                    border: 'none',
+                  }}
+                  onMouseEnter={e => { if (!isExecuting && !isTestsRunning) { e.currentTarget.style.background = '#5C0909'; e.currentTarget.style.boxShadow = '0 0 10px rgba(123,13,13,.45)'; } }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#7B0D0D'; e.currentTarget.style.boxShadow = 'none'; }}
+                >
+                  {compileButtonLabel}
+                </button>
+              )}
 
               <button
                 onClick={handleOpenInlineInput}
