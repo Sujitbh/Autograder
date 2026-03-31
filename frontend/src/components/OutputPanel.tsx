@@ -15,6 +15,23 @@ interface OutputPanelProps {
   isRunWithInputDisabled?: boolean;
 }
 
+function getMissingInputHint(result: ExecuteCodeResponse, stdinInput?: string): string | null {
+  if ((stdinInput ?? '').trim().length > 0) return null;
+
+  const errorText = `${result.stderr ?? ''}\n${result.stdout ?? ''}`;
+  const missingInputPatterns = [
+    /NoSuchElementException/i,
+    /No line found/i,
+    /\bEOFError\b/i,
+    /EOF when reading a line/i,
+  ];
+
+  const matched = missingInputPatterns.some((pattern) => pattern.test(errorText));
+  if (!matched) return null;
+
+  return 'This program expects input. Open the Input panel, enter stdin, and run again.';
+}
+
 /** Shared stdin input composer shown inside the output panel */
 function StdinComposer({
   inputDraft,
@@ -129,6 +146,7 @@ export function OutputPanel({
 
   const isSuccess = result.status === 'success' || result.status === 'SUCCESS';
   const isTimeout = result.status === 'timeout' || result.status === 'TIMEOUT';
+  const missingInputHint = !isSuccess ? getMissingInputHint(result, stdinInput) : null;
 
   const statusColor = isSuccess
     ? 'var(--color-success)'
@@ -163,6 +181,18 @@ export function OutputPanel({
 
       {/* Output Content */}
       <div className="flex-1 overflow-auto p-4">
+        {missingInputHint && (
+          <div
+            className="mb-3 p-3 rounded-md border"
+            style={{
+              borderColor: 'var(--color-warning)',
+              backgroundColor: 'var(--color-warning-bg)',
+              color: 'var(--color-warning)',
+            }}
+          >
+            <p className="text-sm font-medium">{missingInputHint}</p>
+          </div>
+        )}
         {stdinInput && (
           <div className="mb-3">
             <p className="text-xs font-semibold font-mono uppercase mb-1" style={{ color: 'var(--color-text-light)' }}>

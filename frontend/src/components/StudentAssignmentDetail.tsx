@@ -47,6 +47,10 @@ const LANGUAGE_EXTENSION_MAP: Record<string, string> = {
   javascript: '.js',
 };
 
+const DEFAULT_FILE_NAME_BY_LANGUAGE: Record<string, string> = {
+  java: 'Solution.java',
+};
+
 const STARTER_COMMENTS: Record<string, string> = {
   python: '# Write your solution here\n\n',
   java: '// Write your solution here\n\npublic class Solution {\n    public static void main(String[] args) {\n        \n    }\n}\n',
@@ -142,7 +146,8 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const starterCode = assignment?.starterCode
     ?? STARTER_COMMENTS[language]
     ?? '// Write your solution here\n';
-  const defaultFileName = `solution${LANGUAGE_EXTENSION_MAP[language] ?? '.txt'}`;
+  const defaultFileName = DEFAULT_FILE_NAME_BY_LANGUAGE[language]
+    ?? `solution${LANGUAGE_EXTENSION_MAP[language] ?? '.txt'}`;
   const [editorFiles, setEditorFiles] = useState<EditorFile[]>([]);
   const [activeFileIdx, setActiveFileIdx] = useState(0);
   const activeFile = editorFiles[activeFileIdx] ?? null;
@@ -258,25 +263,6 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     }
   }, []);
 
-  // Detect common stdin patterns by language to offer inline input automatically.
-  const codeUsesInput = (codeStr: string, lang: string) => {
-    const lines = codeStr.split('\n');
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed.startsWith('#')) continue;
-      if (lang === 'python' && trimmed.includes('input(')) return true;
-      if (
-        lang === 'java' && (
-          trimmed.includes('Scanner')
-          || trimmed.includes('System.in')
-          || /\bnext(Line|Int|Double|Float|Long|Short|Byte|Boolean)?\s*\(/.test(trimmed)
-        )
-      ) {
-        return true;
-      }
-    }
-    return false;
-  };
   const buildExecutionScope = () => ({
     assignmentId: assignmentId,
     entryFilename: activeFile?.name ?? defaultFileName,
@@ -286,7 +272,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   // Run code
   const handleRunCode = async () => {
     setOutputOpen(true);
-    if (codeUsesInput(code, language)) {
+    if (language === 'java' || language === 'python') {
       if (!showInlineInput) {
         setShowInlineInput(true);
         return; // open input area on first click; user types then clicks Run inside
@@ -1280,13 +1266,13 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
             </p>
             <div className="p-3 rounded-lg" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
               <p className="font-semibold text-sm" style={{ color: 'var(--color-text-dark)' }}>{assignment.name}</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--color-text-mid)' }}>
-                {mode === 'upload' && selectedFiles.length > 0
-                  ? `File: ${selectedFiles[0].name}`
-                  : `File: solution${LANGUAGE_EXTENSION_MAP[language] ?? '.txt'}`
-                }
-              </p>
-            </div>
+                <p className="text-xs mt-1" style={{ color: 'var(--color-text-mid)' }}>
+                  {mode === 'upload' && selectedFiles.length > 0
+                    ? `File: ${selectedFiles[0].name}`
+                    : `File: ${defaultFileName}`
+                  }
+                </p>
+              </div>
             <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
               This will run your code against all test cases (public + private) for final grading.
               {submissions && submissions.length > 0 && ` This will be attempt #${submissions.length + 1}.`}
