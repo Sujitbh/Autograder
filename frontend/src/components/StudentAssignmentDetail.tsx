@@ -277,6 +277,11 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     }
     return false;
   };
+  const buildExecutionScope = () => ({
+    assignmentId: assignmentId,
+    entryFilename: activeFile?.name ?? defaultFileName,
+    files: editorFiles.map(file => ({ name: file.name, content: file.content })),
+  });
 
   // Run code
   const handleRunCode = async () => {
@@ -287,11 +292,11 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
         return; // open input area on first click; user types then clicks Run inside
       }
       // input area already open — run with whatever is currently in stdinValue
-      await execute(code, language, stdinValue);
+      await execute(code, language, stdinValue, buildExecutionScope());
       return;
     }
     setShowInlineInput(false);
-    await execute(code, language);
+    await execute(code, language, '', buildExecutionScope());
   };
 
   const supportsCompileCheck = language === 'python' || language === 'java';
@@ -301,7 +306,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     if (!supportsCompileCheck) return;
     setOutputOpen(true);
     setShowInlineInput(false);
-    await compile(code, language);
+    await compile(code, language, buildExecutionScope());
   };
 
   const handleOpenInlineInput = () => {
@@ -313,7 +318,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const handleRunWithStdin = async () => {
     setOutputOpen(true);
     setShowInlineInput(true);
-    await execute(code, language, stdinValue);
+    await execute(code, language, stdinValue, buildExecutionScope());
   };
 
   // Run public tests

@@ -5,7 +5,7 @@ from collections import Counter
 from pathlib import Path
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
@@ -148,16 +148,106 @@ def _heuristic_ai_likelihood(code: str) -> dict:
     }
 
 
-def _estimate_ai_likelihood(code: str) -> dict:
-    model_result = predict_ai_likelihood(code)
+def _resolve_ai_threshold(threshold: float | None) -> float:
+    raw = settings.AI_DETECTOR_DEFAULT_THRESHOLD if threshold is None else threshold
+    try:
+        parsed = float(raw)
+    except Exception:
+        parsed = float(settings.AI_DETECTOR_DEFAULT_THRESHOLD)
+    return max(0.0, min(1.0, parsed))
+
+
+def _build_ai_result_from_confidence(
+    confidence: float,
+    threshold: float,
+    model_language: str | None,
+    *,
+    extra_signals: list[str] | None = None,
+) -> dict:
+    confidence = max(0.0, min(1.0, float(confidence)))
+    threshold = _resolve_ai_threshold(threshold)
+    flagged = confidence >= threshold
+
+    if confidence >= 0.65:
+        band = "high"
+    elif confidence >= 0.40:
+        band = "medium"
+    else:
+        band = "low"
+
+    signals = list(extra_signals or [])
+    if not signals:
+        signals = ["Stored model confidence"]
+    if model_language:
+        signals.append(f"Language-specific model: {model_language}")
+
+    return {
+        "ai_confidence": round(confidence, 6),
+        "ai_flagged": flagged,
+        "threshold_used": round(threshold, 6),
+        "model_language": model_language,
+        # Compatibility fields consumed by existing frontend integrity card.
+        "score": round(confidence * 100.0, 1),
+        "band": band,
+        "signals": signals,
+        "disclaimer": "AI detection is advisory only; use instructor judgement and corroborating evidence.",
+    }
+
+
+def _stored_ai_likelihood(submission: Submission, threshold: float | None = None) -> dict | None:
+    if submission.ai_confidence is None:
+        return None
+
+    threshold_used = (
+        threshold
+        if threshold is not None
+        else (submission.ai_threshold_used if submission.ai_threshold_used is not None else settings.AI_DETECTOR_DEFAULT_THRESHOLD)
+    )
+
+    signals = []
+    if threshold is not None and submission.ai_threshold_used is not None:
+        if abs(float(submission.ai_threshold_used) - float(threshold_used)) > 1e-9:
+            signals.append("Flag recomputed with request threshold override")
+
+    return _build_ai_result_from_confidence(
+        confidence=float(submission.ai_confidence),
+        threshold=float(threshold_used),
+        model_language=submission.ai_model_language,
+        extra_signals=signals,
+    )
+
+
+def _estimate_ai_likelihood(code: str, filename: str | None = None, threshold: float | None = None) -> dict:
+    if not code or not code.strip():
+        return _build_ai_result_from_confidence(
+            confidence=0.0,
+            threshold=_resolve_ai_threshold(threshold),
+            model_language=None,
+            extra_signals=["No source code available for model scoring"],
+        )
+
+    model_result = predict_ai_likelihood(code, filename=filename, threshold=threshold)
     if model_result is not None:
         return model_result
-    return _heuristic_ai_likelihood(code)
+    heuristic = _heuristic_ai_likelihood(code)
+    score_percent = float(heuristic.get("score", 0.0))
+    threshold_used = _resolve_ai_threshold(threshold)
+    return {
+        "ai_confidence": round(score_percent / 100.0, 6),
+        "ai_flagged": (score_percent / 100.0) >= threshold_used,
+        "threshold_used": round(threshold_used, 6),
+        "model_language": None,
+        "score": heuristic["score"],
+        "band": heuristic["band"],
+        "signals": heuristic["signals"],
+        "disclaimer": heuristic["disclaimer"],
+    }
 
 
-def _build_integrity_report(db: Session, submission: Submission) -> dict:
+def _build_integrity_report(db: Session, submission: Submission, ai_threshold: float | None = None) -> dict:
     files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == submission.id).all()
-    _, current_code = _extract_primary_source_file(files)
+    current_filename, current_code = _extract_primary_source_file(files)
+    stored_ai = _stored_ai_likelihood(submission, threshold=ai_threshold)
     if not current_code:
         return {
             "plagiarism": {
@@ -165,7 +255,7 @@ def _build_integrity_report(db: Session, submission: Submission) -> dict:
                 "top_matches": [],
                 "note": "No source code found for current submission.",
             },
-            "ai_detection": _estimate_ai_likelihood(""),
+            "ai_detection": stored_ai or _estimate_ai_likelihood("", threshold=ai_threshold),
         }
 
     # Compare against latest submission from each *other* student in the same assignment.
@@ -207,7 +297,11 @@ def _build_integrity_report(db: Session, submission: Submission) -> dict:
             "top_matches": top,
             "note": "Similarity is based on normalized code/token overlap and should be reviewed manually.",
         },
-        "ai_detection": _estimate_ai_likelihood(current_code),
+        "ai_detection": stored_ai or _estimate_ai_likelihood(
+            current_code,
+            filename=current_filename,
+            threshold=ai_threshold,
+        ),
     }
 
 
@@ -269,6 +363,7 @@ def get_submission(
 @router.get("/{s_id}/detail")
 def get_submission_detail(
     s_id: int,
+    ai_threshold: float | None = Query(default=None, ge=0.0, le=1.0),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -358,7 +453,9 @@ def get_submission_detail(
     integrity_report = None
     # Only instructors/TAs/admin should see integrity diagnostics.
     if user.role != "student":
-        integrity_report = _build_integrity_report(db, s)
+        integrity_report = _build_integrity_report(db, s, ai_threshold=ai_threshold)
+
+    stored_ai = _stored_ai_likelihood(s, threshold=ai_threshold)
 
     return {
         "id": s.id,
@@ -413,6 +510,10 @@ def get_submission_detail(
             Submission.student_id == s.student_id,
             Submission.id <= s.id,
         ).count(),
+        "ai_confidence": stored_ai["ai_confidence"] if stored_ai else None,
+        "ai_flagged": stored_ai["ai_flagged"] if stored_ai else None,
+        "threshold_used": stored_ai["threshold_used"] if stored_ai else None,
+        "model_language": stored_ai["model_language"] if stored_ai else None,
         "integrity": integrity_report,
     }
 
@@ -482,6 +583,10 @@ def get_submissions_by_assignment(
             "status": sub.status,
             "score": sub.score,
             "max_score": sub.max_score,
+            "ai_confidence": sub.ai_confidence,
+            "ai_flagged": sub.ai_flagged,
+            "ai_threshold_used": sub.ai_threshold_used,
+            "ai_model_language": sub.ai_model_language,
             "display_max_score": sub.max_score if sub.max_score is not None else resolved_assignment_max,
             "feedback": sub.feedback,
             "graded_at": sub.graded_at,
@@ -572,6 +677,7 @@ def download_submission_file(
 @router.post("/assignments/{assignment_id}/upload")
 async def upload_submission_files(
     assignment_id: int,
+    ai_threshold: float | None = Query(default=None, ge=0.0, le=1.0),
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
@@ -623,10 +729,34 @@ async def upload_submission_files(
 
     db.commit()
 
+    ai_result = None
+    try:
+        submission_files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == submission.id).all()
+        primary_filename, primary_code = _extract_primary_source_file(submission_files)
+        if primary_code:
+            ai_result = _estimate_ai_likelihood(
+                primary_code,
+                filename=primary_filename,
+                threshold=ai_threshold,
+            )
+            submission.ai_confidence = ai_result.get("ai_confidence")
+            submission.ai_flagged = ai_result.get("ai_flagged")
+            submission.ai_threshold_used = ai_result.get("threshold_used")
+            submission.ai_model_language = ai_result.get("model_language")
+            db.add(submission)
+            db.commit()
+            db.refresh(submission)
+    except Exception as exc:
+        logger.warning("AI detection failed for submission %s: %s", submission.id, exc)
+
     return {
         "submission_id": submission.id,
         "assignment_id": assignment_id,
         "student": user.email,
         "files_saved": saved,
         "folder": str(dest_dir),
+        "ai_confidence": submission.ai_confidence,
+        "ai_flagged": submission.ai_flagged,
+        "threshold_used": submission.ai_threshold_used,
+        "model_language": submission.ai_model_language,
     }

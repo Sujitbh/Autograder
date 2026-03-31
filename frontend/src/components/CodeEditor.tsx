@@ -141,13 +141,19 @@ export function CodeEditor({ language, value = '', onChange, readOnly = false, h
   }, []);
 
   const handleMount = useCallback(
-    (editor: MonacoEditorNS.IStandaloneCodeEditor) => {
+    (editor: MonacoEditorNS.IStandaloneCodeEditor, monaco: typeof import('monaco-editor')) => {
       editorRef.current = editor;
+      monaco.editor.remeasureFonts();
       applyEditorMetrics(editor);
 
       if (typeof document !== 'undefined' && 'fonts' in document) {
-        void document.fonts.ready.then(() => {
+        const fontLoads = [
+          document.fonts.load('14px "JetBrains Mono"'),
+          document.fonts.load('14px "Fira Code"'),
+        ];
+        void Promise.allSettled(fontLoads).then(() => {
           if (editorRef.current === editor) {
+            monaco.editor.remeasureFonts();
             applyEditorMetrics(editor);
           }
         });
@@ -175,6 +181,7 @@ export function CodeEditor({ language, value = '', onChange, readOnly = false, h
         lineHeight: 22,
         letterSpacing: 0,
         fontLigatures: false,
+        disableMonospaceOptimizations: true,
         lineNumbers: 'on',
         minimap: { enabled: true, scale: 1 },
         automaticLayout: true,
@@ -191,8 +198,8 @@ export function CodeEditor({ language, value = '', onChange, readOnly = false, h
         scrollbar: { verticalScrollbarSize: 10, horizontalScrollbarSize: 10 },
         padding: { top: 12 },
         smoothScrolling: true,
-        cursorBlinking: 'smooth',
-        cursorSmoothCaretAnimation: 'on',
+        cursorBlinking: 'blink',
+        cursorSmoothCaretAnimation: 'off',
         guides: { bracketPairs: true },
       }}
     />

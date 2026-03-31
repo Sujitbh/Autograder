@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, String, Text
+from sqlalchemy import Column, Integer, ForeignKey, DateTime, String, Text, Float, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -18,6 +18,11 @@ class Submission(Base):
     feedback = Column(Text, nullable=True)
     graded_at = Column(DateTime(timezone=True), nullable=True)
 
+    # AI integrity signals
+    ai_confidence = Column(Float, nullable=True)
+    ai_flagged = Column(Boolean, nullable=True)
+    ai_threshold_used = Column(Float, nullable=True)
+    ai_model_language = Column(String, nullable=True)
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -26,3 +31,4 @@ class Submission(Base):
     student = relationship("User", back_populates="submissions", foreign_keys=[student_id])
     files = relationship("SubmissionFile", back_populates="submission", cascade="all, delete-orphan")
     results = relationship("SubmissionResult", back_populates="submission", cascade="all, delete-orphan")
+

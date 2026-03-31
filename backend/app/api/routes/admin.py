@@ -748,7 +748,9 @@ def update_system_settings(
 def get_integrity_detector_status(user: User = Depends(get_current_user)):
     _require_admin(user)
 
-    model_path = Path(settings.DATA_ROOT) / "models" / "ai_code_detector.joblib"
+    model_root = Path(settings.AI_DETECTOR_MODEL_ROOT)
+    python_model_path = model_root / "python" / "model_bundle.joblib"
+    java_model_path = model_root / "java" / "model_bundle.joblib"
     metrics_path = Path(settings.DATA_ROOT) / "models" / "ai_code_detector_metrics.json"
 
     metrics_payload = None
@@ -760,10 +762,30 @@ def get_integrity_detector_status(user: User = Depends(get_current_user)):
             metrics_payload = None
 
     return {
-        "model_available": model_path.exists(),
-        "model_path": str(model_path),
-        "model_size_bytes": model_path.stat().st_size if model_path.exists() else None,
-        "model_last_modified": model_path.stat().st_mtime if model_path.exists() else None,
+        "model_available": python_model_path.exists() or java_model_path.exists(),
+        "model_path": str(model_root),
+        # Backward-compatible aggregate fields expected by existing frontend.
+        "model_size_bytes": (
+            (python_model_path.stat().st_size if python_model_path.exists() else 0)
+            + (java_model_path.stat().st_size if java_model_path.exists() else 0)
+        ) or None,
+        "model_last_modified": max(
+            [
+                value
+                for value in [
+                    python_model_path.stat().st_mtime if python_model_path.exists() else None,
+                    java_model_path.stat().st_mtime if java_model_path.exists() else None,
+                ]
+                if value is not None
+            ],
+            default=None,
+        ),
+        "python_model_available": python_model_path.exists(),
+        "java_model_available": java_model_path.exists(),
+        "python_model_size_bytes": python_model_path.stat().st_size if python_model_path.exists() else None,
+        "java_model_size_bytes": java_model_path.stat().st_size if java_model_path.exists() else None,
+        "python_model_last_modified": python_model_path.stat().st_mtime if python_model_path.exists() else None,
+        "java_model_last_modified": java_model_path.stat().st_mtime if java_model_path.exists() else None,
         "metrics_available": metrics_payload is not None,
         "metrics": metrics_payload,
     }

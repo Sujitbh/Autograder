@@ -1,6 +1,12 @@
 import { useState, useCallback } from 'react';
-import { codeExecutionApiService, type ExecuteCodeRequest, type ExecuteCodeResponse } from '@/services/api/codeExecutionApiService';
+import { codeExecutionApiService, type ExecuteCodeFile, type ExecuteCodeRequest, type ExecuteCodeResponse } from '@/services/api/codeExecutionApiService';
 import { runClientJavaScript } from '@/utils/clientExecution';
+
+interface ExecutionScopeOptions {
+  assignmentId?: string | number;
+  entryFilename?: string;
+  files?: ExecuteCodeFile[];
+}
 
 export function useCodeExecution() {
   const [isRunning, setIsRunning] = useState(false);
@@ -19,7 +25,9 @@ export function useCodeExecution() {
       const stdin = payload.stdin_input || '';
       const compileOnly = payload.compile_only === true;
 
-      if (language === 'javascript' && !compileOnly) {
+      if (compileOnly) {
+        res = await codeExecutionApiService.compile(payload);
+      } else if (language === 'javascript') {
         res = await runClientJavaScript(code, stdin || '');
       } else {
         res = await codeExecutionApiService.execute(payload);
@@ -36,21 +44,29 @@ export function useCodeExecution() {
     }
   }, []);
 
-  const execute = useCallback(async (code: string, language: string, stdin?: string) => {
+  const execute = useCallback(async (code: string, language: string, stdin?: string, scope?: ExecutionScopeOptions) => {
+    const resolvedAssignmentId = scope?.assignmentId != null ? Number(scope.assignmentId) : undefined;
     return runExecution({
       code,
       language,
       stdin_input: stdin || '',
       compile_only: false,
+      assignment_id: Number.isFinite(resolvedAssignmentId) ? resolvedAssignmentId : undefined,
+      entry_filename: scope?.entryFilename,
+      files: scope?.files,
     });
   }, [runExecution]);
 
-  const compile = useCallback(async (code: string, language: string) => {
+  const compile = useCallback(async (code: string, language: string, scope?: ExecutionScopeOptions) => {
+    const resolvedAssignmentId = scope?.assignmentId != null ? Number(scope.assignmentId) : undefined;
     return runExecution({
       code,
       language,
       stdin_input: '',
       compile_only: true,
+      assignment_id: Number.isFinite(resolvedAssignmentId) ? resolvedAssignmentId : undefined,
+      entry_filename: scope?.entryFilename,
+      files: scope?.files,
     });
   }, [runExecution]);
 

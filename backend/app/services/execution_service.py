@@ -9,6 +9,7 @@ This service provides secure code execution with:
 """
 
 import os
+import sys
 import subprocess
 import tempfile
 import shutil
@@ -159,6 +160,8 @@ class ExecutionService:
         timeout: Optional[int] = None,
         memory_limit: Optional[int] = None,
         compile_only: bool = False,
+        entry_filename: Optional[str] = None,
+        files: Optional[list[dict[str, str]]] = None,
     ) -> ExecutionResult:
         """
         Execute code in a sandboxed environment.
@@ -195,6 +198,17 @@ class ExecutionService:
                 exit_code=-1,
                 execution_time_ms=0,
             )
+        for file_obj in files or []:
+            file_content = str(file_obj.get("content", ""))
+            file_safe, file_reason = ExecutionService.check_security(file_content, language)
+            if not file_safe:
+                return ExecutionResult(
+                    status=ExecutionStatus.SECURITY_ERROR,
+                    stdout="",
+                    stderr=file_reason,
+                    exit_code=-1,
+                    execution_time_ms=0,
+                )
 
         # Create temporary directory for execution
         with tempfile.TemporaryDirectory(prefix="autograder_") as tmpdir:
@@ -207,6 +221,8 @@ class ExecutionService:
                     stdin_input=stdin_input,
                     timeout=timeout,
                     compile_only=compile_only,
+                    entry_filename=entry_filename,
+                    files=files,
                 )
                 return result
             except Exception as e:
@@ -219,6 +235,87 @@ class ExecutionService:
                 )
 
     @staticmethod
+    def _normalize_workspace_filename(filename: str) -> str:
+        normalized = (filename or "").replace("\\", "/").strip().lstrip("/")
+        if not normalized:
+            raise ValueError("Empty filename")
+
+        candidate = Path(normalized)
+        if candidate.is_absolute() or any(part in ("", ".", "..") for part in candidate.parts):
+            raise ValueError("Invalid filename")
+
+        return "/".join(candidate.parts)
+
+    @staticmethod
+    def _build_workspace_files(
+        tmpdir: str,
+        language: str,
+        code: str,
+        config: dict,
+        files: Optional[list[dict[str, str]]],
+        entry_filename: Optional[str],
+    ) -> Path:
+        tmpdir_path = Path(tmpdir).resolve()
+        ext = config["extension"]
+
+        workspace_paths: dict[str, Path] = {}
+
+        for file_obj in files or []:
+            raw_name = str(file_obj.get("name", ""))
+            content = str(file_obj.get("content", ""))
+            try:
+                normalized_name = ExecutionService._normalize_workspace_filename(raw_name)
+            except ValueError:
+                continue
+
+            dest = (tmpdir_path / Path(normalized_name)).resolve()
+            if tmpdir_path not in dest.parents and dest != tmpdir_path:
+                continue
+
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(content)
+            workspace_paths[normalized_name] = dest
+
+        source_file: Optional[Path] = None
+        if workspace_paths:
+            if entry_filename:
+                try:
+                    normalized_entry = ExecutionService._normalize_workspace_filename(entry_filename)
+                except ValueError:
+                    normalized_entry = ""
+                if normalized_entry in workspace_paths:
+                    source_file = workspace_paths[normalized_entry]
+                elif normalized_entry:
+                    entry_basename = Path(normalized_entry).name
+                    for name, path in workspace_paths.items():
+                        if Path(name).name == entry_basename:
+                            source_file = path
+                            break
+
+            if source_file is None:
+                for name, path in workspace_paths.items():
+                    if path.suffix.lower() == ext:
+                        source_file = path
+                        break
+
+            if source_file is None:
+                _, source_file = next(iter(workspace_paths.items()))
+
+            return source_file
+
+        # Backward-compatible single-file mode
+        if language == "java":
+            import re
+            match = re.search(r"public\s+class\s+(\w+)", code)
+            classname = match.group(1) if match else "Main"
+            source_file = tmpdir_path / f"{classname}{ext}"
+        else:
+            source_file = tmpdir_path / f"solution{ext}"
+
+        source_file.write_text(code)
+        return source_file
+
+    @staticmethod
     def _execute_in_sandbox(
         code: str,
         language: str,
@@ -227,78 +324,43 @@ class ExecutionService:
         stdin_input: str,
         timeout: int,
         compile_only: bool,
+        entry_filename: Optional[str],
+        files: Optional[list[dict[str, str]]],
     ) -> ExecutionResult:
         """Execute code in temporary directory."""
         import time
 
-        # Write source file
-        ext = config["extension"]
-        if language == "java":
-            # Extract class name for Java
-            import re
-            match = re.search(r"public\s+class\s+(\w+)", code)
-            classname = match.group(1) if match else "Main"
-            source_file = Path(tmpdir) / f"{classname}{ext}"
-        else:
-            source_file = Path(tmpdir) / f"solution{ext}"
+        source_file = ExecutionService._build_workspace_files(
+            tmpdir=tmpdir,
+            language=language,
+            code=code,
+            config=config,
+            files=files,
+            entry_filename=entry_filename,
+        )
 
-        source_file.write_text(code)
+        if language == "java":
+            classname = source_file.stem
+            try:
+                source_content = source_file.read_text()
+            except Exception:
+                source_content = code
+            import re
+            match = re.search(r"public\s+class\s+(\w+)", source_content)
+            if match:
+                classname = match.group(1)
 
         compile_time_ms = 0.0
 
-        # Compile if needed
-        if config["compile_cmd"]:
-            compile_start = time.time()
-            compile_cmd = [
-                c.format(
-                    file=str(source_file),
-                    output=str(Path(tmpdir) / "a.out"),
-                    dir=tmpdir,
-                )
-                for c in config["compile_cmd"]
-            ]
-
-            try:
-                compile_result = subprocess.run(
-                    compile_cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    cwd=tmpdir,
-                )
-                if compile_result.returncode != 0:
-                    return ExecutionResult(
-                        status=ExecutionStatus.COMPILE_ERROR,
-                        stdout="",
-                        stderr=compile_result.stderr or compile_result.stdout,
-                        exit_code=compile_result.returncode,
-                        execution_time_ms=0,
-                    )
-                compile_time_ms = (time.time() - compile_start) * 1000
-            except subprocess.TimeoutExpired:
-                return ExecutionResult(
-                    status=ExecutionStatus.TIMEOUT,
-                    stdout="",
-                    stderr="Compilation timed out",
-                    exit_code=-1,
-                    execution_time_ms=0,
-                )
-
-            if compile_only:
-                return ExecutionResult(
-                    status=ExecutionStatus.SUCCESS,
-                    stdout="Compilation successful.",
-                    stderr="",
-                    exit_code=0,
-                    execution_time_ms=compile_time_ms,
-                )
-
+        # Compile/syntax-check only path. Return immediately so code is never run.
         if compile_only:
             if language == "python":
                 compile_start = time.time()
+                python_files = sorted(Path(tmpdir).rglob("*.py"))
+                targets = python_files if python_files else [source_file]
                 try:
                     compile_result = subprocess.run(
-                        ["python3", "-m", "py_compile", str(source_file)],
+                        [sys.executable, "-m", "py_compile", *[str(f) for f in targets]],
                         capture_output=True,
                         text=True,
                         timeout=30,
@@ -329,6 +391,53 @@ class ExecutionService:
                         execution_time_ms=0,
                     )
 
+            if config["compile_cmd"]:
+                compile_start = time.time()
+                if language == "java":
+                    java_files = sorted(Path(tmpdir).rglob("*.java"))
+                    compile_cmd = ["javac", *[str(f) for f in (java_files or [source_file])]]
+                else:
+                    compile_cmd = [
+                        c.format(
+                            file=str(source_file),
+                            output=str(Path(tmpdir) / "a.out"),
+                            dir=tmpdir,
+                        )
+                        for c in config["compile_cmd"]
+                    ]
+                try:
+                    compile_result = subprocess.run(
+                        compile_cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        cwd=tmpdir,
+                    )
+                    compile_time_ms = (time.time() - compile_start) * 1000
+                    if compile_result.returncode != 0:
+                        return ExecutionResult(
+                            status=ExecutionStatus.COMPILE_ERROR,
+                            stdout="",
+                            stderr=compile_result.stderr or compile_result.stdout,
+                            exit_code=compile_result.returncode,
+                            execution_time_ms=compile_time_ms,
+                        )
+                    return ExecutionResult(
+                        status=ExecutionStatus.SUCCESS,
+                        stdout="Compilation successful.",
+                        stderr="",
+                        exit_code=0,
+                        execution_time_ms=compile_time_ms,
+                    )
+                except subprocess.TimeoutExpired:
+                    return ExecutionResult(
+                        status=ExecutionStatus.TIMEOUT,
+                        stdout="",
+                        stderr="Compilation timed out",
+                        exit_code=-1,
+                        execution_time_ms=0,
+                    )
+
             return ExecutionResult(
                 status=ExecutionStatus.SECURITY_ERROR,
                 stdout="",
@@ -336,6 +445,48 @@ class ExecutionService:
                 exit_code=-1,
                 execution_time_ms=0,
             )
+
+        # Compile if needed
+        if config["compile_cmd"]:
+            compile_start = time.time()
+            if language == "java":
+                java_files = sorted(Path(tmpdir).rglob("*.java"))
+                compile_cmd = ["javac", *[str(f) for f in (java_files or [source_file])]]
+            else:
+                compile_cmd = [
+                    c.format(
+                        file=str(source_file),
+                        output=str(Path(tmpdir) / "a.out"),
+                        dir=tmpdir,
+                    )
+                    for c in config["compile_cmd"]
+                ]
+
+            try:
+                compile_result = subprocess.run(
+                    compile_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    cwd=tmpdir,
+                )
+                if compile_result.returncode != 0:
+                    return ExecutionResult(
+                        status=ExecutionStatus.COMPILE_ERROR,
+                        stdout="",
+                        stderr=compile_result.stderr or compile_result.stdout,
+                        exit_code=compile_result.returncode,
+                        execution_time_ms=0,
+                    )
+                compile_time_ms = (time.time() - compile_start) * 1000
+            except subprocess.TimeoutExpired:
+                return ExecutionResult(
+                    status=ExecutionStatus.TIMEOUT,
+                    stdout="",
+                    stderr="Compilation timed out",
+                    exit_code=-1,
+                    execution_time_ms=0,
+                )
 
         # Prepare run command
         if language == "java":

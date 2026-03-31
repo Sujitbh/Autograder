@@ -38,7 +38,10 @@ class SubmissionOut(BaseModel):
     feedback: Optional[str] = None
     graded_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
-
+    ai_confidence: Optional[float] = None
+    ai_flagged: Optional[bool] = None
+    ai_threshold_used: Optional[float] = None
+    ai_model_language: Optional[str] = None
     class Config:
         from_attributes = True
 
@@ -90,3 +93,4 @@ class SubmissionGradingResult(BaseModel):
     feedback: List[str] = []
     test_results: Optional[dict] = None
     rubric_results: Optional[dict] = None
+

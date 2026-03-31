@@ -20,6 +20,11 @@ from app.services.execution_service import ExecutionService, ExecutionStatus
 router = APIRouter(prefix="/grading", tags=["grading"])
 
 
+class ExecuteCodeFile(BaseModel):
+    name: str
+    content: str
+
+
 class ExecuteCodeRequest(BaseModel):
     """Request schema for code execution."""
     code: str
@@ -27,6 +32,9 @@ class ExecuteCodeRequest(BaseModel):
     stdin_input: Optional[str] = ""
     timeout: Optional[int] = 10
     compile_only: bool = False
+    assignment_id: Optional[int] = None
+    entry_filename: Optional[str] = None
+    files: Optional[list[ExecuteCodeFile]] = None
 
 
 class ExecuteCodeResponse(BaseModel):
@@ -53,24 +61,8 @@ class ManualScoreUpdateRequest(BaseModel):
 
 # ==================== Code Execution ====================
 
-@router.post("/execute", response_model=ExecuteCodeResponse)
-def execute_code(
-    payload: ExecuteCodeRequest,
-    user: User = Depends(get_current_user),
-):
-    """
-    Execute code in a sandboxed environment.
-    
-    Supports: python, java, cpp, c, javascript
-    """
-    result = ExecutionService.execute(
-        code=payload.code,
-        language=payload.language,
-        stdin_input=payload.stdin_input or "",
-        timeout=payload.timeout,
-        compile_only=payload.compile_only,
-    )
-
+def _build_execute_response(result) -> ExecuteCodeResponse:
+    """Normalize execution results into API response payload."""
     return ExecuteCodeResponse(
         status=result.status.value,
         stdout=result.stdout,
@@ -78,6 +70,92 @@ def execute_code(
         exit_code=result.exit_code,
         execution_time_ms=result.execution_time_ms,
     )
+
+
+def _require_assignment_scope_if_provided(
+    payload: ExecuteCodeRequest,
+    db: Session,
+    user: User,
+) -> None:
+    """If assignment context is provided, enforce course-scoped access."""
+    if payload.files and payload.assignment_id is None:
+        raise HTTPException(status_code=400, detail="assignment_id is required when files are provided")
+
+    if payload.assignment_id is None:
+        return
+
+    assignment = db.query(Assignment).filter(Assignment.id == payload.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    require_course_role(
+        db=db,
+        user=user,
+        course_id=assignment.course_id,
+        allowed_roles=["student", "ta", "instructor"],
+    )
+
+
+@router.post("/execute", response_model=ExecuteCodeResponse)
+def execute_code(
+    payload: ExecuteCodeRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Execute code in a sandboxed environment.
+    
+    Supports: python, java, cpp, c, javascript
+    """
+    _require_assignment_scope_if_provided(payload=payload, db=db, user=user)
+
+    workspace_files = (
+        [{"name": f.name, "content": f.content} for f in payload.files]
+        if payload.files
+        else None
+    )
+    result = ExecutionService.execute(
+        code=payload.code,
+        language=payload.language,
+        stdin_input=payload.stdin_input or "",
+        timeout=payload.timeout,
+        compile_only=payload.compile_only,
+        entry_filename=payload.entry_filename,
+        files=workspace_files,
+    )
+
+    return _build_execute_response(result)
+
+
+@router.post("/compile", response_model=ExecuteCodeResponse)
+def compile_code(
+    payload: ExecuteCodeRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Compile/syntax-check code without running program execution.
+
+    This endpoint intentionally forces compile-only mode server-side.
+    """
+    _require_assignment_scope_if_provided(payload=payload, db=db, user=user)
+
+    workspace_files = (
+        [{"name": f.name, "content": f.content} for f in payload.files]
+        if payload.files
+        else None
+    )
+    result = ExecutionService.execute(
+        code=payload.code,
+        language=payload.language,
+        stdin_input="",
+        timeout=payload.timeout,
+        compile_only=True,
+        entry_filename=payload.entry_filename,
+        files=workspace_files,
+    )
+
+    return _build_execute_response(result)
 
 
 @router.post("/test-code")
