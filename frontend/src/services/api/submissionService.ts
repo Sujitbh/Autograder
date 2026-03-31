@@ -176,6 +176,9 @@ export const submissionService = {
           risk: 'low' | 'medium' | 'high';
         }>;
         note: string;
+        peers_with_latest_submission?: number;
+        peers_skipped_no_file_rows?: number;
+        peers_skipped_unreadable_on_disk?: number;
       };
       ai_detection: {
         score: number;
@@ -190,6 +193,69 @@ export const submissionService = {
     );
     return data;
   },
+
+  /** Full classmate similarity scan (all matches; instructor/TA). */
+  async getPlagiarismScan(submissionId: string): Promise<{
+    plagiarism: {
+      checked_against: number;
+      top_matches: Array<{
+        submission_id: number;
+        student_id: number;
+        student_name: string;
+        student_email: string | null;
+        status: string;
+        submitted_at: string | null;
+        filename: string | null;
+        similarity_percent: number;
+        risk: 'low' | 'medium' | 'high';
+      }>;
+      note: string;
+      peers_with_latest_submission?: number;
+      peers_skipped_no_file_rows?: number;
+      peers_skipped_unreadable_on_disk?: number;
+    };
+    ai_detection: {
+      score: number;
+      band: 'low' | 'medium' | 'high';
+      signals: string[];
+      disclaimer: string;
+    };
+  }> {
+    const { data } = await withRetry(() => api.get(`/submissions/${submissionId}/plagiarism-scan`));
+    return data;
+  },
+
+  /** Side-by-side source comparison for two submissions on the same assignment. */
+  async getPlagiarismCompare(
+    baseSubmissionId: string,
+    otherSubmissionId: number
+  ): Promise<{
+    similarity_percent: number;
+    risk: 'low' | 'medium' | 'high';
+    base: {
+      submission_id: number;
+      student_id: number;
+      student_name: string;
+      filename: string | null;
+      content: string;
+    };
+    peer: {
+      submission_id: number;
+      student_id: number;
+      student_name: string;
+      student_email: string | null;
+      filename: string | null;
+      content: string;
+    };
+    unified_diff: string;
+    note: string;
+  }> {
+    const { data } = await withRetry(() =>
+      api.get(`/submissions/${baseSubmissionId}/plagiarism-compare/${otherSubmissionId}`)
+    );
+    return data;
+  },
+
   /** Get files for a submission. */
   async getSubmissionFiles(submissionId: string): Promise<Array<{ id: number; filename: string; file_size: number | null }>> {
     const { data } = await withRetry(() =>

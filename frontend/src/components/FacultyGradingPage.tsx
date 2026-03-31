@@ -8,6 +8,7 @@ import { useTheme } from '@/utils/ThemeContext';
 import { PageLayout } from './PageLayout';
 import { TopNav } from './TopNav';
 import { CodeEditor } from './CodeEditor';
+import { PlagiarismCompareModal } from './PlagiarismCompareModal';
 import { OutputPanel } from './OutputPanel';
 import { useCodeExecution } from '@/hooks/useCodeExecution';
 import { submissionService } from '@/services/api';
@@ -27,6 +28,7 @@ import {
     FileText,
     Play,
     Zap,
+    ScanSearch,
 } from 'lucide-react';
 
 interface FacultyGradingPageProps {
@@ -64,6 +66,25 @@ function getRiskTagStyle(risk: 'low' | 'medium' | 'high') {
 
 function getBandLabel(scoreBand: 'low' | 'medium' | 'high') {
     return scoreBand.charAt(0).toUpperCase() + scoreBand.slice(1);
+}
+
+function getPlagiarismZeroMatchesExplanation(plagiarism: {
+    checked_against: number;
+    peers_with_latest_submission?: number;
+    peers_skipped_no_file_rows?: number;
+    peers_skipped_unreadable_on_disk?: number;
+}): string | null {
+    const peers = plagiarism.peers_with_latest_submission ?? 0;
+    const noRows = plagiarism.peers_skipped_no_file_rows ?? 0;
+    const badDisk = plagiarism.peers_skipped_unreadable_on_disk ?? 0;
+    if (plagiarism.checked_against > 0) return null;
+    if (peers === 0) {
+        return 'No other students have a submission on this assignment yet, so there is nothing to compare against. The scan is working — add more submissions to see matches.';
+    }
+    if (noRows > 0 || badDisk > 0) {
+        return `The scan found ${peers} classmate(s) with submissions, but none could be compared: ${noRows} had no uploaded file records and ${badDisk} had files missing or unreadable on the server (paths often break after moving the database without the backend/data folder).`;
+    }
+    return null;
 }
 
 export default function FacultyGradingPage({ courseId, submissionId }: Readonly<FacultyGradingPageProps>) {
@@ -112,6 +133,25 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const [showInlineInput, setShowInlineInput] = useState(false);
     const [autoGradeResult, setAutoGradeResult] = useState<any>(null);
     const [liveTestResults, setLiveTestResults] = useState<any[] | null>(null);
+    /** Full plagiarism scan result after instructor clicks "Run plagiarism scan". */
+    const [plagiarismScanOverride, setPlagiarismScanOverride] = useState<Awaited<
+        ReturnType<typeof submissionService.getPlagiarismScan>
+    > | null>(null);
+    const [compareOtherSubmissionId, setCompareOtherSubmissionId] = useState<number | null>(null);
+
+    useEffect(() => {
+        setPlagiarismScanOverride(null);
+        setCompareOtherSubmissionId(null);
+    }, [submissionId]);
+
+    const plagiarismScanMutation = useMutation({
+        mutationFn: () => submissionService.getPlagiarismScan(submissionId),
+        onSuccess: (data) => {
+            setPlagiarismScanOverride(data);
+        },
+    });
+
+    const integrityForPanel = plagiarismScanOverride ?? detail?.integrity ?? null;
 
     const { data: assignmentSubmissions = [] } = useQuery({
         queryKey: ['faculty-assignment-submissions', detail?.assignment?.id],
@@ -886,50 +926,107 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                 {/* ── Integrity Tab ── */}
                                 {infoTab === 'integrity' && (
                                     <div>
-                                        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: 12 }}>🛡 Integrity Check</h2>
+                                        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: 8 }}>🛡 Integrity Check</h2>
+                                        <p style={{ fontSize: 11, color: 'var(--color-text-mid)', marginBottom: 10, lineHeight: 1.5 }}>
+                                            Run a plagiarism-style scan against every classmate’s latest submission, then open a side-by-side diff for any match.
+                                        </p>
+                                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => plagiarismScanMutation.mutate()}
+                                                disabled={plagiarismScanMutation.isPending || !detail}
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all shadow-sm disabled:opacity-50"
+                                                style={{
+                                                    backgroundColor: 'var(--color-primary-light)',
+                                                    color: 'var(--color-primary)',
+                                                    border: '1px solid var(--color-primary)',
+                                                    fontSize: 11,
+                                                    fontWeight: 700,
+                                                    textTransform: 'uppercase' as const,
+                                                    cursor: 'pointer',
+                                                }}
+                                            >
+                                                {plagiarismScanMutation.isPending ? (
+                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                ) : (
+                                                    <ScanSearch className="w-3.5 h-3.5" />
+                                                )}
+                                                Run plagiarism scan
+                                            </button>
+                                            {plagiarismScanOverride && (
+                                                <span style={{ fontSize: 10, color: 'var(--color-text-light)' }}>Showing full class results from your last scan.</span>
+                                            )}
+                                        </div>
 
-                                        {detail.integrity ? (
+                                        {integrityForPanel ? (
                                             <div className="mb-5 rounded-lg p-3" style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface-elevated)' }}>
                                                 <div className="mb-3 p-2 rounded" style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}>
                                                     <div className="flex items-center justify-between">
                                                         <span style={{ fontSize: '12px', color: 'var(--color-text-dark)', fontWeight: 600 }}>AI-generated likelihood</span>
                                                         <span
                                                             style={{
-                                                                ...getRiskTagStyle(detail.integrity.ai_detection.band),
+                                                                ...getRiskTagStyle(integrityForPanel.ai_detection.band),
                                                                 fontSize: '11px',
                                                                 fontWeight: 700,
                                                                 padding: '2px 8px',
                                                                 borderRadius: 999,
                                                             }}
                                                         >
-                                                            {detail.integrity.ai_detection.score}% {getBandLabel(detail.integrity.ai_detection.band)}
+                                                            {integrityForPanel.ai_detection.score}% {getBandLabel(integrityForPanel.ai_detection.band)}
                                                         </span>
                                                     </div>
-                                                    {detail.integrity.ai_detection.signals.length > 0 && (
+                                                    {integrityForPanel.ai_detection.signals.length > 0 && (
                                                         <ul style={{ marginTop: 6, paddingLeft: 16, fontSize: '11px', color: 'var(--color-text-mid)' }}>
-                                                            {detail.integrity.ai_detection.signals.slice(0, 3).map((sig, i) => (
+                                                            {integrityForPanel.ai_detection.signals.slice(0, 3).map((sig, i) => (
                                                                 <li key={`${sig}-${i}`}>{sig}</li>
                                                             ))}
                                                         </ul>
                                                     )}
                                                     <p style={{ marginTop: 6, fontSize: '10px', color: 'var(--color-text-light)' }}>
-                                                        {detail.integrity.ai_detection.disclaimer}
+                                                        {integrityForPanel.ai_detection.disclaimer}
                                                     </p>
                                                 </div>
 
                                                 <div>
                                                     <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: 6 }}>
-                                                        Similarity with other student submissions
+                                                        Plagiarism checker — similarity with other students
                                                     </p>
                                                     <p style={{ fontSize: '10px', color: 'var(--color-text-light)', marginBottom: 8 }}>
-                                                        Compared against {detail.integrity.plagiarism.checked_against} latest submissions from classmates.
+                                                        Compared against {integrityForPanel.plagiarism.checked_against} classmate submission(s) with readable source
+                                                        {plagiarismScanOverride ? ' (full list)' : ' (top matches; run scan for all)'}.
+                                                        {(integrityForPanel.plagiarism.peers_with_latest_submission ?? 0) > 0 && (
+                                                            <span>
+                                                                {' '}
+                                                                · {integrityForPanel.plagiarism.peers_with_latest_submission} other student(s) have a latest submission on this assignment.
+                                                            </span>
+                                                        )}
                                                     </p>
+                                                    {(() => {
+                                                        const explain = getPlagiarismZeroMatchesExplanation(integrityForPanel.plagiarism);
+                                                        if (!explain) return null;
+                                                        return (
+                                                            <p
+                                                                style={{
+                                                                    fontSize: 11,
+                                                                    lineHeight: 1.5,
+                                                                    marginBottom: 10,
+                                                                    padding: '8px 10px',
+                                                                    borderRadius: 8,
+                                                                    background: 'var(--color-primary-bg)',
+                                                                    border: '1px solid var(--color-border)',
+                                                                    color: 'var(--color-text-dark)',
+                                                                }}
+                                                            >
+                                                                {explain}
+                                                            </p>
+                                                        );
+                                                    })()}
 
-                                                    {detail.integrity.plagiarism.top_matches.length === 0 ? (
-                                                        <p style={{ fontSize: '11px', color: 'var(--color-text-mid)' }}>No comparable submissions found yet.</p>
+                                                    {integrityForPanel.plagiarism.top_matches.length === 0 ? (
+                                                        <p style={{ fontSize: '11px', color: 'var(--color-text-mid)' }}>No similarity matches to list.</p>
                                                     ) : (
                                                         <div className="space-y-2">
-                                                            {detail.integrity.plagiarism.top_matches.map((m) => (
+                                                            {integrityForPanel.plagiarism.top_matches.map((m) => (
                                                                 <div
                                                                     key={m.submission_id}
                                                                     className="rounded-md px-2 py-2"
@@ -957,28 +1054,46 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                             Submitted {new Date(m.submitted_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                                                         </p>
                                                                     )}
-                                                                    <button
-                                                                        onClick={() => router.push(`/courses/${courseId}/submissions/${m.submission_id}/grade`)}
-                                                                        style={{
-                                                                            marginTop: 6,
-                                                                            fontSize: '11px',
-                                                                            fontWeight: 600,
-                                                                            color: 'var(--color-primary)',
-                                                                            background: 'transparent',
-                                                                            border: 'none',
-                                                                            padding: 0,
-                                                                            cursor: 'pointer',
-                                                                        }}
-                                                                    >
-                                                                        Open matched submission
-                                                                    </button>
+                                                                    <div className="flex flex-wrap gap-3" style={{ marginTop: 8 }}>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setCompareOtherSubmissionId(m.submission_id)}
+                                                                            style={{
+                                                                                fontSize: '11px',
+                                                                                fontWeight: 600,
+                                                                                color: '#fff',
+                                                                                background: 'var(--color-primary)',
+                                                                                border: 'none',
+                                                                                padding: '4px 10px',
+                                                                                borderRadius: 6,
+                                                                                cursor: 'pointer',
+                                                                            }}
+                                                                        >
+                                                                            Side-by-side compare
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => router.push(`/courses/${courseId}/submissions/${m.submission_id}/grade`)}
+                                                                            style={{
+                                                                                fontSize: '11px',
+                                                                                fontWeight: 600,
+                                                                                color: 'var(--color-primary)',
+                                                                                background: 'transparent',
+                                                                                border: 'none',
+                                                                                padding: '4px 0',
+                                                                                cursor: 'pointer',
+                                                                            }}
+                                                                        >
+                                                                            Open matched submission
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     )}
 
                                                     <p style={{ marginTop: 8, fontSize: '10px', color: 'var(--color-text-light)' }}>
-                                                        {detail.integrity.plagiarism.note}
+                                                        {integrityForPanel.plagiarism.note}
                                                     </p>
                                                 </div>
                                             </div>
@@ -1189,6 +1304,13 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                 </div>
             </div>
 
+            <PlagiarismCompareModal
+                open={compareOtherSubmissionId != null}
+                onClose={() => setCompareOtherSubmissionId(null)}
+                baseSubmissionId={submissionId}
+                otherSubmissionId={compareOtherSubmissionId ?? 0}
+                assignmentLanguage={detail?.assignment?.language ?? 'java'}
+            />
         </PageLayout>
     );
 }
