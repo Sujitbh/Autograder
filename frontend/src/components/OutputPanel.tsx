@@ -29,7 +29,7 @@ function getMissingInputHint(result: ExecuteCodeResponse, stdinInput?: string): 
   const matched = missingInputPatterns.some((pattern) => pattern.test(errorText));
   if (!matched) return null;
 
-  return 'This program expects input. Open the Input panel, enter stdin, and run again.';
+  return 'This program expects input. Enter each response on a new line (including repeated prompts in loops), then run again.';
 }
 
 /** Shared stdin input composer shown inside the output panel */
@@ -49,7 +49,13 @@ function StdinComposer({
   return (
     <div className="p-3 border-b" style={{ borderColor: 'var(--color-border)' }}>
       <p className="text-xs font-semibold font-mono uppercase mb-2" style={{ color: 'var(--color-text-light)' }}>
-        Program Input (stdin)
+        Program Input
+      </p>
+      <p className="text-xs mb-2" style={{ color: 'var(--color-text-mid)' }}>
+        Enter all input your program will ask for, one line per prompt, then click Run.
+      </p>
+      <p className="text-xs mb-2" style={{ color: 'var(--color-text-light)' }}>
+        Input is provided all at once before the program runs.
       </p>
       <div className={withButton ? 'flex items-start gap-2' : undefined}>
         <textarea
@@ -57,7 +63,7 @@ function StdinComposer({
           onChange={(e) => onChange(e.target.value)}
           className="w-full rounded-md px-3 py-2 text-sm font-mono"
           rows={3}
-          placeholder="Type input here..."
+          placeholder={'Example:\nAlice\n42\nY'}
           style={{
             backgroundColor: 'var(--color-surface)',
             color: 'var(--color-text-dark)',
@@ -196,7 +202,7 @@ export function OutputPanel({
         {stdinInput && (
           <div className="mb-3">
             <p className="text-xs font-semibold font-mono uppercase mb-1" style={{ color: 'var(--color-text-light)' }}>
-              Input (stdin)
+              Input
             </p>
             <pre className="text-sm font-mono whitespace-pre-wrap" style={{ color: 'var(--color-text-mid)' }}>
               {stdinInput}
