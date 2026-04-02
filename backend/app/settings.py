@@ -21,7 +21,8 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
 
     # MFA / OTP settings
-    MFA_ENABLED: bool = True
+    # Temporary testing default; set to True (or env MFA_ENABLED=true) to re-enable OTP MFA.
+    MFA_ENABLED: bool = False
     MFA_BYPASS_ENABLED: bool = True
     MFA_BYPASS_ACCOUNTS: str = ""
     OTP_TTL_MINUTES: int = 5

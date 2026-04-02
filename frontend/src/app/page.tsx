@@ -25,7 +25,7 @@ export default function Home() {
         if (isAuthenticated && role) {
             router.replace(dashboardForRole(role));
         } else {
-            router.replace('/login');
+            router.replace('/landing');
         }
     }, [isAuthenticated, role, isLoading, router]);
 
