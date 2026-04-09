@@ -38,7 +38,7 @@ export default function LandingNav() {
     >
       <div className="mx-auto flex items-center justify-between px-8 lg:px-16 py-4" style={{ maxWidth: 1280 }}>
         {/* Logo */}
-        <a href="#" className="flex items-center gap-3 no-underline">
+        <a href="/" className="flex items-center gap-3 no-underline">
           <img
             src="/images/axiom-logo.png"
             alt="Axiom"
@@ -69,10 +69,10 @@ export default function LandingNav() {
           ))}
         </div>
 
-        {/* Sign In */}
+        {/* Get Started → sign-in */}
         <a
           href="/login"
-          className="hidden md:inline-flex items-center rounded-full px-7 py-2.5 no-underline transition-all duration-300"
+          className="inline-flex items-center rounded-full px-5 sm:px-7 py-2.5 no-underline transition-all duration-300"
           style={{
             backgroundColor: 'var(--landing-primary)',
             color: '#fff',
@@ -93,7 +93,7 @@ export default function LandingNav() {
             e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
-          Sign In
+          Get Started
         </a>
       </div>
     </nav>

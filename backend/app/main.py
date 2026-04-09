@@ -28,6 +28,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+logger.info(
+    "Auth: MFA_ENABLED=%s (if True, login sends email OTP unless email is in MFA_BYPASS_ACCOUNTS)",
+    settings.MFA_ENABLED,
+)
+
 
 app = FastAPI(
     title="Autograder API",

@@ -120,7 +120,7 @@ export default function LandingCTA() {
             e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.15)';
           }}
         >
-          Sign In / Sign Up
+          Get Started
         </a>
       </div>
     </section>

@@ -149,6 +149,28 @@ def generate_enrollment_code(db: Session) -> str:
     raise HTTPException(status_code=500, detail="Unable to generate unique enrollment code")
 
 
+def _ensure_creator_enrolled_as_instructor(db: Session, course_id: int, user: User) -> None:
+    """
+    List courses only returns rows where the user has an enrollment.
+    The 'existing course' branch of create_course updates a row but previously skipped
+    enrollment, so the creator saw an empty My Courses list.
+    """
+    if user.role not in ("faculty", "instructor", "admin"):
+        return
+    en = (
+        db.query(Enrollment)
+        .filter(Enrollment.course_id == course_id, Enrollment.user_id == user.id)
+        .first()
+    )
+    if en is None:
+        db.add(Enrollment(course_id=course_id, user_id=user.id, role="instructor"))
+        db.commit()
+    elif en.role != "instructor":
+        en.role = "instructor"
+        db.add(en)
+        db.commit()
+
+
 @router.get("/semesters")
 def list_semesters_for_faculty(db: DbSession, user: CurrentUser):
     """Return all semesters, accessible to any authenticated faculty or admin (used in course creation form)."""
@@ -204,6 +226,8 @@ def create_course(payload: CourseCreate, db: DbSession, user: CurrentUser):
             existing_course.section = payload.section
         db.add(existing_course)
         db.commit()
+        db.refresh(existing_course)
+        _ensure_creator_enrolled_as_instructor(db, existing_course.id, user)
         db.refresh(existing_course)
         return existing_course
 

@@ -98,8 +98,8 @@ export default function LandingHero() {
             The code evaluation platform for the University of Louisiana Monroe — automated testing, AI-powered integrity checks, and instant feedback.
           </p>
 
-          {/* Two CTA buttons */}
-          <div className="flex items-center gap-4 mb-16">
+          {/* Primary: Get Started → sign-in; secondary: Create account */}
+          <div className="flex flex-wrap items-center gap-4 mb-16">
             <a
               href="/login"
               className="inline-flex items-center rounded-full px-8 py-3.5 no-underline transition-all duration-300"
@@ -122,7 +122,7 @@ export default function LandingHero() {
                 e.currentTarget.style.boxShadow = '0 4px 16px rgba(123,13,13,0.3)';
               }}
             >
-              Sign In
+              Get Started
             </a>
             <a
               href="/signup"

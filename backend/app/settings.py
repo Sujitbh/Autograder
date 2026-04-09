@@ -20,8 +20,9 @@ class Settings(BaseSettings):
 
     FRONTEND_URL: str = "http://localhost:3000"
 
-    # MFA / OTP settings
-    MFA_ENABLED: bool = True
+    # MFA / OTP — default off for local dev. Production: set MFA_ENABLED=true (env or .env).
+    # Note: a shell/IDE env var MFA_ENABLED=true overrides .env; use `unset MFA_ENABLED` if stuck on OTP.
+    MFA_ENABLED: bool = False
     MFA_BYPASS_ENABLED: bool = True
     MFA_BYPASS_ACCOUNTS: str = ""
     OTP_TTL_MINUTES: int = 5
