@@ -13,6 +13,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # Token types
 TOKEN_TYPE_ACCESS = "access"
 TOKEN_TYPE_REFRESH = "refresh"
+TOKEN_TYPE_MFA_PENDING = "mfa_pending"
 
 # Refresh token expiry (7 days)
 REFRESH_TOKEN_EXPIRE_DAYS = 7
@@ -79,6 +80,34 @@ def create_refresh_token(subject: str, role: str) -> str:
         "iat": datetime.utcnow(),
     }
     return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
+
+
+def create_mfa_pending_token(user_id: int, email: str) -> str:
+    """
+    Short-lived token issued after password verification but before OTP.
+    Grants zero application access — only valid for /verify-otp and /resend-otp.
+    5-minute TTL matches OTP expiry.
+    """
+    expire = datetime.utcnow() + timedelta(minutes=5)
+    payload = {
+        "sub": email,
+        "user_id": user_id,
+        "exp": expire,
+        "type": TOKEN_TYPE_MFA_PENDING,
+        "iat": datetime.utcnow(),
+    }
+    return jwt.encode(payload, settings.JWT_SECRET, algorithm=settings.JWT_ALG)
+
+
+def verify_mfa_pending_token(token: str) -> dict:
+    """
+    Decode an MFA pending token. Raises ValueError if invalid, expired,
+    or not the correct token type.
+    """
+    payload = decode_token(token)
+    if payload.get("type") != TOKEN_TYPE_MFA_PENDING:
+        raise ValueError("Invalid token type: expected mfa_pending token")
+    return payload
 
 
 def decode_token(token: str) -> dict:

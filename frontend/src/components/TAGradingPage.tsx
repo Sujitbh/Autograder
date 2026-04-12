@@ -7,9 +7,6 @@ import { PageLayout } from './PageLayout';
 import { TopNav } from './TopNav';
 import { CodeEditor } from './CodeEditor';
 import { OutputPanel } from './OutputPanel';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
-import { Textarea } from './ui/textarea';
-import { Button } from './ui/button';
 import { useCodeExecution } from '@/hooks/useCodeExecution';
 import {
     useTASubmissionDetail,
@@ -67,6 +64,81 @@ function getFileIcon(name: string) {
     return FILE_ICONS[ext] ?? '📄';
 }
 
+type TARubricCriterionView = {
+    id: number;
+    name: string;
+    description: string | null;
+    weight: number | null;
+    max_points: number | null;
+    order?: number | null;
+    section_name?: string;
+    section_weight?: number | null;
+};
+
+type TARubricSectionView = {
+    id: number | string;
+    name: string;
+    description: string | null;
+    weight: number | null;
+    criteria: TARubricCriterionView[];
+};
+
+type TASubmissionRubricItem = {
+    id: number;
+    name: string;
+    description: string | null;
+    weight: number | null;
+    max_points: number | null;
+    order: number | null;
+    criteria?: Array<{
+        id: number;
+        name: string;
+        description: string | null;
+        weight: number | null;
+        max_points: number | null;
+        order?: number | null;
+    }>;
+};
+
+function normalizeTARubricSections(rubrics: TASubmissionRubricItem[]): TARubricSectionView[] {
+    if (rubrics.length === 0) return [];
+    const hasSections = rubrics.some((rubric) => Array.isArray(rubric.criteria));
+
+    if (hasSections) {
+        return rubrics.map((section) => ({
+            id: section.id,
+            name: section.name,
+            description: section.description,
+            weight: section.weight,
+            criteria: (section.criteria ?? []).map((criterion) => ({
+                id: criterion.id,
+                name: criterion.name,
+                description: criterion.description,
+                weight: criterion.weight,
+                max_points: criterion.max_points,
+                order: criterion.order ?? null,
+            })),
+        }));
+    }
+
+    return [
+        {
+            id: 'section-rubric',
+            name: 'Rubric Criteria',
+            description: null,
+            weight: 100,
+            criteria: rubrics.map((criterion) => ({
+                id: criterion.id,
+                name: criterion.name,
+                description: criterion.description,
+                weight: criterion.weight,
+                max_points: criterion.max_points,
+                order: criterion.order,
+            })),
+        },
+    ];
+}
+
 export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGradingPageProps>) {
     const router = useRouter();
     const { isDark } = useTheme();
@@ -84,7 +156,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const autoGradeMutation = useTAAutoGrade(courseIdNum);
 
     // Code execution hook (for ad-hoc run)
-    const { execute, isRunning: isExecutingCode, result: execResult, error: execError } = useCodeExecution();
+    const { execute, isRunning: isExecutingCode, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
 
     const [activeFileIndex, setActiveFileIndex] = useState(0);
     const [score, setScore] = useState<string>('');
@@ -95,10 +167,12 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     // UI Layout state
     const [showExplorer, setShowExplorer] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
+    const [infoPanelWidth, setInfoPanelWidth] = useState(360);
     const [outputOpen, setOutputOpen] = useState(false);
+    const [outputPanelHeight, setOutputPanelHeight] = useState(280);
     const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading'>('grading');
-    const [stdinDialogOpen, setStdinDialogOpen] = useState(false);
     const [stdinValue, setStdinValue] = useState('');
+    const [showInlineInput, setShowInlineInput] = useState(false);
 
     const [runTestsResult, setRunTestsResult] = useState<{
         total_testcases: number;
@@ -111,6 +185,8 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
             testcase_id: number | null;
             testcase_name: string | null;
             is_public?: boolean | null;
+            input_data?: string | null;
+            expected_output?: string | null;
             passed: boolean;
             output: string | null;
             error_output: string | null;
@@ -268,6 +344,33 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         detail.assignment.allowed_languages?.split(',')[0]
         || 'python'
     ).toLowerCase();
+
+    const sectionWeightPercent = (weight?: number | null) => {
+        if (weight == null || Number.isNaN(weight)) return 100;
+        return weight <= 1.5 ? weight * 100 : weight;
+    };
+
+    const rubricSections = normalizeTARubricSections(detail.rubrics ?? []);
+    const rubrics = rubricSections.flatMap((section) =>
+        section.criteria.map((criterion) => ({
+            ...criterion,
+            section_name: section.name,
+            section_weight: section.weight,
+        }))
+    );
+    const inferredWeightedRubric = rubricSections.some(
+        (section) =>
+            Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 ||
+            section.criteria.some((criterion) => Math.abs((criterion.weight ?? 1) - 1) > 0.0001)
+    );
+    const isWeightedRubric = detail.assignment?.rubric_mode === 'weighted' || inferredWeightedRubric;
+    const getSectionFallbackPoints = (section: any) => {
+        const assignmentMaxPoints = detail.assignment?.max_points ?? 0;
+        if (assignmentMaxPoints <= 0) return null;
+        if (rubricSections.length === 1) return assignmentMaxPoints;
+        if (isWeightedRubric) return Math.round((assignmentMaxPoints * sectionWeightPercent(section.weight)) / 100);
+        return null;
+    };
     const activeFile = detail.files[activeFileIndex];
     const code = activeFile?.content || '';
 
@@ -292,21 +395,27 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     };
 
     const handleRunCode = async () => {
+        setOutputOpen(true);
         if (codeUsesInput(code, language)) {
-            setStdinDialogOpen(true);
+            if (!showInlineInput) {
+                setShowInlineInput(true);
+                return;
+            }
+            await execute(code, language, stdinValue);
             return;
         }
-        setOutputOpen(true);
+        setShowInlineInput(false);
         await execute(code, language);
     };
 
-    const handleOpenStdinDialog = () => {
-        setStdinDialogOpen(true);
+    const handleOpenInlineInput = () => {
+        setOutputOpen(true);
+        setShowInlineInput(true);
     };
 
     const handleRunWithStdin = async () => {
-        setStdinDialogOpen(false);
         setOutputOpen(true);
+        setShowInlineInput(true);
         await execute(code, language, stdinValue);
     };
 
@@ -411,7 +520,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                             </button>
 
                             <button
-                                onClick={handleOpenStdinDialog}
+                                onClick={handleOpenInlineInput}
                                 disabled={isExecutingCode || runTestsMutation.isPending || autoGradeMutation.isPending}
                                 style={{
                                     padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
@@ -524,15 +633,28 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
 
                         {/* Output Panel (collapsible, matching student) */}
                         <div style={{
-                            height: outputOpen ? 280 : 0,
+                            height: outputOpen ? outputPanelHeight : 0,
                             background: 'var(--color-surface)',
                             borderTop: outputOpen ? '1px solid var(--color-border)' : 'none',
                             overflow: 'hidden',
-                            transition: 'height .3s ease',
                             flexShrink: 0,
                             display: 'flex',
                             flexDirection: 'column' as const,
                         }}>
+                            {/* Drag-to-resize handle */}
+                            <div
+                                onMouseDown={(e) => {
+                                    const startY = e.clientY;
+                                    const startH = outputPanelHeight;
+                                    const onMove = (ev: MouseEvent) => setOutputPanelHeight(Math.max(120, Math.min(700, startH + (startY - ev.clientY))));
+                                    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
+                                    window.addEventListener('mousemove', onMove);
+                                    window.addEventListener('mouseup', onUp);
+                                }}
+                                style={{ height: 5, cursor: 'ns-resize', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-surface-elevated)' }}
+                            >
+                                <div style={{ width: 28, height: 3, borderRadius: 2, background: 'var(--color-border)' }} />
+                            </div>
                             <div style={{
                                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                                 padding: '6px 14px', background: 'var(--color-surface-elevated)',
@@ -553,7 +675,17 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                 </button>
                             </div>
                             <div className="flex-1 min-h-0">
-                                <OutputPanel result={execResult} isRunning={isExecutingCode} error={execError} />
+                                <OutputPanel
+                                    result={execResult}
+                                    isRunning={isExecutingCode}
+                                    error={execError}
+                                    stdinInput={lastStdinInput}
+                                    showInputEditor={showInlineInput}
+                                    inputDraft={stdinValue}
+                                    onInputDraftChange={setStdinValue}
+                                    onRunWithInput={handleRunWithStdin}
+                                    isRunWithInputDisabled={isExecutingCode || runTestsMutation.isPending || autoGradeMutation.isPending}
+                                />
                             </div>
                         </div>
                     </div>
@@ -563,12 +695,40 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                         <div
                             className="flex flex-col overflow-hidden shrink-0"
                             style={{
-                                width: 360, minWidth: 360,
+                                width: infoPanelWidth, minWidth: infoPanelWidth,
                                 background: 'var(--color-surface)',
                                 borderLeft: '1px solid var(--color-border)',
                                 transition: 'width .3s ease, min-width .3s ease, opacity .25s ease',
+                                position: 'relative',
                             }}
                         >
+                            <div
+                                onMouseDown={(e) => {
+                                    const startX = e.clientX;
+                                    const startWidth = infoPanelWidth;
+                                    const onMove = (ev: MouseEvent) => {
+                                        const next = Math.max(300, Math.min(760, startWidth + (startX - ev.clientX)));
+                                        setInfoPanelWidth(next);
+                                    };
+                                    const onUp = () => {
+                                        window.removeEventListener('mousemove', onMove);
+                                        window.removeEventListener('mouseup', onUp);
+                                    };
+                                    window.addEventListener('mousemove', onMove);
+                                    window.addEventListener('mouseup', onUp);
+                                }}
+                                title="Drag to resize panel"
+                                style={{
+                                    position: 'absolute',
+                                    left: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    width: 6,
+                                    cursor: 'col-resize',
+                                    zIndex: 20,
+                                    background: 'transparent',
+                                }}
+                            />
                             {/* Tabs */}
                             <div style={{ display: 'flex', padding: '8px 10px 0', gap: 4, flexShrink: 0, flexWrap: 'wrap' as const }}>
                                 {(['desc', 'tests', 'grading'] as const).map(tab => (
@@ -742,6 +902,42 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                         className="px-3 py-2 border-t"
                                                                         style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-primary-bg)' }}
                                                                     >
+                                                                        {test.input_data && (
+                                                                            <div className="mb-2">
+                                                                                <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>
+                                                                                    Input:
+                                                                                </p>
+                                                                                <pre
+                                                                                    className="p-2 rounded text-xs overflow-x-auto"
+                                                                                    style={{
+                                                                                        backgroundColor: '#111827',
+                                                                                        color: '#E5E7EB',
+                                                                                        fontFamily: 'monospace',
+                                                                                        maxHeight: '120px',
+                                                                                    }}
+                                                                                >
+                                                                                    {test.input_data}
+                                                                                </pre>
+                                                                            </div>
+                                                                        )}
+                                                                        {test.expected_output && (
+                                                                            <div className="mb-2">
+                                                                                <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>
+                                                                                    Expected Output:
+                                                                                </p>
+                                                                                <pre
+                                                                                    className="p-2 rounded text-xs overflow-x-auto"
+                                                                                    style={{
+                                                                                        backgroundColor: '#111827',
+                                                                                        color: '#E5E7EB',
+                                                                                        fontFamily: 'monospace',
+                                                                                        maxHeight: '120px',
+                                                                                    }}
+                                                                                >
+                                                                                    {test.expected_output}
+                                                                                </pre>
+                                                                            </div>
+                                                                        )}
                                                                         {test.output && (
                                                                             <div className="mb-2">
                                                                                 <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '4px' }}>
@@ -817,51 +1013,107 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                         )}
 
                                         {/* Rubric Section */}
-                                        {detail.rubrics.length > 0 && (
+                                        {rubrics.length > 0 && (
                                             <div className="mb-6">
-                                                <h3 style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '8px' }}>
-                                                    Rubric Reference
-                                                </h3>
-                                                <div className="space-y-2">
-                                                    {detail.rubrics.map((rubric) => {
-                                                        // Find if we have auto-grade results for this rubric
-                                                        const autoEval = autoGradeResult?.rubric_results?.evaluations?.find(
-                                                            (e: any) => e.rubric_id === rubric.id
-                                                        );
-                                                        const earned = autoEval ? autoEval.earned_points : null;
-                                                        const max = rubric.max_points || 0;
-
-                                                        return (
-                                                            <div
-                                                                key={rubric.id}
-                                                                className="flex items-center justify-between px-3 py-2 rounded-lg"
-                                                                style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}
-                                                            >
-                                                                <div className="flex-1 pr-2">
-                                                                    <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                                        {rubric.name}
-                                                                    </p>
-                                                                    {autoEval?.feedback && (
-                                                                        <p style={{ fontSize: '10px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
-                                                                            {autoEval.feedback}
-                                                                        </p>
-                                                                    )}
-                                                                </div>
-                                                                <span
-                                                                    className="px-2 py-0.5 rounded-md shrink-0"
-                                                                    style={{
-                                                                        fontSize: '11px',
-                                                                        fontWeight: 600,
-                                                                        color: earned !== null ? (earned === max ? '#059669' : '#D97706') : 'var(--color-text-mid)',
-                                                                        backgroundColor: 'var(--color-surface)',
-                                                                        border: '1px solid var(--color-border)',
-                                                                    }}
-                                                                >
-                                                                    {earned !== null ? `${earned} / ` : ''}{max} pts
-                                                                </span>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <h3 style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)' }}>
+                                                        Rubric Reference
+                                                    </h3>
+                                                    <span
+                                                        style={{
+                                                            fontSize: 11,
+                                                            fontWeight: 700,
+                                                            letterSpacing: '.35px',
+                                                            textTransform: 'uppercase' as const,
+                                                            color: isWeightedRubric ? '#6B0000' : '#2D6A2D',
+                                                            backgroundColor: isWeightedRubric ? 'rgba(107,0,0,.10)' : 'rgba(45,106,45,.12)',
+                                                            border: `1px solid ${isWeightedRubric ? 'rgba(107,0,0,.24)' : 'rgba(45,106,45,.24)'}`,
+                                                            borderRadius: 999,
+                                                            padding: '3px 9px',
+                                                        }}
+                                                    >
+                                                        {isWeightedRubric ? 'Weighted' : 'Unweighted'}
+                                                    </span>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    {rubricSections.map((section) => (
+                                                        <div key={section.id} className="border-l-2 border-blue-500 pl-3">
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                                                                    {section.name}
+                                                                </p>
+                                                                {Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 && (
+                                                                    <span style={{ fontSize: '10px', color: '#6B0000', backgroundColor: 'rgba(107,0,0,.10)', padding: '2px 6px', borderRadius: '3px' }}>
+                                                                        {sectionWeightPercent(section.weight).toFixed(1)}%
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                        );
-                                                    })}
+                                                            <div className="space-y-2">
+                                                                {(section.criteria || []).length > 0 ? (
+                                                                    (section.criteria || []).map((criterion) => {
+                                                                        const autoEval = autoGradeResult?.rubric_results?.evaluations?.find(
+                                                                            (e) => e.rubric_id === criterion.id
+                                                                        );
+                                                                        const earned = autoEval ? autoEval.earned_points : null;
+                                                                        const max = criterion.max_points || 0;
+
+                                                                        return (
+                                                                            <div
+                                                                                key={criterion.id}
+                                                                                className="flex items-center justify-between px-3 py-2 rounded-lg"
+                                                                                style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}
+                                                                            >
+                                                                                <div className="flex-1 pr-2">
+                                                                                    <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                                                                                        {criterion.name}
+                                                                                    </p>
+                                                                                    <p style={{ fontSize: '10px', color: 'var(--color-text-light)', marginTop: '2px' }}>
+                                                                                        Weight: {((criterion.weight ?? 1) * 100).toFixed(0)}%
+                                                                                    </p>
+                                                                                    {criterion.description && (
+                                                                                        <p style={{ fontSize: '10px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
+                                                                                            {criterion.description}
+                                                                                        </p>
+                                                                                    )}
+                                                                                    {autoEval?.feedback && (
+                                                                                        <p style={{ fontSize: '10px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
+                                                                                            {autoEval.feedback}
+                                                                                        </p>
+                                                                                    )}
+                                                                                </div>
+                                                                                <span
+                                                                                    className="px-2 py-0.5 rounded-md shrink-0"
+                                                                                    style={{
+                                                                                        fontSize: '11px',
+                                                                                        fontWeight: 600,
+                                                                                        color: earned !== null ? (earned === max ? '#059669' : '#D97706') : 'var(--color-text-mid)',
+                                                                                        backgroundColor: 'var(--color-surface)',
+                                                                                        border: '1px solid var(--color-border)',
+                                                                                    }}
+                                                                                >
+                                                                                    {earned !== null ? `${earned} / ` : ''}{max} pts
+                                                                                </span>
+                                                                            </div>
+                                                                        );
+                                                                    })
+                                                                ) : (
+                                                                    <div
+                                                                        className="px-3 py-2 rounded-lg"
+                                                                        style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}
+                                                                    >
+                                                                        <p style={{ fontSize: '12px', color: 'var(--color-text-mid)', lineHeight: 1.6 }}>
+                                                                            {section.description || 'No criteria were defined for this section.'}
+                                                                        </p>
+                                                                        {getSectionFallbackPoints(section) !== null && (
+                                                                            <p style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 700, marginTop: 8 }}>
+                                                                                Points: {getSectionFallbackPoints(section)}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             </div>
                                         )}
@@ -1046,33 +1298,6 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                 </div>
 
             </div>
-
-            {/* Stdin Dialog */}
-            <Dialog open={stdinDialogOpen} onOpenChange={setStdinDialogOpen}>
-                <DialogContent style={{ maxWidth: '500px' }}>
-                    <DialogHeader>
-                        <DialogTitle>Run with Input</DialogTitle>
-                    </DialogHeader>
-                    <div className="mt-4">
-                        <label className="text-sm font-medium" style={{ color: 'var(--color-text-dark)' }}>
-                            Enter program input (stdin):
-                        </label>
-                        <Textarea
-                            value={stdinValue}
-                            onChange={(e) => setStdinValue(e.target.value)}
-                            placeholder="Type your input here..."
-                            className="mt-2 font-mono text-sm"
-                            rows={6}
-                        />
-                    </div>
-                    <DialogFooter className="mt-4">
-                        <Button variant="outline" onClick={() => setStdinDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleRunWithStdin} className="text-white" style={{ backgroundColor: 'var(--color-success)' }}>
-                            <Play className="w-4 h-4 mr-2" /> Run
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
 
         </PageLayout>
     );

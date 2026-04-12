@@ -158,6 +158,7 @@ class ExecutionService:
         stdin_input: str = "",
         timeout: Optional[int] = None,
         memory_limit: Optional[int] = None,
+        compile_only: bool = False,
     ) -> ExecutionResult:
         """
         Execute code in a sandboxed environment.
@@ -205,6 +206,7 @@ class ExecutionService:
                     tmpdir=tmpdir,
                     stdin_input=stdin_input,
                     timeout=timeout,
+                    compile_only=compile_only,
                 )
                 return result
             except Exception as e:
@@ -224,6 +226,7 @@ class ExecutionService:
         tmpdir: str,
         stdin_input: str,
         timeout: int,
+        compile_only: bool,
     ) -> ExecutionResult:
         """Execute code in temporary directory."""
         import time
@@ -241,8 +244,11 @@ class ExecutionService:
 
         source_file.write_text(code)
 
+        compile_time_ms = 0.0
+
         # Compile if needed
         if config["compile_cmd"]:
+            compile_start = time.time()
             compile_cmd = [
                 c.format(
                     file=str(source_file),
@@ -264,10 +270,11 @@ class ExecutionService:
                     return ExecutionResult(
                         status=ExecutionStatus.COMPILE_ERROR,
                         stdout="",
-                        stderr=compile_result.stderr,
+                        stderr=compile_result.stderr or compile_result.stdout,
                         exit_code=compile_result.returncode,
                         execution_time_ms=0,
                     )
+                compile_time_ms = (time.time() - compile_start) * 1000
             except subprocess.TimeoutExpired:
                 return ExecutionResult(
                     status=ExecutionStatus.TIMEOUT,
@@ -276,6 +283,59 @@ class ExecutionService:
                     exit_code=-1,
                     execution_time_ms=0,
                 )
+
+            if compile_only:
+                return ExecutionResult(
+                    status=ExecutionStatus.SUCCESS,
+                    stdout="Compilation successful.",
+                    stderr="",
+                    exit_code=0,
+                    execution_time_ms=compile_time_ms,
+                )
+
+        if compile_only:
+            if language == "python":
+                compile_start = time.time()
+                try:
+                    compile_result = subprocess.run(
+                        ["python3", "-m", "py_compile", str(source_file)],
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                        cwd=tmpdir,
+                    )
+                    compile_time_ms = (time.time() - compile_start) * 1000
+                    if compile_result.returncode != 0:
+                        return ExecutionResult(
+                            status=ExecutionStatus.COMPILE_ERROR,
+                            stdout="",
+                            stderr=compile_result.stderr or compile_result.stdout,
+                            exit_code=compile_result.returncode,
+                            execution_time_ms=compile_time_ms,
+                        )
+                    return ExecutionResult(
+                        status=ExecutionStatus.SUCCESS,
+                        stdout="Syntax check passed.",
+                        stderr="",
+                        exit_code=0,
+                        execution_time_ms=compile_time_ms,
+                    )
+                except subprocess.TimeoutExpired:
+                    return ExecutionResult(
+                        status=ExecutionStatus.TIMEOUT,
+                        stdout="",
+                        stderr="Syntax check timed out",
+                        exit_code=-1,
+                        execution_time_ms=0,
+                    )
+
+            return ExecutionResult(
+                status=ExecutionStatus.SECURITY_ERROR,
+                stdout="",
+                stderr=f"Compile check is not supported for language: {language}",
+                exit_code=-1,
+                execution_time_ms=0,
+            )
 
         # Prepare run command
         if language == "java":
@@ -453,11 +513,13 @@ class ExecutionService:
             if hasattr(tc, "input_data"):
                 input_data = tc.input_data
                 expected_output = tc.expected_output
+                testcase_name = tc.name if hasattr(tc, "name") else None
                 points = tc.points if hasattr(tc, "points") else 1
                 tc_id = tc.id if hasattr(tc, "id") else None
             else:
                 input_data = tc.get("input_data", "")
                 expected_output = tc.get("expected_output", "")
+                testcase_name = tc.get("name")
                 points = tc.get("points", 1)
                 tc_id = tc.get("id")
 
@@ -469,6 +531,9 @@ class ExecutionService:
             )
 
             result["testcase_id"] = tc_id
+            result["testcase_name"] = testcase_name
+            result["input_data"] = input_data
+            result["expected_output"] = expected_output
             result["points"] = points
             result["points_earned"] = points if result["passed"] else 0
 

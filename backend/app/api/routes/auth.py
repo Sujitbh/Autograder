@@ -2,8 +2,14 @@
 Authentication and user management routes.
 """
 
+import secrets
+import uuid
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user
@@ -12,6 +18,8 @@ from app.core.security import (
     verify_password,
     create_access_token,
     create_refresh_token,
+    create_mfa_pending_token,
+    verify_mfa_pending_token,
     verify_refresh_token,
 )
 from app.core.permissions import require_role
@@ -25,10 +33,35 @@ from app.schemas.auth import (
     UserUpdate,
     RoleUpdate,
     PasswordChange,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    MFARequiredResponse,
+    OTPVerifyRequest,
+    OTPResendRequest,
 )
 from app.services.user_service import UserService
+from app.services.email_service import EmailService
+from app.services import otp_service
+from app.settings import settings
+
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+
+def _photo_dir() -> Path:
+    d = Path(settings.DATA_ROOT) / "profile_photos"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _requires_mfa(email: str) -> bool:
+    """Check if this account requires MFA or is bypass-listed via env config."""
+    if settings.MFA_BYPASS_ENABLED and settings.MFA_BYPASS_ACCOUNTS:
+        bypass_list = [a.strip().lower() for a in settings.MFA_BYPASS_ACCOUNTS.split(",")]
+        if email.strip().lower() in bypass_list:
+            return False
+    return True
 
 
 # ==================== Authentication ====================
@@ -45,18 +78,32 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     return user
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     """
     Login with email and password.
-    
-    Returns access token and refresh token.
+
+    If MFA is enabled, returns an mfa_token and sends an OTP to the
+    user's email. The client must call /verify-otp to complete login.
+    If MFA is disabled, returns access + refresh tokens directly.
     """
     user = UserService.authenticate(db, payload.email, payload.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
+        )
+
+    if settings.MFA_ENABLED and _requires_mfa(user.email):
+        # Opportunistic cleanup of stale OTP rows
+        otp_service.cleanup_expired(db)
+
+        mfa_token = create_mfa_pending_token(user.id, user.email)
+        otp_service.create_and_send_otp(db, user.id, user.email)
+
+        return MFARequiredResponse(
+            mfa_token=mfa_token,
+            expires_in=settings.OTP_TTL_MINUTES * 60,
         )
 
     access_token = create_access_token(subject=user.email, role=user.role)
@@ -67,6 +114,84 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         refresh_token=refresh_token,
         expires_in=3600,
     )
+
+
+# ==================== MFA / OTP ====================
+
+@router.post("/verify-otp")
+def verify_otp_endpoint(
+    payload: OTPVerifyRequest, db: Session = Depends(get_db)
+):
+    """
+    Verify a 6-digit OTP and issue full session tokens.
+    The mfa_token (from /login) proves the user already passed password auth.
+    """
+    try:
+        token_data = verify_mfa_pending_token(payload.mfa_token)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired MFA session. Please log in again.",
+        )
+
+    user_id = token_data["user_id"]
+    email = token_data["sub"]
+
+    result = otp_service.verify_otp(db, user_id, payload.otp_code)
+
+    if result == "ok":
+        user = UserService.get_by_email(db, email)
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found or inactive.",
+            )
+        access_token = create_access_token(subject=user.email, role=user.role)
+        refresh_token = create_refresh_token(subject=user.email, role=user.role)
+        return TokenResponse(
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=3600,
+        )
+
+    detail_map = {
+        "invalid": "Incorrect verification code.",
+        "expired": "Verification code has expired. Please request a new one.",
+        "max_attempts": "Too many failed attempts. Please log in again.",
+        "no_otp": "No pending verification code found. Please log in again.",
+    }
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=detail_map.get(result, "Verification failed."),
+    )
+
+
+@router.post("/resend-otp")
+def resend_otp_endpoint(
+    payload: OTPResendRequest, db: Session = Depends(get_db)
+):
+    """
+    Resend the OTP email. Rate-limited to one request per 60 seconds.
+    """
+    try:
+        token_data = verify_mfa_pending_token(payload.mfa_token)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired MFA session. Please log in again.",
+        )
+
+    user_id = token_data["user_id"]
+    email = token_data["sub"]
+
+    if not otp_service.can_resend(db, user_id):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Please wait 60 seconds before requesting a new code.",
+        )
+
+    otp_service.create_and_send_otp(db, user_id, email)
+    return {"message": "A new verification code has been sent to your email."}
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -151,6 +276,136 @@ def change_password(
     db.add(user)
     db.commit()
     return {"message": "Password changed successfully"}
+
+
+# ==================== Password Reset ====================
+
+@router.post("/forgot-password")
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Request a password reset. Generates a one-time token and emails a reset
+    link. Always returns 200 to avoid leaking whether the email exists.
+    """
+    user = UserService.get_by_email(db, payload.email)
+    if user and user.is_active:
+        token = secrets.token_urlsafe(48)
+        user.password_reset_token = token
+        user.password_reset_expires = datetime.now(timezone.utc) + timedelta(
+            minutes=settings.PASSWORD_RESET_EXPIRE_MINUTES
+        )
+        db.add(user)
+        db.commit()
+
+        reset_url = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        EmailService.send_password_reset_email(user.email, reset_url)
+
+    return {"message": "If that email is registered, a reset link has been sent."}
+
+
+@router.post("/reset-password")
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Reset a password using a valid reset token.
+    """
+    user = (
+        db.query(User)
+        .filter(User.password_reset_token == payload.token)
+        .first()
+    )
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token.",
+        )
+
+    if (
+        user.password_reset_expires is None
+        or user.password_reset_expires.replace(tzinfo=timezone.utc)
+        < datetime.now(timezone.utc)
+    ):
+        user.password_reset_token = None
+        user.password_reset_expires = None
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Reset token has expired. Please request a new one.",
+        )
+
+    if len(payload.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters.",
+        )
+
+    user.password_hash = hash_password(payload.new_password)
+    user.password_reset_token = None
+    user.password_reset_expires = None
+    db.add(user)
+    db.commit()
+
+    return {"message": "Password has been reset successfully. You can now sign in."}
+
+
+# ==================== Profile Photo ====================
+
+@router.post("/me/photo", response_model=UserOut)
+async def upload_profile_photo(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Upload or replace the current user's profile photo."""
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File type '{ext}' not allowed. Use: {', '.join(ALLOWED_EXTENSIONS)}",
+        )
+
+    contents = await file.read()
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File too large. Maximum size is 5 MB.",
+        )
+
+    # Delete old photo file if it exists
+    if user.profile_photo:
+        old_path = _photo_dir() / user.profile_photo
+        old_path.unlink(missing_ok=True)
+
+    filename = f"{user.id}_{uuid.uuid4().hex[:8]}{ext}"
+    (_photo_dir() / filename).write_bytes(contents)
+
+    user.profile_photo = filename
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.delete("/me/photo", response_model=UserOut)
+def delete_profile_photo(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Remove the current user's profile photo."""
+    if user.profile_photo:
+        (path := _photo_dir() / user.profile_photo) and path.unlink(missing_ok=True)
+        user.profile_photo = None
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
+
+
+@router.get("/photos/{filename}")
+def serve_profile_photo(filename: str):
+    """Serve a profile photo by filename."""
+    path = _photo_dir() / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Photo not found")
+    return FileResponse(path)
 
 
 # ==================== User Management (Admin) ====================

@@ -19,6 +19,7 @@ class Assignment(Base):
     max_points = Column(Integer, nullable=True, default=100)
     allowed_languages = Column(String, nullable=True)  # Comma-separated: "python,java,cpp"
     starter_code = Column(Text, nullable=True)  # Faculty-provided starter code template
+    rubric_mode = Column(String, nullable=False, default="unweighted")  # weighted | unweighted
     status = Column(String, nullable=False, default="published")  # draft | published | closed
     is_active = Column(Boolean, default=True)
     
@@ -30,3 +31,14 @@ class Assignment(Base):
     submissions = relationship("Submission", back_populates="assignment", cascade="all, delete-orphan")
     testcases = relationship("TestCase", back_populates="assignment", cascade="all, delete-orphan")
     rubrics = relationship("Rubric", back_populates="assignment", cascade="all, delete-orphan")
+    rubric_sections = relationship("RubricSection", back_populates="assignment", cascade="all, delete-orphan")
+
+    @property
+    def rubrics_out(self):
+        """Preferred rubric payload for API responses.
+
+        New assignments store rubric data in `rubric_sections`; legacy data lives
+        in `rubrics`. Expose a single attribute so response schemas can map
+        consistently regardless of storage format.
+        """
+        return self.rubric_sections if self.rubric_sections else self.rubrics

@@ -85,6 +85,8 @@ export interface TASubmissionDetail {
         due_date: string | null;
         max_submissions: number | null;
         allowed_languages: string | null;
+        max_points?: number | null;
+        rubric_mode?: 'weighted' | 'unweighted' | null;
     };
     status: string;
     score: number | null;
@@ -102,6 +104,8 @@ export interface TASubmissionDetail {
         id: number;
         testcase_id: number | null;
         testcase_name: string | null;
+        input_data: string | null;
+        expected_output: string | null;
         passed: boolean;
         output: string | null;
         error_output: string | null;
@@ -115,6 +119,21 @@ export interface TASubmissionDetail {
         weight: number | null;
         max_points: number | null;
         order: number | null;
+        criteria?: Array<{
+            id: number;
+            name: string;
+            description: string | null;
+            weight: number | null;
+            max_points: number | null;
+            order?: number | null;
+        }>;
+    }>;
+    rubric_scores?: Array<{
+        id: number;
+        rubric_id: number;
+        score_awarded: number;
+        feedback: string | null;
+        grader_id: number | null;
     }>;
     permissions: TAPermissions;
 }
@@ -195,7 +214,17 @@ export const taDashboardService = {
     async gradeSubmission(
         courseId: number,
         submissionId: number,
-        payload: { score?: number; max_score?: number; feedback?: string; is_draft?: boolean }
+        payload: {
+            score?: number;
+            max_score?: number;
+            feedback?: string;
+            is_draft?: boolean;
+            rubric_breakdown?: Array<{
+                rubric_id: number;
+                score_awarded: number;
+                feedback?: string | null;
+            }>;
+        }
     ): Promise<{ id: number; status: string; score: number | null; message: string }> {
         const { data } = await api.post(`/ta-dashboard/courses/${courseId}/submissions/${submissionId}/grade`, payload);
         return data;
@@ -214,6 +243,8 @@ export const taDashboardService = {
             testcase_id: number | null;
             testcase_name: string | null;
             is_public: boolean | null;
+            input_data: string | null;
+            expected_output: string | null;
             passed: boolean;
             output: string | null;
             error_output: string | null;
@@ -238,6 +269,8 @@ export const taDashboardService = {
             id: number;
             testcase_id: number | null;
             testcase_name: string | null;
+            input_data: string | null;
+            expected_output: string | null;
             passed: boolean;
             output: string | null;
             error_output: string | null;

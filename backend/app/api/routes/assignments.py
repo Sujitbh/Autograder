@@ -6,7 +6,7 @@ from app.api.deps import get_db, get_current_user, get_current_user_optional
 from app.core.permissions import require_role, require_course_role
 from app.models.assignment import Assignment
 from app.models.testcase import TestCase
-from app.models.rubric import Rubric
+from app.models.rubric_section import RubricSection, RubricCriterion
 from app.models.user import User
 from app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentOut
 
@@ -19,7 +19,7 @@ def list_assignments(
     db: Session = Depends(get_db),
     user: Optional[User] = Depends(get_current_user_optional),
 ):
-    q = db.query(Assignment).options(selectinload(Assignment.rubrics))
+    q = db.query(Assignment).options(selectinload(Assignment.rubric_sections).selectinload(RubricSection.criteria))
     if course_id is not None:
         q = q.filter(Assignment.course_id == course_id)
 
@@ -47,6 +47,7 @@ def create_assignment(
         due_date=payload.due_date,
         max_submissions=payload.max_submissions,
         max_points=payload.max_points,
+        rubric_mode=payload.rubric_mode or "unweighted",
         allowed_languages=payload.allowed_languages,
         starter_code=payload.starter_code,
         status=payload.status or "published",
@@ -74,16 +75,28 @@ def create_assignment(
             points=tc.points or 1,
         ))
 
-    # ── Persist rubric criteria ─────────────────────────────────────
-    for idx, rc in enumerate(payload.rubric or []):
-        db.add(Rubric(
+    # ── Persist rubric sections + criteria ──────────────────────────
+    for section_idx, rs in enumerate(payload.rubric or []):
+        section = RubricSection(
             assignment_id=assignment.id,
-            name=rc.name,
-            description=rc.description,
-            max_points=rc.maxPoints or 10,
-            weight=rc.weight if rc.weight is not None else 1.0,
-            order=idx,
-        ))
+            name=rs.name,
+            description=rs.description,
+            weight=rs.weight if rs.weight is not None else 100.0,
+            order=section_idx,
+        )
+        db.add(section)
+        db.flush()
+
+        for crit_idx, rc in enumerate(rs.criteria or []):
+            db.add(RubricCriterion(
+                section_id=section.id,
+                name=rc.name,
+                description=rc.description,
+                max_points=rc.maxPoints or 10,
+                weight=rc.weight if rc.weight is not None else 1.0,
+                grading_method=rc.gradingMethod or "manual",
+                order=crit_idx,
+            ))
 
     db.commit()
     db.refresh(assignment)
@@ -94,7 +107,7 @@ def create_assignment(
 def get_assignment(assignment_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     assignment = (
         db.query(Assignment)
-        .options(selectinload(Assignment.rubrics))
+        .options(selectinload(Assignment.rubric_sections).selectinload(RubricSection.criteria))
         .filter(Assignment.id == assignment_id)
         .first()
     )

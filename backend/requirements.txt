@@ -31,3 +31,5 @@ openpyxl
 joblib
 scikit-learn
 datasets
+sendgrid
+requests

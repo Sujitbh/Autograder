@@ -148,6 +148,7 @@ export function CreateAssignment() {
     const [showDiscardDialog, setShowDiscardDialog] = useState(false);
     const [showPublishDialog, setShowPublishDialog] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [copiedRubricPrompt, setCopiedRubricPrompt] = useState<'weighted' | 'unweighted' | null>(null);
 
     /* ── Step 1: Basic Info ── */
     const [assignmentName, setAssignmentName] = useState('');
@@ -190,6 +191,9 @@ export function CreateAssignment() {
         type: 'auto' | 'manual' | 'hybrid';
         criteria: RubricCriterion[];
     }
+
+    const weightedGradingPrompt = `Apply weighted grading to this rubric. Assign percentage weights to each section based on importance. Ensure the total weight equals 100%. More critical sections (like functionality or correctness) should have higher weights than less critical ones (like style or comments).\n\nExample:\n\nFunctionality: 50%\nCode Quality: 30%\nDocumentation: 20%`;
+    const unweightedGradingPrompt = 'Apply unweighted grading to this rubric. All sections and criteria should have equal weight and contribute equally to the final score.';
 
     const [savedRubricTemplates, setSavedRubricTemplates] = useState<SavedRubricTemplate[]>([
         {
@@ -296,10 +300,10 @@ export function CreateAssignment() {
             rubricCriteria.forEach((c, i) => {
                 if (!c.name.trim()) newErrors[`rubric_name_${i}`] = `Criterion ${i + 1} needs a name`;
                 if (c.points < 0) newErrors[`rubric_points_${i}`] = 'Points cannot be negative';
+                if (isWeightedRubric && c.weight < 0) newErrors[`rubric_weight_${i}`] = 'Weight cannot be negative';
             });
-            if (isWeightedRubric) {
-                const totalWeight = rubricCriteria.reduce((s, c) => s + c.weight, 0);
-                if (totalWeight !== 100) newErrors.rubricWeight = `Weights must total 100% (currently ${totalWeight}%)`;
+            if (isWeightedRubric && getTotalWeight() !== 100) {
+                newErrors.rubric_weight_total = 'For weighted grading, total weight must equal 100%';
             }
         }
 
@@ -363,11 +367,11 @@ export function CreateAssignment() {
        ════════════════════════════════════════════════════════ */
 
     const addRubricCriterion = () => {
-        setRubricCriteria([...rubricCriteria, { id: Date.now().toString(), name: '', description: '', points: 10, weight: 10 }]);
+        setRubricCriteria([...rubricCriteria, { id: Date.now().toString(), name: '', description: '', points: 10, weight: 1 }]);
     };
 
     const removeRubricCriterion = (id: string) => {
-        if (rubricCriteria.length > 1) setRubricCriteria(rubricCriteria.filter(c => c.id !== id));
+        setRubricCriteria(rubricCriteria.filter(c => c.id !== id));
     };
 
     const updateRubricCriterion = (id: string, field: keyof RubricCriterion, value: string | number) => {
@@ -376,6 +380,17 @@ export function CreateAssignment() {
 
     const getTotalPoints = () => rubricCriteria.reduce((s, c) => s + c.points, 0);
     const getTotalWeight = () => rubricCriteria.reduce((s, c) => s + c.weight, 0);
+
+    const copyRubricPrompt = async (mode: 'weighted' | 'unweighted') => {
+        const text = mode === 'weighted' ? weightedGradingPrompt : unweightedGradingPrompt;
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedRubricPrompt(mode);
+            setTimeout(() => setCopiedRubricPrompt(null), 1600);
+        } catch {
+            setCopiedRubricPrompt(null);
+        }
+    };
 
     const getSensitivityLabel = (v: number) => {
         if (v < 33) return 'Low';
@@ -793,6 +808,33 @@ export function CreateAssignment() {
                                     <FieldError error={errors.rubric} />
                                 </div>
 
+                                <div className="space-y-3 p-4 rounded-lg border" style={{ borderColor: 'var(--color-border)', backgroundColor: '#FAFAFA' }}>
+                                    <p style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Rubric Prompt Templates</p>
+                                    <p style={{ fontSize: '12px', color: '#595959' }}>Copy and use these prompts to quickly apply weighted or unweighted grading rules.</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="p-3 rounded-lg border" style={{ borderColor: '#E6D6D6', backgroundColor: '#FFFDFC' }}>
+                                            <p style={{ fontSize: '12px', fontWeight: 600, color: '#6B0000', marginBottom: '8px' }}>Weighted Grading Prompt</p>
+                                            <p style={{ fontSize: '12px', color: '#595959', lineHeight: 1.5 }}>
+                                                Apply weighted grading to this rubric. Assign percentage weights to each section based on importance. Ensure the total weight equals 100%.
+                                            </p>
+                                            <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => copyRubricPrompt('weighted')}>
+                                                <Copy className="w-4 h-4 mr-2" />
+                                                {copiedRubricPrompt === 'weighted' ? 'Copied' : 'Copy Weighted Prompt'}
+                                            </Button>
+                                        </div>
+                                        <div className="p-3 rounded-lg border" style={{ borderColor: '#DCE7DC', backgroundColor: '#FBFFFB' }}>
+                                            <p style={{ fontSize: '12px', fontWeight: 600, color: '#2D6A2D', marginBottom: '8px' }}>Unweighted Grading Prompt</p>
+                                            <p style={{ fontSize: '12px', color: '#595959', lineHeight: 1.5 }}>
+                                                Apply unweighted grading to this rubric. All sections and criteria should have equal weight and contribute equally to the final score.
+                                            </p>
+                                            <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => copyRubricPrompt('unweighted')}>
+                                                <Copy className="w-4 h-4 mr-2" />
+                                                {copiedRubricPrompt === 'unweighted' ? 'Copied' : 'Copy Unweighted Prompt'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 {/* Save / Load rubric templates */}
                                 <div className="flex flex-wrap items-center gap-2 p-4 rounded-lg border" style={{ borderColor: 'var(--color-border)', backgroundColor: '#FAFAFA' }}>
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -825,7 +867,7 @@ export function CreateAssignment() {
                                         <div className="flex items-center justify-between">
                                             <div>
                                                 <label style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Weighted Rubric</label>
-                                                <p style={{ fontSize: '12px', color: '#595959', marginTop: '2px' }}>Criteria weights must total 100%</p>
+                                                <p style={{ fontSize: '12px', color: '#595959', marginTop: '2px' }}>Use percentage weights; total must be exactly 100%.</p>
                                             </div>
                                             <Switch checked={isWeightedRubric} onCheckedChange={setIsWeightedRubric} />
                                         </div>
@@ -867,13 +909,14 @@ export function CreateAssignment() {
                                                             </div>
                                                         )}
                                                     </div>
+                                                    {isWeightedRubric && errors[`rubric_weight_${index}`] && (
+                                                        <FieldError error={errors[`rubric_weight_${index}`]} />
+                                                    )}
                                                     <Input value={criterion.description} onChange={e => updateRubricCriterion(criterion.id, 'description', e.target.value)} placeholder="Description (optional)" className="border-[var(--color-border)]" />
                                                 </div>
-                                                {rubricCriteria.length > 1 && (
-                                                    <Button type="button" variant="ghost" size="sm" onClick={() => removeRubricCriterion(criterion.id)}>
-                                                        <Trash2 className="w-4 h-4" style={{ color: '#B91C1C' }} />
-                                                    </Button>
-                                                )}
+                                                <Button type="button" variant="ghost" size="sm" onClick={() => removeRubricCriterion(criterion.id)}>
+                                                    <Trash2 className="w-4 h-4" style={{ color: '#B91C1C' }} />
+                                                </Button>
                                             </div>
                                         </div>
                                     ))}
@@ -894,7 +937,7 @@ export function CreateAssignment() {
                                             <span style={{ fontSize: '18px', fontWeight: 700, color: getTotalWeight() === 100 ? '#2D6A2D' : '#B91C1C' }}>{getTotalWeight()}%</span>
                                         </div>
                                     )}
-                                    <FieldError error={errors.rubricWeight} />
+                                    {isWeightedRubric && <FieldError error={errors.rubric_weight_total} />}
                                 </div>
                             </div>
                         )}

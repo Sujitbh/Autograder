@@ -12,10 +12,11 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db, get_current_user
 from app.core.permissions import require_role, require_course_role
 from app.models.assignment import Assignment
-from app.models.rubric import Rubric
+from app.models.rubric_section import RubricSection
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
 from app.models.submission_result import SubmissionResult
+from app.models.submission_rubric_score import SubmissionRubricScore
 from app.models.testcase import TestCase
 from app.models.user import User
 from app.schemas.submission import SubmissionCreate, SubmissionOut, SubmissionWithStudent
@@ -28,14 +29,35 @@ router = APIRouter(prefix="/submissions", tags=["submissions"])
 SOURCE_EXTENSIONS = {".py", ".java", ".cpp", ".c", ".js", ".ts", ".go", ".rs", ".kt", ".swift"}
 
 
+def _resolve_submission_disk_path(stored: str | None) -> str | None:
+    """Map DB path to a path that exists on this server (handles data/ relative and moved trees)."""
+    if not stored or not str(stored).strip():
+        return None
+    p = str(stored).strip()
+    candidates: list[str] = []
+    if os.path.isabs(p):
+        candidates.append(p)
+    if p.startswith("data/"):
+        candidates.append(str(Path(settings.DATA_ROOT) / p[5:]))
+    if not os.path.isabs(p):
+        candidates.append(str(Path(settings.DATA_ROOT) / p))
+    candidates.append(p)
+    seen: set[str] = set()
+    for c in candidates:
+        if c in seen:
+            continue
+        seen.add(c)
+        if c and os.path.isfile(c):
+            return c
+    return None
+
+
 def _extract_primary_source_file(files: list[SubmissionFile]) -> tuple[str | None, str | None]:
     """Return (filename, content) for the best candidate source file in a submission."""
     candidates: list[tuple[str, str]] = []
     for f in files:
-        actual_path = f.path
-        if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
-            actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
-        if not actual_path or not os.path.exists(actual_path):
+        actual_path = _resolve_submission_disk_path(f.path)
+        if not actual_path:
             continue
         try:
             with open(actual_path, "r", encoding="utf-8", errors="replace") as fh:
@@ -155,7 +177,12 @@ def _estimate_ai_likelihood(code: str) -> dict:
     return _heuristic_ai_likelihood(code)
 
 
-def _build_integrity_report(db: Session, submission: Submission) -> dict:
+def _build_integrity_report(
+    db: Session,
+    submission: Submission,
+    *,
+    match_limit: int | None = 5,
+) -> dict:
     files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == submission.id).all()
     _, current_code = _extract_primary_source_file(files)
     if not current_code:
@@ -164,6 +191,9 @@ def _build_integrity_report(db: Session, submission: Submission) -> dict:
                 "checked_against": 0,
                 "top_matches": [],
                 "note": "No source code found for current submission.",
+                "peers_with_latest_submission": 0,
+                "peers_skipped_no_file_rows": 0,
+                "peers_skipped_unreadable_on_disk": 0,
             },
             "ai_detection": _estimate_ai_likelihood(""),
         }
@@ -177,11 +207,18 @@ def _build_integrity_report(db: Session, submission: Submission) -> dict:
         if sub.student_id not in latest_by_student:
             latest_by_student[sub.student_id] = sub
 
+    peers_with_latest = len(latest_by_student)
+    peers_skipped_no_file_rows = 0
+    peers_skipped_unreadable_on_disk = 0
     matches = []
     for other in latest_by_student.values():
         other_files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == other.id).all()
+        if not other_files:
+            peers_skipped_no_file_rows += 1
+            continue
         other_filename, other_code = _extract_primary_source_file(other_files)
         if not other_code:
+            peers_skipped_unreadable_on_disk += 1
             continue
 
         similarity = _similarity_percent(current_code, other_code)
@@ -199,13 +236,19 @@ def _build_integrity_report(db: Session, submission: Submission) -> dict:
         })
 
     matches.sort(key=lambda m: m["similarity_percent"], reverse=True)
-    top = matches[:5]
+    if match_limit is None:
+        top = matches
+    else:
+        top = matches[:match_limit]
 
     return {
         "plagiarism": {
             "checked_against": len(matches),
             "top_matches": top,
             "note": "Similarity is based on normalized code/token overlap and should be reviewed manually.",
+            "peers_with_latest_submission": peers_with_latest,
+            "peers_skipped_no_file_rows": peers_skipped_no_file_rows,
+            "peers_skipped_unreadable_on_disk": peers_skipped_unreadable_on_disk,
         },
         "ai_detection": _estimate_ai_likelihood(current_code),
     }
@@ -293,13 +336,8 @@ def get_submission_detail(
     files_out = []
     for f in files:
         content = None
-        actual_path = f.path
-        if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
-            from app.settings import settings
-            from pathlib import Path
-            actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
-
-        if actual_path and os.path.exists(actual_path):
+        actual_path = _resolve_submission_disk_path(f.path)
+        if actual_path:
             try:
                 with open(actual_path, "r", encoding="utf-8", errors="replace") as fh:
                     content = fh.read()
@@ -343,6 +381,7 @@ def get_submission_detail(
             results_out.append({
                 "testcase_id": r.testcase_id or r.id,
                 "test_name": tc.name if tc else f"Test {r.id}",
+                "input_data": tc.input_data if tc else "",
                 "passed": r.passed,
                 "actual_output": r.output or "",
                 "expected_output": tc.expected_output if tc else "",
@@ -379,17 +418,43 @@ def get_submission_detail(
             "max_points": assignment.max_points,
             "due_date": assignment.due_date.isoformat() if getattr(assignment, "due_date", None) else None,
             "language": (assignment.allowed_languages.split(",")[0].strip().lower() if assignment.allowed_languages else "python"),
+            "rubric_mode": assignment.rubric_mode,
         },
         "rubrics": [
             {
-                "id": r.id,
-                "name": r.name,
-                "description": r.description,
-                "max_points": r.max_points or 0,
-                "weight": r.weight,
-                "order": r.order or 0,
+                "id": section.id,
+                "assignment_id": section.assignment_id,
+                "name": section.name,
+                "description": section.description,
+                "weight": section.weight,
+                "criteria": [
+                    {
+                        "id": crit.id,
+                        "section_id": crit.section_id,
+                        "name": crit.name,
+                        "description": crit.description,
+                        "weight": crit.weight,
+                        "max_points": crit.max_points or 0,
+                        "grading_method": crit.grading_method,
+                        "order": crit.order or 0,
+                    }
+                    for crit in sorted(section.criteria or [], key=lambda c: (c.order or 0, c.id))
+                ],
             }
-            for r in db.query(Rubric).filter(Rubric.assignment_id == s.assignment_id).order_by(Rubric.order).all()
+            for section in db.query(RubricSection)
+                .filter(RubricSection.assignment_id == s.assignment_id)
+                .order_by(RubricSection.order.asc(), RubricSection.id.asc())
+                .all()
+        ],
+        "rubric_scores": [
+            {
+                "id": rs.id,
+                "rubric_id": rs.rubric_id,
+                "score_awarded": rs.score_awarded,
+                "feedback": rs.feedback,
+                "grader_id": rs.grader_id,
+            }
+            for rs in db.query(SubmissionRubricScore).filter(SubmissionRubricScore.submission_id == s.id).all()
         ],
         "attempt_number": db.query(Submission).filter(
             Submission.assignment_id == s.assignment_id,
@@ -397,6 +462,115 @@ def get_submission_detail(
             Submission.id <= s.id,
         ).count(),
         "integrity": integrity_report,
+    }
+
+
+@router.get("/{s_id}/plagiarism-scan")
+def plagiarism_scan(
+    s_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Full plagiarism-style similarity scan for this submission vs classmates' latest attempts.
+    Instructors/TAs only; returns all matches (not capped like submission detail).
+    """
+    s = db.query(Submission).filter(Submission.id == s_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    assignment = db.query(Assignment).filter(Assignment.id == s.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    if user.role != "admin" and s.student_id != user.id:
+        require_course_role(
+            db=db,
+            user=user,
+            course_id=assignment.course_id,
+            allowed_roles=["instructor", "ta"],
+        )
+
+    if user.role == "student":
+        raise HTTPException(status_code=403, detail="Not available for students")
+
+    return _build_integrity_report(db, s, match_limit=None)
+
+
+@router.get("/{s_id}/plagiarism-compare/{other_id}")
+def plagiarism_compare(
+    s_id: int,
+    other_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Side-by-side source comparison between two submissions on the same assignment."""
+    s = db.query(Submission).filter(Submission.id == s_id).first()
+    other = db.query(Submission).filter(Submission.id == other_id).first()
+    if not s or not other:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    if s.assignment_id != other.assignment_id:
+        raise HTTPException(status_code=400, detail="Submissions must belong to the same assignment")
+
+    assignment = db.query(Assignment).filter(Assignment.id == s.assignment_id).first()
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    if user.role != "admin" and s.student_id != user.id:
+        require_course_role(
+            db=db,
+            user=user,
+            course_id=assignment.course_id,
+            allowed_roles=["instructor", "ta"],
+        )
+    if user.role == "student":
+        raise HTTPException(status_code=403, detail="Not available for students")
+
+    base_files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == s.id).all()
+    peer_files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == other.id).all()
+    base_fn, base_code = _extract_primary_source_file(base_files)
+    peer_fn, peer_code = _extract_primary_source_file(peer_files)
+
+    if not base_code or not peer_code:
+        raise HTTPException(
+            status_code=400,
+            detail="Both submissions need readable primary source files for comparison.",
+        )
+
+    similarity = _similarity_percent(base_code, peer_code)
+    risk = "high" if similarity >= 75 else "medium" if similarity >= 55 else "low"
+
+    base_student = db.query(User).filter(User.id == s.student_id).first()
+    peer_student = db.query(User).filter(User.id == other.student_id).first()
+
+    diff_lines = difflib.unified_diff(
+        base_code.splitlines(keepends=True),
+        peer_code.splitlines(keepends=True),
+        fromfile=f"{base_fn or 'submission_a'} (submission #{s.id})",
+        tofile=f"{peer_fn or 'submission_b'} (submission #{other.id})",
+        lineterm="",
+    )
+    unified_diff = "".join(diff_lines)
+
+    return {
+        "similarity_percent": similarity,
+        "risk": risk,
+        "base": {
+            "submission_id": s.id,
+            "student_id": s.student_id,
+            "student_name": base_student.name if base_student else f"Student {s.student_id}",
+            "filename": base_fn,
+            "content": base_code,
+        },
+        "peer": {
+            "submission_id": other.id,
+            "student_id": other.student_id,
+            "student_name": peer_student.name if peer_student else f"Student {other.student_id}",
+            "student_email": peer_student.email if peer_student else None,
+            "filename": peer_fn,
+            "content": peer_code,
+        },
+        "unified_diff": unified_diff,
+        "note": "Review the diff and both files in context; similarity is heuristic only.",
     }
 
 
@@ -535,14 +709,8 @@ def download_submission_file(
             allowed_roles=["instructor", "ta"],
         )
     
-    # Check if file exists on disk
-    actual_path = file_record.path
-    if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
-        from app.settings import settings
-        from pathlib import Path
-        actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
-
-    if not actual_path or not os.path.exists(actual_path):
+    actual_path = _resolve_submission_disk_path(file_record.path)
+    if not actual_path:
         raise HTTPException(status_code=404, detail="File not found on disk")
     
     return FileResponse(

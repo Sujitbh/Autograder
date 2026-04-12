@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+from datetime import datetime, UTC
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from app.services.email_service import EmailService
@@ -80,6 +81,21 @@ def _build_email_from_row(row: dict, default_domain: str) -> Optional[str]:
     return None
 
 
+def _submission_status_for_gradebook(assignment: Assignment, submission: Optional[Submission]) -> str:
+    """Return a report-friendly assignment status."""
+    if submission and submission.status == "graded" and submission.score is not None:
+        return "graded"
+    if submission is not None:
+        return "ungraded"
+
+    due_date = assignment.due_date
+    if due_date is None:
+        return "not_submitted"
+
+    now = datetime.now(due_date.tzinfo) if due_date.tzinfo else datetime.now(UTC).replace(tzinfo=None)
+    return "missing" if due_date < now else "not_submitted"
+
+
 def _parse_dict_rows(decoded_text: str) -> list[dict]:
     sample = decoded_text[:4096]
     delimiter = ","
@@ -149,6 +165,28 @@ def generate_enrollment_code(db: Session) -> str:
     raise HTTPException(status_code=500, detail="Unable to generate unique enrollment code")
 
 
+def _ensure_creator_enrolled_as_instructor(db: Session, course_id: int, user: User) -> None:
+    """
+    List courses only returns rows where the user has an enrollment.
+    The 'existing course' branch of create_course updates a row but previously skipped
+    enrollment, so the creator saw an empty My Courses list.
+    """
+    if user.role not in ("faculty", "instructor", "admin"):
+        return
+    en = (
+        db.query(Enrollment)
+        .filter(Enrollment.course_id == course_id, Enrollment.user_id == user.id)
+        .first()
+    )
+    if en is None:
+        db.add(Enrollment(course_id=course_id, user_id=user.id, role="instructor"))
+        db.commit()
+    elif en.role != "instructor":
+        en.role = "instructor"
+        db.add(en)
+        db.commit()
+
+
 @router.get("/semesters")
 def list_semesters_for_faculty(db: DbSession, user: CurrentUser):
     """Return all semesters, accessible to any authenticated faculty or admin (used in course creation form)."""
@@ -204,6 +242,8 @@ def create_course(payload: CourseCreate, db: DbSession, user: CurrentUser):
             existing_course.section = payload.section
         db.add(existing_course)
         db.commit()
+        db.refresh(existing_course)
+        _ensure_creator_enrolled_as_instructor(db, existing_course.id, user)
         db.refresh(existing_course)
         return existing_course
 
@@ -461,9 +501,35 @@ async def import_course_enrollments(
                 s = s[:-2]
             return s or None
 
+        def _normalize_cwid(val: str | None) -> str | None:
+            """Normalize CWID to exactly 8 digits or return None if invalid."""
+            if not val:
+                return None
+            digits = "".join(ch for ch in val if ch.isdigit())
+            if len(digits) != 8:
+                return None
+            return digits
+
         sis_login_id = _clean_id(row.get("sis login id") or row.get("sis_login_id"))
-        sis_user_id = _clean_id(row.get("sis user id") or row.get("sis_user_id"))
+        raw_sis_user_id = _clean_id(row.get("sis user id") or row.get("sis_user_id"))
+        sis_user_id = _normalize_cwid(raw_sis_user_id)
         external_id = _clean_id(row.get("id") or row.get("external_id"))
+
+        if raw_sis_user_id and not sis_user_id:
+            skipped_count += 1
+            results.append(
+                EnrollmentImportRowOut(
+                    row_number=idx,
+                    name=normalized_name or None,
+                    email=email,
+                    sis_login_id=sis_login_id,
+                    sis_user_id=raw_sis_user_id,
+                    external_id=external_id,
+                    status="skipped",
+                    message="CWID must be exactly 8 digits",
+                )
+            )
+            continue
 
         if not email:
             skipped_count += 1
@@ -796,20 +862,33 @@ def get_course_grades(
                 sub = db.query(Submission).filter(
                     Submission.student_id == student.id,
                     Submission.assignment_id == a.id,
-                    Submission.status == "graded",
-                ).order_by(Submission.created_at.desc()).first()
+                ).order_by(Submission.created_at.desc(), Submission.id.desc()).first()
 
-                if sub and sub.score is not None:
+                status = _submission_status_for_gradebook(a, sub)
+
+                if sub and sub.status == "graded" and sub.score is not None:
                     grades[str(a.id)] = {
                         "score": float(sub.score),
                         "max_score": float(sub.max_score) if sub.max_score else float(a.max_points or 100),
                         "submission_id": sub.id,
                         "is_late": False,
+                        "status": status,
+                        "raw_submission_status": sub.status,
                     }
                     total_earned += float(sub.score)
                     total_possible += float(sub.max_score) if sub.max_score else float(a.max_points or 100)
                 else:
-                    grades[str(a.id)] = None
+                    grades[str(a.id)] = {
+                        "score": None,
+                        "max_score": float(a.max_points or 100),
+                        "submission_id": sub.id if sub else None,
+                        "is_late": False,
+                        "status": status,
+                        "raw_submission_status": sub.status if sub else None,
+                    }
+
+                    if status == "missing":
+                        total_possible += float(a.max_points or 100)
 
             students_data.append({
                 "student_id": student.id,
@@ -870,6 +949,7 @@ def get_course_grades(
     
     for assignment in assignments:
         sub = latest_submissions.get(assignment.id)
+        status = _submission_status_for_gradebook(assignment, sub)
         if sub and sub.status == "graded" and sub.score is not None and sub.max_score is not None and sub.max_score > 0:
             percentage = (sub.score / sub.max_score) * 100
             graded_scores.append(percentage)
@@ -880,6 +960,7 @@ def get_course_grades(
                 "max_score": sub.max_score,
                 "percentage": round(percentage, 1),
                 "submitted": True,
+                "status": status,
                 "feedback": sub.feedback,
                 "graded_at": sub.graded_at.isoformat() if sub.graded_at else None,
             })
@@ -891,6 +972,7 @@ def get_course_grades(
                 "max_score": assignment.max_points,
                 "percentage": None,
                 "submitted": sub is not None,
+                "status": status,
                 "feedback": sub.feedback if sub is not None else None,
                 "graded_at": sub.graded_at.isoformat() if sub and sub.graded_at else None,
             })
