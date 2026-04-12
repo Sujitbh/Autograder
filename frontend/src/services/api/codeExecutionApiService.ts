@@ -5,6 +5,7 @@ export interface ExecuteCodeRequest {
   language: string;
   stdin_input?: string;
   timeout?: number;
+  compile_only?: boolean;
 }
 
 export interface ExecuteCodeResponse {

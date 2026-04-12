@@ -1,23 +1,56 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageLayout } from './PageLayout';
 import { Button } from './ui/button';
 import { useAuth } from '@/utils/AuthContext';
-import { ArrowLeft, User, Lock, Loader2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, User, Lock, Loader2, CheckCircle2, Camera, Trash2 } from 'lucide-react';
 import api from '@/services/api/client';
+import { authService } from '@/services/api';
 
 export function StudentAccountSettings() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPhotoError(null);
+    setPhotoLoading(true);
+    try {
+      const updated = await authService.uploadPhoto(file);
+      updateUser({ profilePhoto: updated.profilePhoto });
+    } catch (err: any) {
+      setPhotoError(err?.response?.data?.detail || 'Failed to upload photo');
+    } finally {
+      setPhotoLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    setPhotoError(null);
+    setPhotoLoading(true);
+    try {
+      await authService.deletePhoto();
+      updateUser({ profilePhoto: undefined });
+    } catch (err: any) {
+      setPhotoError(err?.response?.data?.detail || 'Failed to remove photo');
+    } finally {
+      setPhotoLoading(false);
+    }
+  };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +96,70 @@ export function StudentAccountSettings() {
 
         <h1 className="text-3xl font-bold mb-8" style={{ color: 'var(--color-text-dark)' }}>Account Settings</h1>
 
+        {/* Profile Photo */}
+        <div className="rounded-xl border p-6 mb-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
+          <h2 className="text-lg font-bold mb-4" style={{ color: 'var(--color-text-dark)' }}>Profile Photo</h2>
+          <div className="flex items-center gap-6">
+            {user?.profilePhoto ? (
+              <img
+                src={user.profilePhoto}
+                alt="Profile"
+                className="rounded-full flex-shrink-0 object-cover"
+                style={{ width: '80px', height: '80px', border: '2px solid #D9D9D9' }}
+              />
+            ) : (
+              <div
+                className="rounded-full flex items-center justify-center text-white flex-shrink-0"
+                style={{
+                  width: '80px',
+                  height: '80px',
+                  backgroundColor: 'var(--color-primary)',
+                  fontSize: '28px',
+                  fontWeight: 700,
+                  border: '2px solid #D9D9D9',
+                }}
+              >
+                {`${((user as any)?.firstName || 'S')[0]}${((user as any)?.lastName || '')[0] || ''}`.toUpperCase()}
+              </div>
+            )}
+            <div>
+              <p className="text-sm mb-3" style={{ color: 'var(--color-text-mid)' }}>
+                Your photo helps others recognize you
+              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  className="hidden"
+                  onChange={handlePhotoUpload}
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={photoLoading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {photoLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Camera className="w-4 h-4 mr-2" />}
+                  {user?.profilePhoto ? 'Change Photo' : 'Upload Photo'}
+                </Button>
+                {user?.profilePhoto && (
+                  <button
+                    onClick={handlePhotoDelete}
+                    disabled={photoLoading}
+                    style={{ fontSize: '13px', color: '#8B0000', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
+                  >
+                    Remove Photo
+                  </button>
+                )}
+              </div>
+              {photoError && (
+                <p className="mt-2 text-xs" style={{ color: 'var(--color-error)' }}>{photoError}</p>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Profile Section */}
         <div className="rounded-xl border p-6 mb-6" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
           <div className="flex items-center gap-3 mb-6">
@@ -74,7 +171,7 @@ export function StudentAccountSettings() {
             <div>
               <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text-mid)' }}>Name</label>
               <div className="px-4 py-3 rounded-xl border text-sm" style={{ backgroundColor: 'var(--color-surface-elevated)', borderColor: 'var(--color-border)', color: 'var(--color-text-dark)' }}>
-                {(user as any)?.name || (user as any)?.firstName || 'N/A'}
+                {`${(user as any)?.firstName ?? ''} ${(user as any)?.lastName ?? ''}`.trim() || 'N/A'}
               </div>
             </div>
             <div>

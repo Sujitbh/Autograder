@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import {
     ChevronLeft, Calendar, Code, Users, Download, CheckCircle2, Search,
     Inbox, BarChart3, AlertTriangle, ChevronUp, ChevronDown,
-    Edit, Trash2, FileText, ClipboardList, Clock, Star, BookOpen, Settings2,
+    Edit, Trash2, FileText, Clock, Star, BookOpen, Settings2,
     UserCheck, Loader2, Zap,
 } from 'lucide-react';
 import { TopNav } from './TopNav';
@@ -23,7 +23,7 @@ import {
 
 import { useAssignment } from '@/hooks/queries';
 import { useSubmissions } from '@/hooks/queries/useSubmissions';
-import { submissionService } from '@/services/api';
+import { courseService, submissionService } from '@/services/api';
 
 /* ─── Rubric criterion ─── */
 interface RubricCriterion {
@@ -70,6 +70,17 @@ interface StudentSubmission {
 type SortField = 'studentName' | 'submittedAt' | 'autoScore' | 'finalGrade';
 type SortOrder = 'asc' | 'desc';
 
+function getDisplayStudentName(sub: StudentSubmission): string {
+    if (sub.status === 'not-submitted' || sub.status === 'graded') return sub.studentName;
+    const token = (sub.studentId || sub.id || '').replace(/^missing-/, '');
+    return `Student #${token}`;
+}
+
+function getDisplayAvatarInitials(sub: StudentSubmission): string {
+    if (sub.status === 'not-submitted' || sub.status === 'graded') return sub.avatarInitials;
+    return '';
+}
+
 function scoreColor(score: number, max: number): string {
     const pct = (score / max) * 100;
     if (pct >= 90) return '#2D6A2D';
@@ -85,11 +96,75 @@ export function AssignmentGrading() {
     // Fetch from API
     const { data: apiAssignment, isLoading: isLoadingAssignment } = useAssignment(courseId, assignmentId);
     const { data: apiSubmissions, isLoading: isLoadingSubmissions, refetch: refetchSubmissions } = useSubmissions(assignmentId);
+    const [rosterStudents, setRosterStudents] = useState<Array<{
+        id: string;
+        name: string;
+        sisUserId: string;
+        avatarInitials: string;
+    }>>([]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadRoster = async () => {
+            if (!courseId) return;
+            try {
+                const enrollments = await courseService.getEnrollments(courseId);
+                const students = enrollments
+                    .filter((enrollment) => enrollment.role === 'student' && enrollment.user)
+                    .map((enrollment) => {
+                        const userId = String(enrollment.user?.id ?? enrollment.user_id ?? '');
+                        const name = enrollment.user?.name ?? 'Student';
+                        const initials = name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')
+                            .toUpperCase()
+                            .slice(0, 2);
+                        return {
+                            id: userId,
+                            name,
+                            sisUserId: enrollment.user?.sis_user_id ?? userId,
+                            avatarInitials: initials,
+                        };
+                    });
+                if (isMounted) {
+                    setRosterStudents(students);
+                }
+            } catch {
+                if (isMounted) {
+                    setRosterStudents([]);
+                }
+            }
+        };
+
+        loadRoster();
+        return () => {
+            isMounted = false;
+        };
+    }, [courseId]);
 
     // Derive assignment metadata from API data or localStorage fallback
     const meta: AssignmentMeta | undefined = useMemo(() => {
         // 1. API data (for real assignments from the database)
         if (apiAssignment) {
+            const rubricItems: RubricCriterion[] = (apiAssignment.rubric ?? []).map((r: any) => {
+                const criteria = Array.isArray(r.criteria) ? r.criteria : [];
+                if (criteria.length > 0) {
+                    const sectionPoints = criteria.reduce((sum: number, c: any) => sum + (Number(c.maxPoints) || 0), 0);
+                    return {
+                        name: r.name ?? 'Section',
+                        description: r.description ?? '',
+                        maxPoints: sectionPoints,
+                    };
+                }
+                return {
+                    name: r.name ?? 'Criterion',
+                    description: r.description ?? '',
+                    maxPoints: Number(r.maxPoints) || 0,
+                };
+            });
+
             return {
                 name: apiAssignment.name ?? 'Untitled',
                 language: apiAssignment.language ?? 'Python',
@@ -104,11 +179,7 @@ export function AssignmentGrading() {
                     ? '10% deduction per day, max 3 days late'
                     : 'No late submissions',
                 aiDetection: true,
-                rubric: (apiAssignment.rubric ?? []).map((r: any) => ({
-                    name: r.name ?? 'Criterion',
-                    description: r.description ?? '',
-                    maxPoints: r.maxPoints ?? 0,
-                })),
+                rubric: rubricItems,
                 isGroupAssignment: apiAssignment.isGroup ?? false,
             } as AssignmentMeta;
         }
@@ -156,29 +227,35 @@ export function AssignmentGrading() {
                 .toUpperCase()
                 .slice(0, 2);
 
-        // Keep only the latest submission per student
+        // Keep only the latest submission per student when a stable student id exists.
+        // If missing, fall back to submission id so entries remain gradeable.
         const latestByStudent = new Map<string, any>();
         for (const sub of apiSubmissions as any[]) {
             const uid = String(sub.student?.id ?? sub.studentId ?? sub.student_id ?? '');
-            const existing = latestByStudent.get(uid);
+            const key = uid || `submission-${String(sub.id ?? '')}`;
+            const existing = latestByStudent.get(key);
             if (!existing) {
-                latestByStudent.set(uid, sub);
+                latestByStudent.set(key, sub);
             } else {
                 const existingTime = new Date(existing.created_at ?? existing.submittedAt ?? 0).getTime();
                 const newTime = new Date(sub.created_at ?? sub.submittedAt ?? 0).getTime();
-                if (newTime > existingTime) latestByStudent.set(uid, sub);
+                if (newTime > existingTime) latestByStudent.set(key, sub);
             }
         }
 
-        return Array.from(latestByStudent.values()).map((sub: any) => {
-            const studentName = sub.student?.name ?? 'Student';
-            const studentIdentifier = sub.student?.student_id ?? String(sub.studentId ?? sub.student_id ?? sub.student?.id ?? '');
+        const rows: StudentSubmission[] = [];
+        const studentsWithSubmission = new Set<string>();
+
+        Array.from(latestByStudent.values()).forEach((sub: any) => {
+            const studentName = sub.student?.name ?? sub.studentName ?? 'Student';
+            const studentUid = String(sub.student?.id ?? sub.studentId ?? sub.student_id ?? '');
+            const studentIdentifier = (sub.student?.student_id ?? sub.student?.sis_user_id ?? studentUid) || String(sub.id ?? '');
             const submittedAt = sub.created_at ?? sub.submittedAt ?? null;
             const score = sub.score ?? sub.grade?.totalScore ?? null;
             const maxScore = sub.max_score ?? sub.grade?.maxScore ?? meta?.totalPoints ?? 100;
             const status = sub.status === 'graded' || score != null ? 'graded' : 'submitted';
 
-            return {
+            const row = {
                 id: String(sub.id),
                 studentName,
                 studentId: studentIdentifier,
@@ -191,8 +268,32 @@ export function AssignmentGrading() {
                 late: false,
                 flagged: false,
             } as StudentSubmission;
+
+            if (studentUid) {
+                studentsWithSubmission.add(studentUid);
+            }
+            rows.push(row);
         });
-    }, [apiSubmissions, isLoadingSubmissions, meta]);
+
+        for (const student of rosterStudents) {
+            if (studentsWithSubmission.has(student.id)) continue;
+            rows.push({
+                id: `missing-${student.id}`,
+                studentName: student.name,
+                studentId: student.sisUserId,
+                avatarInitials: student.avatarInitials,
+                submittedAt: null,
+                autoScore: null,
+                finalGrade: null,
+                maxPoints: meta?.totalPoints ?? 100,
+                status: 'not-submitted',
+                late: false,
+                flagged: false,
+            });
+        }
+
+        return rows;
+    }, [apiSubmissions, isLoadingSubmissions, meta, rosterStudents]);
 
     const [submissionsState, setSubmissionsState] = useState<StudentSubmission[]>(submissions);
     // Update local state when API data changes
@@ -216,7 +317,7 @@ export function AssignmentGrading() {
     const [sortField, setSortField] = useState<SortField>('studentName');
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
     const [showBulkGradeDialog, setShowBulkGradeDialog] = useState(false);
-    const [pageSection, setPageSection] = useState<'overview' | 'rubric' | 'submissions'>('overview');
+    const [pageSection, setPageSection] = useState<'overview' | 'submissions'>('overview');
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
     const [showEditDialog, setShowEditDialog] = useState(false);
     const [editName, setEditName] = useState(meta?.name ?? '');
@@ -229,6 +330,42 @@ export function AssignmentGrading() {
     const [applyGroupStudent, setApplyGroupStudent] = useState<StudentSubmission | null>(null);
     const [applyGroupGrade, setApplyGroupGrade] = useState<number | null>(null);
     const [groupGradeApplied, setGroupGradeApplied] = useState(false);
+
+    const classStats = useMemo(() => {
+        if (!meta) {
+            return {
+                gradedCount: 0,
+                meanPoints: null as number | null,
+                medianPoints: null as number | null,
+            };
+        }
+
+        const gradedScores = submissionsState
+            .filter((s) => s.status === 'graded' && s.finalGrade != null)
+            .map((s) => Number(s.finalGrade));
+
+        if (gradedScores.length === 0) {
+            return {
+                gradedCount: 0,
+                meanPoints: null as number | null,
+                medianPoints: null as number | null,
+            };
+        }
+
+        const sorted = [...gradedScores].sort((a, b) => a - b);
+        const meanPoints = Number((sorted.reduce((sum, score) => sum + score, 0) / sorted.length).toFixed(1));
+        const mid = Math.floor(sorted.length / 2);
+        const medianRaw = sorted.length % 2 === 0
+            ? (sorted[mid - 1] + sorted[mid]) / 2
+            : sorted[mid];
+        const medianPoints = Number(medianRaw.toFixed(1));
+
+        return {
+            gradedCount: sorted.length,
+            meanPoints,
+            medianPoints,
+        };
+    }, [meta, submissionsState]);
 
     const handleDownloadZip = async () => {
         if (!assignmentId) return;
@@ -290,7 +427,7 @@ export function AssignmentGrading() {
             if (activeTab !== 'all' && s.status !== activeTab) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                return s.studentName.toLowerCase().includes(q) || s.studentId.includes(q);
+                return getDisplayStudentName(s).toLowerCase().includes(q) || s.studentId.includes(q);
             }
             return true;
         });
@@ -301,7 +438,7 @@ export function AssignmentGrading() {
         return [...filtered].sort((a, b) => {
             let cmp = 0;
             switch (sortField) {
-                case 'studentName': cmp = a.studentName.localeCompare(b.studentName); break;
+                case 'studentName': cmp = getDisplayStudentName(a).localeCompare(getDisplayStudentName(b)); break;
                 case 'submittedAt':
                     cmp = (a.submittedAt ? new Date(a.submittedAt).getTime() : Infinity) - (b.submittedAt ? new Date(b.submittedAt).getTime() : Infinity);
                     break;
@@ -448,7 +585,6 @@ export function AssignmentGrading() {
                     <div className="flex items-center gap-1 mb-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
                         {([
                             { id: 'overview' as const, label: 'Overview', icon: FileText },
-                            { id: 'rubric' as const, label: 'Rubric', icon: ClipboardList },
                             { id: 'submissions' as const, label: 'Submissions', icon: Users },
                         ]).map(sec => {
                             const active = pageSection === sec.id;
@@ -472,11 +608,6 @@ export function AssignmentGrading() {
                                     {sec.id === 'submissions' && (
                                         <span style={{ fontSize: '11px', fontWeight: 600, backgroundColor: active ? '#6B0000' : '#E0E0E0', color: active ? '#fff' : '#595959', padding: '1px 7px', borderRadius: '10px' }}>
                                             {counts.all}
-                                        </span>
-                                    )}
-                                    {sec.id === 'rubric' && (
-                                        <span style={{ fontSize: '11px', fontWeight: 600, backgroundColor: active ? '#6B0000' : '#E0E0E0', color: active ? '#fff' : '#595959', padding: '1px 7px', borderRadius: '10px' }}>
-                                            {meta.rubric.length}
                                         </span>
                                     )}
                                 </button>
@@ -509,28 +640,36 @@ export function AssignmentGrading() {
                                 </div>
                             </div>
 
-                            {/* Settings + Points Cards */}
+                            {/* Settings + Class Stats Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Points Breakdown */}
+                                {/* Class Statistics */}
                                 <div className="rounded-lg p-6" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
                                     <h2 className="flex items-center gap-2 mb-4" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                                        <Star className="w-5 h-5" style={{ color: '#C9A84C' }} />
-                                        Points Breakdown
+                                        <BarChart3 className="w-5 h-5" style={{ color: '#6B0000' }} />
+                                        Class Statistics
                                     </h2>
-                                    <div className="space-y-3">
-                                        {meta.rubric.map((c, i) => (
-                                            <div key={i} className="flex items-center justify-between py-2" style={{ borderBottom: i < meta.rubric.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
-                                                <span style={{ fontSize: '14px', color: '#2D2D2D' }}>{c.name}</span>
-                                                <span className="flex items-center gap-1" style={{ fontSize: '14px', fontWeight: 700, color: '#6B0000' }}>
-                                                    {c.maxPoints} pts
+                                    {classStats.gradedCount === 0 ? (
+                                        <p style={{ fontSize: '14px', color: '#595959' }}>No graded submissions yet.</p>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                                <span style={{ fontSize: '14px', color: '#2D2D2D' }}>Mean</span>
+                                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#6B0000' }}>
+                                                    {classStats.meanPoints}/{meta.totalPoints} pts
                                                 </span>
                                             </div>
-                                        ))}
-                                        <div className="flex items-center justify-between pt-3" style={{ borderTop: '2px solid var(--color-border)' }}>
-                                            <span style={{ fontSize: '15px', fontWeight: 700, color: '#2D2D2D' }}>Total</span>
-                                            <span style={{ fontSize: '15px', fontWeight: 700, color: '#6B0000' }}>{meta.totalPoints} pts</span>
+                                            <div className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                                <span style={{ fontSize: '14px', color: '#2D2D2D' }}>Median</span>
+                                                <span style={{ fontSize: '14px', fontWeight: 700, color: '#6B0000' }}>
+                                                    {classStats.medianPoints}/{meta.totalPoints} pts
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between pt-3" style={{ borderTop: '2px solid var(--color-border)' }}>
+                                                <span style={{ fontSize: '15px', fontWeight: 700, color: '#2D2D2D' }}>Graded Students</span>
+                                                <span style={{ fontSize: '15px', fontWeight: 700, color: '#6B0000' }}>{classStats.gradedCount}</span>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
 
                                 {/* Assignment Settings */}
@@ -558,77 +697,6 @@ export function AssignmentGrading() {
                                             </div>
                                         ))}
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* ══════════════════ RUBRIC SECTION ══════════════════ */}
-                    {pageSection === 'rubric' && (
-                        <div className="space-y-6">
-                            {/* Rubric Header */}
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>Grading Rubric</h2>
-                                    <p style={{ fontSize: '13px', color: '#595959', marginTop: '4px' }}>
-                                        {meta.rubric.length} criteria • {meta.totalPoints} total points
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Rubric Criteria Cards */}
-                            <div className="space-y-4">
-                                {meta.rubric.map((criterion, i) => {
-                                    const pct = Math.round((criterion.maxPoints / meta.totalPoints) * 100);
-                                    return (
-                                        <div key={i} className="rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
-                                            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                                <div className="flex items-center gap-3">
-                                                    <div
-                                                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                                                        style={{ backgroundColor: 'var(--color-primary-bg)', color: '#6B0000', fontSize: '13px', fontWeight: 700 }}
-                                                    >
-                                                        {i + 1}
-                                                    </div>
-                                                    <h3 style={{ fontSize: '15px', fontWeight: 600, color: '#2D2D2D' }}>{criterion.name}</h3>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <span style={{ fontSize: '12px', color: '#8A8A8A' }}>{pct}% weight</span>
-                                                    <span className="flex items-center justify-center px-3 py-1 rounded-full" style={{ backgroundColor: '#F5EDED', color: '#6B0000', fontSize: '14px', fontWeight: 700, minWidth: '60px', textAlign: 'center' }}>
-                                                        {criterion.maxPoints} pts
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="px-6 py-4">
-                                                <p style={{ fontSize: '14px', color: '#595959', lineHeight: '1.6' }}>{criterion.description}</p>
-                                                {/* Progress indicator for weight */}
-                                                <div className="mt-3 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: '#F0F0F0' }}>
-                                                    <div
-                                                        className="h-full rounded-full"
-                                                        style={{ width: `${pct}%`, backgroundColor: '#6B0000', transition: 'width 0.3s ease' }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Total Points Summary */}
-                            <div className="rounded-lg p-6" style={{ backgroundColor: '#F5EDED', border: '2px solid #6B0000' }}>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <Star className="w-6 h-6" style={{ color: '#C9A84C' }} />
-                                        <span style={{ fontSize: '16px', fontWeight: 600, color: '#2D2D2D' }}>Total Points</span>
-                                    </div>
-                                    <span style={{ fontSize: '24px', fontWeight: 700, color: '#6B0000' }}>{meta.totalPoints}</span>
-                                </div>
-                                <div className="mt-3 flex items-center gap-4 flex-wrap">
-                                    {meta.rubric.map((c, i) => (
-                                        <span key={i} style={{ fontSize: '12px', color: '#595959' }}>
-                                            {c.name}: <strong style={{ color: '#6B0000' }}>{c.maxPoints}</strong>
-                                        </span>
-                                    ))}
                                 </div>
                             </div>
                         </div>
@@ -763,6 +831,8 @@ export function AssignmentGrading() {
                                         <tbody>
                                             {sorted.map((sub) => {
                                                 const rowFlagged = sub.flagged;
+                                                const displayStudentName = getDisplayStudentName(sub);
+                                                const displayAvatarInitials = getDisplayAvatarInitials(sub);
                                                 return (
                                                     <tr
                                                         key={sub.id}
@@ -783,13 +853,15 @@ export function AssignmentGrading() {
                                                     >
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: '11px', fontWeight: 700 }}>
-                                                                    {sub.avatarInitials}
-                                                                </div>
+                                                                {displayAvatarInitials && (
+                                                                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: '11px', fontWeight: 700 }}>
+                                                                        {displayAvatarInitials}
+                                                                    </div>
+                                                                )}
                                                                 <div>
                                                                     <div className="flex items-center gap-2">
                                                                         {rowFlagged && <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#FF6B00' }} />}
-                                                                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>{sub.studentName}</span>
+                                                                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>{displayStudentName}</span>
                                                                     </div>
                                                                     {meta.isGroupAssignment && (
                                                                         <span style={{ fontSize: '11px', color: '#6B0000', fontWeight: 500 }}>

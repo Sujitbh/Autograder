@@ -85,7 +85,7 @@ export const submissionService = {
     files.forEach((file) => formData.append('files', file));
 
     // Use fetch directly to avoid axios Content-Type header interference with FormData
-    const token = typeof window !== 'undefined' ? sessionStorage.getItem('autograde_token') : null;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('autograde_token') : null;
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -130,19 +130,29 @@ export const submissionService = {
     submitted_at: string | null;
     attempt_number: number;
     student: { id: number; name: string; email: string | null };
-    assignment: { id: number; title: string; max_points: number | null; due_date: string | null; language: string };
-    rubrics: Array<{ id: number; name: string; description: string | null; max_points: number; weight: number | null; order: number }>;
-    rubric_scores?: Array<{
+    assignment: { id: number; title: string; max_points: number | null; due_date: string | null; language: string; rubric_mode?: 'weighted' | 'unweighted' | null };
+    rubrics: Array<{
       id: number;
-      rubric_id: number;
-      score_awarded: number;
-      feedback: string | null;
-      grader_id: number | null;
+      assignment_id?: number;
+      name: string;
+      description: string | null;
+      weight: number | null;
+      criteria: Array<{
+        id: number;
+        section_id?: number;
+        name: string;
+        description: string | null;
+        weight: number | null;
+        max_points: number;
+        grading_method?: string | null;
+        order?: number;
+      }>;
     }>;
     files: Array<{ id: number; filename: string; content: string | null }>;
     results: Array<{
       testcase_id: number;
       test_name: string;
+      input_data: string | null;
       passed: boolean;
       actual_output: string;
       expected_output: string;
@@ -166,6 +176,9 @@ export const submissionService = {
           risk: 'low' | 'medium' | 'high';
         }>;
         note: string;
+        peers_with_latest_submission?: number;
+        peers_skipped_no_file_rows?: number;
+        peers_skipped_unreadable_on_disk?: number;
       };
       ai_detection: {
         score: number;
@@ -180,6 +193,69 @@ export const submissionService = {
     );
     return data;
   },
+
+  /** Full classmate similarity scan (all matches; instructor/TA). */
+  async getPlagiarismScan(submissionId: string): Promise<{
+    plagiarism: {
+      checked_against: number;
+      top_matches: Array<{
+        submission_id: number;
+        student_id: number;
+        student_name: string;
+        student_email: string | null;
+        status: string;
+        submitted_at: string | null;
+        filename: string | null;
+        similarity_percent: number;
+        risk: 'low' | 'medium' | 'high';
+      }>;
+      note: string;
+      peers_with_latest_submission?: number;
+      peers_skipped_no_file_rows?: number;
+      peers_skipped_unreadable_on_disk?: number;
+    };
+    ai_detection: {
+      score: number;
+      band: 'low' | 'medium' | 'high';
+      signals: string[];
+      disclaimer: string;
+    };
+  }> {
+    const { data } = await withRetry(() => api.get(`/submissions/${submissionId}/plagiarism-scan`));
+    return data;
+  },
+
+  /** Side-by-side source comparison for two submissions on the same assignment. */
+  async getPlagiarismCompare(
+    baseSubmissionId: string,
+    otherSubmissionId: number
+  ): Promise<{
+    similarity_percent: number;
+    risk: 'low' | 'medium' | 'high';
+    base: {
+      submission_id: number;
+      student_id: number;
+      student_name: string;
+      filename: string | null;
+      content: string;
+    };
+    peer: {
+      submission_id: number;
+      student_id: number;
+      student_name: string;
+      student_email: string | null;
+      filename: string | null;
+      content: string;
+    };
+    unified_diff: string;
+    note: string;
+  }> {
+    const { data } = await withRetry(() =>
+      api.get(`/submissions/${baseSubmissionId}/plagiarism-compare/${otherSubmissionId}`)
+    );
+    return data;
+  },
+
   /** Get files for a submission. */
   async getSubmissionFiles(submissionId: string): Promise<Array<{ id: number; filename: string; file_size: number | null }>> {
     const { data } = await withRetry(() =>
@@ -215,16 +291,7 @@ export const submissionService = {
   /** Manual score entry/override by instructor/TA. */
   async overrideSubmissionScore(
     submissionId: string,
-    payload: {
-      score: number;
-      max_score?: number;
-      feedback?: string;
-      rubric_breakdown?: Array<{
-        rubric_id: number;
-        score_awarded: number;
-        feedback?: string | null;
-      }>;
-    }
+    payload: { score: number; max_score?: number; feedback?: string }
   ): Promise<BackendGradingResults> {
     const { data } = await api.patch<BackendGradingResults>(
       `/grading/submissions/${submissionId}/score`,
@@ -261,6 +328,21 @@ export const submissionService = {
   async getSubmissionResults(submissionId: string): Promise<BackendGradingResults> {
     const { data } = await withRetry(() =>
       api.get<BackendGradingResults>(`/grading/submissions/${submissionId}/results`)
+    );
+    return data;
+  },
+
+  /** Get all testcases configured for an assignment (faculty/instructor see public + private). */
+  async getAssignmentTestcases(assignmentId: string): Promise<Array<{
+    id: number;
+    name: string;
+    input_data: string;
+    expected_output: string;
+    is_public: boolean;
+    points: number;
+  }>> {
+    const { data } = await withRetry(() =>
+      api.get(`/testcases/by-assignment/${assignmentId}`)
     );
     return data;
   },

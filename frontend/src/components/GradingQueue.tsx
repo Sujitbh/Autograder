@@ -18,6 +18,7 @@ import {
 import { useAssignments } from '@/hooks/queries';
 import { submissionService } from '@/services/api';
 import type { Submission as ApiSubmission, Assignment, RubricCriterion, TestCaseResult } from '@/types';
+import { normalizeRubricToCriteria } from '@/utils/rubric';
 
 /** Local UI row — derived from API Submission + Assignment metadata */
 interface QueueSubmission {
@@ -152,26 +153,33 @@ export function GradingQueue() {
         return rows;
     }, [allSubmissions]);
 
-    const tabs = [
-        { id: 'all', label: 'All', count: groupedSubmissions.length },
-        { id: 'pending', label: 'Pending', count: groupedSubmissions.filter(s => s.latest.status === 'pending').length },
-        { id: 'in-review', label: 'In Review', count: groupedSubmissions.filter(s => s.latest.status === 'in-review').length },
-        { id: 'resubmitted', label: 'Resubmitted', count: groupedSubmissions.filter(s => s.latest.status === 'resubmitted').length },
-        { id: 'graded', label: 'Graded', count: groupedSubmissions.filter(s => s.latest.status === 'graded').length },
-    ];
-
     const uniqueAssignments = [...new Set(groupedSubmissions.map(s => s.assignmentName))];
 
-    const filteredSubmissions = groupedSubmissions
+    // Base scope for live counters and table totals.
+    // This keeps tab badges in sync with assignment/search filters.
+    const scopedSubmissions = groupedSubmissions.filter(s => {
+        if (assignmentFilter !== 'all' && s.assignmentName !== assignmentFilter) return false;
+        if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            return s.studentName.toLowerCase().includes(q) ||
+                s.studentId.toLowerCase().includes(q) ||
+                s.assignmentName.toLowerCase().includes(q);
+        }
+        return true;
+    });
+
+    const tabs = [
+        { id: 'all', label: 'All', count: scopedSubmissions.length },
+        { id: 'pending', label: 'Pending', count: scopedSubmissions.filter(s => s.latest.status === 'pending').length },
+        { id: 'in-review', label: 'In Review', count: scopedSubmissions.filter(s => s.latest.status === 'in-review').length },
+        { id: 'resubmitted', label: 'Resubmitted', count: scopedSubmissions.filter(s => s.latest.status === 'resubmitted').length },
+        { id: 'graded', label: 'Graded', count: scopedSubmissions.filter(s => s.latest.status === 'graded').length },
+    ];
+
+    const filteredSubmissions = scopedSubmissions
         .filter(s => {
             if (activeTab !== 'all' && s.latest.status !== activeTab) return false;
             if (assignmentFilter !== 'all' && s.assignmentName !== assignmentFilter) return false;
-            if (searchQuery) {
-                const q = searchQuery.toLowerCase();
-                return s.studentName.toLowerCase().includes(q) ||
-                    s.studentId.toLowerCase().includes(q) ||
-                    s.assignmentName.toLowerCase().includes(q);
-            }
             return true;
         })
         .sort((a, b) => {
@@ -240,6 +248,10 @@ export function GradingQueue() {
         ? filteredSubmissions.find(s => s.id === gradingSubmissionId) ?? allSubmissions.find(s => s.id === gradingSubmissionId) ?? null
         : null;
 
+    const gradingSubmissionRow: QueueSubmission | null = gradingSubmission
+        ? ('_raw' in gradingSubmission ? gradingSubmission : gradingSubmission.latest)
+        : null;
+
     const gradingIndex = gradingSubmission
         ? filteredSubmissions.findIndex(s => s.id === gradingSubmission.id)
         : -1;
@@ -274,11 +286,11 @@ export function GradingQueue() {
     };
 
     /** Resolve the assignment's rubric for the grading panel */
-    const gradingAssignment = gradingSubmission
-        ? assignments.find(a => a.id === gradingSubmission.assignmentId)
+    const gradingAssignment = gradingSubmissionRow
+        ? assignments.find(a => a.id === gradingSubmissionRow.assignmentId)
         : undefined;
 
-    const gradingRubric: RubricCriterion[] = gradingAssignment?.rubric ?? [];
+    const gradingRubric: RubricCriterion[] = normalizeRubricToCriteria(gradingAssignment?.rubric);
 
     const isLoading = assignmentsLoading || submissionsLoading;
 
@@ -644,10 +656,10 @@ export function GradingQueue() {
                                 <div className="text-center py-16">
                                     <CheckCircle2 className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-success)' }} />
                                     <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '4px' }}>
-                                        {groupedSubmissions.length === 0 ? 'No submissions yet' : 'All caught up!'}
+                                        {scopedSubmissions.length === 0 ? 'No submissions yet' : 'All caught up!'}
                                     </p>
                                     <p style={{ fontSize: '14px', color: 'var(--color-text-light)' }}>
-                                        {groupedSubmissions.length === 0
+                                        {scopedSubmissions.length === 0
                                             ? 'Submissions will appear here once students submit their work.'
                                             : 'No submissions match your current filters.'}
                                     </p>
@@ -660,7 +672,7 @@ export function GradingQueue() {
                     {!isLoading && (
                         <div className="flex items-center justify-between mt-4">
                             <p style={{ fontSize: '13px', color: 'var(--color-text-light)' }}>
-                                Showing {filteredSubmissions.length} of {groupedSubmissions.length} students
+                                Showing {filteredSubmissions.length} of {scopedSubmissions.length} students
                             </p>
                             <div className="flex items-center gap-2">
                                 <Button variant="outline" size="sm" className="border-[var(--color-border)]" disabled>
@@ -683,7 +695,7 @@ export function GradingQueue() {
             </div>
 
             {/* Grading Interface Panel */}
-            {gradingSubmission && (
+            {gradingSubmissionRow && (
                 <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--color-background, #f5f5f5)' }}>
                     {/* Header bar */}
                     <div className="flex items-center justify-between px-6 py-3 border-b" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
@@ -695,25 +707,25 @@ export function GradingQueue() {
                             &larr; Back to Grading Queue
                         </button>
                         <span className="text-sm" style={{ color: 'var(--color-text-mid)' }}>
-                            Grading: {gradingSubmission.assignmentName} &mdash; {gradingSubmission.studentName}
+                            Grading: {gradingSubmissionRow.assignmentName} &mdash; {gradingSubmissionRow.studentName}
                         </span>
                     </div>
                     {/* GradingInterface */}
                     <div className="flex-1 overflow-auto p-6">
                         <GradingInterface
                             submission={{
-                                id: gradingSubmission.id,
-                                studentName: gradingSubmission.studentName,
-                                studentId: gradingSubmission.studentId,
-                                code: gradingSubmission._raw.code || '# No code available',
-                                language: gradingSubmission._raw.language ?? 'python',
-                                submittedAt: gradingSubmission.submittedAt,
-                                isLate: gradingSubmission.lateSubmission,
-                                testResults: gradingSubmission._raw.testResults,
+                                id: gradingSubmissionRow.id,
+                                studentName: gradingSubmissionRow.studentName,
+                                studentId: gradingSubmissionRow.studentId,
+                                code: gradingSubmissionRow._raw.code || '# No code available',
+                                language: gradingSubmissionRow._raw.language ?? 'python',
+                                submittedAt: gradingSubmissionRow.submittedAt,
+                                isLate: gradingSubmissionRow.lateSubmission,
+                                testResults: gradingSubmissionRow._raw.testResults,
                             }}
                             rubricCriteria={gradingRubric}
-                            autoScore={gradingSubmission.score ?? undefined}
-                            maxPoints={gradingSubmission.maxScore}
+                            autoScore={gradingSubmissionRow.score ?? undefined}
+                            maxPoints={gradingSubmissionRow.maxScore}
                             totalSubmissions={filteredSubmissions.length}
                             currentIndex={gradingIndex}
                             onPrevious={handleGradingPrev}

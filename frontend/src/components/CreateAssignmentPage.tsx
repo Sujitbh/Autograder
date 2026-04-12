@@ -46,6 +46,7 @@ function toDto(data: AssignmentFormData, courseId: string): CreateAssignmentDto 
         category: 'Homework',
         dueDate: isoDate,
         maxPoints: data.maxPoints ?? 100,
+        rubricMode: data.rubricMode,
         isGroup: data.isGroup ?? false,
         starterCode: data.starterCode || undefined,
         allowLateSubmissions: false,
@@ -64,12 +65,17 @@ function toDto(data: AssignmentFormData, courseId: string): CreateAssignmentDto 
             isPublic: false,
             points: t.points,
         })),
-        rubric: (data.rubric ?? []).map((c) => ({
-            name: c.name,
-            description: c.description,
-            maxPoints: c.maxPoints,
-            weight: (c as any).weight ?? 1,
-            gradingMethod: c.gradingMethod,
+        rubric: (data.rubric ?? []).map((section) => ({
+            name: section.name,
+            description: section.description ?? '',
+            weight: section.weight ?? 100,
+            criteria: (section.criteria ?? []).map((criterion) => ({
+                name: criterion.name,
+                description: criterion.description ?? '',
+                maxPoints: criterion.maxPoints,
+                weight: (criterion.weight ?? 100) / 100,
+                gradingMethod: criterion.gradingMethod,
+            })),
         })),
     };
 }

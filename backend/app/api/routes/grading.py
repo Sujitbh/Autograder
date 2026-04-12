@@ -30,6 +30,7 @@ class ExecuteCodeRequest(BaseModel):
     language: str
     stdin_input: Optional[str] = ""
     timeout: Optional[int] = 10
+    compile_only: bool = False
 
 
 class ExecuteCodeResponse(BaseModel):
@@ -135,6 +136,7 @@ def execute_code(
         language=payload.language,
         stdin_input=payload.stdin_input or "",
         timeout=payload.timeout,
+        compile_only=payload.compile_only,
     )
 
     return ExecuteCodeResponse(

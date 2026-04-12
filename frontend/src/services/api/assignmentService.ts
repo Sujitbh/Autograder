@@ -19,6 +19,7 @@ interface BackendAssignment {
     due_date: string | null;
     max_submissions: number | null;
     max_points: number | null;
+    rubric_mode?: 'weighted' | 'unweighted' | null;
     allowed_languages: string | null;
     starter_code: string | null;
     status: string;
@@ -27,10 +28,20 @@ interface BackendAssignment {
     updated_at?: string | null;
     rubrics?: Array<{
         id: number;
+        assignment_id?: number;
         name: string;
         description: string | null;
-        max_points: number | null;
         weight?: number | null;
+        max_points?: number | null;
+        criteria?: Array<{
+            id: number;
+            section_id?: number;
+            name: string;
+            description: string | null;
+            max_points: number | null;
+            weight?: number | null;
+            grading_method?: 'auto' | 'manual' | 'hybrid' | null;
+        }>;
     }>;
 }
 
@@ -47,6 +58,7 @@ function mapAssignment(a: BackendAssignment): Assignment {
         dueDate: a.due_date ?? '',
         starterCode: a.starter_code ?? undefined,
         maxPoints: a.max_points ?? 100,
+        rubricMode: (a.rubric_mode as 'weighted' | 'unweighted' | undefined) ?? 'unweighted',
         status: (a.status as 'draft' | 'published' | 'closed') ?? (a.is_active ? 'published' : 'draft'),
         isGroup: false,
         allowLateSubmissions: false,
@@ -56,9 +68,15 @@ function mapAssignment(a: BackendAssignment): Assignment {
             id: String(r.id),
             name: r.name,
             description: r.description ?? '',
-            maxPoints: r.max_points ?? 0,
-            weight: r.weight ?? 1,
-            gradingMethod: 'manual' as const,
+            weight: r.weight ?? 100,
+            criteria: (r.criteria ?? []).map((c) => ({
+                id: String(c.id),
+                name: c.name,
+                description: c.description ?? '',
+                maxPoints: c.max_points ?? 0,
+                weight: c.weight ?? 1,
+                gradingMethod: (c.grading_method ?? 'manual') as 'auto' | 'manual' | 'hybrid',
+            })),
         })),
         createdAt: a.created_at ?? '',
         updatedAt: a.updated_at ?? '',
@@ -100,6 +118,7 @@ export const assignmentService = {
             course_id: Number(dto.courseId) || null,
             allowed_languages: dto.language ?? 'python',
             max_points: dto.maxPoints ?? 100,
+            rubric_mode: dto.rubricMode ?? 'unweighted',
             max_submissions: (dto as any).maxSubmissions ?? null,
             status: dto.status ?? 'published',
         };
@@ -134,13 +153,22 @@ export const assignmentService = {
 
         // Send rubric when provided
         if (dto.rubric && dto.rubric.length > 0) {
-            payload.rubric = dto.rubric.map(r => ({
-                name: r.name,
-                description: r.description,
-                maxPoints: r.maxPoints,
-                weight: r.weight ?? 1,
-                gradingMethod: r.gradingMethod,
-            }));
+            payload.rubric = dto.rubric
+                .filter((r: any) => r && typeof r.name === 'string')
+                .map((r: any) => ({
+                    name: r.name,
+                    description: r.description ?? '',
+                    weight: r.weight ?? 100,
+                    criteria: Array.isArray(r.criteria)
+                        ? r.criteria.map((c: any) => ({
+                            name: c.name,
+                            description: c.description ?? '',
+                            maxPoints: c.maxPoints ?? 0,
+                            weight: c.weight ?? 1,
+                            gradingMethod: c.gradingMethod ?? 'manual',
+                        }))
+                        : [],
+                }));
         }
 
         const { data } = await api.post<BackendAssignment>('/assignments/', payload);
