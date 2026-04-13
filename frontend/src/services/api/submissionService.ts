@@ -121,7 +121,10 @@ export const submissionService = {
     return mapSubmission(data);
   },
   /** Get full submission detail including file contents and test results. */
-  async getSubmissionDetail(submissionId: string): Promise<{
+  async getSubmissionDetail(
+    submissionId: string,
+    options?: { aiThreshold?: number }
+  ): Promise<{
     id: number;
     status: string;
     score: number | null;
@@ -130,7 +133,17 @@ export const submissionService = {
     submitted_at: string | null;
     attempt_number: number;
     student: { id: number; name: string; email: string | null };
-    assignment: { id: number; title: string; max_points: number | null; due_date: string | null; language: string; rubric_mode?: 'weighted' | 'unweighted' | null };
+    assignment: {
+      id: number;
+      title: string;
+      max_points: number | null;
+      due_date: string | null;
+      language: string;
+      rubric_mode?: 'weighted' | 'unweighted' | null;
+      ai_detection_enabled?: boolean;
+      auto_flag_enabled?: boolean;
+      auto_flag_threshold?: number | null;
+    };
     rubrics: Array<{
       id: number;
       assignment_id?: number;
@@ -178,15 +191,30 @@ export const submissionService = {
         note: string;
       };
       ai_detection: {
+        ai_confidence?: number;
+        ai_flagged?: boolean;
+        threshold_used?: number;
+        model_language?: string | null;
         score: number;
         band: 'low' | 'medium' | 'high';
         signals: string[];
         disclaimer: string;
+        flagged_sections?: Array<{
+          start_line: number;
+          end_line: number;
+          score: number;
+          threshold: number;
+          snippet: string;
+        }>;
       };
     } | null;
   }> {
     const { data } = await withRetry(() =>
-      api.get(`/submissions/${submissionId}/detail`)
+      api.get(`/submissions/${submissionId}/detail`, {
+        params: options?.aiThreshold != null
+          ? { ai_threshold: options.aiThreshold }
+          : undefined,
+      })
     );
     return data;
   },

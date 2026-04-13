@@ -81,6 +81,10 @@ export interface Assignment {
     status: AssignmentStatus;
     isGroup: boolean;
     allowLateSubmissions: boolean;
+    aiDetectionEnabled?: boolean;
+    autoFlagEnabled?: boolean;
+    // Percent [0..100]
+    autoFlagThreshold?: number;
     latePenalty?: LatePenalty;
     starterCode?: string;
     publicTests: TestCase[];
@@ -247,6 +251,10 @@ export interface CreateAssignmentDto {
     rubricMode?: 'weighted' | 'unweighted';
     isGroup: boolean;
     allowLateSubmissions: boolean;
+    aiDetectionEnabled?: boolean;
+    autoFlagEnabled?: boolean;
+    // Percent [0..100]
+    autoFlagThreshold?: number;
     latePenalty?: LatePenalty;
     starterCode?: string;
     publicTests: Omit<TestCase, 'id' | 'assignmentId'>[];

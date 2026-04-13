@@ -108,6 +108,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const [showInlineInput, setShowInlineInput] = useState(false);
     const [autoGradeResult, setAutoGradeResult] = useState<any>(null);
     const [liveTestResults, setLiveTestResults] = useState<any[] | null>(null);
+    const [showFlaggedSections, setShowFlaggedSections] = useState(false);
 
     const { data: assignmentSubmissions = [] } = useQuery({
         queryKey: ['faculty-assignment-submissions', detail?.assignment?.id],
@@ -139,6 +140,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     useEffect(() => {
         if (!detail) return;
         setFeedback(detail.feedback || '');
+        setShowFlaggedSections(false);
         const rubricSections = detail.rubrics ?? [];
         const flatRubrics = flattenRubrics(rubricSections);
         
@@ -402,6 +404,13 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
             };
         });
     })();
+    const integrityAi = detail.integrity?.ai_detection;
+    const flaggedSections = integrityAi?.flagged_sections ?? [];
+    const hasFlaggedSections = Boolean(integrityAi?.ai_flagged) && flaggedSections.length > 0;
+    const assignmentThresholdPercent =
+        detail.assignment?.auto_flag_threshold != null
+            ? (detail.assignment.auto_flag_threshold * 100).toFixed(1)
+            : null;
 
     return (
         <PageLayout>
@@ -410,7 +419,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
             <div className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
                 <div className="flex flex-1 overflow-hidden relative">
 
-                    {/* ── LEFT: File Explorer ── */}
+                    {/* -- LEFT: File Explorer -- */}
                     {showExplorer && (
                         <div className="flex flex-col shrink-0 overflow-hidden"
                             style={{ width: 220, minWidth: 220, background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)' }}>
@@ -449,7 +458,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                         </div>
                     )}
 
-                    {/* ── CENTER: Editor ── */}
+                    {/* -- CENTER: Editor -- */}
                     <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
                         {/* Editor Topbar */}
                         <div style={{ height: 38, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, flexShrink: 0 }}>
@@ -559,7 +568,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                         </div>
                     </div>
 
-                    {/* ── RIGHT: Info Panel ── */}
+                    {/* -- RIGHT: Info Panel -- */}
                     {showInfoPanel && (
                         <div className="flex flex-col overflow-hidden shrink-0"
                             style={{ width: infoPanelWidth, minWidth: infoPanelWidth, background: 'var(--color-surface)', borderLeft: '1px solid var(--color-border)', position: 'relative' }}>
@@ -591,20 +600,20 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                 }}
                             />
                             {/* Tabs */}
-                            <div style={{ display: 'flex', padding: '8px 10px 0', gap: 4, flexShrink: 0 }}>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', padding: '8px 10px 0', gap: 6, flexShrink: 0 }}>
                                 {(['desc', 'tests', 'grading', 'rubric', 'integrity'] as const).map(tab => (
                                     <button key={tab} onClick={() => setInfoTab(tab)}
-                                        style={{ padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' as const, transition: 'all .2s', background: infoTab === tab ? '#7f1d1d' : 'transparent', color: infoTab === tab ? '#fff' : 'var(--color-text-light)', border: 'none', cursor: 'pointer' }}
+                                        style={{ padding: '5px 11px', borderRadius: 16, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' as const, transition: 'all .2s', background: infoTab === tab ? '#7f1d1d' : 'var(--color-surface)', color: infoTab === tab ? '#fff' : 'var(--color-text-mid)', border: '1px solid var(--color-border)', cursor: 'pointer' }}
                                         onMouseEnter={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'var(--color-surface-elevated)'; e.currentTarget.style.color = 'var(--color-text-mid)'; } }}
-                                        onMouseLeave={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-light)'; } }}>
-                                        {tab === 'desc' ? '📋 Info' : tab === 'tests' ? '🧪 Tests' : tab === 'grading' ? '📊 Grading' : tab === 'rubric' ? '📚 Rubric' : '🛡 Integrity'}
+                                        onMouseLeave={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'var(--color-surface)'; e.currentTarget.style.color = 'var(--color-text-mid)'; } }}>
+                                        {tab === 'desc' ? 'Details' : tab === 'tests' ? 'Tests' : tab === 'grading' ? 'Grading' : tab === 'rubric' ? 'Rubric' : 'Integrity'}
                                     </button>
                                 ))}
                             </div>
 
                             <div className="flex-1 overflow-y-auto" style={{ padding: 16 }}>
 
-                                {/* ── Info Tab ── */}
+                                {/* -- Info Tab -- */}
                                 {infoTab === 'desc' && (
                                     <div>
                                         <div className="flex items-center gap-4 mb-6">
@@ -645,7 +654,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                     </div>
                                 )}
 
-                                {/* ── Tests Tab ── */}
+                                {/* -- Tests Tab -- */}
                                 {infoTab === 'tests' && (
                                     <div>
                                         <div className="flex items-center justify-between mb-4">
@@ -747,7 +756,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                     </div>
                                 )}
 
-                                {/* ── Integrity Tab ── */}
+                                {/* -- Integrity Tab -- */}
                                 {infoTab === 'rubric' && (
                                     <div>
                                         <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: 12 }}>📚 Rubric &amp; Points</h2>
@@ -837,10 +846,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                     </div>
                                 )}
 
-                                {/* ── Integrity Tab ── */}
+                                {/* -- Integrity Tab -- */}
                                 {infoTab === 'integrity' && (
                                     <div>
-                                        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: 12 }}>🛡 Integrity Check</h2>
+                                        <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: 12 }}>Integrity Check</h2>
 
                                         {detail.integrity ? (
                                             <div className="mb-5 rounded-lg p-3" style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface-elevated)' }}>
@@ -849,26 +858,104 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                         <span style={{ fontSize: '12px', color: 'var(--color-text-dark)', fontWeight: 600 }}>AI-generated likelihood</span>
                                                         <span
                                                             style={{
-                                                                ...getRiskTagStyle(detail.integrity.ai_detection.band),
+                                                                ...getRiskTagStyle(integrityAi?.band ?? 'low'),
                                                                 fontSize: '11px',
                                                                 fontWeight: 700,
                                                                 padding: '2px 8px',
                                                                 borderRadius: 999,
                                                             }}
                                                         >
-                                                            {detail.integrity.ai_detection.score}% {getBandLabel(detail.integrity.ai_detection.band)}
+                                                            {integrityAi?.score ?? 0}% {getBandLabel(integrityAi?.band ?? 'low')}
                                                         </span>
                                                     </div>
-                                                    {detail.integrity.ai_detection.signals.length > 0 && (
+                                                    <p style={{ marginTop: 6, fontSize: '10px', color: 'var(--color-text-light)' }}>
+                                                        Flag threshold used:{' '}
+                                                        {integrityAi?.threshold_used != null
+                                                            ? `${(integrityAi.threshold_used * 100).toFixed(1)}%`
+                                                            : 'Not available'}
+                                                    </p>
+                                                    {assignmentThresholdPercent && (
+                                                        <p style={{ marginTop: 2, fontSize: '10px', color: 'var(--color-text-light)' }}>
+                                                            Assignment threshold: {assignmentThresholdPercent}%
+                                                        </p>
+                                                    )}
+                                                    {(integrityAi?.signals?.length ?? 0) > 0 && (
                                                         <ul style={{ marginTop: 6, paddingLeft: 16, fontSize: '11px', color: 'var(--color-text-mid)' }}>
-                                                            {detail.integrity.ai_detection.signals.slice(0, 3).map((sig, i) => (
+                                                            {(integrityAi?.signals ?? []).slice(0, 3).map((sig, i) => (
                                                                 <li key={`${sig}-${i}`}>{sig}</li>
                                                             ))}
                                                         </ul>
                                                     )}
                                                     <p style={{ marginTop: 6, fontSize: '10px', color: 'var(--color-text-light)' }}>
-                                                        {detail.integrity.ai_detection.disclaimer}
+                                                        {integrityAi?.disclaimer ?? 'AI detection is advisory only; use instructor judgement.'}
                                                     </p>
+
+                                                    {Boolean(integrityAi?.ai_flagged) ? (
+                                                        <div style={{ marginTop: 10 }}>
+                                                            {hasFlaggedSections ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowFlaggedSections((prev) => !prev)}
+                                                                    style={{
+                                                                        fontSize: '11px',
+                                                                        fontWeight: 600,
+                                                                        borderRadius: 999,
+                                                                        border: '1px solid var(--color-border)',
+                                                                        backgroundColor: 'var(--color-surface)',
+                                                                        color: 'var(--color-text-dark)',
+                                                                        padding: '6px 12px',
+                                                                        cursor: 'pointer',
+                                                                    }}
+                                                                >
+                                                                    {showFlaggedSections
+                                                                        ? 'Hide Flagged Sections'
+                                                                        : `View Flagged Sections (${flaggedSections.length})`}
+                                                                </button>
+                                                            ) : (
+                                                                <p style={{ marginTop: 4, fontSize: '11px', color: 'var(--color-text-mid)' }}>
+                                                                    This submission is flagged above the threshold, but no section snippets were returned.
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <p style={{ marginTop: 8, fontSize: '11px', color: 'var(--color-text-mid)' }}>
+                                                            This submission is below the current threshold.
+                                                        </p>
+                                                    )}
+
+                                                    {showFlaggedSections && hasFlaggedSections && (
+                                                        <div className="mt-3 space-y-2">
+                                                            {flaggedSections.map((section: any, idx: number) => (
+                                                                <div
+                                                                    key={`${section.start_line}-${section.end_line}-${idx}`}
+                                                                    className="rounded-md p-2"
+                                                                    style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)' }}
+                                                                >
+                                                                    <div className="flex items-center justify-between mb-1">
+                                                                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-dark)' }}>
+                                                                            Lines {section.start_line}-{section.end_line}
+                                                                        </span>
+                                                                        <span style={{ fontSize: '10px', color: 'var(--color-text-mid)' }}>
+                                                                            {section.score}% confidence
+                                                                        </span>
+                                                                    </div>
+                                                                    <pre
+                                                                        className="rounded p-2 overflow-x-auto"
+                                                                        style={{
+                                                                            fontSize: '11px',
+                                                                            lineHeight: 1.4,
+                                                                            maxHeight: 180,
+                                                                            backgroundColor: '#111827',
+                                                                            color: '#E5E7EB',
+                                                                            fontFamily: 'monospace',
+                                                                        }}
+                                                                    >
+                                                                        {section.snippet}
+                                                                    </pre>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 <div>
@@ -942,7 +1029,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                     </div>
                                 )}
 
-                                {/* ── Grading Tab ── */}
+                                {/* -- Grading Tab -- */}
                                 {infoTab === 'grading' && (
                                     <div>
                                         <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: 12 }}>📊 Assess &amp; Grade</h2>
@@ -1147,3 +1234,4 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         </PageLayout>
     );
 }
+

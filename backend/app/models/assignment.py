@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -22,6 +22,10 @@ class Assignment(Base):
     rubric_mode = Column(String, nullable=False, default="unweighted")  # weighted | unweighted
     status = Column(String, nullable=False, default="published")  # draft | published | closed
     is_active = Column(Boolean, default=True)
+    ai_detection_enabled = Column(Boolean, nullable=False, default=True)
+    auto_flag_enabled = Column(Boolean, nullable=False, default=True)
+    # Stored as fraction [0.0, 1.0], e.g. 0.70 means 70%.
+    auto_flag_threshold = Column(Float, nullable=False, default=0.70)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())

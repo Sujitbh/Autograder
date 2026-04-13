@@ -47,6 +47,10 @@ class AssignmentCreate(BaseModel):
     allowed_languages: Optional[str] = None  # Comma-separated: "python,java,cpp"
     starter_code: Optional[str] = None  # Faculty-provided starter code template
     status: Optional[str] = "published"  # draft | published | closed
+    ai_detection_enabled: Optional[bool] = True
+    auto_flag_enabled: Optional[bool] = True
+    # Stored as fraction [0.0, 1.0]
+    auto_flag_threshold: Optional[float] = 0.70
     # Nested test cases & rubric (optional — sent from the assignment creation form)
     public_tests: Optional[List[TestCaseInline]] = None
     private_tests: Optional[List[TestCaseInline]] = None
@@ -66,6 +70,9 @@ class AssignmentUpdate(BaseModel):
     starter_code: Optional[str] = None
     status: Optional[str] = None
     is_active: Optional[bool] = None
+    ai_detection_enabled: Optional[bool] = None
+    auto_flag_enabled: Optional[bool] = None
+    auto_flag_threshold: Optional[float] = None
 
 
 class AssignmentRubricOut(BaseModel):
@@ -95,6 +102,9 @@ class AssignmentOut(BaseModel):
     starter_code: Optional[str] = None
     status: str = "published"
     is_active: bool = True
+    ai_detection_enabled: bool = True
+    auto_flag_enabled: bool = True
+    auto_flag_threshold: float = 0.70
     created_at: Optional[datetime] = None
     # Keep API key as "rubrics" but source data from Assignment.rubric_sections.
     rubrics: List[RubricSectionOut] = Field(default_factory=list, validation_alias="rubric_sections")

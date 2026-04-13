@@ -3,7 +3,7 @@ import re
 import difflib
 from collections import Counter
 from pathlib import Path
-from typing import List
+from typing import List, Any
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import FileResponse
@@ -157,16 +157,50 @@ def _resolve_ai_threshold(threshold: float | None) -> float:
     return max(0.0, min(1.0, parsed))
 
 
+def _is_ai_detection_enabled(assignment: Assignment | None) -> bool:
+    if assignment is None:
+        return True
+    return bool(getattr(assignment, "ai_detection_enabled", True))
+
+
+def _is_auto_flag_enabled(assignment: Assignment | None) -> bool:
+    if assignment is None:
+        return True
+    return bool(getattr(assignment, "auto_flag_enabled", True))
+
+
+def _assignment_threshold(assignment: Assignment | None) -> float | None:
+    if assignment is None:
+        return None
+    raw = getattr(assignment, "auto_flag_threshold", None)
+    if raw is None:
+        return None
+    try:
+        return _resolve_ai_threshold(float(raw))
+    except Exception:
+        return None
+
+
+def _effective_ai_threshold(assignment: Assignment | None, override_threshold: float | None) -> float:
+    if override_threshold is not None:
+        return _resolve_ai_threshold(override_threshold)
+    assignment_threshold = _assignment_threshold(assignment)
+    if assignment_threshold is not None:
+        return assignment_threshold
+    return _resolve_ai_threshold(None)
+
+
 def _build_ai_result_from_confidence(
     confidence: float,
     threshold: float,
     model_language: str | None,
     *,
     extra_signals: list[str] | None = None,
+    force_unflag: bool = False,
 ) -> dict:
     confidence = max(0.0, min(1.0, float(confidence)))
     threshold = _resolve_ai_threshold(threshold)
-    flagged = confidence >= threshold
+    flagged = (confidence >= threshold) and (not force_unflag)
 
     if confidence >= 0.65:
         band = "high"
@@ -194,7 +228,12 @@ def _build_ai_result_from_confidence(
     }
 
 
-def _stored_ai_likelihood(submission: Submission, threshold: float | None = None) -> dict | None:
+def _stored_ai_likelihood(
+    submission: Submission,
+    threshold: float | None = None,
+    *,
+    force_unflag: bool = False,
+) -> dict | None:
     if submission.ai_confidence is None:
         return None
 
@@ -214,27 +253,37 @@ def _stored_ai_likelihood(submission: Submission, threshold: float | None = None
         threshold=float(threshold_used),
         model_language=submission.ai_model_language,
         extra_signals=signals,
+        force_unflag=force_unflag,
     )
 
 
-def _estimate_ai_likelihood(code: str, filename: str | None = None, threshold: float | None = None) -> dict:
+def _estimate_ai_likelihood(
+    code: str,
+    filename: str | None = None,
+    threshold: float | None = None,
+    *,
+    force_unflag: bool = False,
+) -> dict:
     if not code or not code.strip():
         return _build_ai_result_from_confidence(
             confidence=0.0,
             threshold=_resolve_ai_threshold(threshold),
             model_language=None,
             extra_signals=["No source code available for model scoring"],
+            force_unflag=force_unflag,
         )
 
     model_result = predict_ai_likelihood(code, filename=filename, threshold=threshold)
     if model_result is not None:
+        if force_unflag:
+            model_result["ai_flagged"] = False
         return model_result
     heuristic = _heuristic_ai_likelihood(code)
     score_percent = float(heuristic.get("score", 0.0))
     threshold_used = _resolve_ai_threshold(threshold)
     return {
         "ai_confidence": round(score_percent / 100.0, 6),
-        "ai_flagged": (score_percent / 100.0) >= threshold_used,
+        "ai_flagged": ((score_percent / 100.0) >= threshold_used) and (not force_unflag),
         "threshold_used": round(threshold_used, 6),
         "model_language": None,
         "score": heuristic["score"],
@@ -244,10 +293,185 @@ def _estimate_ai_likelihood(code: str, filename: str | None = None, threshold: f
     }
 
 
-def _build_integrity_report(db: Session, submission: Submission, ai_threshold: float | None = None) -> dict:
+def _sync_submission_ai_fields(submission: Submission, ai_result: dict | None) -> bool:
+    if not ai_result:
+        return False
+
+    changed = False
+    next_confidence = ai_result.get("ai_confidence")
+    next_flagged = ai_result.get("ai_flagged")
+    next_threshold = ai_result.get("threshold_used")
+    next_language = ai_result.get("model_language")
+
+    def _float_diff(a: float | None, b: float | None) -> bool:
+        if a is None or b is None:
+            return a != b
+        return abs(float(a) - float(b)) > 1e-9
+
+    if _float_diff(submission.ai_confidence, next_confidence):
+        submission.ai_confidence = float(next_confidence) if next_confidence is not None else None
+        changed = True
+
+    if submission.ai_flagged != (bool(next_flagged) if next_flagged is not None else None):
+        submission.ai_flagged = bool(next_flagged) if next_flagged is not None else None
+        changed = True
+
+    if _float_diff(submission.ai_threshold_used, next_threshold):
+        submission.ai_threshold_used = float(next_threshold) if next_threshold is not None else None
+        changed = True
+
+    if submission.ai_model_language != next_language:
+        submission.ai_model_language = next_language
+        changed = True
+
+    return changed
+
+
+def _chunk_windows(line_count: int, window_size: int = 24, step: int = 10) -> list[tuple[int, int]]:
+    if line_count <= 0:
+        return []
+    if line_count <= window_size:
+        return [(0, line_count)]
+
+    windows: list[tuple[int, int]] = []
+    start = 0
+    while start < line_count:
+        end = min(start + window_size, line_count)
+        windows.append((start, end))
+        if end >= line_count:
+            break
+        start += step
+
+    if windows and windows[-1][1] < line_count:
+        windows.append((max(0, line_count - window_size), line_count))
+
+    return windows
+
+
+def _chunk_confidence(chunk_code: str, filename: str | None) -> float:
+    model_result = predict_ai_likelihood(chunk_code, filename=filename, threshold=0.0)
+    if model_result is not None and model_result.get("ai_confidence") is not None:
+        try:
+            return max(0.0, min(1.0, float(model_result["ai_confidence"])))
+        except Exception:
+            pass
+    heuristic = _heuristic_ai_likelihood(chunk_code)
+    return max(0.0, min(1.0, float(heuristic.get("score", 0.0)) / 100.0))
+
+
+def _flagged_code_sections(
+    code: str,
+    filename: str | None,
+    threshold: float,
+    *,
+    max_sections: int = 6,
+) -> list[dict[str, Any]]:
+    lines = code.splitlines()
+    if not lines:
+        return []
+
+    windows = _chunk_windows(len(lines))
+    flagged_windows: list[dict[str, Any]] = []
+    for start, end in windows:
+        chunk = "\n".join(lines[start:end]).strip()
+        if not chunk:
+            continue
+        confidence = _chunk_confidence(chunk, filename=filename)
+        if confidence >= threshold:
+            flagged_windows.append(
+                {
+                    "start_line": start + 1,
+                    "end_line": end,
+                    "confidence": confidence,
+                }
+            )
+
+    if not flagged_windows:
+        return []
+
+    flagged_windows.sort(key=lambda item: item["start_line"])
+    merged: list[dict[str, Any]] = []
+    for current in flagged_windows:
+        if not merged:
+            merged.append(dict(current))
+            continue
+        prev = merged[-1]
+        if current["start_line"] <= prev["end_line"] + 1:
+            prev["end_line"] = max(prev["end_line"], current["end_line"])
+            prev["confidence"] = max(prev["confidence"], current["confidence"])
+        else:
+            merged.append(dict(current))
+
+    merged.sort(key=lambda item: item["confidence"], reverse=True)
+    trimmed = merged[:max_sections]
+    trimmed.sort(key=lambda item: item["start_line"])
+
+    sections: list[dict[str, Any]] = []
+    for block in trimmed:
+        start_line = int(block["start_line"])
+        end_line = int(block["end_line"])
+        snippet_lines = lines[start_line - 1:end_line]
+        max_snippet_lines = 40
+        if len(snippet_lines) > max_snippet_lines:
+            snippet_lines = snippet_lines[:max_snippet_lines] + ["... (truncated)"]
+        sections.append(
+            {
+                "start_line": start_line,
+                "end_line": end_line,
+                "score": round(float(block["confidence"]) * 100.0, 1),
+                "threshold": round(float(threshold) * 100.0, 1),
+                "snippet": "\n".join(snippet_lines),
+            }
+        )
+
+    return sections
+
+
+def _build_integrity_report(
+    db: Session,
+    submission: Submission,
+    assignment: Assignment | None = None,
+    ai_threshold: float | None = None,
+) -> dict:
+    threshold_to_use = _effective_ai_threshold(assignment, ai_threshold)
+    ai_detection_enabled = _is_ai_detection_enabled(assignment)
+    auto_flag_enabled = _is_auto_flag_enabled(assignment)
+    force_unflag = (not ai_detection_enabled) or (not auto_flag_enabled)
+
     files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == submission.id).all()
     current_filename, current_code = _extract_primary_source_file(files)
-    stored_ai = _stored_ai_likelihood(submission, threshold=ai_threshold)
+    stored_ai = _stored_ai_likelihood(
+        submission,
+        threshold=threshold_to_use,
+        force_unflag=force_unflag,
+    )
+
+    if ai_detection_enabled:
+        ai_detection = stored_ai or _estimate_ai_likelihood(
+            current_code or "",
+            filename=current_filename,
+            threshold=threshold_to_use,
+            force_unflag=force_unflag,
+        )
+        ai_detection["flagged_sections"] = (
+            _flagged_code_sections(
+                current_code,
+                filename=current_filename,
+                threshold=float(ai_detection.get("threshold_used", threshold_to_use)),
+            )
+            if current_code and ai_detection.get("ai_flagged")
+            else []
+        )
+    else:
+        ai_detection = _build_ai_result_from_confidence(
+            confidence=float(submission.ai_confidence or 0.0),
+            threshold=threshold_to_use,
+            model_language=submission.ai_model_language,
+            extra_signals=["AI detection is disabled for this assignment."],
+            force_unflag=True,
+        )
+        ai_detection["flagged_sections"] = []
+
     if not current_code:
         return {
             "plagiarism": {
@@ -255,7 +479,7 @@ def _build_integrity_report(db: Session, submission: Submission, ai_threshold: f
                 "top_matches": [],
                 "note": "No source code found for current submission.",
             },
-            "ai_detection": stored_ai or _estimate_ai_likelihood("", threshold=ai_threshold),
+            "ai_detection": ai_detection,
         }
 
     # Compare against latest submission from each *other* student in the same assignment.
@@ -297,11 +521,7 @@ def _build_integrity_report(db: Session, submission: Submission, ai_threshold: f
             "top_matches": top,
             "note": "Similarity is based on normalized code/token overlap and should be reviewed manually.",
         },
-        "ai_detection": stored_ai or _estimate_ai_likelihood(
-            current_code,
-            filename=current_filename,
-            threshold=ai_threshold,
-        ),
+        "ai_detection": ai_detection,
     }
 
 
@@ -383,6 +603,9 @@ def get_submission_detail(
             allowed_roles=["instructor", "ta"],
         )
 
+    threshold_to_use = _effective_ai_threshold(assignment, ai_threshold)
+    force_unflag = (not _is_ai_detection_enabled(assignment)) or (not _is_auto_flag_enabled(assignment))
+
     # Build files with content
     files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == s_id).all()
     files_out = []
@@ -453,9 +676,29 @@ def get_submission_detail(
     integrity_report = None
     # Only instructors/TAs/admin should see integrity diagnostics.
     if user.role != "student":
-        integrity_report = _build_integrity_report(db, s, ai_threshold=ai_threshold)
+        integrity_report = _build_integrity_report(
+            db,
+            s,
+            assignment=assignment,
+            ai_threshold=threshold_to_use,
+        )
 
-    stored_ai = _stored_ai_likelihood(s, threshold=ai_threshold)
+    stored_ai = _stored_ai_likelihood(
+        s,
+        threshold=threshold_to_use,
+        force_unflag=force_unflag,
+    )
+    ai_snapshot = integrity_report["ai_detection"] if integrity_report else stored_ai
+    if _sync_submission_ai_fields(s, ai_snapshot):
+        db.add(s)
+        db.commit()
+        db.refresh(s)
+        # Keep response aligned to persisted values.
+        stored_ai = _stored_ai_likelihood(
+            s,
+            threshold=threshold_to_use,
+            force_unflag=force_unflag,
+        )
 
     return {
         "id": s.id,
@@ -478,6 +721,9 @@ def get_submission_detail(
             "due_date": assignment.due_date.isoformat() if getattr(assignment, "due_date", None) else None,
             "language": (assignment.allowed_languages.split(",")[0].strip().lower() if assignment.allowed_languages else "python"),
             "rubric_mode": assignment.rubric_mode,
+            "ai_detection_enabled": assignment.ai_detection_enabled,
+            "auto_flag_enabled": assignment.auto_flag_enabled,
+            "auto_flag_threshold": assignment.auto_flag_threshold,
         },
         "rubrics": [
             {
@@ -568,6 +814,23 @@ def get_submissions_by_assignment(
     
     # For faculty/admin, return submissions with student details and files
     submissions = query.all()
+    threshold_to_use = _effective_ai_threshold(assignment, None)
+    force_unflag = (not _is_ai_detection_enabled(assignment)) or (not _is_auto_flag_enabled(assignment))
+    any_ai_updates = False
+
+    for sub in submissions:
+        recalculated_ai = _stored_ai_likelihood(
+            sub,
+            threshold=threshold_to_use,
+            force_unflag=force_unflag,
+        )
+        if _sync_submission_ai_fields(sub, recalculated_ai):
+            db.add(sub)
+            any_ai_updates = True
+
+    if any_ai_updates:
+        db.commit()
+
     assignment_testcases = db.query(TestCase).filter(TestCase.assignment_id == assignment_id).all()
     testcase_points_total = sum((tc.points or 0) for tc in assignment_testcases)
     resolved_assignment_max = testcase_points_total or assignment.max_points or 100
@@ -693,6 +956,8 @@ async def upload_submission_files(
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     require_course_role(db=db, user=user, course_id=assignment.course_id, allowed_roles=["student", "ta"])
+    threshold_to_use = _effective_ai_threshold(assignment, ai_threshold)
+    force_unflag = (not _is_ai_detection_enabled(assignment)) or (not _is_auto_flag_enabled(assignment))
 
     submission = Submission(assignment_id=assignment_id, student_id=user.id)
     db.add(submission)
@@ -734,18 +999,26 @@ async def upload_submission_files(
         submission_files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == submission.id).all()
         primary_filename, primary_code = _extract_primary_source_file(submission_files)
         if primary_code:
-            ai_result = _estimate_ai_likelihood(
-                primary_code,
-                filename=primary_filename,
-                threshold=ai_threshold,
-            )
-            submission.ai_confidence = ai_result.get("ai_confidence")
-            submission.ai_flagged = ai_result.get("ai_flagged")
-            submission.ai_threshold_used = ai_result.get("threshold_used")
-            submission.ai_model_language = ai_result.get("model_language")
-            db.add(submission)
-            db.commit()
-            db.refresh(submission)
+            if _is_ai_detection_enabled(assignment):
+                ai_result = _estimate_ai_likelihood(
+                    primary_code,
+                    filename=primary_filename,
+                    threshold=threshold_to_use,
+                    force_unflag=force_unflag,
+                )
+            else:
+                ai_result = _build_ai_result_from_confidence(
+                    confidence=0.0,
+                    threshold=threshold_to_use,
+                    model_language=None,
+                    extra_signals=["AI detection is disabled for this assignment."],
+                    force_unflag=True,
+                )
+
+            if _sync_submission_ai_fields(submission, ai_result):
+                db.add(submission)
+                db.commit()
+                db.refresh(submission)
     except Exception as exc:
         logger.warning("AI detection failed for submission %s: %s", submission.id, exc)
 

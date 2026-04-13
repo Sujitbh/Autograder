@@ -51,6 +51,9 @@ def create_assignment(
         allowed_languages=payload.allowed_languages,
         starter_code=payload.starter_code,
         status=payload.status or "published",
+        ai_detection_enabled=payload.ai_detection_enabled if payload.ai_detection_enabled is not None else True,
+        auto_flag_enabled=payload.auto_flag_enabled if payload.auto_flag_enabled is not None else True,
+        auto_flag_threshold=payload.auto_flag_threshold if payload.auto_flag_threshold is not None else 0.70,
     )
     db.add(assignment)
     db.flush()  # get assignment.id before committing so we can create children

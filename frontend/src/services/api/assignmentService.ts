@@ -24,6 +24,10 @@ interface BackendAssignment {
     starter_code: string | null;
     status: string;
     is_active: boolean;
+    ai_detection_enabled?: boolean;
+    auto_flag_enabled?: boolean;
+    // Fraction [0..1]
+    auto_flag_threshold?: number;
     created_at: string;
     updated_at?: string | null;
     rubrics?: Array<{
@@ -62,6 +66,9 @@ function mapAssignment(a: BackendAssignment): Assignment {
         status: (a.status as 'draft' | 'published' | 'closed') ?? (a.is_active ? 'published' : 'draft'),
         isGroup: false,
         allowLateSubmissions: false,
+        aiDetectionEnabled: a.ai_detection_enabled ?? true,
+        autoFlagEnabled: a.auto_flag_enabled ?? true,
+        autoFlagThreshold: Math.round((a.auto_flag_threshold ?? 0.70) * 100),
         publicTests: [],
         privateTests: [],
         rubric: (a.rubrics ?? []).map((r) => ({
@@ -121,6 +128,11 @@ export const assignmentService = {
             rubric_mode: dto.rubricMode ?? 'unweighted',
             max_submissions: (dto as any).maxSubmissions ?? null,
             status: dto.status ?? 'published',
+            ai_detection_enabled: dto.aiDetectionEnabled ?? true,
+            auto_flag_enabled: dto.autoFlagEnabled ?? true,
+            auto_flag_threshold: typeof dto.autoFlagThreshold === 'number'
+                ? Math.max(0, Math.min(100, dto.autoFlagThreshold)) / 100
+                : 0.70,
         };
         // Include starter code when provided
         if (dto.starterCode) {
