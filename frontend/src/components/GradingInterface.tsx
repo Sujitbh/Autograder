@@ -186,19 +186,19 @@ export function GradingInterface({
     return (
         <div className="flex h-full flex-col">
             {/* ── Header / Navigation ── */}
-            <div className="flex items-center justify-between border-b bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
+            <div className="flex items-center justify-between border-b bg-[var(--color-surface)] px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
                 <div className="flex items-center gap-3">
                     <Button variant="ghost" size="icon" onClick={onPrevious} disabled={currentIndex === 0} aria-label="Previous student">
                         <ChevronLeft className="h-5 w-5" />
                     </Button>
                     <div className="text-center">
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        <p className="text-sm font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
                             {submission.studentName}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-[var(--color-text-mid)]">
                             {currentIndex + 1} of {totalSubmissions}
                             {submission.isLate && (
-                                <span className="ml-2 text-orange-600">Late Submission</span>
+                                <span className="ml-2 text-[var(--color-warning)]">Late Submission</span>
                             )}
                         </p>
                     </div>
@@ -207,7 +207,7 @@ export function GradingInterface({
                     </Button>
                 </div>
 
-                <div className="flex items-center gap-2 text-sm text-gray-500">
+                <div className="flex items-center gap-2 text-sm text-[var(--color-text-mid)]">
                     <span>Ctrl+S save draft</span>
                     <span>•</span>
                     <span>Ctrl+Enter submit</span>
@@ -229,7 +229,7 @@ export function GradingInterface({
                     <div className="border-t dark:border-gray-700">
                         <button
                             type="button"
-                            className="flex w-full items-center justify-between bg-gray-50 px-4 py-2.5 text-sm font-medium dark:bg-gray-800"
+                            className="flex w-full items-center justify-between bg-[var(--color-surface-elevated)] px-4 py-2.5 text-sm font-medium dark:bg-gray-800"
                             onClick={() => setExpandedTests((v) => !v)}
                         >
                             <span className="flex items-center gap-2">
@@ -237,8 +237,8 @@ export function GradingInterface({
                                 {totalTests > 0 && (
                                     <span
                                         className={`rounded-full px-2 py-0.5 text-xs font-semibold ${passedTests === totalTests
-                                                ? 'bg-green-100 text-green-700'
-                                                : 'bg-orange-100 text-orange-700'
+                                                ? 'bg-green-100 text-[var(--color-success)]'
+                                                : 'bg-orange-100 text-[var(--color-warning)]'
                                             }`}
                                     >
                                         {passedTests}/{totalTests} passed
@@ -255,7 +255,7 @@ export function GradingInterface({
                         {expandedTests && (
                             <div className="max-h-60 overflow-y-auto">
                                 {(!submission.testResults || submission.testResults.length === 0) && (
-                                    <p className="p-4 text-sm text-gray-400">No test results available.</p>
+                                    <p className="p-4 text-sm text-[var(--color-text-light)]">No test results available.</p>
                                 )}
                                 {submission.testResults?.map((tr, idx) => (
                                     <TestResultRow key={idx} result={tr} index={idx} />
@@ -266,11 +266,11 @@ export function GradingInterface({
                 </div>
 
                 {/* RIGHT PANEL: Score + Rubric + Feedback (40%) */}
-                <div className="flex w-2/5 flex-col overflow-y-auto bg-white dark:bg-gray-900">
+                <div className="flex w-2/5 flex-col overflow-y-auto bg-[var(--color-surface)] dark:bg-gray-900">
                     {/* Auto score card */}
                     {autoScore != null && (
-                        <div className="border-b bg-blue-50 px-5 py-4 dark:border-gray-700 dark:bg-blue-900/20">
-                            <p className="text-xs font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">
+                        <div className="border-b bg-[var(--color-info-bg)] px-5 py-4 dark:border-gray-700 dark:bg-blue-900/20">
+                            <p className="text-xs font-medium uppercase tracking-wide text-[var(--color-info)] dark:text-blue-400">
                                 Auto Score (Test Pass Rate)
                             </p>
                             <p className="mt-1 text-2xl font-bold text-blue-800 dark:text-blue-200">
@@ -281,7 +281,7 @@ export function GradingInterface({
 
                     {/* Rubric scores */}
                     <div className="flex-1 space-y-4 p-5">
-                        <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        <h4 className="text-sm font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
                             Rubric Grading
                         </h4>
 
@@ -289,14 +289,14 @@ export function GradingInterface({
                             <div key={criterion.id} className="rounded-lg border p-3 dark:border-gray-700">
                                 <div className="flex items-center justify-between">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        <p className="text-sm font-medium text-[var(--color-text-dark)] dark:text-gray-100">
                                             {criterion.name}
                                         </p>
                                         {criterion.description && (
-                                            <p className="text-xs text-gray-400">{criterion.description}</p>
+                                            <p className="text-xs text-[var(--color-text-light)]">{criterion.description}</p>
                                         )}
                                     </div>
-                                    <span className="text-xs text-gray-400">
+                                    <span className="text-xs text-[var(--color-text-light)]">
                                         {criterion.gradingMethod === 'auto'
                                             ? 'Auto'
                                             : criterion.gradingMethod === 'hybrid'
@@ -323,7 +323,7 @@ export function GradingInterface({
                                         className="w-20 text-center text-sm"
                                         aria-label={`Score for ${criterion.name}`}
                                     />
-                                    <span className="text-sm text-gray-500">
+                                    <span className="text-sm text-[var(--color-text-mid)]">
                                         / {criterion.maxPoints}
                                     </span>
                                 </div>
@@ -343,13 +343,13 @@ export function GradingInterface({
                         ))}
 
                         {/* Total */}
-                        <div className="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
-                            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        <div className="flex items-center justify-between rounded-lg bg-[var(--color-surface-elevated)] p-3 dark:bg-gray-800">
+                            <span className="text-sm font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
                                 Total
                             </span>
-                            <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                            <span className="text-lg font-bold text-[var(--color-text-dark)] dark:text-gray-100">
                                 {totalScore} / {totalMaxPoints}{' '}
-                                <span className="text-sm font-normal text-gray-500">
+                                <span className="text-sm font-normal text-[var(--color-text-mid)]">
                                     ({percentage}%)
                                 </span>
                             </span>
@@ -359,7 +359,7 @@ export function GradingInterface({
                         <div>
                             <Label className="flex items-center justify-between">
                                 <span>Overall Feedback</span>
-                                <span className="text-xs text-gray-400">{feedback.length}/500</span>
+                                <span className="text-xs text-[var(--color-text-light)]">{feedback.length}/500</span>
                             </Label>
                             <Textarea
                                 value={feedback}
@@ -372,9 +372,9 @@ export function GradingInterface({
 
                         {/* Group assignment controls */}
                         {submission.groupMembers && submission.groupMembers.length > 1 && (
-                            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
+                            <div className="rounded-lg border border-blue-200 bg-[var(--color-info-bg)] p-3 dark:border-blue-800 dark:bg-blue-900/20">
                                 <div className="flex items-center gap-2">
-                                    <Users className="h-4 w-4 text-blue-600" />
+                                    <Users className="h-4 w-4 text-[var(--color-info)]" />
                                     <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
                                         Group Assignment ({submission.groupMembers.length} members)
                                     </span>
@@ -385,7 +385,7 @@ export function GradingInterface({
                                         checked={applyToGroup}
                                         onCheckedChange={(v) => setApplyToGroup(v === true)}
                                     />
-                                    <Label htmlFor="applyToGroup" className="mb-0 cursor-pointer text-xs text-blue-700 dark:text-blue-300">
+                                    <Label htmlFor="applyToGroup" className="mb-0 cursor-pointer text-xs text-[var(--color-info)] dark:text-blue-300">
                                         Apply this grade to all group members
                                     </Label>
                                 </div>
@@ -402,7 +402,7 @@ export function GradingInterface({
                             <Save className="mr-1 h-4 w-4" /> Save Draft
                         </Button>
                         <Button
-                            className="bg-[#6B0000] text-white hover:bg-[#8B1A1A]"
+                            className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
                             onClick={() => setShowConfirmDialog(true)}
                         >
                             <Send className="mr-1 h-4 w-4" /> Submit Grade
@@ -435,7 +435,7 @@ export function GradingInterface({
                             Cancel
                         </Button>
                         <Button
-                            className="bg-[#6B0000] text-white hover:bg-[#8B1A1A]"
+                            className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
                             onClick={() => {
                                 onSubmitGrade(buildPayload());
                                 setShowConfirmDialog(false);
@@ -465,52 +465,52 @@ function TestResultRow({
         <div className="border-b last:border-b-0 dark:border-gray-700">
             <button
                 type="button"
-                className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm hover:bg-[var(--color-surface-elevated)]"
                 onClick={() => setExpanded((v) => !v)}
             >
                 {result.passed ? (
-                    <CheckCircle className="h-4 w-4 flex-shrink-0 text-green-500" />
+                    <CheckCircle className="h-4 w-4 flex-shrink-0 text-[var(--color-success)]" />
                 ) : (
-                    <XCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
+                    <XCircle className="h-4 w-4 flex-shrink-0 text-[var(--color-error)]" />
                 )}
-                <span className="flex-1 text-gray-700 dark:text-gray-300">
+                <span className="flex-1 text-[var(--color-text-mid)] dark:text-gray-300">
                     {result.testCase.name || `Test ${index + 1}`}
                 </span>
-                <span className="text-xs text-gray-400">{result.executionTime}ms</span>
+                <span className="text-xs text-[var(--color-text-light)]">{result.executionTime}ms</span>
                 {expanded ? (
-                    <ChevronUp className="h-3.5 w-3.5 text-gray-400" />
+                    <ChevronUp className="h-3.5 w-3.5 text-[var(--color-text-light)]" />
                 ) : (
-                    <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
+                    <ChevronDown className="h-3.5 w-3.5 text-[var(--color-text-light)]" />
                 )}
             </button>
 
             {expanded && (
-                <div className="grid gap-2 bg-gray-50 px-4 py-3 text-xs dark:bg-gray-800 md:grid-cols-2">
+                <div className="grid gap-2 bg-[var(--color-surface-elevated)] px-4 py-3 text-xs dark:bg-gray-800 md:grid-cols-2">
                     <div>
-                        <span className="font-medium text-gray-500">Input</span>
-                        <pre className="mt-0.5 whitespace-pre-wrap rounded bg-white p-2 font-mono dark:bg-gray-900">
+                        <span className="font-medium text-[var(--color-text-mid)]">Input</span>
+                        <pre className="mt-0.5 whitespace-pre-wrap rounded bg-[var(--color-surface)] p-2 font-mono dark:bg-gray-900">
                             {result.testCase.input || '(none)'}
                         </pre>
                     </div>
                     <div>
-                        <span className="font-medium text-gray-500">Expected</span>
-                        <pre className="mt-0.5 whitespace-pre-wrap rounded bg-white p-2 font-mono dark:bg-gray-900">
+                        <span className="font-medium text-[var(--color-text-mid)]">Expected</span>
+                        <pre className="mt-0.5 whitespace-pre-wrap rounded bg-[var(--color-surface)] p-2 font-mono dark:bg-gray-900">
                             {result.expectedOutput}
                         </pre>
                     </div>
                     <div className="md:col-span-2">
-                        <span className="font-medium text-gray-500">Actual</span>
+                        <span className="font-medium text-[var(--color-text-mid)]">Actual</span>
                         <pre
                             className={`mt-0.5 whitespace-pre-wrap rounded p-2 font-mono ${result.passed
-                                    ? 'bg-green-50 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-                                    : 'bg-red-50 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+                                    ? 'bg-[var(--color-success-bg)] text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                                    : 'bg-[var(--color-error-bg)] text-red-800 dark:bg-red-900/40 dark:text-red-300'
                                 }`}
                         >
                             {result.actualOutput || '(empty)'}
                         </pre>
                     </div>
                     {result.error && (
-                        <div className="md:col-span-2 flex items-start gap-1 text-red-600">
+                        <div className="md:col-span-2 flex items-start gap-1 text-[var(--color-error)]">
                             <AlertTriangle className="mt-0.5 h-3 w-3 flex-shrink-0" />
                             {result.error}
                         </div>

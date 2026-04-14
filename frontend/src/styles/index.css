@@ -6,59 +6,91 @@
 .ql-toolbar {
   border-top-left-radius: 8px;
   border-top-right-radius: 8px;
-  background-color: #F5EDED !important;
-  border-color: #D9D9D9 !important;
+  background-color: var(--color-primary-bg) !important;
+  border-color: var(--color-border) !important;
 }
 
 .ql-container {
   border-bottom-left-radius: 8px;
   border-bottom-right-radius: 8px;
-  border-color: #D9D9D9 !important;
+  border-color: var(--color-border) !important;
+  background-color: var(--color-surface) !important;
   font-family: Inter, system-ui, -apple-system, sans-serif !important;
   font-size: 14px !important;
 }
 
 .ql-editor {
   min-height: 200px;
+  color: var(--color-text-dark);
+  caret-color: var(--color-primary);
   font-family: Inter, system-ui, -apple-system, sans-serif !important;
 }
 
 .ql-editor.ql-blank::before {
-  color: #8A8A8A;
+  color: var(--color-text-light);
   font-style: normal;
 }
 
 .ql-snow .ql-stroke {
-  stroke: #6B0000 !important;
+  stroke: var(--color-primary) !important;
 }
 
 .ql-snow .ql-fill {
-  fill: #6B0000 !important;
+  fill: var(--color-primary) !important;
 }
 
+.ql-snow .ql-picker,
 .ql-snow .ql-picker-label {
-  color: #2D2D2D !important;
+  color: var(--color-text-dark) !important;
+}
+
+.ql-snow .ql-picker-options {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
 }
 
 .ql-toolbar button:hover,
 .ql-toolbar button:focus,
 .ql-toolbar button.ql-active {
-  color: #6B0000 !important;
+  color: var(--color-primary) !important;
 }
 
 .ql-toolbar button:hover .ql-stroke,
 .ql-toolbar button:focus .ql-stroke,
 .ql-toolbar button.ql-active .ql-stroke {
-  stroke: #6B0000 !important;
+  stroke: var(--color-primary) !important;
 }
 
 .ql-toolbar button:hover .ql-fill,
 .ql-toolbar button:focus .ql-fill,
 .ql-toolbar button.ql-active .ql-fill {
-  fill: #6B0000 !important;
+  fill: var(--color-primary) !important;
 }
 
 .ql-snow.ql-toolbar button:hover,
 .ql-snow.ql-toolbar button:focus {
-  background-color: rgba(107, 0, 0, 0.1) !important;
+  background-color: color-mix(in srgb, var(--color-primary) 12%, transparent) !important;
+}
+
+.dark .ql-toolbar {
+  background-color: var(--color-surface-elevated) !important;
+}
+
+:where(input, textarea, select) {
+  color: var(--color-text-dark);
+  caret-color: var(--color-primary);
+}
+
+:where(input, textarea, select)::placeholder {
+  color: var(--color-text-light);
+  opacity: 1;
+}
+
+.monaco-editor .cursor {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+}
+
+.monaco-editor textarea.inputarea {
+  caret-color: var(--color-primary) !important;
 }

@@ -284,7 +284,7 @@ export function GradingModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
       <div
-        className="bg-white rounded-2xl overflow-hidden flex flex-col"
+        className="bg-[var(--color-surface)] rounded-2xl overflow-hidden flex flex-col"
         style={{
           width: '90vw',
           height: '90vh',
@@ -317,7 +317,7 @@ export function GradingModal({
               </button>
             </div>
             <div>
-              <h2 style={{ fontSize: '18px', fontWeight: 700, color: '#6B0000' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)' }}>
                 {studentName}
               </h2>
               <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '2px' }}>
@@ -346,15 +346,15 @@ export function GradingModal({
                   Submitted Files
                 </h3>
                 {isLoadingFiles ? (
-                  <p className="text-sm text-gray-500">Loading files...</p>
+                  <p className="text-sm text-[var(--color-text-mid)]">Loading files...</p>
                 ) : files.length === 0 ? (
-                  <p className="text-sm text-gray-500">No files submitted</p>
+                  <p className="text-sm text-[var(--color-text-mid)]">No files submitted</p>
                 ) : (
                   <div className="space-y-2">
                     {files.map((file) => (
                       <div
                         key={file.id}
-                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50"
+                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-[var(--color-surface-elevated)]"
                         style={{ borderColor: 'var(--color-border)' }}
                       >
                         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -363,7 +363,7 @@ export function GradingModal({
                             {file.filename}
                           </span>
                           {file.file_size && (
-                            <span className="text-xs text-gray-400 flex-shrink-0">
+                            <span className="text-xs text-[var(--color-text-light)] flex-shrink-0">
                               ({Math.round(file.file_size / 1024)}KB)
                             </span>
                           )}
@@ -498,24 +498,24 @@ export function GradingModal({
           <div className="w-[40%] flex flex-col">
             <div className="flex-1 overflow-auto p-6">
               {/* Auto Score Card */}
-              <div className="mb-6 p-4 rounded-lg" style={{ backgroundColor: '#E8F0FF' }}>
-                <p style={{ fontSize: '13px', fontWeight: 500, color: '#1A4D7A', marginBottom: '4px' }}>Auto Score</p>
+              <div className="mb-6 p-4 rounded-lg" style={{ backgroundColor: 'var(--color-info-bg)' }}>
+                <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-info)', marginBottom: '4px' }}>Auto Score</p>
                 <div className="flex items-baseline gap-2">
-                  <span style={{ fontSize: '28px', fontWeight: 700, color: '#6B0000' }}>
+                  <span style={{ fontSize: '28px', fontWeight: 700, color: 'var(--color-primary)' }}>
                     {autoScore !== null && autoScore !== undefined ? autoScore : '—'} / {maxPoints}
                   </span>
                   {autoScorePct !== null && (
-                    <span style={{ fontSize: '14px', color: '#595959' }}>({autoScorePct}%)</span>
+                    <span style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>({autoScorePct}%)</span>
                   )}
                 </div>
-                <p style={{ fontSize: '12px', color: '#1A4D7A', marginTop: '6px' }}>
+                <p style={{ fontSize: '12px', color: 'var(--color-info)', marginTop: '6px' }}>
                   Tests Passed: {testResults.all.filter(t => t.status === 'pass').length} / {testResults.all.length}
                 </p>
               </div>
 
               {/* Rubric Grading */}
               <div className="mb-6">
-                <h3 className="mb-4" style={{ fontSize: '16px', fontWeight: 600, color: '#2D2D2D' }}>
+                <h3 className="mb-4" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                   Rubric Grading
                 </h3>
                 <div className="space-y-3">
@@ -551,8 +551,8 @@ export function GradingModal({
                   <span style={{
                     fontSize: '24px',
                     fontWeight: 700,
-                    color: (getTotalScore() / getTotalMaxPoints()) >= 0.9 ? '#2D6A2D'
-                      : (getTotalScore() / getTotalMaxPoints()) >= 0.7 ? '#6B0000' : '#8B0000',
+                    color: (getTotalScore() / getTotalMaxPoints()) >= 0.9 ? 'var(--color-success)'
+                      : (getTotalScore() / getTotalMaxPoints()) >= 0.7 ? 'var(--color-primary)' : 'var(--color-error)',
                   }}>
                     {getTotalScore()} / {getTotalMaxPoints()}
                   </span>
