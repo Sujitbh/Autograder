@@ -18,6 +18,7 @@ import { useTestCaseRunner } from '@/hooks/useTestCaseRunner';
 import { useAuth } from '@/utils/AuthContext';
 import { submissionService } from '@/services/api';
 import { normalizeRubricToSections } from '@/utils/rubric';
+import { codeRequiresStdin } from '@/utils/codeInputDetection';
 import {
   Play,
   RotateCcw,
@@ -84,7 +85,7 @@ function launchConfetti() {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  const colors = ['#6B0000', '#C9A84C', '#2D6A2D', '#1A4D7A', '#D4544C', '#E8CC6E', '#81C784', '#90CAF9'];
+  const colors = ['var(--color-primary)', '#C9A84C', 'var(--color-success)', 'var(--color-info)', '#D4544C', '#E8CC6E', '#81C784', '#90CAF9'];
   const particles: {
     x: number; y: number; vx: number; vy: number;
     color: string; size: number; rotation: number; rotSpeed: number;
@@ -272,7 +273,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   // Run code
   const handleRunCode = async () => {
     setOutputOpen(true);
-    if (language === 'java' || language === 'python') {
+    if (codeRequiresStdin(code, language)) {
       if (!showInlineInput) {
         setShowInlineInput(true);
         return; // open input area on first click; user types then clicks Run inside
@@ -525,8 +526,8 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
               <span style={{
                 fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const,
                 letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10,
-                background: isDark ? '#3b1a1a' : '#fef3c7',
-                color: isDark ? '#fca5a5' : '#92400e',
+                background: isDark ? '#3b1a1a' : 'var(--color-warning-bg)',
+                color: isDark ? '#fca5a5' : 'var(--color-warning)',
                 display: 'inline-flex', alignItems: 'center', gap: 4,
               }}>
                 {language.charAt(0).toUpperCase() + language.slice(1)}
@@ -539,14 +540,14 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                 disabled={isExecuting || isTestsRunning}
                 style={{
                   padding: '5px 16px', borderRadius: 5, fontSize: 12, fontWeight: 700,
-                  background: '#16a34a', color: '#fff', letterSpacing: '.3px',
+                  background: 'var(--color-success)', color: '#fff', letterSpacing: '.3px',
                   transition: 'background .15s, box-shadow .2s',
                   opacity: isExecuting || isTestsRunning ? 0.7 : 1,
                   cursor: isExecuting || isTestsRunning ? 'not-allowed' : 'pointer',
                   border: 'none',
                 }}
-                onMouseEnter={e => { if (!isExecuting && !isTestsRunning) { e.currentTarget.style.background = '#15803d'; e.currentTarget.style.boxShadow = '0 0 10px rgba(22,163,74,.5)'; } }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#16a34a'; e.currentTarget.style.boxShadow = 'none'; }}
+                onMouseEnter={e => { if (!isExecuting && !isTestsRunning) { e.currentTarget.style.background = 'var(--color-success)'; e.currentTarget.style.boxShadow = '0 0 10px rgba(22,163,74,.5)'; } }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-success)'; e.currentTarget.style.boxShadow = 'none'; }}
               >
                 {isExecuting ? '⏳ Running...' : '▶ Run'}
               </button>
@@ -557,14 +558,14 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                   disabled={isExecuting || isTestsRunning}
                   style={{
                     padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
-                    background: '#7B0D0D', color: '#fff', letterSpacing: '.3px',
+                    background: 'var(--color-primary)', color: '#fff', letterSpacing: '.3px',
                     transition: 'background .15s, box-shadow .2s',
                     opacity: isExecuting || isTestsRunning ? 0.7 : 1,
                     cursor: isExecuting || isTestsRunning ? 'not-allowed' : 'pointer',
                     border: 'none',
                   }}
-                  onMouseEnter={e => { if (!isExecuting && !isTestsRunning) { e.currentTarget.style.background = '#5C0909'; e.currentTarget.style.boxShadow = '0 0 10px rgba(123,13,13,.45)'; } }}
-                  onMouseLeave={e => { e.currentTarget.style.background = '#7B0D0D'; e.currentTarget.style.boxShadow = 'none'; }}
+                  onMouseEnter={e => { if (!isExecuting && !isTestsRunning) { e.currentTarget.style.background = 'var(--color-primary-hover)'; e.currentTarget.style.boxShadow = '0 0 10px rgba(123,13,13,.45)'; } }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.boxShadow = 'none'; }}
                 >
                   {compileButtonLabel}
                 </button>
@@ -710,12 +711,12 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
             {/* Success/Error banners */}
             {submitSuccess && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: 13, background: isDark ? 'rgba(74,222,128,.12)' : 'rgba(22,163,74,.10)', color: isDark ? '#4ade80' : '#16a34a', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: 13, background: isDark ? 'rgba(74,222,128,.12)' : 'rgba(22,163,74,.10)', color: isDark ? '#4ade80' : 'var(--color-success)', flexShrink: 0 }}>
                 <CheckCircle2 className="w-4 h-4" /> You have successfully submitted the assignment! Redirecting back to assignment page…
               </div>
             )}
             {submitError && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', fontSize: 13, background: isDark ? 'rgba(248,113,113,.12)' : 'rgba(220,38,38,.08)', color: isDark ? '#f87171' : '#dc2626', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', fontSize: 13, background: isDark ? 'rgba(248,113,113,.12)' : 'rgba(220,38,38,.08)', color: isDark ? 'var(--color-error)' : 'var(--color-error)', flexShrink: 0 }}>
                 <AlertCircle className="w-4 h-4" /> {submitError}
               </div>
             )}
@@ -769,7 +770,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                     style={{
                       padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600,
                       whiteSpace: 'nowrap' as const, transition: 'all .2s',
-                      background: infoTab === tab ? '#7f1d1d' : 'transparent',
+                      background: infoTab === tab ? 'var(--color-primary)' : 'transparent',
                       color: infoTab === tab ? '#fff' : 'var(--color-text-light)',
                       border: 'none', cursor: 'pointer',
                     }}
@@ -794,7 +795,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                         display: 'inline-block', fontSize: 11, fontWeight: 600,
                         padding: '4px 12px', borderRadius: 12,
                         background: isDark ? 'rgba(251,191,36,.12)' : 'rgba(180,83,9,.10)',
-                        color: isDark ? '#fbbf24' : '#b45309',
+                        color: isDark ? 'var(--color-warning)' : 'var(--color-warning)',
                         margin: '8px 0 16px',
                       }}>
                         📅 Due: {dueDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} — {dueDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -809,7 +810,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                         padding: '10px 12px', marginTop: 16, borderRadius: 6,
                         background: isDark ? 'rgba(74,222,128,.12)' : 'rgba(22,163,74,.10)',
-                        fontWeight: 700, color: isDark ? '#4ade80' : '#16a34a', fontSize: 14,
+                        fontWeight: 700, color: isDark ? '#4ade80' : 'var(--color-success)', fontSize: 14,
                       }}>
                         <span>Total Points</span><span>{assignment.maxPoints}</span>
                       </div>
@@ -828,8 +829,8 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                             ? (isDark ? 'rgba(74,222,128,.12)' : 'rgba(22,163,74,.10)')
                             : (isDark ? 'rgba(251,191,36,.12)' : 'rgba(180,83,9,.10)'),
                           color: latestSubmission.status === 'graded'
-                            ? (isDark ? '#4ade80' : '#16a34a')
-                            : (isDark ? '#fbbf24' : '#b45309'),
+                            ? (isDark ? '#4ade80' : 'var(--color-success)')
+                            : (isDark ? 'var(--color-warning)' : 'var(--color-warning)'),
                         }}>
                           {latestSubmission.status === 'graded' ? '✅' : '⏳'} {latestSubmission.status.charAt(0).toUpperCase() + latestSubmission.status.slice(1)}
                         </div>
@@ -885,7 +886,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                             fontWeight: 700,
                             letterSpacing: '.4px',
                             textTransform: 'uppercase' as const,
-                            color: isWeightedRubric ? '#6B0000' : '#2D6A2D',
+                            color: isWeightedRubric ? 'var(--color-primary)' : 'var(--color-success)',
                             background: isWeightedRubric ? 'rgba(107,0,0,.10)' : 'rgba(45,106,45,.12)',
                             border: `1px solid ${isWeightedRubric ? 'rgba(107,0,0,.24)' : 'rgba(45,106,45,.24)'}`,
                           }}
@@ -938,7 +939,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                   {(section.criteria || []).map((criterion, critIdx) => (
                                     <tr key={critIdx} style={{ borderTop: '1px solid var(--color-border)' }}>
                                       <td style={{ padding: '10px 12px', color: 'var(--color-text-dark)', fontWeight: 500 }}>{criterion.name}</td>
-                                      <td style={{ padding: '10px 12px', textAlign: 'center', color: isDark ? '#4ade80' : '#16a34a', fontWeight: 700 }}>{criterion.maxPoints ?? 0}</td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'center', color: isDark ? '#4ade80' : 'var(--color-success)', fontWeight: 700 }}>{criterion.maxPoints ?? 0}</td>
                                       {isWeightedRubric && <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--color-text-dark)', fontWeight: 600 }}>{((criterion.weight ?? 1) * 100).toFixed(0)}%</td>}
                                       <td style={{ padding: '10px 12px', color: 'var(--color-text-mid)', fontSize: 11 }}>{criterion.description || '—'}</td>
                                     </tr>
@@ -966,7 +967,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                 {getSectionFallbackPoints(section) !== null && (
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12 }}>
                                     <span style={{ color: 'var(--color-text-light)', fontWeight: 600 }}>Points</span>
-                                    <span style={{ color: isDark ? '#4ade80' : '#16a34a', fontWeight: 700 }}>{getSectionFallbackPoints(section)}</span>
+                                    <span style={{ color: isDark ? '#4ade80' : 'var(--color-success)', fontWeight: 700 }}>{getSectionFallbackPoints(section)}</span>
                                   </div>
                                 )}
                                 {isWeightedRubric && (
@@ -988,7 +989,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                           padding: '10px 12px',
                           borderRadius: 6,
                           background: isDark ? 'rgba(74,222,128,.12)' : 'rgba(22,163,74,.10)',
-                          color: isDark ? '#4ade80' : '#16a34a',
+                          color: isDark ? '#4ade80' : 'var(--color-success)',
                           fontWeight: 700,
                           fontSize: 14,
                         }}>
@@ -1017,12 +1018,12 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                           disabled={isTestsRunning}
                           style={{
                             padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                            background: '#7f1d1d', color: '#fff', marginBottom: 14,
+                            background: 'var(--color-primary)', color: '#fff', marginBottom: 14,
                             transition: 'all .2s', border: 'none', cursor: isTestsRunning ? 'not-allowed' : 'pointer',
                             opacity: isTestsRunning ? 0.7 : 1,
                           }}
-                          onMouseEnter={e => { if (!isTestsRunning) e.currentTarget.style.background = '#991b1b'; }}
-                          onMouseLeave={e => e.currentTarget.style.background = '#7f1d1d'}
+                          onMouseEnter={e => { if (!isTestsRunning) e.currentTarget.style.background = 'var(--color-error)'; }}
+                          onMouseLeave={e => e.currentTarget.style.background = 'var(--color-primary)'}
                         >
                           {isTestsRunning ? '⏳ Running...' : '▶ Run All Tests'}
                         </button>
@@ -1044,8 +1045,8 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                   background: status === 'pass' ? (isDark ? 'rgba(74,222,128,.12)' : 'rgba(22,163,74,.10)')
                                     : status === 'fail' ? (isDark ? 'rgba(248,113,113,.12)' : 'rgba(220,38,38,.08)')
                                       : 'var(--color-surface)',
-                                  color: status === 'pass' ? (isDark ? '#4ade80' : '#16a34a')
-                                    : status === 'fail' ? (isDark ? '#f87171' : '#dc2626')
+                                  color: status === 'pass' ? (isDark ? '#4ade80' : 'var(--color-success)')
+                                    : status === 'fail' ? (isDark ? 'var(--color-error)' : 'var(--color-error)')
                                       : 'var(--color-text-light)',
                                 }}>
                                   {status === 'pass' ? '✅ Passed' : status === 'fail' ? '❌ Failed' : '⏳ Not Run'}
@@ -1056,7 +1057,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                   <div style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.5px', color: 'var(--color-text-light)', marginBottom: 4, fontWeight: 600 }}>Input</div>
                                   <div style={{
                                     background: 'var(--color-surface)', padding: '8px 12px', borderRadius: 4,
-                                    fontFamily: 'monospace', fontSize: 12, color: isDark ? '#4ade80' : '#16a34a',
+                                    fontFamily: 'monospace', fontSize: 12, color: isDark ? '#4ade80' : 'var(--color-success)',
                                     whiteSpace: 'pre' as const, overflowX: 'auto' as const,
                                   }}>
                                     {tc.input_data}
@@ -1068,7 +1069,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                   <div style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.5px', color: 'var(--color-text-light)', marginBottom: 4, fontWeight: 600 }}>Expected Output</div>
                                   <div style={{
                                     background: 'var(--color-surface)', padding: '8px 12px', borderRadius: 4,
-                                    fontFamily: 'monospace', fontSize: 12, color: isDark ? '#4ade80' : '#16a34a',
+                                    fontFamily: 'monospace', fontSize: 12, color: isDark ? '#4ade80' : 'var(--color-success)',
                                     whiteSpace: 'pre' as const, overflowX: 'auto' as const,
                                   }}>
                                     {tc.expected_output}
@@ -1080,7 +1081,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                   <div style={{ fontSize: 10, textTransform: 'uppercase' as const, letterSpacing: '.5px', color: 'var(--color-text-light)', marginBottom: 4, fontWeight: 600 }}>Actual Output</div>
                                   <div style={{
                                     background: 'var(--color-surface)', padding: '8px 12px', borderRadius: 4,
-                                    fontFamily: 'monospace', fontSize: 12, color: isDark ? '#f87171' : '#dc2626',
+                                    fontFamily: 'monospace', fontSize: 12, color: isDark ? 'var(--color-error)' : 'var(--color-error)',
                                     whiteSpace: 'pre' as const, overflowX: 'auto' as const,
                                   }}>
                                     {result.actualOutput}
@@ -1115,11 +1116,11 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                         <span style={{ fontSize: 16 }}>
                           {testCases && testResults.length === testCases.length && testResults.every(r => r.passed) ? '✅' : '⬜'}
                         </span>
-                        Tests passed: <b style={{ color: isDark ? '#4ade80' : '#16a34a' }}>{testResults.filter(r => r.passed).length}</b> / {testCases?.length ?? 0}
+                        Tests passed: <b style={{ color: isDark ? '#4ade80' : 'var(--color-success)' }}>{testResults.filter(r => r.passed).length}</b> / {testCases?.length ?? 0}
                       </li>
                       {testResults.filter(r => !r.passed).length > 0 && (
                         <li style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', fontSize: 13, color: 'var(--color-text-mid)', borderBottom: '1px solid var(--color-border)' }}>
-                          <span style={{ fontSize: 16 }}>❌</span> Tests failed: <b style={{ color: isDark ? '#f87171' : '#dc2626' }}>{testResults.filter(r => !r.passed).length}</b>
+                          <span style={{ fontSize: 16 }}>❌</span> Tests failed: <b style={{ color: isDark ? 'var(--color-error)' : 'var(--color-error)' }}>{testResults.filter(r => !r.passed).length}</b>
                         </li>
                       )}
                     </ul>
@@ -1156,7 +1157,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                       style={{
                         width: '100%', padding: 14, borderRadius: 6,
                         fontSize: 14, fontWeight: 700, border: 'none',
-                        background: isDark ? 'linear-gradient(135deg, #dc2626, #991b1b)' : 'linear-gradient(135deg, #991b1b, #7f1d1d)',
+                        background: isDark ? 'linear-gradient(135deg, var(--color-error), var(--color-error))' : 'linear-gradient(135deg, var(--color-error), var(--color-primary))',
                         color: '#fff', transition: 'all .2s', marginTop: 8,
                         textTransform: 'uppercase' as const, letterSpacing: '.5px',
                         cursor: isSubmitting ? 'not-allowed' : 'pointer',
@@ -1164,13 +1165,13 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                       }}
                       onMouseEnter={e => {
                         if (!isSubmitting) {
-                          e.currentTarget.style.background = isDark ? 'linear-gradient(135deg, #ef4444, #dc2626)' : 'linear-gradient(135deg, #b91c1c, #991b1b)';
+                          e.currentTarget.style.background = isDark ? 'linear-gradient(135deg, var(--color-error), var(--color-error))' : 'linear-gradient(135deg, var(--color-error), var(--color-error))';
                           e.currentTarget.style.transform = 'translateY(-1px)';
                           e.currentTarget.style.boxShadow = isDark ? '0 4px 16px rgba(220,38,38,.4)' : '0 4px 16px rgba(127,29,29,.35)';
                         }
                       }}
                       onMouseLeave={e => {
-                        e.currentTarget.style.background = isDark ? 'linear-gradient(135deg, #dc2626, #991b1b)' : 'linear-gradient(135deg, #991b1b, #7f1d1d)';
+                        e.currentTarget.style.background = isDark ? 'linear-gradient(135deg, var(--color-error), var(--color-error))' : 'linear-gradient(135deg, var(--color-error), var(--color-primary))';
                         e.currentTarget.style.transform = 'none';
                         e.currentTarget.style.boxShadow = 'none';
                       }}
@@ -1186,7 +1187,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
         {/* ═══ STATUS BAR (matching codelab) ═══ */}
         <div style={{
-          height: 28, background: '#7f1d1d', color: '#fff',
+          height: 28, background: 'var(--color-primary)', color: '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 12px', fontSize: 11, fontWeight: 500, flexShrink: 0,
         }}>

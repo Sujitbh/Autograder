@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import type { AxiosError } from 'axios';
 import { useTheme } from '@/utils/ThemeContext';
+import { codeRequiresStdin } from '@/utils/codeInputDetection';
 import { PageLayout } from './PageLayout';
 import { TopNav } from './TopNav';
 import { CodeEditor } from './CodeEditor';
@@ -54,12 +55,12 @@ function getFileIcon(name: string) {
 
 function getRiskTagStyle(risk: 'low' | 'medium' | 'high') {
     if (risk === 'high') {
-        return { background: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5' };
+        return { background: 'var(--color-error-bg)', color: 'var(--color-error)', border: '1px solid #FCA5A5' };
     }
     if (risk === 'medium') {
-        return { background: '#FEF3C7', color: '#92400E', border: '1px solid #FCD34D' };
+        return { background: 'var(--color-warning-bg)', color: 'var(--color-warning)', border: '1px solid #FCD34D' };
     }
-    return { background: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC' };
+    return { background: 'var(--color-success-bg)', color: 'var(--color-success)', border: '1px solid #86EFAC' };
 }
 
 function getBandLabel(scoreBand: 'low' | 'medium' | 'high') {
@@ -284,25 +285,12 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         }
     };
 
-    const codeUsesInput = (code: string, lang: string) =>
-        code.split('\n').some((line) => {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('#')) return false;
-            if (lang === 'python') return trimmed.includes('input(');
-            if (lang === 'java') {
-                return trimmed.includes('Scanner')
-                    || trimmed.includes('System.in')
-                    || /\bnext(Line|Int|Double|Float|Long|Short|Byte|Boolean)?\s*\(/.test(trimmed);
-            }
-            return false;
-        });
-
     const handleRunCode = async () => {
         if (!detail) return;
         const lang = (detail.assignment.language || 'python').toLowerCase();
         const code = detail.files[activeFileIndex]?.content ?? '';
         setOutputOpen(true);
-        if (codeUsesInput(code, lang)) {
+        if (codeRequiresStdin(code, lang)) {
             if (!showInlineInput) {
                 setShowInlineInput(true);
                 return;
@@ -474,7 +462,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                             <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-dark)' }}>
                                 {activeFile?.filename ?? 'No file open'}
                             </span>
-                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#3b1a1a' : '#fef3c7', color: isDark ? '#fca5a5' : '#92400e', display: 'inline-flex', alignItems: 'center' }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#3b1a1a' : 'var(--color-warning-bg)', color: isDark ? '#fca5a5' : 'var(--color-warning)', display: 'inline-flex', alignItems: 'center' }}>
                                 {language.charAt(0).toUpperCase() + language.slice(1)}
                             </span>
                             <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#d1d5db' : '#374151', display: 'inline-flex', alignItems: 'center' }}>
@@ -483,9 +471,9 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                             <div style={{ flex: 1 }} />
                             {/* Run Code */}
                             <button onClick={handleRunCode} disabled={isExecutingCode || autoGradeMutation.isPending}
-                                style={{ padding: '5px 16px', borderRadius: 5, fontSize: 12, fontWeight: 700, background: '#16a34a', color: '#fff', letterSpacing: '.3px', transition: 'background .15s', opacity: isExecutingCode ? 0.7 : 1, cursor: isExecutingCode ? 'not-allowed' : 'pointer', border: 'none' }}
-                                onMouseEnter={e => { if (!isExecutingCode) { e.currentTarget.style.background = '#15803d'; } }}
-                                onMouseLeave={e => { e.currentTarget.style.background = '#16a34a'; }}>
+                                style={{ padding: '5px 16px', borderRadius: 5, fontSize: 12, fontWeight: 700, background: 'var(--color-success)', color: '#fff', letterSpacing: '.3px', transition: 'background .15s', opacity: isExecutingCode ? 0.7 : 1, cursor: isExecutingCode ? 'not-allowed' : 'pointer', border: 'none' }}
+                                onMouseEnter={e => { if (!isExecutingCode) { e.currentTarget.style.background = 'var(--color-success)'; } }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-success)'; }}>
                                 {isExecutingCode ? '⏳ Running...' : '▶ Run Code'}
                             </button>
                             <button
@@ -505,9 +493,9 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                             <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 6px' }} />
                             {/* Auto Grade */}
                             <button onClick={handleAutoGrade} disabled={autoGradeMutation.isPending}
-                                style={{ padding: '5px 16px', borderRadius: 5, fontSize: 12, fontWeight: 700, background: isDark ? '#7f1d1d' : '#991b1b', color: '#fff', letterSpacing: '.3px', transition: 'all .15s', opacity: autoGradeMutation.isPending ? 0.7 : 1, cursor: autoGradeMutation.isPending ? 'not-allowed' : 'pointer', border: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
-                                onMouseEnter={e => { if (!autoGradeMutation.isPending) e.currentTarget.style.background = '#b91c1c'; }}
-                                onMouseLeave={e => { e.currentTarget.style.background = isDark ? '#7f1d1d' : '#991b1b'; }}>
+                                style={{ padding: '5px 16px', borderRadius: 5, fontSize: 12, fontWeight: 700, background: isDark ? 'var(--color-primary)' : 'var(--color-error)', color: '#fff', letterSpacing: '.3px', transition: 'all .15s', opacity: autoGradeMutation.isPending ? 0.7 : 1, cursor: autoGradeMutation.isPending ? 'not-allowed' : 'pointer', border: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+                                onMouseEnter={e => { if (!autoGradeMutation.isPending) e.currentTarget.style.background = 'var(--color-error)'; }}
+                                onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'var(--color-primary)' : 'var(--color-error)'; }}>
                                 {autoGradeMutation.isPending ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Grading...</> : <><Zap style={{ width: 14, height: 14 }} /> Auto Grade</>}
                             </button>
                             <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 6px' }} />
@@ -612,7 +600,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                             <div style={{ display: 'flex', flexWrap: 'wrap', padding: '8px 10px 0', gap: 6, flexShrink: 0 }}>
                                 {(['desc', 'tests', 'grading', 'rubric', 'integrity'] as const).map(tab => (
                                     <button key={tab} onClick={() => setInfoTab(tab)}
-                                        style={{ padding: '5px 11px', borderRadius: 16, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' as const, transition: 'all .2s', background: infoTab === tab ? '#7f1d1d' : 'var(--color-surface)', color: infoTab === tab ? '#fff' : 'var(--color-text-mid)', border: '1px solid var(--color-border)', cursor: 'pointer' }}
+                                        style={{ padding: '5px 11px', borderRadius: 16, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' as const, transition: 'all .2s', background: infoTab === tab ? 'var(--color-primary)' : 'var(--color-surface)', color: infoTab === tab ? '#fff' : 'var(--color-text-mid)', border: '1px solid var(--color-border)', cursor: 'pointer' }}
                                         onMouseEnter={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'var(--color-surface-elevated)'; e.currentTarget.style.color = 'var(--color-text-mid)'; } }}
                                         onMouseLeave={e => { if (infoTab !== tab) { e.currentTarget.style.background = 'var(--color-surface)'; e.currentTarget.style.color = 'var(--color-text-mid)'; } }}>
                                         {tab === 'desc' ? 'Details' : tab === 'tests' ? 'Tests' : tab === 'grading' ? 'Grading' : tab === 'rubric' ? 'Rubric' : 'Integrity'}
@@ -689,7 +677,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                             return (
                                                 <div>
                                                     <span className="px-2.5 py-1 rounded-full mb-4 inline-block"
-                                                        style={{ fontSize: '12px', fontWeight: 600, color: passed === displayTests.length ? '#059669' : '#D97706', backgroundColor: passed === displayTests.length ? '#D1FAE5' : '#FEF3C7' }}>
+                                                        style={{ fontSize: '12px', fontWeight: 600, color: passed === displayTests.length ? 'var(--color-success)' : 'var(--color-warning)', backgroundColor: passed === displayTests.length ? 'var(--color-success-bg)' : 'var(--color-warning-bg)' }}>
                                                         {passed}/{displayTests.length} passed
                                                     </span>
                                                     <div className="space-y-2">
@@ -700,7 +688,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                     onMouseEnter={e => e.currentTarget.style.background = 'var(--color-primary-bg)'}
                                                                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                                                     <div className="flex items-center gap-2">
-                                                                        {test.passed ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#059669' }} /> : <XCircle className="w-3.5 h-3.5" style={{ color: '#DC2626' }} />}
+                                                                        {test.passed ? <CheckCircle2 className="w-3.5 h-3.5" style={{ color: 'var(--color-success)' }} /> : <XCircle className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />}
                                                                         <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>{test.testcase_name || `Test #${test.testcase_id}`}</span>
                                                                         {typeof test.is_public === 'boolean' && (
                                                                             <span
@@ -710,8 +698,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                                     padding: '2px 6px',
                                                                                     borderRadius: 999,
                                                                                     border: '1px solid var(--color-border)',
-                                                                                    color: test.is_public ? '#065F46' : '#7C2D12',
-                                                                                    backgroundColor: test.is_public ? '#D1FAE5' : '#FFEDD5',
+                                                                                    color: test.is_public ? 'var(--color-success)' : '#7C2D12',
+                                                                                    backgroundColor: test.is_public ? 'var(--color-success-bg)' : '#FFEDD5',
                                                                                 }}
                                                                             >
                                                                                 {test.is_public ? 'Public' : 'Private'}
@@ -745,8 +733,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                         )}
                                                                         {test.error_output && (
                                                                             <div>
-                                                                                <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: '#DC2626', marginBottom: '4px' }}>Error:</p>
-                                                                                <pre className="p-2 rounded text-xs overflow-x-auto" style={{ backgroundColor: '#FEF2F2', color: '#991B1B', fontFamily: 'monospace', maxHeight: '120px' }}>{test.error_output}</pre>
+                                                                                <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-error)', marginBottom: '4px' }}>Error:</p>
+                                                                                <pre className="p-2 rounded text-xs overflow-x-auto" style={{ backgroundColor: 'var(--color-error-bg)', color: 'var(--color-error)', fontFamily: 'monospace', maxHeight: '120px' }}>{test.error_output}</pre>
                                                                             </div>
                                                                         )}
                                                                         {!test.output && !test.error_output && (
@@ -1014,9 +1002,9 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
                                         {/* Auto-grade result banner */}
                                         {autoGradeResult && (
-                                            <div className="mb-4 px-4 py-3 rounded-lg" style={{ backgroundColor: '#D1FAE5', border: '1px solid #6EE7B7' }}>
-                                                <p style={{ fontSize: '13px', fontWeight: 600, color: '#065F46', marginBottom: '2px' }}>{autoGradeResult.message}</p>
-                                                <p style={{ fontSize: '12px', color: '#065F46' }}>
+                                            <div className="mb-4 px-4 py-3 rounded-lg" style={{ backgroundColor: 'var(--color-success-bg)', border: '1px solid #6EE7B7' }}>
+                                                <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-success)', marginBottom: '2px' }}>{autoGradeResult.message}</p>
+                                                <p style={{ fontSize: '12px', color: 'var(--color-success)' }}>
                                                     Auto-score: {autoGradeResult.score ?? '—'} / {autoGradeResult.max_score ?? '—'} ({autoGradeResult.percentage?.toFixed(1)}%)
                                                 </p>
                                             </div>
@@ -1035,7 +1023,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                             fontWeight: 700,
                                                             letterSpacing: '.35px',
                                                             textTransform: 'uppercase' as const,
-                                                            color: isWeightedRubric ? '#6B0000' : '#2D6A2D',
+                                                            color: isWeightedRubric ? 'var(--color-primary)' : 'var(--color-success)',
                                                             backgroundColor: isWeightedRubric ? 'rgba(107,0,0,.10)' : 'rgba(45,106,45,.12)',
                                                             border: `1px solid ${isWeightedRubric ? 'rgba(107,0,0,.24)' : 'rgba(45,106,45,.24)'}`,
                                                             borderRadius: 999,
@@ -1159,7 +1147,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                         <div className="flex flex-col gap-3">
                                                     <button onClick={() => handleGrade(false)}
                                                 disabled={gradeMutation.isPending || (rubrics.length === 0 && (rubricScores[0] == null || Number.isNaN(rubricScores[0])))}
-                                                style={{ width: '100%', padding: '12px', borderRadius: 6, fontSize: 13, fontWeight: 700, border: 'none', background: 'linear-gradient(135deg, #15803d, #16a34a)', color: '#fff', textTransform: 'uppercase' as const, letterSpacing: '.5px', cursor: gradeMutation.isPending ? 'not-allowed' : 'pointer', opacity: gradeMutation.isPending ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all .2s' }}
+                                                style={{ width: '100%', padding: '12px', borderRadius: 6, fontSize: 13, fontWeight: 700, border: 'none', background: 'linear-gradient(135deg, var(--color-success), var(--color-success))', color: '#fff', textTransform: 'uppercase' as const, letterSpacing: '.5px', cursor: gradeMutation.isPending ? 'not-allowed' : 'pointer', opacity: gradeMutation.isPending ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, transition: 'all .2s' }}
                                                 onMouseEnter={e => { if (!gradeMutation.isPending) { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(21,128,61,.35)'; } }}
                                                 onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>
                                                 {gradeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -1180,13 +1168,13 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                         </div>
 
                                         {gradeMutation.isSuccess && (
-                                            <div className="mt-4 px-4 py-2 rounded-lg" style={{ backgroundColor: '#D1FAE5', border: '1px solid #6EE7B7' }}>
-                                                <p style={{ fontSize: '12px', fontWeight: 500, color: '#065F46' }}>Grade recorded successfully</p>
+                                            <div className="mt-4 px-4 py-2 rounded-lg" style={{ backgroundColor: 'var(--color-success-bg)', border: '1px solid #6EE7B7' }}>
+                                                <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-success)' }}>Grade recorded successfully</p>
                                             </div>
                                         )}
                                         {gradeMutation.isError && (
-                                            <div className="mt-4 px-4 py-2 rounded-lg" style={{ backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5' }}>
-                                                <p style={{ fontSize: '12px', fontWeight: 500, color: '#991B1B' }}>{getGradeErrorMessage()}</p>
+                                            <div className="mt-4 px-4 py-2 rounded-lg" style={{ backgroundColor: 'var(--color-error-bg)', border: '1px solid #FCA5A5' }}>
+                                                <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-error)' }}>{getGradeErrorMessage()}</p>
                                             </div>
                                         )}
                                     </div>

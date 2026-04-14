@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/utils/ThemeContext';
+import { codeRequiresStdin } from '@/utils/codeInputDetection';
 import { PageLayout } from './PageLayout';
 import { TopNav } from './TopNav';
 import { CodeEditor } from './CodeEditor';
@@ -374,29 +375,9 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const activeFile = detail.files[activeFileIndex];
     const code = activeFile?.content || '';
 
-    // Ad-hoc execution helpers (similar to StudentAssignmentDetail)
-    const codeUsesInput = (codeStr: string, lang: string) => {
-        const lines = codeStr.split('\n');
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith('#')) continue;
-            if (lang === 'python' && trimmed.includes('input(')) return true;
-            if (
-                lang === 'java' && (
-                    trimmed.includes('Scanner')
-                    || trimmed.includes('System.in')
-                    || /\bnext(Line|Int|Double|Float|Long|Short|Byte|Boolean)?\s*\(/.test(trimmed)
-                )
-            ) {
-                return true;
-            }
-        }
-        return false;
-    };
-
     const handleRunCode = async () => {
         setOutputOpen(true);
-        if (codeUsesInput(code, language)) {
+        if (codeRequiresStdin(code, language)) {
             if (!showInlineInput) {
                 setShowInlineInput(true);
                 return;
@@ -493,8 +474,8 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                             <span style={{
                                 fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const,
                                 letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10,
-                                background: isDark ? '#3b1a1a' : '#fef3c7',
-                                color: isDark ? '#fca5a5' : '#92400e',
+                                background: isDark ? '#3b1a1a' : 'var(--color-warning-bg)',
+                                color: isDark ? '#fca5a5' : 'var(--color-warning)',
                                 display: 'inline-flex', alignItems: 'center', gap: 4,
                             }}>
                                 {language.charAt(0).toUpperCase() + language.slice(1)}
@@ -507,14 +488,14 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                 disabled={isExecutingCode || runTestsMutation.isPending || autoGradeMutation.isPending}
                                 style={{
                                     padding: '5px 16px', borderRadius: 5, fontSize: 12, fontWeight: 700,
-                                    background: '#16a34a', color: '#fff', letterSpacing: '.3px',
+                                    background: 'var(--color-success)', color: '#fff', letterSpacing: '.3px',
                                     transition: 'background .15s, box-shadow .2s',
                                     opacity: isExecutingCode ? 0.7 : 1,
                                     cursor: isExecutingCode ? 'not-allowed' : 'pointer',
                                     border: 'none',
                                 }}
-                                onMouseEnter={e => { if (!isExecutingCode) { e.currentTarget.style.background = '#15803d'; e.currentTarget.style.boxShadow = '0 0 10px rgba(22,163,74,.5)'; } }}
-                                onMouseLeave={e => { e.currentTarget.style.background = '#16a34a'; e.currentTarget.style.boxShadow = 'none'; }}
+                                onMouseEnter={e => { if (!isExecutingCode) { e.currentTarget.style.background = 'var(--color-success)'; e.currentTarget.style.boxShadow = '0 0 10px rgba(22,163,74,.5)'; } }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-success)'; e.currentTarget.style.boxShadow = 'none'; }}
                             >
                                 {isExecutingCode ? '⏳ Running...' : '▶ Run Code'}
                             </button>
@@ -545,14 +526,14 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                     disabled={autoGradeMutation.isPending || runTestsMutation.isPending}
                                     style={{
                                         padding: '5px 16px', borderRadius: 5, fontSize: 12, fontWeight: 700,
-                                        background: isDark ? '#7f1d1d' : '#991b1b', color: '#fff', letterSpacing: '.3px',
+                                        background: isDark ? 'var(--color-primary)' : 'var(--color-error)', color: '#fff', letterSpacing: '.3px',
                                         transition: 'background .15s, box-shadow .2s',
                                         opacity: autoGradeMutation.isPending ? 0.7 : 1,
                                         cursor: autoGradeMutation.isPending ? 'not-allowed' : 'pointer',
                                         border: 'none', display: 'flex', alignItems: 'center', gap: 6,
                                     }}
-                                    onMouseEnter={e => { if (!autoGradeMutation.isPending) { e.currentTarget.style.background = '#b91c1c'; e.currentTarget.style.boxShadow = '0 0 10px rgba(153,27,27,.5)'; } }}
-                                    onMouseLeave={e => { e.currentTarget.style.background = isDark ? '#7f1d1d' : '#991b1b'; e.currentTarget.style.boxShadow = 'none'; }}
+                                    onMouseEnter={e => { if (!autoGradeMutation.isPending) { e.currentTarget.style.background = 'var(--color-error)'; e.currentTarget.style.boxShadow = '0 0 10px rgba(153,27,27,.5)'; } }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'var(--color-primary)' : 'var(--color-error)'; e.currentTarget.style.boxShadow = 'none'; }}
                                 >
                                     {autoGradeMutation.isPending ? '⏳ Grading...' : <><Zap style={{ width: 14, height: 14 }} /> Auto Grade</>}
                                 </button>
@@ -738,7 +719,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                         style={{
                                             padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600,
                                             whiteSpace: 'nowrap' as const, transition: 'all .2s',
-                                            background: infoTab === tab ? '#7f1d1d' : 'transparent',
+                                            background: infoTab === tab ? 'var(--color-primary)' : 'transparent',
                                             color: infoTab === tab ? '#fff' : 'var(--color-text-light)',
                                             border: 'none', cursor: 'pointer',
                                         }}
@@ -856,8 +837,8 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                         style={{
                                                             fontSize: '12px',
                                                             fontWeight: 600,
-                                                            color: passed === displayTests.length ? '#059669' : '#D97706',
-                                                            backgroundColor: passed === displayTests.length ? '#D1FAE5' : '#FEF3C7',
+                                                            color: passed === displayTests.length ? 'var(--color-success)' : 'var(--color-warning)',
+                                                            backgroundColor: passed === displayTests.length ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
                                                         }}
                                                     >
                                                         {passed}/{displayTests.length} passed
@@ -876,9 +857,9 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                 >
                                                                     <div className="flex items-center gap-2">
                                                                         {test.passed ? (
-                                                                            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#059669' }} />
+                                                                            <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
                                                                         ) : (
-                                                                            <XCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#DC2626' }} />
+                                                                            <XCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-error)' }} />
                                                                         )}
                                                                         <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
                                                                             {test.testcase_name || `Test #${test.testcase_id}`}
@@ -958,14 +939,14 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                         )}
                                                                         {test.error_output && (
                                                                             <div>
-                                                                                <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: '#DC2626', marginBottom: '4px' }}>
+                                                                                <p style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-error)', marginBottom: '4px' }}>
                                                                                     Error:
                                                                                 </p>
                                                                                 <pre
                                                                                     className="p-2 rounded text-xs overflow-x-auto"
                                                                                     style={{
-                                                                                        backgroundColor: '#FEF2F2',
-                                                                                        color: '#991B1B',
+                                                                                        backgroundColor: 'var(--color-error-bg)',
+                                                                                        color: 'var(--color-error)',
                                                                                         fontFamily: 'monospace',
                                                                                         maxHeight: '120px',
                                                                                     }}
@@ -1001,12 +982,12 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                         {autoGradeResult && (
                                             <div
                                                 className="mb-6 px-4 py-3 rounded-lg"
-                                                style={{ backgroundColor: '#D1FAE5', border: '1px solid #6EE7B7' }}
+                                                style={{ backgroundColor: 'var(--color-success-bg)', border: '1px solid #6EE7B7' }}
                                             >
-                                                <p style={{ fontSize: '13px', fontWeight: 600, color: '#065F46', marginBottom: '4px' }}>
+                                                <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-success)', marginBottom: '4px' }}>
                                                     {autoGradeResult.message}
                                                 </p>
-                                                <p style={{ fontSize: '12px', color: '#065F46' }}>
+                                                <p style={{ fontSize: '12px', color: 'var(--color-success)' }}>
                                                     Auto-score: {autoGradeResult.score ?? '—'} / {autoGradeResult.max_score ?? '—'} ({autoGradeResult.percentage.toFixed(1)}%)
                                                 </p>
                                             </div>
@@ -1025,7 +1006,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                             fontWeight: 700,
                                                             letterSpacing: '.35px',
                                                             textTransform: 'uppercase' as const,
-                                                            color: isWeightedRubric ? '#6B0000' : '#2D6A2D',
+                                                            color: isWeightedRubric ? 'var(--color-primary)' : 'var(--color-success)',
                                                             backgroundColor: isWeightedRubric ? 'rgba(107,0,0,.10)' : 'rgba(45,106,45,.12)',
                                                             border: `1px solid ${isWeightedRubric ? 'rgba(107,0,0,.24)' : 'rgba(45,106,45,.24)'}`,
                                                             borderRadius: 999,
@@ -1043,7 +1024,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                     {section.name}
                                                                 </p>
                                                                 {Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 && (
-                                                                    <span style={{ fontSize: '10px', color: '#6B0000', backgroundColor: 'rgba(107,0,0,.10)', padding: '2px 6px', borderRadius: '3px' }}>
+                                                                    <span style={{ fontSize: '10px', color: 'var(--color-primary)', backgroundColor: 'rgba(107,0,0,.10)', padding: '2px 6px', borderRadius: '3px' }}>
                                                                         {sectionWeightPercent(section.weight).toFixed(1)}%
                                                                     </span>
                                                                 )}
@@ -1086,7 +1067,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                                     style={{
                                                                                         fontSize: '11px',
                                                                                         fontWeight: 600,
-                                                                                        color: earned !== null ? (earned === max ? '#059669' : '#D97706') : 'var(--color-text-mid)',
+                                                                                        color: earned !== null ? (earned === max ? 'var(--color-success)' : 'var(--color-warning)') : 'var(--color-text-mid)',
                                                                                         backgroundColor: 'var(--color-surface)',
                                                                                         border: '1px solid var(--color-border)',
                                                                                     }}
@@ -1200,7 +1181,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                         style={{
                                                             width: '100%', padding: '12px', borderRadius: 6,
                                                             fontSize: 13, fontWeight: 700, border: 'none',
-                                                            background: isDark ? 'linear-gradient(135deg, #16a34a, #15803d)' : 'linear-gradient(135deg, #15803d, #16a34a)',
+                                                            background: isDark ? 'linear-gradient(135deg, var(--color-success), var(--color-success))' : 'linear-gradient(135deg, var(--color-success), var(--color-success))',
                                                             color: '#fff', transition: 'all .2s',
                                                             textTransform: 'uppercase' as const, letterSpacing: '.5px',
                                                             cursor: (gradeMutation.isPending || !score) ? 'not-allowed' : 'pointer',
@@ -1258,9 +1239,9 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                 {gradeMutation.isSuccess && (
                                                     <div
                                                         className="mt-4 px-4 py-2 rounded-lg"
-                                                        style={{ backgroundColor: '#D1FAE5', border: '1px solid #6EE7B7' }}
+                                                        style={{ backgroundColor: 'var(--color-success-bg)', border: '1px solid #6EE7B7' }}
                                                     >
-                                                        <p style={{ fontSize: '12px', fontWeight: 500, color: '#065F46' }}>
+                                                        <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-success)' }}>
                                                             Grade recorded successfully
                                                         </p>
                                                     </div>
