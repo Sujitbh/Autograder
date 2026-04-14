@@ -363,8 +363,6 @@ def _flagged_code_sections(
     code: str,
     filename: str | None,
     threshold: float,
-    *,
-    max_sections: int = 6,
 ) -> list[dict[str, Any]]:
     lines = code.splitlines()
     if not lines:
@@ -402,20 +400,16 @@ def _flagged_code_sections(
         else:
             merged.append(dict(current))
 
-    merged.sort(key=lambda item: item["confidence"], reverse=True)
-    trimmed = merged[:max_sections]
-    trimmed.sort(key=lambda item: item["start_line"])
+    merged.sort(key=lambda item: item["start_line"])
 
     sections: list[dict[str, Any]] = []
-    for block in trimmed:
+    for block in merged:
         start_line = int(block["start_line"])
         end_line = int(block["end_line"])
         snippet_lines = lines[start_line - 1:end_line]
-        max_snippet_lines = 40
-        if len(snippet_lines) > max_snippet_lines:
-            snippet_lines = snippet_lines[:max_snippet_lines] + ["... (truncated)"]
         sections.append(
             {
+                "filename": filename,
                 "start_line": start_line,
                 "end_line": end_line,
                 "score": round(float(block["confidence"]) * 100.0, 1),

@@ -411,6 +411,15 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         detail.assignment?.auto_flag_threshold != null
             ? (detail.assignment.auto_flag_threshold * 100).toFixed(1)
             : null;
+    const handleOpenFlaggedSection = (section: { filename?: string | null }) => {
+        if (section.filename) {
+            const fileIndex = detail.files.findIndex((file) => file.filename === section.filename);
+            if (fileIndex >= 0) {
+                setActiveFileIndex(fileIndex);
+            }
+        }
+        setShowFlaggedSections(false);
+    };
 
     return (
         <PageLayout>
@@ -893,24 +902,27 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                     {Boolean(integrityAi?.ai_flagged) ? (
                                                         <div style={{ marginTop: 10 }}>
                                                             {hasFlaggedSections ? (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setShowFlaggedSections((prev) => !prev)}
-                                                                    style={{
-                                                                        fontSize: '11px',
-                                                                        fontWeight: 600,
-                                                                        borderRadius: 999,
-                                                                        border: '1px solid var(--color-border)',
-                                                                        backgroundColor: 'var(--color-surface)',
-                                                                        color: 'var(--color-text-dark)',
-                                                                        padding: '6px 12px',
-                                                                        cursor: 'pointer',
-                                                                    }}
-                                                                >
-                                                                    {showFlaggedSections
-                                                                        ? 'Hide Flagged Sections'
-                                                                        : `View Flagged Sections (${flaggedSections.length})`}
-                                                                </button>
+                                                                <div>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setShowFlaggedSections(true)}
+                                                                        style={{
+                                                                            fontSize: '11px',
+                                                                            fontWeight: 600,
+                                                                            borderRadius: 999,
+                                                                            border: '1px solid var(--color-border)',
+                                                                            backgroundColor: 'var(--color-surface)',
+                                                                            color: 'var(--color-text-dark)',
+                                                                            padding: '6px 12px',
+                                                                            cursor: 'pointer',
+                                                                        }}
+                                                                    >
+                                                                        View Flagged Sections ({flaggedSections.length})
+                                                                    </button>
+                                                                    <p style={{ marginTop: 6, fontSize: '10px', color: 'var(--color-text-light)' }}>
+                                                                        Opens a full viewer so you can inspect each flagged section in full.
+                                                                    </p>
+                                                                </div>
                                                             ) : (
                                                                 <p style={{ marginTop: 4, fontSize: '11px', color: 'var(--color-text-mid)' }}>
                                                                     This submission is flagged above the threshold, but no section snippets were returned.
@@ -921,40 +933,6 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                         <p style={{ marginTop: 8, fontSize: '11px', color: 'var(--color-text-mid)' }}>
                                                             This submission is below the current threshold.
                                                         </p>
-                                                    )}
-
-                                                    {showFlaggedSections && hasFlaggedSections && (
-                                                        <div className="mt-3 space-y-2">
-                                                            {flaggedSections.map((section: any, idx: number) => (
-                                                                <div
-                                                                    key={`${section.start_line}-${section.end_line}-${idx}`}
-                                                                    className="rounded-md p-2"
-                                                                    style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)' }}
-                                                                >
-                                                                    <div className="flex items-center justify-between mb-1">
-                                                                        <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-dark)' }}>
-                                                                            Lines {section.start_line}-{section.end_line}
-                                                                        </span>
-                                                                        <span style={{ fontSize: '10px', color: 'var(--color-text-mid)' }}>
-                                                                            {section.score}% confidence
-                                                                        </span>
-                                                                    </div>
-                                                                    <pre
-                                                                        className="rounded p-2 overflow-x-auto"
-                                                                        style={{
-                                                                            fontSize: '11px',
-                                                                            lineHeight: 1.4,
-                                                                            maxHeight: 180,
-                                                                            backgroundColor: '#111827',
-                                                                            color: '#E5E7EB',
-                                                                            fontFamily: 'monospace',
-                                                                        }}
-                                                                    >
-                                                                        {section.snippet}
-                                                                    </pre>
-                                                                </div>
-                                                            ))}
-                                                        </div>
                                                     )}
                                                 </div>
 
@@ -1217,6 +1195,143 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                         </div>
                     )}
                 </div>
+
+                {showFlaggedSections && hasFlaggedSections && (
+                    <div
+                        style={{
+                            position: 'fixed',
+                            inset: 0,
+                            zIndex: 80,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: 20,
+                        }}
+                    >
+                        <div
+                            onClick={() => setShowFlaggedSections(false)}
+                            style={{
+                                position: 'absolute',
+                                inset: 0,
+                                backgroundColor: 'rgba(15, 23, 42, 0.55)',
+                            }}
+                        />
+
+                        <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="AI flagged code sections"
+                            style={{
+                                position: 'relative',
+                                width: 'min(1100px, 100%)',
+                                height: 'min(84vh, 900px)',
+                                backgroundColor: 'var(--color-surface)',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: 10,
+                                boxShadow: '0 24px 48px rgba(0,0,0,0.35)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                overflow: 'hidden',
+                            }}
+                        >
+                            <div
+                                className="flex items-center justify-between"
+                                style={{
+                                    padding: '12px 14px',
+                                    borderBottom: '1px solid var(--color-border)',
+                                    backgroundColor: 'var(--color-surface-elevated)',
+                                }}
+                            >
+                                <div>
+                                    <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text-dark)' }}>
+                                        AI Flagged Sections
+                                    </p>
+                                    <p style={{ fontSize: 11, color: 'var(--color-text-light)', marginTop: 2 }}>
+                                        Full code view for each section flagged above the assignment threshold.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowFlaggedSections(false)}
+                                    style={{
+                                        border: '1px solid var(--color-border)',
+                                        backgroundColor: 'var(--color-surface)',
+                                        color: 'var(--color-text-dark)',
+                                        borderRadius: 6,
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        padding: '6px 10px',
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    Close
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto" style={{ padding: 14 }}>
+                                <div className="space-y-3">
+                                    {flaggedSections.map((section: any, idx: number) => (
+                                        <div
+                                            key={`${section.start_line}-${section.end_line}-${idx}`}
+                                            className="rounded-md p-3"
+                                            style={{
+                                                border: '1px solid var(--color-border)',
+                                                backgroundColor: 'var(--color-surface-elevated)',
+                                            }}
+                                        >
+                                            <div className="flex items-start justify-between gap-3 mb-2">
+                                                <div>
+                                                    <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text-dark)', display: 'block' }}>
+                                                        Lines {section.start_line}-{section.end_line}
+                                                    </span>
+                                                    {section.filename && (
+                                                        <span style={{ fontSize: '10px', color: 'var(--color-text-light)', display: 'block', marginTop: 2 }}>
+                                                            {section.filename}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span style={{ fontSize: '11px', color: 'var(--color-text-mid)' }}>
+                                                        {section.score}% confidence
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenFlaggedSection(section)}
+                                                        style={{
+                                                            border: '1px solid var(--color-border)',
+                                                            backgroundColor: 'var(--color-surface)',
+                                                            color: 'var(--color-text-dark)',
+                                                            borderRadius: 999,
+                                                            fontSize: 11,
+                                                            fontWeight: 600,
+                                                            padding: '4px 10px',
+                                                            cursor: 'pointer',
+                                                        }}
+                                                    >
+                                                        Open In Editor
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <pre
+                                                className="rounded p-3 overflow-auto"
+                                                style={{
+                                                    fontSize: '12px',
+                                                    lineHeight: 1.5,
+                                                    backgroundColor: '#111827',
+                                                    color: '#E5E7EB',
+                                                    fontFamily: 'monospace',
+                                                    margin: 0,
+                                                }}
+                                            >
+                                                {section.snippet}
+                                            </pre>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Status Bar */}
                 <div style={{ height: 28, background: '#1e4a7a', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', fontSize: 11, fontWeight: 500, flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
