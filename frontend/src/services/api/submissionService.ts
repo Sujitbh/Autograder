@@ -200,6 +200,7 @@ export const submissionService = {
         signals: string[];
         disclaimer: string;
         flagged_sections?: Array<{
+          filename?: string | null;
           start_line: number;
           end_line: number;
           score: number;
