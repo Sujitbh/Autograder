@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:3000"
 
     # MFA / OTP settings
-    # Default OTP MFA is enabled; can still be overridden by env MFA_ENABLED.
-    MFA_ENABLED: bool = True
+    # Default OTP MFA is disabled; can still be overridden by env MFA_ENABLED.
+    MFA_ENABLED: bool = False
     MFA_BYPASS_ENABLED: bool = True
     MFA_BYPASS_ACCOUNTS: str = ""
     OTP_TTL_MINUTES: int = 5
