@@ -1,5 +1,6 @@
-from pydantic import BaseModel
-from typing import Optional, List
+import json as _json
+from pydantic import BaseModel, field_validator
+from typing import Dict, Optional, List
 
 
 # ── Criterion Schema ────────────────────────────────────────────────
@@ -9,7 +10,8 @@ class RubricCriterionBase(BaseModel):
     description: Optional[str] = None
     weight: Optional[float] = None
     max_points: Optional[int] = None
-    grading_method: Optional[str] = "manual"  # auto, manual, hybrid
+    grading_method: Optional[str] = "manual"
+    default_comments: Optional[Dict[str, str]] = None
 
 
 class RubricCriterionCreate(RubricCriterionBase):
@@ -23,6 +25,16 @@ class RubricCriterionUpdate(RubricCriterionBase):
 class RubricCriterionOut(RubricCriterionBase):
     id: int
     section_id: int
+
+    @field_validator("default_comments", mode="before")
+    @classmethod
+    def _parse_json_string(cls, v):
+        if isinstance(v, str):
+            try:
+                return _json.loads(v)
+            except _json.JSONDecodeError:
+                return None
+        return v
 
     class Config:
         from_attributes = True

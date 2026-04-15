@@ -1,16 +1,65 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, selectinload
 from typing import List, Optional
 
 from app.api.deps import get_db, get_current_user, get_current_user_optional
-from app.core.permissions import require_role, require_course_role
+from app.core.permissions import require_role, require_course_role, get_course_enrollment_role
 from app.models.assignment import Assignment
 from app.models.testcase import TestCase
 from app.models.rubric_section import RubricSection, RubricCriterion
 from app.models.user import User
+from app.models.enrollment import Enrollment
+from app.models.ta_permission import TAPermission
 from app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentOut
+from app.schemas.course_default_rubric import AssignmentRubricReplaceBody
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
+
+_WEIGHT_SUM_TOLERANCE = 0.55
+
+
+def _require_assignment_rubric_editor(db: Session, user: User, assignment: Assignment) -> None:
+    if user.role == "admin":
+        return
+    cid = assignment.course_id
+    if cid is None:
+        raise HTTPException(status_code=400, detail="Assignment is not linked to a course")
+    role = get_course_enrollment_role(db, user.id, cid)
+    if role == "instructor":
+        return
+    if role == "ta":
+        en = (
+            db.query(Enrollment)
+            .filter(Enrollment.course_id == cid, Enrollment.user_id == user.id)
+            .first()
+        )
+        if not en:
+            raise HTTPException(status_code=403, detail="Not enrolled in this course")
+        perm = db.query(TAPermission).filter(TAPermission.enrollment_id == en.id).first()
+        if perm and perm.can_edit_rubrics:
+            return
+    raise HTTPException(
+        status_code=403,
+        detail="Forbidden: course instructor or TA with rubric edit permission required",
+    )
+
+
+def _criterion_payload_weight_to_db(raw: float | None, section_weight: float) -> float:
+    """
+    Map API criterion weight → DB fraction of section (0–1).
+    Values ≤1.5 are treated as legacy fractions; larger values as global % of total grade
+    (same convention as the assignment creation form).
+    """
+    if raw is None:
+        return 1.0
+    if raw <= 1.5:
+        return float(raw)
+    sw = float(section_weight) or 100.0
+    if sw <= 0:
+        return 1.0
+    return max(0.0, min(1.0, float(raw) / sw))
 
 
 @router.get("/", response_model=List[AssignmentOut])
@@ -87,15 +136,18 @@ def create_assignment(
         db.add(section)
         db.flush()
 
+        sec_w = float(rs.weight if rs.weight is not None else 100.0)
         for crit_idx, rc in enumerate(rs.criteria or []):
+            dc = json.dumps(rc.defaultComments) if rc.defaultComments else None
             db.add(RubricCriterion(
                 section_id=section.id,
                 name=rc.name,
                 description=rc.description,
-                max_points=rc.maxPoints or 10,
-                weight=rc.weight if rc.weight is not None else 1.0,
+                max_points=rc.maxPoints or 5,
+                weight=_criterion_payload_weight_to_db(rc.weight, sec_w),
                 grading_method=rc.gradingMethod or "manual",
                 order=crit_idx,
+                default_comments=dc,
             ))
 
     db.commit()
@@ -114,6 +166,92 @@ def get_assignment(assignment_id: int, db: Session = Depends(get_db), user: User
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     return assignment
+
+
+@router.post("/{assignment_id}/rubric", response_model=AssignmentOut)
+def replace_assignment_rubric(
+    assignment_id: int,
+    payload: AssignmentRubricReplaceBody,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """
+    Replace all rubric sections and criteria on an assignment.
+    Instructors may always edit; TAs need `can_edit_rubrics` on their enrollment.
+    """
+    assignment = (
+        db.query(Assignment)
+        .options(selectinload(Assignment.rubric_sections).selectinload(RubricSection.criteria))
+        .filter(Assignment.id == assignment_id)
+        .first()
+    )
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+
+    _require_assignment_rubric_editor(db, user, assignment)
+
+    mode = payload.rubricMode or assignment.rubric_mode or "unweighted"
+    if mode == "weighted":
+        ssum = sum(s.weight for s in payload.rubric)
+        if abs(ssum - 100.0) > _WEIGHT_SUM_TOLERANCE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Weighted rubric section weights must sum to 100 (±{_WEIGHT_SUM_TOLERANCE}); got {ssum:.2f}",
+            )
+        for sec in payload.rubric:
+            csum = sum(c.weight or 0 for c in sec.criteria)
+            if abs(csum - sec.weight) > _WEIGHT_SUM_TOLERANCE:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f'Section "{sec.name}": criterion weights must sum to the section weight '
+                        f"({sec.weight:.2f}); got {csum:.2f}"
+                    ),
+                )
+
+    if payload.rubricMode is not None:
+        assignment.rubric_mode = payload.rubricMode
+
+    for sec in list(assignment.rubric_sections):
+        db.delete(sec)
+    db.flush()
+
+    for section_idx, rs in enumerate(payload.rubric):
+        section = RubricSection(
+            assignment_id=assignment.id,
+            name=rs.name,
+            description=rs.description,
+            weight=float(rs.weight) if rs.weight is not None else 100.0,
+            order=section_idx,
+        )
+        db.add(section)
+        db.flush()
+
+        sec_w = float(section.weight)
+        for crit_idx, rc in enumerate(rs.criteria or []):
+            dc = json.dumps(rc.defaultComments) if rc.defaultComments else None
+            db.add(
+                RubricCriterion(
+                    section_id=section.id,
+                    name=rc.name,
+                    description=rc.description,
+                    max_points=rc.maxPoints or 5,
+                    weight=_criterion_payload_weight_to_db(rc.weight, sec_w),
+                    grading_method=rc.gradingMethod or "manual",
+                    order=crit_idx,
+                    default_comments=dc,
+                )
+            )
+
+    db.add(assignment)
+    db.commit()
+    db.refresh(assignment)
+    return (
+        db.query(Assignment)
+        .options(selectinload(Assignment.rubric_sections).selectinload(RubricSection.criteria))
+        .filter(Assignment.id == assignment_id)
+        .first()
+    )
 
 
 @router.put("/{assignment_id}", response_model=AssignmentOut)

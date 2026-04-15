@@ -24,7 +24,8 @@ class RubricInline(BaseModel):
     description: Optional[str] = None
     maxPoints: Optional[int] = 10
     weight: Optional[float] = 1.0
-    gradingMethod: Optional[str] = None  # auto | manual | hybrid
+    gradingMethod: Optional[str] = None
+    defaultComments: Optional[dict[str, str]] = None
 
 
 class RubricSectionInline(BaseModel):

@@ -41,6 +41,7 @@ interface BackendAssignment {
             max_points: number | null;
             weight?: number | null;
             grading_method?: 'auto' | 'manual' | 'hybrid' | null;
+            default_comments?: Record<string, string> | null;
         }>;
     }>;
 }
@@ -73,9 +74,10 @@ function mapAssignment(a: BackendAssignment): Assignment {
                 id: String(c.id),
                 name: c.name,
                 description: c.description ?? '',
-                maxPoints: c.max_points ?? 0,
-                weight: c.weight ?? 1,
+                maxPoints: c.max_points ?? 5,
+                weight: c.weight ?? 0,
                 gradingMethod: (c.grading_method ?? 'manual') as 'auto' | 'manual' | 'hybrid',
+                defaultComments: c.default_comments ?? null,
             })),
         })),
         createdAt: a.created_at ?? '',
@@ -163,9 +165,10 @@ export const assignmentService = {
                         ? r.criteria.map((c: any) => ({
                             name: c.name,
                             description: c.description ?? '',
-                            maxPoints: c.maxPoints ?? 0,
-                            weight: c.weight ?? 1,
+                            maxPoints: c.maxPoints ?? 5,
+                            weight: c.weight ?? 0,
                             gradingMethod: c.gradingMethod ?? 'manual',
+                            defaultComments: c.defaultComments ?? null,
                         }))
                         : [],
                 }));
@@ -191,6 +194,33 @@ export const assignmentService = {
     /** Delete an assignment. */
     async deleteAssignment(_courseId: string, assignmentId: string): Promise<void> {
         await api.delete(`/assignments/${assignmentId}`);
+    },
+
+    /**
+     * Replace rubric sections on an existing assignment.
+     * Instructors or TAs with `can_edit_rubrics` (backend).
+     */
+    async replaceAssignmentRubric(
+        assignmentId: string,
+        body: {
+            rubricMode?: 'weighted' | 'unweighted';
+            rubric: Array<{
+                name: string;
+                description?: string;
+                weight: number;
+                criteria: Array<{
+                    name: string;
+                    description?: string;
+                    maxPoints: number;
+                    weight: number;
+                    gradingMethod: 'auto' | 'manual' | 'hybrid';
+                    defaultComments?: Record<string, string> | null;
+                }>;
+            }>;
+        }
+    ): Promise<Assignment> {
+        const { data } = await api.post<BackendAssignment>(`/assignments/${assignmentId}/rubric`, body);
+        return mapAssignment(data);
     },
 
     /** Publish a draft assignment (toggle is_active). */

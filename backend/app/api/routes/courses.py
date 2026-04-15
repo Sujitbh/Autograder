@@ -31,6 +31,8 @@ from app.schemas.course import (
     EnrollmentImportResult,
     EnrollmentImportRowOut,
 )
+from app.schemas.course_default_rubric import CourseDefaultRubricOut, CourseDefaultRubricPut
+import app.services.course_default_rubric as course_default_rubric_service
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -294,6 +296,64 @@ def get_course_catalog(db: DbSession, user: CurrentUser):
             catalog.append({"code": code.strip().upper(), "name": name.strip()})
     catalog.sort(key=lambda x: x["code"])
     return catalog
+
+
+@router.get("/{course_id}/default-rubric", response_model=CourseDefaultRubricOut)
+def get_course_default_rubric(course_id: int, db: DbSession, user: CurrentUser):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail=COURSE_NOT_FOUND)
+    require_course_role(db=db, user=user, course_id=course_id, allowed_roles=["instructor", "ta"])
+
+    updater_name = None
+    if course.default_rubric_updated_by_id:
+        u = db.query(User).filter(User.id == course.default_rubric_updated_by_id).first()
+        if u:
+            updater_name = (getattr(u, "name", None) or getattr(u, "email", None) or "").strip() or None
+
+    return course_default_rubric_service.course_row_to_out(
+        rubric_json=course.default_rubric_json,
+        weight_policy=course.default_rubric_weight_policy or "percent",
+        updated_at=course.default_rubric_updated_at,
+        updated_by_id=course.default_rubric_updated_by_id,
+        updated_by_name=updater_name,
+    )
+
+
+@router.put("/{course_id}/default-rubric", response_model=CourseDefaultRubricOut)
+def put_course_default_rubric(
+    course_id: int,
+    payload: CourseDefaultRubricPut,
+    db: DbSession,
+    user: CurrentUser,
+):
+    require_role(user.role, {"faculty", "admin"})
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail=COURSE_NOT_FOUND)
+    require_course_role(db=db, user=user, course_id=course_id, allowed_roles=["instructor"])
+
+    try:
+        normalized = course_default_rubric_service.validate_and_normalize_put(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    course.default_rubric_json = course_default_rubric_service.put_payload_to_json(normalized)
+    course.default_rubric_weight_policy = normalized.weightPolicy
+    course.default_rubric_updated_at = datetime.now(UTC)
+    course.default_rubric_updated_by_id = user.id
+    db.add(course)
+    db.commit()
+    db.refresh(course)
+
+    updater_name = (getattr(user, "name", None) or getattr(user, "email", None) or "").strip() or None
+    return course_default_rubric_service.course_row_to_out(
+        rubric_json=course.default_rubric_json,
+        weight_policy=course.default_rubric_weight_policy,
+        updated_at=course.default_rubric_updated_at,
+        updated_by_id=course.default_rubric_updated_by_id,
+        updated_by_name=updater_name,
+    )
 
 
 @router.get("/{course_id}", response_model=CourseOut, responses={404: {"description": "Resource not found"}})

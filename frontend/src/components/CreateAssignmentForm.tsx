@@ -12,7 +12,8 @@
    ═══════════════════════════════════════════════════════════════════ */
 
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import Link from 'next/link';
+import { useForm, useFieldArray, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -38,6 +39,9 @@ import {
     FileUp,
     Loader2,
     Users,
+    Layers,
+    ListChecks,
+    PlusCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +66,11 @@ import {
     DialogDescription,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { useAuth } from '@/utils/AuthContext';
+import { courseService } from '@/services/api/courseService';
+import { courseDefaultApiToFormPartial, formRubricToCoursePutApi } from '@/lib/courseDefaultRubric';
+import WeightedRubricTable from '@/components/rubric/WeightedRubricTable';
+import type { RubricSection as WeightedRubricSection } from '@/components/rubric/WeightedRubricTable';
 
 
 // ── Rubric Template types ───────────────────────────────────────────
@@ -103,6 +112,52 @@ function toCriterionWeightPercent(weight?: number | string | null): number {
     if (numeric >= 0 && numeric <= 1.5) return numeric * 100;
     return numeric;
 }
+
+/** Split `targetTotal` percent across positive `parts` proportionally; fix rounding drift on the last part. */
+function distributePercentAcrossParts(parts: number[], targetTotal: number): number[] {
+    const n = parts.length;
+    if (n === 0) return [];
+    const sum = parts.reduce((a, b) => a + b, 0);
+    if (sum <= 0) {
+        const each = Math.round((targetTotal / n) * 1000) / 1000;
+        return parts.map(() => each);
+    }
+    const scaled = parts.map((p) => (p / sum) * targetTotal);
+    const rounded = scaled.map((x) => Math.max(0, Math.round(x * 1000) / 1000));
+    let drift = Math.round((targetTotal - rounded.reduce((a, b) => a + b, 0)) * 1000) / 1000;
+    rounded[n - 1] = Math.max(0, Math.round((rounded[n - 1] + drift) * 1000) / 1000);
+    return rounded;
+}
+
+function normalizeCriterionWeightsForSection(criteria: RubricCriterion[], sectionWeightPercent: number): number[] {
+    const n = criteria.length;
+    if (n === 0) return [];
+    const parts = criteria.map((c) => (c.weight != null ? toCriterionWeightPercent(c.weight) : 0));
+    const sum = parts.reduce((a, b) => a + b, 0);
+    if (sum <= 0) {
+        const each = Math.round((sectionWeightPercent / n) * 1000) / 1000;
+        return parts.map(() => each);
+    }
+    return distributePercentAcrossParts(parts, sectionWeightPercent);
+}
+
+function criterionWeightsFromMaxPoints(
+    criteria: { maxPoints: number }[],
+    totalPercent: number
+): number[] {
+    const pts = criteria.map((c) => Math.max(0, c.maxPoints));
+    const sumPts = pts.reduce((a, b) => a + b, 0);
+    const n = criteria.length;
+    if (n === 0) return [];
+    if (sumPts <= 0) {
+        const each = Math.round((totalPercent / n) * 1000) / 1000;
+        return pts.map(() => each);
+    }
+    return distributePercentAcrossParts(pts, totalPercent);
+}
+
+const RUBRIC_STEP_INDEX = 5;
+const WEIGHT_SUM_TOLERANCE = 0.55;
 
 const NO_RUBRIC_TEMPLATE_ID = 'none';
 
@@ -209,9 +264,10 @@ const testCaseSchema = z.object({
 const rubricCriterionSchema = z.object({
     name: z.string().min(1, 'Criterion name is required'),
     description: z.string(),
-    maxPoints: z.number().min(-1000, 'Value out of range').max(1000, 'Value out of range'),
-    weight: z.number().min(0, 'Weight must be 0 or higher').max(1000, 'Weight too large'),
+    maxPoints: z.number().min(0, 'Value out of range').max(1000, 'Value out of range'),
+    weight: z.number().min(0, 'Weight must be 0 or higher').max(100, 'Weight too large'),
     gradingMethod: z.enum(['auto', 'manual', 'hybrid']),
+    defaultComments: z.record(z.string()).optional(),
 });
 
 const rubricSectionSchema = z.object({
@@ -236,6 +292,7 @@ const formSchema = z.object({
     publicTests: z.array(testCaseSchema),
     privateTests: z.array(testCaseSchema),
     rubricMode: z.enum(['weighted', 'unweighted']),
+    rubricWeightKind: z.enum(['percent', 'points']),
     rubric: z.array(rubricSectionSchema),
     // Submission Settings
     maxAttempts: z.number().min(1).max(100),
@@ -283,11 +340,14 @@ interface CreateAssignmentFormProps {
 
 interface RubricSectionEditorProps {
     sectionIdx: number;
+    sectionNumber: number;
     watchRubricMode: 'weighted' | 'unweighted';
     errors: any;
     register: any;
     control: any;
     onRemoveSection: () => void;
+    getValues: (name?: any) => any;
+    setValue: (name: any, value: any, options?: { shouldDirty?: boolean }) => void;
 }
 
 // ── Helper ──────────────────────────────────────────────────────────
@@ -358,6 +418,7 @@ export function CreateAssignmentForm({
             autoFlagThreshold: 70,
             crossSectionComparison: false,
             ...initialData,
+            rubricWeightKind: initialData?.rubricWeightKind ?? 'percent',
         }),
         [initialData]
     );
@@ -370,6 +431,7 @@ export function CreateAssignmentForm({
         trigger,
         getValues,
         setValue,
+        reset,
         formState: { errors, isDirty },
     } = useForm<AssignmentFormData>({
         resolver: zodResolver(formSchema),
@@ -403,13 +465,45 @@ export function CreateAssignmentForm({
     const watchLanguage = watch('language');
     const watchRubricMode = watch('rubricMode');
     const watchRubric = watch('rubric');
+    const { user } = useAuth();
+    const canManageCourseDefaultRubric = user?.role === 'faculty' || user?.role === 'admin';
+    const rubricModePrevRef = useRef<'weighted' | 'unweighted' | undefined>(undefined);
 
+    /** When rubric mode changes, normalize weights so totals stay coherent. */
     useEffect(() => {
+        const prev = rubricModePrevRef.current;
+        rubricModePrevRef.current = watchRubricMode;
+        if (prev === undefined) return;
+        if (prev === watchRubricMode) return;
+
+        const rubric = getValues('rubric') as AssignmentFormData['rubric'];
+        if (!rubric?.length) return;
+
         if (watchRubricMode === 'unweighted') {
-            const current = getValues('rubric');
-            current.forEach((_, idx) => setValue(`rubric.${idx}.weight`, 100));
+            const nSec = rubric.length;
+            const perSec = nSec ? Math.round((100 / nSec) * 100) / 100 : 100;
+            rubric.forEach((_, idx) => setValue(`rubric.${idx}.weight`, perSec));
+            const totalCrit = rubric.reduce((s, r) => s + (r.criteria?.length || 0), 0);
+            if (totalCrit > 0) {
+                const w = Math.round((100 / totalCrit) * 1000) / 1000;
+                rubric.forEach((sec, si) => {
+                    (sec.criteria || []).forEach((_, ci) => {
+                        setValue(`rubric.${si}.criteria.${ci}.weight`, w);
+                    });
+                });
+            }
+        } else {
+            rubric.forEach((section, si) => {
+                const sw = toSectionWeightPercent(section.weight);
+                const n = section.criteria?.length || 0;
+                if (n === 0) return;
+                const each = Math.round((sw / n) * 1000) / 1000;
+                (section.criteria || []).forEach((_, ci) => {
+                    setValue(`rubric.${si}.criteria.${ci}.weight`, each);
+                });
+            });
         }
-    }, [watchRubricMode]);
+    }, [watchRubricMode, getValues, setValue]);
 
     // ── Auto-save to localStorage every 30 seconds ────────────────
 
@@ -484,12 +578,44 @@ export function CreateAssignmentForm({
     const handleNext = useCallback(async () => {
         const fields = stepFields[currentStep];
         const valid = fields.length === 0 || (await trigger(fields));
-        if (valid && currentStep < STEPS.length - 1) {
+        if (!valid) return;
+
+        if (currentStep === RUBRIC_STEP_INDEX) {
+            const values = getValues();
+            const rubric = values.rubric ?? [];
+            if (rubric.length === 0) {
+                toast.error('Add at least one rubric section.');
+                return;
+            }
+            if (rubric.some((s) => !s.criteria?.length)) {
+                toast.error('Each rubric section needs at least one criterion.');
+                return;
+            }
+            if (values.rubricMode === 'weighted') {
+                const sectionSum = rubric.reduce((acc, s) => acc + (s.weight ?? 0), 0);
+                if (Math.abs(sectionSum - 100) > WEIGHT_SUM_TOLERANCE) {
+                    toast.error(`Section weights must add up to 100% (currently ${sectionSum.toFixed(1)}%).`);
+                    return;
+                }
+                for (let si = 0; si < rubric.length; si++) {
+                    const s = rubric[si];
+                    const secW = s.weight ?? 0;
+                    const critSum = (s.criteria || []).reduce((acc, c) => acc + toCriterionWeightPercent(c.weight), 0);
+                    if (Math.abs(critSum - secW) > WEIGHT_SUM_TOLERANCE) {
+                        toast.error(
+                            `Section "${s.name || `Section ${si + 1}`}": criteria weights must add up to this section's weight (${secW.toFixed(1)}%), not ${critSum.toFixed(1)}%.`
+                        );
+                        return;
+                    }
+                }
+            }
+        }
+
+        if (currentStep < STEPS.length - 1) {
             setCurrentStep((s) => s + 1);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentStep, trigger]);
+    }, [currentStep, trigger, getValues]);
 
     const handlePrev = () => {
         if (currentStep > 0) {
@@ -509,18 +635,23 @@ export function CreateAssignmentForm({
         const template = allTemplates.find((t) => t.id === templateId);
         if (template) {
             replaceRubric(
-                template.sections.map((section) => ({
-                    name: section.name,
-                    description: section.description ?? '',
-                    weight: toSectionWeightPercent(section.weight),
-                    criteria: (section.criteria || []).map((c) => ({
-                        name: c.name,
-                        description: c.description ?? '',
-                        maxPoints: c.maxPoints,
-                        weight: c.weight ?? 1,
-                        gradingMethod: c.gradingMethod,
-                    })),
-                }))
+                template.sections.map((section) => {
+                    const secPct = toSectionWeightPercent(section.weight);
+                    const crits = section.criteria || [];
+                    const weights = normalizeCriterionWeightsForSection(crits, secPct);
+                    return {
+                        name: section.name,
+                        description: section.description ?? '',
+                        weight: secPct,
+                        criteria: crits.map((c, i) => ({
+                            name: c.name,
+                            description: c.description ?? '',
+                            maxPoints: c.maxPoints,
+                            weight: weights[i] ?? 0,
+                            gradingMethod: c.gradingMethod,
+                        })),
+                    };
+                })
             );
         }
     };
@@ -550,6 +681,42 @@ export function CreateAssignmentForm({
         setSavedTemplates(updated);
         saveSavedRubricTemplates(updated);
     };
+
+    const handleResetRubricToCourseDefault = useCallback(async () => {
+        try {
+            const d = await courseService.getCourseDefaultRubric(courseId);
+            const partial = courseDefaultApiToFormPartial(d);
+            reset({
+                ...getValues(),
+                rubricMode: partial.rubricMode,
+                rubricWeightKind: partial.rubricWeightKind,
+                rubric: partial.rubric as AssignmentFormData['rubric'],
+            });
+            toast.success('Rubric reset to the course default.');
+        } catch {
+            toast.error('Could not load the course default rubric.');
+        }
+    }, [courseId, reset, getValues]);
+
+    const handleSaveCourseDefaultRubric = useCallback(async () => {
+        if (!canManageCourseDefaultRubric) return;
+        try {
+            const v = getValues();
+            const body = formRubricToCoursePutApi({
+                rubric: v.rubric,
+                rubricMode: v.rubricMode,
+                rubricWeightKind: v.rubricWeightKind,
+                maxPoints: v.maxPoints,
+            });
+            await courseService.putCourseDefaultRubric(courseId, body);
+            toast.success('Course default rubric saved. New assignments will start from this rubric.');
+        } catch (e: unknown) {
+            const ax = e as { response?: { data?: { detail?: unknown } } };
+            const d = ax.response?.data?.detail;
+            const msg = typeof d === 'string' ? d : 'Failed to save course default rubric.';
+            toast.error(msg);
+        }
+    }, [canManageCourseDefaultRubric, courseId, getValues]);
 
     // ── PDF / Image rubric upload & parse ──────────────────────────
 
@@ -705,13 +872,14 @@ export function CreateAssignmentForm({
             } else {
                 setSelectedRubricTemplateId(NO_RUBRIC_TEMPLATE_ID);
                 // Wrap criteria in a default section, converting multiplier weights to percentages
+                const weights = criterionWeightsFromMaxPoints(criteria, 100);
                 const section: AssignmentFormData['rubric'][number] = {
                     name: 'Rubric Criteria',
                     description: `Criteria extracted from ${file.name}`,
                     weight: 100,
-                    criteria: criteria.map((c) => ({
+                    criteria: criteria.map((c, i) => ({
                         ...c,
-                        weight: (c.weight ?? 1) * 100,
+                        weight: weights[i] ?? 0,
                         gradingMethod: 'manual' as const,
                     })),
                 };
@@ -851,13 +1019,14 @@ export function CreateAssignmentForm({
             } else {
                 setSelectedRubricTemplateId(NO_RUBRIC_TEMPLATE_ID);
                 // Wrap criteria in a default section, converting multiplier weights to percentages
+                const weights = criterionWeightsFromMaxPoints(criteria, 100);
                 const section: AssignmentFormData['rubric'][number] = {
                     name: 'Rubric Criteria',
                     description: `Criteria extracted from ${file.name}`,
                     weight: 100,
-                    criteria: criteria.map((c) => ({
+                    criteria: criteria.map((c, i) => ({
                         ...c,
-                        weight: (c.weight ?? 1) * 100,
+                        weight: weights[i] ?? 0,
                         gradingMethod: 'manual' as const,
                     })),
                 };
@@ -1477,15 +1646,42 @@ export function CreateAssignmentForm({
 
     function renderRubric() {
         const rubricValues = watchRubric ?? [];
-        const totalRubricPoints = rubricValues.reduce((sum, section) => {
-            const sectionPoints = (section.criteria || []).reduce((s, c) => s + (c.maxPoints || 0), 0);
-            return sum + sectionPoints;
-        }, 0);
         const totalCriteria = rubricValues.reduce((sum, section) => sum + (section.criteria?.length || 0), 0);
-        const criteriaWeightTotal = rubricValues.reduce(
-            (sum, section) => sum + (section.criteria || []).reduce((s, c) => s + toCriterionWeightPercent(c.weight), 0),
+        const totalWeight = rubricValues.reduce(
+            (sum, section) => sum + (section.criteria || []).reduce((s, c) => s + (c.weight ?? 0), 0),
             0,
         );
+
+        const handleTableChange = (newSections: WeightedRubricSection[]) => {
+            const formSections = newSections.map((s) => ({
+                name: s.name,
+                description: s.description ?? '',
+                weight: (s.criteria ?? []).reduce((sum, c) => sum + (c.weight ?? 0), 0),
+                criteria: (s.criteria ?? []).map((c) => ({
+                    name: c.name,
+                    description: c.description ?? '',
+                    maxPoints: c.maxPoints ?? 5,
+                    weight: c.weight ?? 0,
+                    gradingMethod: c.gradingMethod ?? ('manual' as const),
+                    defaultComments: c.defaultComments ?? undefined,
+                })),
+            }));
+            setValue('rubric', formSections, { shouldDirty: true });
+        };
+
+        const tableSections: WeightedRubricSection[] = rubricValues.map((s) => ({
+            name: s.name ?? '',
+            description: s.description ?? '',
+            weight: (s.criteria ?? []).reduce((sum, c) => sum + (c.weight ?? 0), 0),
+            criteria: (s.criteria ?? []).map((c) => ({
+                name: c.name ?? '',
+                description: c.description ?? '',
+                maxPoints: c.maxPoints ?? 5,
+                weight: c.weight ?? 0,
+                gradingMethod: (c.gradingMethod as 'auto' | 'manual' | 'hybrid') ?? 'manual',
+                defaultComments: (c as Record<string, unknown>).defaultComments as Record<string, string> | null ?? null,
+            })),
+        }));
 
         return (
             <div className="space-y-5">
@@ -1493,31 +1689,43 @@ export function CreateAssignmentForm({
                     <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
                         <ClipboardList className="h-5 w-5 text-[#C9A84C]" /> Rubric Design
                     </h2>
-                    <p className="text-xs text-gray-500 mt-1">Configure sections with grading criteria. Add as many sections and criteria as needed.</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                        Grade scale 0–5 per criterion. Set % weights (must total 100%). Click &quot;Edit default comments&quot; to set auto-populated comments per score.
+                    </p>
                 </div>
 
-                <div className="rounded-lg border p-4 bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
-                    <Label className="text-xs">Rubric Mode</Label>
-                    <div className="mt-2 flex flex-wrap gap-2">
+                <div
+                    className="rounded-lg border p-4 bg-white dark:bg-gray-900 dark:border-gray-700 space-y-3"
+                    role="region"
+                    aria-label="Course rubric defaults"
+                >
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Course rubric</p>
+                    <div className="flex flex-wrap gap-2">
                         <Button
                             type="button"
-                            variant={watchRubricMode === 'unweighted' ? 'default' : 'outline'}
-                            className="h-8"
-                            onClick={() => setValue('rubricMode', 'unweighted')}
+                            variant="outline"
+                            size="sm"
+                            className="h-9"
+                            onClick={handleResetRubricToCourseDefault}
                         >
-                            Unweighted (equal weights)
+                            Reset to default
                         </Button>
-                        <Button
-                            type="button"
-                            variant={watchRubricMode === 'weighted' ? 'default' : 'outline'}
-                            className="h-8"
-                            onClick={() => setValue('rubricMode', 'weighted')}
-                        >
-                            Weighted (custom weights)
-                        </Button>
+                        {canManageCourseDefaultRubric && (
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="h-9 bg-[#6B0000] text-white hover:bg-[#8B1A1A]"
+                                onClick={handleSaveCourseDefaultRubric}
+                            >
+                                Save as default
+                            </Button>
+                        )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                        Weighted mode lets you set criterion weights directly.
+                    <p className="text-xs text-gray-500">
+                        Edit the full course template in the{' '}
+                        <Link href={`/courses/${courseId}/default-rubric`} className="text-[#6B0000] underline font-medium">
+                            default rubric editor
+                        </Link>.
                     </p>
                 </div>
 
@@ -1680,65 +1888,39 @@ export function CreateAssignmentForm({
                     </div>
                 )}
 
-                {/* Add section button */}
-                <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">{rubricValues.length} sections, {totalCriteria} criteria defined</span>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                            appendRubric({
-                                name: `Section ${rubricValues.length + 1}`,
-                                description: '',
-                                weight: 100,
-                                criteria: [],
-                            })
-                        }
-                    >
-                        <Plus className="mr-1 h-3.5 w-3.5" /> Add Section
-                    </Button>
-                </div>
-
-                {rubricValues.length === 0 && (
+                {/* Weighted rubric table */}
+                {rubricValues.length === 0 ? (
                     <div className="rounded-lg border border-dashed p-8 text-center text-sm text-gray-400">
                         No rubric sections yet. Use a template, upload a PDF, or add sections manually.
                     </div>
+                ) : (
+                    <WeightedRubricTable
+                        sections={tableSections}
+                        onChange={handleTableChange}
+                        mode="edit"
+                        allowReorder
+                    />
                 )}
 
-                {/* Rubric sections */}
-                {rubricValues.map((section, sectionIdx) => (
-                    <RubricSectionEditor
-                        key={`section-${sectionIdx}`}
-                        sectionIdx={sectionIdx}
-                        watchRubricMode={watchRubricMode}
-                        errors={errors}
-                        register={register}
-                        control={control}
-                        onRemoveSection={() => removeRubric(sectionIdx)}
-                    />
-                ))}
-
-                {/* Total points summary */}
+                {/* Summary */}
                 {totalCriteria > 0 && (
                     <div className="rounded-lg p-4" style={{ backgroundColor: '#F5EDED' }}>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm font-semibold text-gray-700">Total Rubric Points:</span>
-                            <span className="text-xl font-bold text-[#6B0000]">{totalRubricPoints}</span>
-                        </div>
-                        {watchRubricMode === 'weighted' && (
-                            <div className="flex justify-between items-center mt-2">
-                                <span className="text-sm font-semibold text-gray-700">Criteria Weights Total:</span>
-                                <span className="text-sm font-bold" style={{ color: Math.abs(criteriaWeightTotal - 100) < 0.001 ? '#166534' : '#991B1B' }}>
-                                    {criteriaWeightTotal.toFixed(1)}%
-                                </span>
-                            </div>
-                        )}
-                        <div className="flex justify-between items-center mt-2">
-                            <span className="text-sm font-semibold text-gray-700">Rubric Mode:</span>
-                            <span className="text-sm font-bold text-[#6B0000]">
-                                {watchRubricMode === 'weighted' ? 'Weighted' : 'Unweighted'}
+                            <span className="text-sm font-semibold text-gray-700">Total Weight:</span>
+                            <span
+                                className="text-xl font-bold"
+                                style={{ color: Math.abs(totalWeight - 100) <= WEIGHT_SUM_TOLERANCE ? '#166534' : '#991B1B' }}
+                            >
+                                {totalWeight.toFixed(1)}%
                             </span>
+                        </div>
+                        <div className="flex justify-between items-center mt-2">
+                            <span className="text-sm font-semibold text-gray-700">Sections:</span>
+                            <span className="text-sm font-bold text-[#6B0000]">{rubricValues.length}</span>
+                        </div>
+                        <div className="flex justify-between items-center mt-2">
+                            <span className="text-sm font-semibold text-gray-700">Criteria:</span>
+                            <span className="text-sm font-bold text-[#6B0000]">{totalCriteria}</span>
                         </div>
                     </div>
                 )}
@@ -2375,11 +2557,14 @@ export function CreateAssignmentForm({
 
 function RubricSectionEditor({
     sectionIdx,
+    sectionNumber,
     watchRubricMode,
     errors,
     register,
     control,
     onRemoveSection,
+    getValues,
+    setValue,
 }: RubricSectionEditorProps) {
     const {
         fields: criteriaFields,
@@ -2387,13 +2572,39 @@ function RubricSectionEditor({
         remove: removeCriterion,
     } = useFieldArray({ control, name: `rubric.${sectionIdx}.criteria` });
 
+    const watchedSection = useWatch({ control, name: `rubric.${sectionIdx}` });
+    const sectionWeightDisplay = toSectionWeightPercent(watchedSection?.weight);
+    const criteriaSumInSection = (watchedSection?.criteria ?? []).reduce(
+        (acc: number, c: { weight?: unknown }) =>
+            acc + toCriterionWeightPercent(c?.weight as number | string | null | undefined),
+        0,
+    );
+
+    const splitSectionWeightAcrossCriteria = () => {
+        const rubric = getValues('rubric') as AssignmentFormData['rubric'];
+        const sec = rubric[sectionIdx];
+        const sw = toSectionWeightPercent(sec?.weight);
+        const n = sec?.criteria?.length ?? 0;
+        if (n === 0) return;
+        const weights = distributePercentAcrossParts(Array(n).fill(1), sw);
+        weights.forEach((w, i) => {
+            setValue(`rubric.${sectionIdx}.criteria.${i}.weight`, w, { shouldDirty: true });
+        });
+    };
+
     return (
-        <div className="rounded-lg border bg-white p-4 dark:bg-gray-900 dark:border-gray-700 space-y-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5 dark:bg-gray-900 dark:border-gray-700 space-y-4 shadow-sm">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[#6B0000]/90 dark:text-amber-200/90">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#6B0000]/10 text-[#6B0000] text-[11px] tabular-nums">
+                    {sectionNumber}
+                </span>
+                Section {sectionNumber}
+            </div>
             {/* Section header */}
             <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 grid gap-3 md:grid-cols-2">
                     <div>
-                        <Label className="text-xs">Section Name *</Label>
+                        <Label className="text-xs">Section name *</Label>
                         <Input
                             {...register(`rubric.${sectionIdx}.name`)}
                             placeholder="e.g. Correctness"
@@ -2402,6 +2613,41 @@ function RubricSectionEditor({
                             <p className="mt-1 text-xs text-red-600">{errors.rubric[sectionIdx]?.name?.message}</p>
                         )}
                     </div>
+                    {watchRubricMode === 'weighted' && (
+                        <div>
+                            <Label className="text-xs">Section weight (% of total grade) *</Label>
+                            <Controller
+                                control={control}
+                                name={`rubric.${sectionIdx}.weight`}
+                                render={({ field }) => (
+                                    <Input
+                                        type="text"
+                                        inputMode="decimal"
+                                        className="h-9 text-sm"
+                                        value={field.value ?? ''}
+                                        onChange={(e) => {
+                                            const raw = e.target.value.replace('%', '').trim();
+                                            if (!raw) {
+                                                field.onChange('');
+                                                return;
+                                            }
+                                            const parsed = Number.parseFloat(raw);
+                                            field.onChange(Number.isFinite(parsed) ? parsed : raw);
+                                        }}
+                                        onBlur={(e) => {
+                                            const parsed = Number.parseFloat(e.target.value.replace('%', '').trim());
+                                            field.onChange(Number.isFinite(parsed) ? parsed : 0);
+                                            field.onBlur();
+                                        }}
+                                        placeholder="e.g. 40"
+                                    />
+                                )}
+                            />
+                            {errors.rubric?.[sectionIdx]?.weight && (
+                                <p className="mt-1 text-xs text-red-600">{errors.rubric[sectionIdx]?.weight?.message}</p>
+                            )}
+                        </div>
+                    )}
                 </div>
                 <Button
                     type="button"
@@ -2426,20 +2672,85 @@ function RubricSectionEditor({
                 />
             </div>
 
-            {/* Criteria table header */}
-            <div className="mt-4 pt-4 border-t dark:border-gray-700">
-                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Criteria</h4>
+            {/* Grading rows */}
+            <div className="mt-2 pt-4 border-t dark:border-gray-700">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                        <ListChecks className="h-4 w-4 text-[#6B0000] shrink-0" aria-hidden />
+                        <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200">Grading rows</h4>
+                        <span className="text-[11px] font-medium text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full tabular-nums">
+                            {criteriaFields.length} {criteriaFields.length === 1 ? 'row' : 'rows'}
+                        </span>
+                    </div>
+                    {watchRubricMode === 'weighted' && criteriaFields.length > 0 && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-8 text-xs"
+                            onClick={splitSectionWeightAcrossCriteria}
+                        >
+                            Split weights evenly
+                        </Button>
+                    )}
+                </div>
+                <p className="text-xs text-gray-500 mb-3">
+                    Each row is one scored item. Add as many as you need, then set points and (in weighted mode) how much of the section it represents.
+                </p>
+
+                {criteriaFields.length === 0 && (
+                    <div
+                        className="rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-600 bg-gray-50/70 dark:bg-gray-800/40 py-10 px-4 flex flex-col items-center justify-center text-center gap-3 mb-3"
+                        role="status"
+                    >
+                        <p className="text-sm text-gray-600 dark:text-gray-400 max-w-sm">
+                            No grading rows in this section yet. Start with one—you can add more in one click.
+                        </p>
+                        <Button
+                            type="button"
+                            size="lg"
+                            variant="secondary"
+                            className="h-11 px-6 font-medium"
+                            onClick={() => {
+                                if (watchRubricMode === 'weighted') {
+                                    const rubric = getValues('rubric') as AssignmentFormData['rubric'];
+                                    const sec = rubric[sectionIdx];
+                                    const sw = toSectionWeightPercent(sec?.weight);
+                                    appendCriterion({
+                                        name: 'First grading row',
+                                        description: '',
+                                        maxPoints: 10,
+                                        weight: sw,
+                                        gradingMethod: 'manual',
+                                    });
+                                } else {
+                                    appendCriterion({
+                                        name: 'First grading row',
+                                        description: '',
+                                        maxPoints: 10,
+                                        weight: 100,
+                                        gradingMethod: 'manual',
+                                    });
+                                }
+                            }}
+                        >
+                            <PlusCircle className="mr-2 h-5 w-5" />
+                            Add first grading row
+                        </Button>
+                    </div>
+                )}
 
                 {/* Criteria items */}
-                <div className="space-y-3 mb-4">
+                <div className="space-y-3 mb-3">
                     {criteriaFields.map((criterionField, critIdx) => (
                         <div
                             key={criterionField.id}
-                            className="rounded-lg border bg-gray-50 dark:bg-gray-800 p-3 dark:border-gray-700"
+                            className="rounded-lg border border-gray-200 bg-gray-50/90 dark:bg-gray-800/80 p-3 sm:p-4 dark:border-gray-700"
                         >
+                            <p className="text-[11px] font-medium text-gray-500 mb-2">Row {critIdx + 1}</p>
                             <div className="grid gap-3 md:grid-cols-2">
                                 <div>
-                                    <Label className="text-xs">Name *</Label>
+                                    <Label className="text-xs">Row name *</Label>
                                     <Input
                                         {...register(`rubric.${sectionIdx}.criteria.${critIdx}.name`)}
                                         placeholder="e.g. Correctness"
@@ -2480,7 +2791,8 @@ function RubricSectionEditor({
                                                             field.onChange(Number.isFinite(parsed) ? parsed : 0);
                                                             field.onBlur();
                                                         }}
-                                                        placeholder="Criteria Weight %"
+                                                        placeholder="% of section"
+                                                        title="Percent of the assignment this criterion earns within this section (row should add up to the section weight)"
                                                         className="h-8 text-sm w-36"
                                                     />
                                                 )}
@@ -2528,27 +2840,57 @@ function RubricSectionEditor({
                     ))}
                 </div>
 
-                {/* Add criterion button */}
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() =>
-                        appendCriterion({
-                            name: '',
-                            description: '',
-                            maxPoints: 10,
-                            weight: 100,
-                            gradingMethod: 'manual',
-                        })
-                    }
-                    className="h-8 text-sm"
-                >
-                    <Plus className="mr-1 h-3.5 w-3.5" /> Add Criterion
-                </Button>
+                {watchRubricMode === 'weighted' && criteriaFields.length > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-gray-50 px-2 py-1.5 text-xs text-gray-600 dark:bg-gray-800/60 dark:text-gray-400 mb-3">
+                        <span>Criteria weights in this section</span>
+                        <span
+                            className={
+                                Math.abs(criteriaSumInSection - sectionWeightDisplay) <= WEIGHT_SUM_TOLERANCE
+                                    ? 'font-medium text-green-700 dark:text-green-400'
+                                    : 'font-semibold text-amber-800 dark:text-amber-300'
+                            }
+                        >
+                            {criteriaSumInSection.toFixed(1)}% / {sectionWeightDisplay.toFixed(1)}%
+                        </span>
+                    </div>
+                )}
 
-                {criteriaFields.length === 0 && (
-                    <p className="text-xs text-gray-400 italic mt-2">No criteria yet. Click "Add Criterion" to get started.</p>
+                {criteriaFields.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (watchRubricMode === 'weighted') {
+                                const rubric = getValues('rubric') as AssignmentFormData['rubric'];
+                                const sec = rubric[sectionIdx];
+                                const sw = toSectionWeightPercent(sec?.weight);
+                                const prevN = criteriaFields.length;
+                                const n = prevN + 1;
+                                const weights = distributePercentAcrossParts(Array(n).fill(1), sw);
+                                appendCriterion({
+                                    name: `Grading row ${n}`,
+                                    description: '',
+                                    maxPoints: 10,
+                                    weight: weights[n - 1] ?? 0,
+                                    gradingMethod: 'manual',
+                                });
+                                for (let i = 0; i < prevN; i++) {
+                                    setValue(`rubric.${sectionIdx}.criteria.${i}.weight`, weights[i], { shouldDirty: true });
+                                }
+                            } else {
+                                appendCriterion({
+                                    name: `Grading row ${criteriaFields.length + 1}`,
+                                    description: '',
+                                    maxPoints: 10,
+                                    weight: 100,
+                                    gradingMethod: 'manual',
+                                });
+                            }
+                        }}
+                        className="w-full rounded-xl border-2 border-dashed border-[#C9A84C]/50 bg-amber-50/40 hover:bg-amber-50/85 dark:bg-amber-950/20 dark:hover:bg-amber-950/35 py-3 px-4 text-sm font-medium text-[#6B0000] dark:text-amber-200 transition-colors flex items-center justify-center gap-2 min-h-[48px]"
+                    >
+                        <PlusCircle className="h-5 w-5 shrink-0" aria-hidden />
+                        Add another grading row
+                    </button>
                 )}
             </div>
         </div>

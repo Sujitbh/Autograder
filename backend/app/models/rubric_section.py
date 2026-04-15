@@ -9,17 +9,15 @@ class RubricSection(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     assignment_id = Column(Integer, ForeignKey("assignments.id"), nullable=False, index=True)
-    
-    name = Column(String, nullable=False)  # e.g., "Correctness"
-    description = Column(Text, nullable=True)
-    weight = Column(Float, nullable=True, default=1.0)  # Section weight multiplier
-    order = Column(Integer, nullable=True, default=0)  # Display order
 
-    # Timestamps
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    weight = Column(Float, nullable=True, default=1.0)
+    order = Column(Integer, nullable=True, default=0)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    # Relationships
     assignment = relationship("Assignment", back_populates="rubric_sections")
     criteria = relationship("RubricCriterion", back_populates="section", cascade="all, delete-orphan")
 
@@ -29,17 +27,17 @@ class RubricCriterion(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     section_id = Column(Integer, ForeignKey("rubric_sections.id"), nullable=False, index=True)
-    
+
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    weight = Column(Float, nullable=True, default=1.0)  # Criterion weight multiplier
+    weight = Column(Float, nullable=True, default=1.0)
     max_points = Column(Integer, nullable=True, default=10)
-    grading_method = Column(String, nullable=False, default="manual")  # auto, manual, hybrid
-    order = Column(Integer, nullable=True, default=0)  # Display order
+    grading_method = Column(String, nullable=False, default="manual")
+    order = Column(Integer, nullable=True, default=0)
+    # JSON map of grade level → default comment, e.g. {"5":"Excellent","4":"Good",...}
+    default_comments = Column(Text, nullable=True)
 
-    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    # Relationships
     section = relationship("RubricSection", back_populates="criteria")

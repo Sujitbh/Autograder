@@ -6,7 +6,7 @@
    Persists created assignments to the backend API via React Query.
    ═══════════════════════════════════════════════════════════════════ */
 
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { TopNav } from '@/components/TopNav';
 import { PageLayout } from '@/components/PageLayout';
@@ -15,6 +15,10 @@ import { CreateAssignmentForm, type AssignmentFormData } from '@/components/Crea
 import { toast } from 'sonner';
 import { useCreateAssignment } from '@/hooks/queries';
 import type { CreateAssignmentDto } from '@/types';
+import { criterionWeightForAssignmentApi } from '@/lib/rubricApiWeights';
+import { courseService } from '@/services/api/courseService';
+import { courseDefaultApiToFormPartial } from '@/lib/courseDefaultRubric';
+import { Loader2 } from 'lucide-react';
 
 function lookupCourseCode(id: string) {
     try {
@@ -65,18 +69,22 @@ function toDto(data: AssignmentFormData, courseId: string): CreateAssignmentDto 
             isPublic: false,
             points: t.points,
         })),
-        rubric: (data.rubric ?? []).map((section) => ({
-            name: section.name,
-            description: section.description ?? '',
-            weight: section.weight ?? 100,
-            criteria: (section.criteria ?? []).map((criterion) => ({
-                name: criterion.name,
-                description: criterion.description ?? '',
-                maxPoints: criterion.maxPoints,
-                weight: (criterion.weight ?? 100) / 100,
-                gradingMethod: criterion.gradingMethod,
-            })),
-        })),
+        rubric: (data.rubric ?? []).map((section) => {
+            const secW = section.weight ?? 100;
+            return {
+                name: section.name,
+                description: section.description ?? '',
+                weight: secW,
+                criteria: (section.criteria ?? []).map((criterion) => ({
+                    name: criterion.name,
+                    description: criterion.description ?? '',
+                    maxPoints: criterion.maxPoints ?? 5,
+                    weight: criterionWeightForAssignmentApi(data.rubricMode, criterion.weight, secW),
+                    gradingMethod: criterion.gradingMethod,
+                    defaultComments: (criterion as Record<string, unknown>).defaultComments as Record<string, string> | undefined ?? undefined,
+                })),
+            };
+        }),
     };
 }
 
@@ -86,6 +94,28 @@ export function CreateAssignmentPage() {
     const cid = courseId ?? '';
     const courseCode = lookupCourseCode(cid);
     const createMutation = useCreateAssignment();
+    const [defaultRubricReady, setDefaultRubricReady] = useState(false);
+    const [initialData, setInitialData] = useState<Partial<AssignmentFormData>>({});
+
+    useEffect(() => {
+        if (!cid) return;
+        let cancelled = false;
+        setDefaultRubricReady(false);
+        courseService
+            .getCourseDefaultRubric(cid)
+            .then((d) => {
+                if (!cancelled) setInitialData(courseDefaultApiToFormPartial(d));
+            })
+            .catch(() => {
+                if (!cancelled) setInitialData({});
+            })
+            .finally(() => {
+                if (!cancelled) setDefaultRubricReady(true);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [cid]);
 
     const handleSaveDraft = useCallback(
         (data: AssignmentFormData) => {
@@ -146,6 +176,24 @@ export function CreateAssignmentPage() {
         router.push(`/courses/${cid}`);
     }, [cid, router]);
 
+    if (!defaultRubricReady) {
+        return (
+            <PageLayout>
+                <TopNav
+                    breadcrumbs={[
+                        { label: 'Courses', href: '/courses' },
+                        { label: courseCode, href: `/courses/${cid}` },
+                        { label: 'Create Assignment' },
+                    ]}
+                />
+                <div className="flex h-[calc(100vh-64px)] items-center justify-center gap-2 text-gray-600">
+                    <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+                    <span>Loading course rubric…</span>
+                </div>
+            </PageLayout>
+        );
+    }
+
     return (
         <PageLayout>
             <TopNav
@@ -162,6 +210,7 @@ export function CreateAssignmentPage() {
                 <main className="flex-1 overflow-auto p-8">
                     <CreateAssignmentForm
                         courseId={cid}
+                        initialData={initialData}
                         onSaveDraft={handleSaveDraft}
                         onPublish={handlePublish}
                         onCancel={handleCancel}

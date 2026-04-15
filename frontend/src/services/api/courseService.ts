@@ -8,6 +8,7 @@ import type {
     CreateCourseDto,
     UpdateCourseDto,
 } from '@/types';
+import type { CourseDefaultRubricApi, CourseDefaultRubricPutApi } from '@/lib/courseDefaultRubric';
 
 /** Shape returned by the FastAPI backend for a course */
 interface BackendCourse {
@@ -258,6 +259,20 @@ export const courseService = {
                 },
             }
         );
+        return data;
+    },
+
+    /** Course template applied when creating new assignments (instructors / TAs can GET). */
+    async getCourseDefaultRubric(courseId: string): Promise<CourseDefaultRubricApi> {
+        const { data } = await withRetry(() =>
+            api.get<CourseDefaultRubricApi>(`/courses/${courseId}/default-rubric`)
+        );
+        return data;
+    },
+
+    /** Persist course default rubric (instructors only on backend). */
+    async putCourseDefaultRubric(courseId: string, body: CourseDefaultRubricPutApi): Promise<CourseDefaultRubricApi> {
+        const { data } = await api.put<CourseDefaultRubricApi>(`/courses/${courseId}/default-rubric`, body);
         return data;
     },
 };
