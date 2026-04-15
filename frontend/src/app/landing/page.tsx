@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import ModernTechLanding from '@/components/landing/ModernTechLanding';
 
 export const metadata: Metadata = {
-  title: 'Axiom — Elevate Your Code. Simplify Your Grading.',
+  title: 'Axiom | Rigorous assessment for ULM Computer Science',
   description:
-    'ULM’s premier automated grading platform for Computer Science. Fast feedback for students, scalable solutions for faculty.',
+    'Axiom is ULM Computer Science’s grading platform: less weekend busywork, clearer TA alignment, and faculty authority preserved. Built for courses that process serious submission volume.',
 };
 
 export default function LandingPage() {
