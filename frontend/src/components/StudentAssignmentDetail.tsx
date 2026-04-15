@@ -434,6 +434,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
   const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
   const isOverdue = dueDate && dueDate < new Date();
+  const descriptionText = (assignment.description ?? '').trim();
 
   return (
     <PageLayout>
@@ -836,9 +837,11 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                         {isOverdue && ' (Overdue!)'}
                       </div>
                     )}
-                    <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--color-text-mid)', whiteSpace: 'pre-wrap' as const }}>
-                      {assignment.description || 'No description provided.'}
-                    </div>
+                    {(descriptionText || !hasDescriptionPdf) && (
+                      <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--color-text-mid)', whiteSpace: 'pre-wrap' as const }}>
+                        {descriptionText || 'No description provided.'}
+                      </div>
+                    )}
                     {hasDescriptionPdf && (
                       <div style={{ marginTop: 12 }}>
                         <Button
