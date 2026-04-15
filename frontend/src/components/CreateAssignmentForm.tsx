@@ -267,7 +267,7 @@ const rubricCriterionSchema = z.object({
     maxPoints: z.number().min(0, 'Value out of range').max(1000, 'Value out of range'),
     weight: z.number().min(0, 'Weight must be 0 or higher').max(100, 'Weight too large'),
     gradingMethod: z.enum(['auto', 'manual', 'hybrid']),
-    defaultComments: z.record(z.string()).optional(),
+    defaultComments: z.record(z.string(), z.string()).optional(),
 });
 
 const rubricSectionSchema = z.object({
