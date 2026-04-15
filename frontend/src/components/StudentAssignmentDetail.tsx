@@ -16,9 +16,10 @@ import { useAssignmentTestCases } from '@/hooks/queries/useTestCases';
 import { useCodeExecution } from '@/hooks/useCodeExecution';
 import { useTestCaseRunner } from '@/hooks/useTestCaseRunner';
 import { useAuth } from '@/utils/AuthContext';
-import { submissionService } from '@/services/api';
+import { assignmentService, submissionService } from '@/services/api';
 import { normalizeRubricToSections } from '@/utils/rubric';
 import { codeRequiresStdin } from '@/utils/codeInputDetection';
+import { toast } from 'sonner';
 import {
   Play,
   RotateCcw,
@@ -173,6 +174,8 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [hasDescriptionPdf, setHasDescriptionPdf] = useState(false);
+  const [isOpeningDescriptionPdf, setIsOpeningDescriptionPdf] = useState(false);
 
   // Dialogs
   const [stdinValue, setStdinValue] = useState('');
@@ -224,6 +227,22 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
   }, [editorFiles, autoSaveKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadDescriptionPdfStatus = async () => {
+      try {
+        const status = await assignmentService.getDescriptionPdfStatus(assignmentId);
+        if (!cancelled) setHasDescriptionPdf(status.available === true);
+      } catch {
+        if (!cancelled) setHasDescriptionPdf(false);
+      }
+    };
+    loadDescriptionPdfStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentId]);
 
   const course = courses?.find((c) => c.id === courseId);
   const latestSubmission = submissions && submissions.length > 0 ? submissions[0] : null;
@@ -372,6 +391,21 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
       setIsSubmitting(false);
     }
   };
+
+  const handleOpenDescriptionPdf = useCallback(async () => {
+    if (!hasDescriptionPdf || isOpeningDescriptionPdf) return;
+    setIsOpeningDescriptionPdf(true);
+    try {
+      const blob = await assignmentService.getDescriptionPdfBlob(assignmentId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to open assignment PDF.');
+    } finally {
+      setIsOpeningDescriptionPdf(false);
+    }
+  }, [assignmentId, hasDescriptionPdf, isOpeningDescriptionPdf]);
 
   // Loading / error states
   if (assignmentLoading) {
@@ -805,6 +839,20 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                     <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--color-text-mid)', whiteSpace: 'pre-wrap' as const }}>
                       {assignment.description || 'No description provided.'}
                     </div>
+                    {hasDescriptionPdf && (
+                      <div style={{ marginTop: 12 }}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleOpenDescriptionPdf}
+                          disabled={isOpeningDescriptionPdf}
+                          className="h-8 px-3 text-xs"
+                        >
+                          {isOpeningDescriptionPdf && <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />}
+                          Open Original PDF
+                        </Button>
+                      </div>
+                    )}
                     {assignment.maxPoints && (
                       <div style={{
                         display: 'flex', justifyContent: 'space-between', alignItems: 'center',

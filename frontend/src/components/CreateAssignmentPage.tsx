@@ -11,10 +11,15 @@ import { useRouter, useParams } from 'next/navigation';
 import { TopNav } from '@/components/TopNav';
 import { PageLayout } from '@/components/PageLayout';
 import { Sidebar } from '@/components/Sidebar';
-import { CreateAssignmentForm, type AssignmentFormData } from '@/components/CreateAssignmentForm';
+import {
+    CreateAssignmentForm,
+    type AssignmentFormData,
+    type AssignmentSubmitOptions,
+} from '@/components/CreateAssignmentForm';
 import { toast } from 'sonner';
 import { useCreateAssignment } from '@/hooks/queries';
 import type { CreateAssignmentDto } from '@/types';
+import { assignmentService } from '@/services/api';
 
 function lookupCourseCode(id: string) {
     try {
@@ -89,60 +94,75 @@ export function CreateAssignmentPage() {
     const cid = courseId ?? '';
     const courseCode = lookupCourseCode(cid);
     const createMutation = useCreateAssignment();
+    const uploadDescriptionPdfIfProvided = useCallback(
+        async (assignmentId: string, options?: AssignmentSubmitOptions) => {
+            const file = options?.descriptionPdfFile;
+            if (!file) return;
+            try {
+                await assignmentService.uploadDescriptionPdf(assignmentId, file);
+            } catch (err) {
+                const message = err instanceof Error ? err.message : 'Unknown error';
+                toast.error(`Assignment saved, but PDF attachment failed: ${message}`);
+            }
+        },
+        []
+    );
 
     const handleSaveDraft = useCallback(
-        (data: AssignmentFormData) => {
+        async (data: AssignmentFormData, options?: AssignmentSubmitOptions) => {
             const dto = { ...toDto(data, cid), status: 'draft' } as CreateAssignmentDto & { status: string };
-            createMutation.mutate(dto, {
-                onSuccess: () => {
-                    // Clear local draft
-                    try {
-                        localStorage.removeItem(`autograde_assignment_draft_${cid}`);
-                    } catch { /* ignore */ }
-                    toast.success('Assignment saved as draft!');
-                    router.push(`/courses/${cid}`);
-                },
-                onError: (err) => {
-                    // Fallback: save to localStorage if backend fails
-                    try {
-                        localStorage.setItem(
-                            `autograde_assignment_draft_${cid}`,
-                            JSON.stringify(data),
-                        );
-                    } catch { /* ignore */ }
-                    const msg = `Failed to save draft to server: ${err.message}. Saved locally instead.`;
-                    toast.error(msg);
-                    if (typeof window !== 'undefined') {
-                        window.alert(msg);
-                    }
-                },
-            });
+            try {
+                const created = await createMutation.mutateAsync(dto);
+                await uploadDescriptionPdfIfProvided(created.id, options);
+
+                // Clear local draft
+                try {
+                    localStorage.removeItem(`autograde_assignment_draft_${cid}`);
+                } catch { /* ignore */ }
+                toast.success('Assignment saved as draft!');
+                router.push(`/courses/${cid}`);
+            } catch (err) {
+                // Fallback: save to localStorage if backend fails
+                try {
+                    localStorage.setItem(
+                        `autograde_assignment_draft_${cid}`,
+                        JSON.stringify(data),
+                    );
+                } catch { /* ignore */ }
+                const message = err instanceof Error ? err.message : 'Unknown error';
+                const msg = `Failed to save draft to server: ${message}. Saved locally instead.`;
+                toast.error(msg);
+                if (typeof window !== 'undefined') {
+                    window.alert(msg);
+                }
+            }
         },
-        [cid, createMutation, router]
+        [cid, createMutation, router, uploadDescriptionPdfIfProvided]
     );
 
     const handlePublish = useCallback(
-        (data: AssignmentFormData) => {
+        async (data: AssignmentFormData, options?: AssignmentSubmitOptions) => {
             const dto = toDto(data, cid);
-            createMutation.mutate(dto, {
-                onSuccess: () => {
-                    // Clear draft
-                    try {
-                        localStorage.removeItem(`autograde_assignment_draft_${cid}`);
-                    } catch { /* ignore */ }
-                    toast.success('Assignment published!');
-                    router.push(`/courses/${cid}`);
-                },
-                onError: (err) => {
-                    const msg = `Failed to create assignment: ${err.message}`;
-                    toast.error(msg);
-                    if (typeof window !== 'undefined') {
-                        window.alert(msg);
-                    }
-                },
-            });
+            try {
+                const created = await createMutation.mutateAsync(dto);
+                await uploadDescriptionPdfIfProvided(created.id, options);
+
+                // Clear draft
+                try {
+                    localStorage.removeItem(`autograde_assignment_draft_${cid}`);
+                } catch { /* ignore */ }
+                toast.success('Assignment published!');
+                router.push(`/courses/${cid}`);
+            } catch (err) {
+                const message = err instanceof Error ? err.message : 'Unknown error';
+                const msg = `Failed to create assignment: ${message}`;
+                toast.error(msg);
+                if (typeof window !== 'undefined') {
+                    window.alert(msg);
+                }
+            }
         },
-        [cid, router, createMutation]
+        [cid, router, createMutation, uploadDescriptionPdfIfProvided]
     );
 
     const handleCancel = useCallback(() => {

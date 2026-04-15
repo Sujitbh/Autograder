@@ -117,6 +117,29 @@ export const assignmentService = {
         return mapAssignment(data);
     },
 
+    /** Attach an original PDF file for assignment description rendering. */
+    async uploadDescriptionPdf(assignmentId: string, file: File): Promise<void> {
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+        await api.post(`/assignments/${assignmentId}/description-pdf`, formData);
+    },
+
+    /** Check whether an assignment has an uploaded description PDF. */
+    async getDescriptionPdfStatus(assignmentId: string): Promise<{ available: boolean }> {
+        const { data } = await withRetry(() =>
+            api.get<{ available: boolean }>(`/assignments/${assignmentId}/description-pdf/status`)
+        );
+        return data;
+    },
+
+    /** Fetch the original assignment description PDF as a Blob. */
+    async getDescriptionPdfBlob(assignmentId: string): Promise<Blob> {
+        const { data } = await withRetry(() =>
+            api.get<Blob>(`/assignments/${assignmentId}/description-pdf`, { responseType: 'blob' })
+        );
+        return data;
+    },
+
     /** Create a new assignment (draft or published). */
     async createAssignment(dto: CreateAssignmentDto & { status?: string }): Promise<Assignment> {
         const payload: Record<string, unknown> = {
