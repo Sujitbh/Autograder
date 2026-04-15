@@ -440,10 +440,6 @@ export function CreateAssignmentForm({
             setCurrentStep(0);
             return;
         }
-        if (!values.description) {
-            setCurrentStep(1);
-            return;
-        }
         if (!values.starterCode) {
             setCurrentStep(2);
             return;
@@ -715,50 +711,25 @@ export function CreateAssignmentForm({
 
     const descFileInputRef = useRef<HTMLInputElement>(null);
     const [descFileLoading, setDescFileLoading] = useState(false);
-    const [descPdfImages, setDescPdfImages] = useState<string[]>([]);
     const [descriptionPdfFile, setDescriptionPdfFile] = useState<File | null>(null);
+    const [descriptionPdfName, setDescriptionPdfName] = useState<string | null>(null);
 
     const handleDescriptionFileUpload = async (file: File) => {
         setDescFileLoading(true);
         try {
             if (file.name.endsWith('.pdf') || file.type === 'application/pdf') {
-                const arrayBuffer = await file.arrayBuffer();
-                const pdfjsLib = await import('pdfjs-dist');
-                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
-                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                const pageImages: string[] = [];
-                let text = '';
-                for (let i = 1; i <= pdf.numPages; i++) {
-                    const page = await pdf.getPage(i);
-                    // Render page to canvas at 2× scale for crisp display
-                    const viewport = page.getViewport({ scale: 2 });
-                    const canvas = document.createElement('canvas');
-                    canvas.width = viewport.width;
-                    canvas.height = viewport.height;
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                        await page.render({ canvasContext: ctx, viewport }).promise;
-                        pageImages.push(canvas.toDataURL('image/png'));
-                    }
-                    // Also extract plain text for backend storage
-                    const content = await page.getTextContent();
-                    text += content.items
-                        .filter((item) => 'str' in item)
-                        .map((item) => (item as { str: string }).str)
-                        .join(' ') + '\n\n';
-                }
-                setDescPdfImages(pageImages);
-                setValue('description', text.trim(), { shouldDirty: true });
                 setDescriptionPdfFile(file);
+                setDescriptionPdfName(file.name);
             } else {
                 const text = await file.text();
-                setDescPdfImages([]);
                 setValue('description', text, { shouldDirty: true });
                 setDescriptionPdfFile(null);
+                setDescriptionPdfName(null);
             }
         } catch (err) {
             console.error('Description file read error', err);
             setDescriptionPdfFile(null);
+            setDescriptionPdfName(null);
         } finally {
             setDescFileLoading(false);
             if (descFileInputRef.current) descFileInputRef.current.value = '';
@@ -1207,31 +1178,34 @@ export function CreateAssignmentForm({
                             />
                         </div>
                     </div>
-                    {descPdfImages.length > 0 ? (
-                        <div className="rounded-lg border dark:border-gray-700 overflow-auto max-h-[600px] bg-[var(--color-surface)] dark:bg-gray-950 p-4 space-y-3">
-                            {descPdfImages.map((src, i) => (
-                                <img
-                                    key={i}
-                                    src={src}
-                                    alt={`Page ${i + 1}`}
-                                    className="w-full rounded shadow-sm border dark:border-gray-700"
-                                    style={{ imageRendering: 'auto' }}
-                                />
-                            ))}
+                    <Textarea
+                        id="description"
+                        {...register('description')}
+                        rows={14}
+                        placeholder="Provide detailed assignment instructions, requirements, and examples..."
+                        className="font-mono text-sm"
+                    />
+                    {descriptionPdfName && (
+                        <div className="mt-2 flex items-center justify-between rounded-md border px-3 py-2 text-xs text-[var(--color-text-mid)] dark:border-gray-700">
+                            <span>Attached PDF: {descriptionPdfName}</span>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => {
+                                    setDescriptionPdfFile(null);
+                                    setDescriptionPdfName(null);
+                                }}
+                            >
+                                Remove PDF
+                            </Button>
                         </div>
-                    ) : (
-                        <Textarea
-                            id="description"
-                            {...register('description')}
-                            rows={14}
-                            placeholder="Provide detailed assignment instructions, requirements, and examples..."
-                            className="font-mono text-sm"
-                        />
                     )}
                     <p className="mt-1 text-xs text-[var(--color-text-light)]">
-                        {descPdfImages.length > 0
-                            ? `${descPdfImages.length} page${descPdfImages.length !== 1 ? 's' : ''} rendered from PDF — exact fonts and formatting preserved.`
-                            : 'Supports Markdown formatting. Upload a .txt, .md, or .pdf file to auto-fill.'}
+                        {descriptionPdfName
+                            ? 'Students will see an Open Original PDF button in the Description tab.'
+                            : 'Supports Markdown formatting. Upload .txt/.md to auto-fill text, or .pdf to attach the original document.'}
                     </p>
                 </div>
             </div>
