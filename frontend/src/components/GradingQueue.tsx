@@ -170,15 +170,14 @@ export function GradingQueue() {
 
     const tabs = [
         { id: 'all', label: 'All', count: scopedSubmissions.length },
-        { id: 'pending', label: 'Pending', count: scopedSubmissions.filter(s => s.latest.status === 'pending').length },
-        { id: 'in-review', label: 'In Review', count: scopedSubmissions.filter(s => s.latest.status === 'in-review').length },
-        { id: 'resubmitted', label: 'Resubmitted', count: scopedSubmissions.filter(s => s.latest.status === 'resubmitted').length },
+        { id: 'to-grade', label: 'To Grade', count: scopedSubmissions.filter(s => s.latest.status !== 'graded').length },
         { id: 'graded', label: 'Graded', count: scopedSubmissions.filter(s => s.latest.status === 'graded').length },
     ];
 
     const filteredSubmissions = scopedSubmissions
         .filter(s => {
-            if (activeTab !== 'all' && s.latest.status !== activeTab) return false;
+            if (activeTab === 'to-grade' && s.latest.status === 'graded') return false;
+            if (activeTab === 'graded' && s.latest.status !== 'graded') return false;
             if (assignmentFilter !== 'all' && s.assignmentName !== assignmentFilter) return false;
             return true;
         })

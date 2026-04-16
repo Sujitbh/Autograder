@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import type { AxiosError } from 'axios';
@@ -29,6 +29,7 @@ import {
     Play,
     Zap,
     ScanSearch,
+    Search,
 } from 'lucide-react';
 
 interface FacultyGradingPageProps {
@@ -125,12 +126,13 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const [expandedTests, setExpandedTests] = useState<Set<number>>(new Set());
     const [showExplorer, setShowExplorer] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
-    const [infoPanelWidth, setInfoPanelWidth] = useState(380);
+    const [infoPanelWidth, setInfoPanelWidth] = useState(340);
     const [outputOpen, setOutputOpen] = useState(false);
     const [outputPanelHeight, setOutputPanelHeight] = useState(280);
     const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading' | 'rubric' | 'integrity'>('grading');
     const [stdinValue, setStdinValue] = useState('');
     const [showInlineInput, setShowInlineInput] = useState(false);
+    const [studentSearch, setStudentSearch] = useState('');
     const [autoGradeResult, setAutoGradeResult] = useState<any>(null);
     const [liveTestResults, setLiveTestResults] = useState<any[] | null>(null);
     /** Full plagiarism scan result after instructor clicks "Run plagiarism scan". */
@@ -317,9 +319,34 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         } catch (e) { /* handled by mutation state */ }
     }, [rubrics, autoGradeMutation, distributeScoreAcrossRubrics]);
 
-    const sortedAssignmentSubmissions = [...assignmentSubmissions].sort(
-        (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+    const sortedAssignmentSubmissions = useMemo(
+        () => [...assignmentSubmissions].sort(
+            (a, b) => new Date(b.submittedAt ?? 0).getTime() - new Date(a.submittedAt ?? 0).getTime()
+        ),
+        [assignmentSubmissions]
     );
+
+    const studentLatestSubmissions = useMemo(() => {
+        const latestByStudent = new Map<string, any>();
+        sortedAssignmentSubmissions.forEach((submission: any) => {
+            const key = String(submission.studentId ?? submission.id);
+            if (!latestByStudent.has(key)) {
+                latestByStudent.set(key, submission);
+            }
+        });
+        return Array.from(latestByStudent.values()).sort((a: any, b: any) =>
+            String(a.studentName ?? '').localeCompare(String(b.studentName ?? ''))
+        );
+    }, [sortedAssignmentSubmissions]);
+
+    const visibleStudentRows = useMemo(() => {
+        const q = studentSearch.trim().toLowerCase();
+        if (!q) return studentLatestSubmissions;
+        return studentLatestSubmissions.filter((s: any) =>
+            `${s.studentName ?? ''} ${s.studentEmail ?? ''} ${s.studentId ?? ''}`.toLowerCase().includes(q)
+        );
+    }, [studentLatestSubmissions, studentSearch]);
+
     const currentSubmissionIndex = sortedAssignmentSubmissions.findIndex((s) => s.id === submissionId);
     const nextSubmissionId =
         currentSubmissionIndex >= 0 && currentSubmissionIndex < sortedAssignmentSubmissions.length - 1
@@ -504,39 +531,140 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
                     {/* ── LEFT: File Explorer ── */}
                     {showExplorer && (
-                        <div className="flex flex-col shrink-0 overflow-hidden"
-                            style={{ width: 220, minWidth: 220, background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)' }}>
-                            <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
-                                Explorer
-                            </div>
-                            <div className="flex-1 overflow-y-auto" style={{ padding: '4px 0' }}>
-                                {detail.files.map((file, idx) => {
-                                    const isActive = idx === activeFileIndex;
-                                    return (
-                                        <div key={file.id} onClick={() => setActiveFileIndex(idx)}
+                        <div className="flex shrink-0 overflow-hidden" style={{ borderRight: '1px solid var(--color-border)' }}>
+                            <div
+                                className="flex flex-col overflow-hidden"
+                                style={{ width: 220, minWidth: 220, background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)' }}
+                            >
+                                <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
+                                    Students
+                                </div>
+                                <div style={{ padding: '0 10px 10px', borderBottom: '1px solid var(--color-border)' }}>
+                                    <div style={{ fontSize: 10, color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
+                                        Roster ({studentLatestSubmissions.length})
+                                    </div>
+                                    <div style={{ position: 'relative', marginBottom: 8 }}>
+                                        <Search style={{ width: 13, height: 13, position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
+                                        <input
+                                            type="text"
+                                            value={studentSearch}
+                                            onChange={(e) => setStudentSearch(e.target.value)}
+                                            placeholder="Find student..."
                                             style={{
-                                                display: 'flex', alignItems: 'center', padding: '5px 14px', cursor: 'pointer',
-                                                fontSize: 13, color: isActive ? 'var(--color-text-dark)' : 'var(--color-text-mid)',
-                                                borderLeft: isActive ? '3px solid var(--color-primary)' : '3px solid transparent',
-                                                background: isActive ? 'var(--color-surface-elevated)' : 'transparent',
-                                                gap: 6, transition: 'background .15s',
+                                                width: '100%',
+                                                padding: '6px 8px 6px 28px',
+                                                borderRadius: 6,
+                                                border: '1px solid var(--color-border)',
+                                                fontSize: 12,
+                                                outline: 'none',
+                                                background: 'var(--color-surface-elevated)',
+                                                color: 'var(--color-text-dark)',
                                             }}
-                                            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
-                                            onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
-                                        >
-                                            <span style={{ fontSize: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', width: 16, height: 16 }}>{getFileIcon(file.filename)}</span>
-                                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{file.filename}</span>
-                                        </div>
-                                    );
-                                })}
+                                        />
+                                    </div>
+                                    <div style={{ maxHeight: 520, overflowY: 'auto', paddingRight: 2 }}>
+                                        {visibleStudentRows.length === 0 ? (
+                                            <p style={{ fontSize: 11, color: 'var(--color-text-light)', padding: '4px 2px' }}>No student found.</p>
+                                        ) : (
+                                            visibleStudentRows.map((s: any) => {
+                                                const isCurrent = String(s.id) === String(submissionId);
+                                                const isGraded = s.status === 'graded';
+                                                return (
+                                                    <button
+                                                        key={s.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (!isCurrent) {
+                                                                router.push(`/courses/${courseId}/submissions/${s.id}/grade`);
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            width: '100%',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'space-between',
+                                                            gap: 8,
+                                                            padding: '7px 8px',
+                                                            borderRadius: 7,
+                                                            border: isCurrent ? '1px solid var(--color-primary)' : '1px solid transparent',
+                                                            background: isCurrent ? 'var(--color-primary-bg)' : 'transparent',
+                                                            cursor: isCurrent ? 'default' : 'pointer',
+                                                            marginBottom: 2,
+                                                            textAlign: 'left',
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            if (!isCurrent) e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            if (!isCurrent) e.currentTarget.style.background = 'transparent';
+                                                        }}
+                                                    >
+                                                        <div style={{ minWidth: 0 }}>
+                                                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-dark)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                {s.studentName || `Student ${s.studentId ?? ''}`}
+                                                            </div>
+                                                            <div style={{ fontSize: 10.5, color: 'var(--color-text-light)' }}>
+                                                                {isGraded
+                                                                    ? `Graded${s.grade ? ` · ${s.grade.totalScore}/${s.grade.maxScore}` : ''}`
+                                                                    : 'Needs grading'}
+                                                            </div>
+                                                        </div>
+                                                        <span
+                                                            style={{
+                                                                width: 7,
+                                                                height: 7,
+                                                                borderRadius: '50%',
+                                                                flexShrink: 0,
+                                                                background: isGraded ? '#16a34a' : '#f59e0b',
+                                                            }}
+                                                        />
+                                                    </button>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
+                                <div style={{ padding: '8px 10px', borderTop: '1px solid var(--color-border)', marginTop: 'auto' }}>
+                                    <button onClick={() => router.push(`/courses/${courseId}/assignments/${detail.assignment.id}/grading`)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--color-text-mid)', background: 'transparent', border: 'none', cursor: 'pointer', width: '100%', transition: 'background .15s' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-elevated)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                        <ArrowLeft style={{ width: 15, height: 15 }} /> Back to Grading
+                                    </button>
+                                </div>
                             </div>
-                            <div style={{ padding: '8px 10px', borderTop: '1px solid var(--color-border)' }}>
-                                <button onClick={() => router.push(`/courses/${courseId}/assignments/${detail.assignment.id}/grading`)}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--color-text-mid)', background: 'transparent', border: 'none', cursor: 'pointer', width: '100%', transition: 'background .15s' }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-elevated)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                    <ArrowLeft style={{ width: 15, height: 15 }} /> Back to Grading
-                                </button>
+
+                            <div
+                                className="flex flex-col overflow-hidden"
+                                style={{ width: 180, minWidth: 180, background: 'var(--color-surface)' }}
+                            >
+                                <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
+                                    Explorer
+                                </div>
+                                <div style={{ padding: '8px 14px 6px', fontSize: 10, fontWeight: 700, letterSpacing: '.06em', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
+                                    Files
+                                </div>
+                                <div className="flex-1 overflow-y-auto" style={{ padding: '4px 0' }}>
+                                    {detail.files.map((file, idx) => {
+                                        const isActive = idx === activeFileIndex;
+                                        return (
+                                            <div key={file.id} onClick={() => setActiveFileIndex(idx)}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', padding: '5px 14px', cursor: 'pointer',
+                                                    fontSize: 13, color: isActive ? 'var(--color-text-dark)' : 'var(--color-text-mid)',
+                                                    borderLeft: isActive ? '3px solid var(--color-primary)' : '3px solid transparent',
+                                                    background: isActive ? 'var(--color-surface-elevated)' : 'transparent',
+                                                    gap: 6, transition: 'background .15s',
+                                                }}
+                                                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
+                                                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                                            >
+                                                <span style={{ fontSize: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', width: 16, height: 16 }}>{getFileIcon(file.filename)}</span>
+                                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{file.filename}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
                     )}
@@ -544,20 +672,20 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                     {/* ── CENTER: Editor ── */}
                     <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
                         {/* Editor Topbar */}
-                        <div style={{ height: 38, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, flexShrink: 0 }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                        <div style={{ height: 42, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 8, flexShrink: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden' }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-dark)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>
                                 {activeFile?.filename ?? 'No file open'}
                             </span>
                             <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#3b1a1a' : '#fef3c7', color: isDark ? '#fca5a5' : '#92400e', display: 'inline-flex', alignItems: 'center' }}>
                                 {language.charAt(0).toUpperCase() + language.slice(1)}
                             </span>
-                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#d1d5db' : '#374151', display: 'inline-flex', alignItems: 'center' }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '4px 10px', borderRadius: 10, background: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#d1d5db' : '#374151', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap', lineHeight: 1, minWidth: 68, flexShrink: 0 }}>
                                 View Only
                             </span>
                             <div style={{ flex: 1 }} />
                             {/* Run Code */}
                             <button onClick={handleRunCode} disabled={isExecutingCode || autoGradeMutation.isPending}
-                                style={{ padding: '5px 16px', borderRadius: 5, fontSize: 12, fontWeight: 700, background: '#16a34a', color: '#fff', letterSpacing: '.3px', transition: 'background .15s', opacity: isExecutingCode ? 0.7 : 1, cursor: isExecutingCode ? 'not-allowed' : 'pointer', border: 'none' }}
+                                style={{ padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: '#16a34a', color: '#fff', letterSpacing: '.3px', transition: 'background .15s', opacity: isExecutingCode ? 0.7 : 1, cursor: isExecutingCode ? 'not-allowed' : 'pointer', border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap', lineHeight: 1.1 }}
                                 onMouseEnter={e => { if (!isExecutingCode) { e.currentTarget.style.background = '#15803d'; } }}
                                 onMouseLeave={e => { e.currentTarget.style.background = '#16a34a'; }}>
                                 {isExecutingCode ? '⏳ Running...' : '▶ Run Code'}
@@ -566,25 +694,26 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                 onClick={handleOpenInlineInput}
                                 disabled={isExecutingCode || autoGradeMutation.isPending}
                                 style={{
-                                    padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                                    padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700,
                                     background: 'var(--color-surface-elevated)', color: 'var(--color-text-dark)', letterSpacing: '.3px',
                                     transition: 'background .15s', opacity: isExecutingCode ? 0.7 : 1,
-                                    cursor: isExecutingCode ? 'not-allowed' : 'pointer', border: '1px solid var(--color-border)'
+                                    cursor: isExecutingCode ? 'not-allowed' : 'pointer', border: '1px solid var(--color-border)',
+                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap', lineHeight: 1.1
                                 }}
                                 onMouseEnter={e => { if (!isExecutingCode) e.currentTarget.style.background = 'var(--color-border)'; }}
                                 onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
                             >
                                 ⌨ Input
                             </button>
-                            <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 6px' }} />
+                            <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 4px' }} />
                             {/* Auto Grade */}
                             <button onClick={handleAutoGrade} disabled={autoGradeMutation.isPending}
-                                style={{ padding: '5px 16px', borderRadius: 5, fontSize: 12, fontWeight: 700, background: isDark ? '#7f1d1d' : '#991b1b', color: '#fff', letterSpacing: '.3px', transition: 'all .15s', opacity: autoGradeMutation.isPending ? 0.7 : 1, cursor: autoGradeMutation.isPending ? 'not-allowed' : 'pointer', border: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
+                                style={{ padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: isDark ? '#7f1d1d' : '#991b1b', color: '#fff', letterSpacing: '.3px', transition: 'all .15s', opacity: autoGradeMutation.isPending ? 0.7 : 1, cursor: autoGradeMutation.isPending ? 'not-allowed' : 'pointer', border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap', lineHeight: 1.1 }}
                                 onMouseEnter={e => { if (!autoGradeMutation.isPending) e.currentTarget.style.background = '#b91c1c'; }}
                                 onMouseLeave={e => { e.currentTarget.style.background = isDark ? '#7f1d1d' : '#991b1b'; }}>
                                 {autoGradeMutation.isPending ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Grading...</> : <><Zap style={{ width: 14, height: 14 }} /> Auto Grade</>}
                             </button>
-                            <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 6px' }} />
+                            <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 4px' }} />
                             {/* Layout toggles */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 {[
@@ -660,7 +789,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                     const startX = e.clientX;
                                     const startWidth = infoPanelWidth;
                                     const onMove = (ev: MouseEvent) => {
-                                        const next = Math.max(300, Math.min(760, startWidth + (startX - ev.clientX)));
+                                        const next = Math.max(280, Math.min(620, startWidth + (startX - ev.clientX)));
                                         setInfoPanelWidth(next);
                                     };
                                     const onUp = () => {
@@ -683,7 +812,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                 }}
                             />
                             {/* Tabs */}
-                            <div style={{ display: 'flex', padding: '8px 10px 0', gap: 4, flexShrink: 0 }}>
+                            <div style={{ display: 'flex', padding: '8px 10px 0', gap: 4, flexShrink: 0, overflowX: 'auto', overflowY: 'hidden' }}>
                                 {(['desc', 'tests', 'grading', 'rubric', 'integrity'] as const).map(tab => (
                                     <button key={tab} onClick={() => setInfoTab(tab)}
                                         style={{ padding: '6px 12px', borderRadius: 16, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' as const, transition: 'all .2s', background: infoTab === tab ? '#7f1d1d' : 'transparent', color: infoTab === tab ? '#fff' : 'var(--color-text-light)', border: 'none', cursor: 'pointer' }}

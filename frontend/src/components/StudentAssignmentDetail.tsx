@@ -698,17 +698,41 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                   window.addEventListener('mousemove', onMove);
                   window.addEventListener('mouseup', onUp);
                 }}
-                style={{ height: 5, cursor: 'ns-resize', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-surface-elevated)' }}
+                style={{
+                  height: 7,
+                  cursor: 'ns-resize',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'linear-gradient(180deg, var(--color-surface) 0%, var(--color-surface-elevated) 100%)',
+                }}
               >
-                <div style={{ width: 28, height: 3, borderRadius: 2, background: 'var(--color-border)' }} />
+                <div style={{ width: 40, height: 3, borderRadius: 999, background: 'var(--color-border)' }} />
               </div>
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '6px 14px', background: 'var(--color-surface-elevated)',
+                padding: '7px 14px', background: 'var(--color-surface-elevated)',
                 borderBottom: '1px solid var(--color-border)',
                 fontSize: 11, fontWeight: 600, color: 'var(--color-text-light)', flexShrink: 0,
               }}>
-                <span>⬤ OUTPUT</span>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '3px 8px',
+                    borderRadius: 999,
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-text-mid)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '.04em',
+                  }}
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--color-primary)' }} />
+                  Output
+                </span>
                 <button
                   onClick={() => setOutputOpen(false)}
                   style={{
@@ -1207,21 +1231,38 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
         {/* ═══ STATUS BAR (matching codelab) ═══ */}
         <div style={{
-          height: 28, background: '#7f1d1d', color: '#fff',
+          minHeight: 32,
+          background: 'var(--color-surface)',
+          color: 'var(--color-text-mid)',
+          borderTop: '1px solid var(--color-border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 12px', fontSize: 11, fontWeight: 500, flexShrink: 0,
+          padding: '6px 12px',
+          fontSize: 11,
+          fontWeight: 600,
+          flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: .9 }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-primary)',
+              }}
+            >
               {language.charAt(0).toUpperCase() + language.slice(1)}
             </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: .9 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: .95 }}>
               {editorFiles.length} file{editorFiles.length !== 1 ? 's' : ''} open
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {lastSaved && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: .9 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: .95, color: 'var(--color-text-light)' }}>
                 ✓ Saved at {lastSaved}
               </span>
             )}

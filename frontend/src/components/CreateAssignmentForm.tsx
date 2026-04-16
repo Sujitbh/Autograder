@@ -49,7 +49,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { Slider } from '@/components/ui/slider';
 import {
     Select,
     SelectContent,
@@ -302,11 +301,7 @@ const formSchema = z.object({
     allowResubmission: z.boolean(),
     showResultsToStudents: z.boolean(),
     enableGitSubmission: z.boolean(),
-    // AI & Plagiarism
-    plagiarismEnabled: z.boolean(),
-    plagiarismSensitivity: z.number().min(0).max(100),
-    aiDetectionEnabled: z.boolean(),
-    aiDetectionSensitivity: z.number().min(0).max(100),
+    // Integrity review
     autoFlagEnabled: z.boolean(),
     autoFlagThreshold: z.number().min(10).max(100),
     crossSectionComparison: z.boolean(),
@@ -336,6 +331,7 @@ interface CreateAssignmentFormProps {
     onPublish: (data: AssignmentFormData) => void;
     onCancel: () => void;
     initialData?: Partial<AssignmentFormData>;
+    initialStep?: number;
 }
 
 interface RubricSectionEditorProps {
@@ -352,10 +348,12 @@ interface RubricSectionEditorProps {
 
 // ── Helper ──────────────────────────────────────────────────────────
 
-function getSensitivityLabel(v: number) {
-    if (v < 33) return 'Low';
-    if (v < 67) return 'Medium';
-    return 'High';
+function getDefaultDueDateTimeLocal(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}T23:59`;
 }
 
 // ── Component ───────────────────────────────────────────────────────
@@ -366,8 +364,9 @@ export function CreateAssignmentForm({
     onPublish,
     onCancel,
     initialData,
+    initialStep = 0,
 }: CreateAssignmentFormProps) {
-    const [currentStep, setCurrentStep] = useState(0);
+    const [currentStep, setCurrentStep] = useState(() => Math.max(0, Math.min(STEPS.length - 1, initialStep)));
     const [showSaveRubricDialog, setShowSaveRubricDialog] = useState(false);
     const [rubricTemplateName, setRubricTemplateName] = useState('');
     const [rubricSaveSuccess, setRubricSaveSuccess] = useState(false);
@@ -386,13 +385,17 @@ export function CreateAssignmentForm({
         [savedTemplates]
     );
 
+    useEffect(() => {
+        setCurrentStep(Math.max(0, Math.min(STEPS.length - 1, initialStep)));
+    }, [initialStep]);
+
     const defaultValues: AssignmentFormData = useMemo(
         () => ({
             name: '',
             shortName: '',
             language: 'python' as const,
             category: 'Homework' as const,
-            dueDate: '',
+            dueDate: getDefaultDueDateTimeLocal(),
             maxPoints: 100,
             isGroup: false,
             description: '',
@@ -409,11 +412,7 @@ export function CreateAssignmentForm({
             allowResubmission: true,
             showResultsToStudents: true,
             enableGitSubmission: false,
-            // AI / Plagiarism
-            plagiarismEnabled: true,
-            plagiarismSensitivity: 50,
-            aiDetectionEnabled: true,
-            aiDetectionSensitivity: 50,
+            // Integrity review
             autoFlagEnabled: true,
             autoFlagThreshold: 70,
             crossSectionComparison: false,
@@ -459,8 +458,6 @@ export function CreateAssignmentForm({
         replace: replaceRubric,
     } = useFieldArray({ control, name: 'rubric' });
 
-    const watchPlagiarism = watch('plagiarismEnabled');
-    const watchAiDetection = watch('aiDetectionEnabled');
     const watchAutoFlag = watch('autoFlagEnabled');
     const watchLanguage = watch('language');
     const watchRubricMode = watch('rubricMode');
@@ -505,6 +502,15 @@ export function CreateAssignmentForm({
         }
     }, [watchRubricMode, getValues, setValue]);
 
+    // Keep allowed file type aligned with selected language.
+    useEffect(() => {
+        const expected = watchLanguage === 'java' ? '.java' : '.py';
+        const current = (getValues('allowedFileTypes') || '').trim();
+        if (current !== expected) {
+            setValue('allowedFileTypes', expected, { shouldDirty: false });
+        }
+    }, [watchLanguage, getValues, setValue]);
+
     // ── Auto-save to localStorage every 30 seconds ────────────────
 
     useEffect(() => {
@@ -540,7 +546,7 @@ export function CreateAssignmentForm({
         ['privateTests'],
         ['rubric'],
         ['maxAttempts', 'allowedFileTypes', 'maxFileSizeMB', 'gradingStrategy'],
-        ['plagiarismSensitivity', 'aiDetectionSensitivity'],
+        [],
         [], // review step — no fields
     ];
 
@@ -1293,8 +1299,8 @@ export function CreateAssignmentForm({
                                 <Select value={field.value} onValueChange={field.onChange}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="python">Python 3.10</SelectItem>
-                                        <SelectItem value="java">Java 17</SelectItem>
+                                        <SelectItem value="python">Python</SelectItem>
+                                        <SelectItem value="java">Java</SelectItem>
                                     </SelectContent>
                                 </Select>
                             )}
@@ -1473,7 +1479,7 @@ export function CreateAssignmentForm({
         ] as const;
 
         return (
-            <div className="space-y-4">
+            <div className="space-y-5">
                 <div className="flex items-center justify-between">
                     <div>
                         <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -1487,7 +1493,7 @@ export function CreateAssignmentForm({
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold" style={{
+                        <span className="px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm" style={{
                             backgroundColor: isPrivate ? '#FFF8E1' : '#EFF6FF',
                             color: isPrivate ? '#8A5700' : '#1976D2',
                         }}>
@@ -1498,16 +1504,17 @@ export function CreateAssignmentForm({
                             size="sm"
                             variant="outline"
                             onClick={() =>
-                                append({ name: `${isPrivate ? 'Private' : 'Public'} Test ${fields.length + 1}`, inputType: 'text', input: '', expectedOutput: '', points: 10 })
+                                append({ name: `${isPrivate ? 'Private' : 'Public'} Test ${fields.length + 1}`, inputType: 'text', input: '', expectedOutput: '', points: 1 })
                             }
+                            className="h-11 px-5 rounded-2xl text-[15px] font-medium tracking-tight border-[#D9C9C9] hover:border-[#6B0000] hover:bg-[#FFF8F8]"
                         >
-                            <Plus className="mr-1 h-3.5 w-3.5" /> Add Test
+                            <Plus className="mr-1.5 h-4 w-4" /> Add Test
                         </Button>
                     </div>
                 </div>
 
                 {fields.length === 0 && (
-                    <div className="rounded-lg border border-dashed p-8 text-center text-sm text-gray-400">
+                    <div className="rounded-xl border-2 border-dashed border-[#DCCFCF] bg-gradient-to-br from-[#FCFAFA] to-[#F8F3F3] p-10 text-center text-[16px] text-gray-400">
                         No test cases yet. Click &quot;Add Test&quot; to get started.
                     </div>
                 )}
@@ -1515,8 +1522,7 @@ export function CreateAssignmentForm({
                 {fields.map((field, idx) => (
                     <div
                         key={field.id}
-                        className="relative rounded-lg border bg-white p-4 dark:bg-gray-900 dark:border-gray-700"
-                        style={{ backgroundColor: isPrivate ? '#FFFDF5' : undefined }}
+                        className="relative rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FCF8F8] p-5 shadow-sm dark:bg-gray-900 dark:border-gray-700"
                     >
                         <div className="absolute right-2 top-2">
                             <Button
@@ -1532,7 +1538,7 @@ export function CreateAssignmentForm({
                         </div>
 
                         <div className="grid gap-3 md:grid-cols-2">
-                            {/* Header row: label, name, points */}
+                            {/* Header row: label + name */}
                             <div className="md:col-span-2 flex items-center gap-2">
                                 <GripVertical className="h-4 w-4 text-gray-300" />
                                 <span className="text-xs font-semibold text-gray-500">
@@ -1541,13 +1547,7 @@ export function CreateAssignmentForm({
                                 <Input
                                     {...register(`${prefix}.${idx}.name`)}
                                     placeholder="Test name"
-                                    className="max-w-xs text-sm"
-                                />
-                                <Input
-                                    type="number"
-                                    {...register(`${prefix}.${idx}.points`, { valueAsNumber: true })}
-                                    className="w-20 text-sm"
-                                    placeholder="pts"
+                                    className="max-w-sm h-10 text-sm"
                                 />
                             </div>
 
@@ -1627,17 +1627,6 @@ export function CreateAssignmentForm({
                     </div>
                 ))}
 
-                {fields.length > 0 && (
-                    <div className="rounded-lg p-3 text-center text-sm" style={{ backgroundColor: '#F5EDED' }}>
-                        <span className="text-gray-600">Total test points: </span>
-                        <span className="font-bold text-[#6B0000]">
-                            {fields.reduce((sum, _, idx) => {
-                                const val = getValues(`${prefix}.${idx}.points`);
-                                return sum + (typeof val === 'number' ? val : 0);
-                            }, 0)}
-                        </span>
-                    </div>
-                )}
             </div>
         );
     }
@@ -1932,7 +1921,7 @@ export function CreateAssignmentForm({
 
     function renderSubmissionSettings() {
         return (
-            <div className="space-y-6">
+            <div className="space-y-7">
                 <div>
                     <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
                         <Settings2 className="h-5 w-5 text-[#6B0000]" /> Submission Settings
@@ -1941,52 +1930,54 @@ export function CreateAssignmentForm({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="p-5 rounded-lg border dark:border-gray-700">
-                        <Label>Maximum Attempts</Label>
-                        <div className="flex items-center gap-3 mt-2">
+                    <div className="p-6 rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FCF8F8] shadow-sm">
+                        <Label className="text-[16px] leading-tight font-semibold text-gray-900">Maximum Attempts</Label>
+                        <div className="flex items-center gap-3 mt-4">
                             <Input
                                 type="number"
                                 {...register('maxAttempts', { valueAsNumber: true })}
-                                className="w-24"
+                                className="w-24 h-10 text-sm font-medium"
                                 min={1}
                                 max={100}
                             />
-                            <span className="text-xs text-gray-500">attempts per student</span>
+                            <span className="text-[13px] text-gray-600">attempts per student</span>
                         </div>
                     </div>
 
-                    <div className="p-5 rounded-lg border dark:border-gray-700">
-                        <Label>Allowed File Types</Label>
+                    <div className="p-6 rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FCF8F8] shadow-sm">
+                        <Label className="text-[16px] leading-tight font-semibold text-gray-900">Allowed File Types</Label>
                         <Input
                             {...register('allowedFileTypes')}
-                            placeholder=".py, .java"
-                            className="mt-2"
+                            placeholder=".py"
+                            className="mt-4 h-10 text-sm font-medium"
                         />
-                        <p className="text-xs text-gray-400 mt-1">Comma-separated extensions</p>
+                        <p className="text-[13px] text-gray-500 mt-2">
+                            Auto-set from language: {watchLanguage === 'python' ? '.py' : '.java'}
+                        </p>
                     </div>
 
-                    <div className="p-5 rounded-lg border dark:border-gray-700">
-                        <Label>Maximum File Size</Label>
-                        <div className="flex items-center gap-3 mt-2">
+                    <div className="p-6 rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FCF8F8] shadow-sm">
+                        <Label className="text-[16px] leading-tight font-semibold text-gray-900">Maximum File Size</Label>
+                        <div className="flex items-center gap-3 mt-4">
                             <Input
                                 type="number"
                                 {...register('maxFileSizeMB', { valueAsNumber: true })}
-                                className="w-24"
+                                className="w-24 h-10 text-sm font-medium"
                                 min={1}
                                 max={50}
                             />
-                            <span className="text-xs text-gray-500">MB per file</span>
+                            <span className="text-[13px] text-gray-600">MB per file</span>
                         </div>
                     </div>
 
-                    <div className="p-5 rounded-lg border dark:border-gray-700">
-                        <Label>Grading Strategy</Label>
+                    <div className="p-6 rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FCF8F8] shadow-sm">
+                        <Label className="text-[16px] leading-tight font-semibold text-gray-900">Grading Strategy</Label>
                         <Controller
                             control={control}
                             name="gradingStrategy"
                             render={({ field }) => (
                                 <Select value={field.value} onValueChange={field.onChange}>
-                                    <SelectTrigger className="mt-2"><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className="mt-4 h-10 text-sm"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="latest">Grade Latest Submission</SelectItem>
                                         <SelectItem value="best">Grade Best Submission</SelectItem>
@@ -2025,117 +2016,31 @@ export function CreateAssignmentForm({
 
     function renderAiDetection() {
         return (
-            <div className="space-y-6">
+            <div className="space-y-7">
                 <div>
                     <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
                         <ShieldAlert className="h-5 w-5 text-[#6B0000]" /> AI-Assisted Detection
                     </h2>
-                    <p className="text-xs text-gray-500 mt-1">Configure plagiarism and AI-generated code detection.</p>
+                    <p className="text-xs text-gray-500 mt-1">Configure integrity review thresholds and report display settings.</p>
                 </div>
 
                 {/* Warning banner */}
-                <div className="rounded-lg p-4 flex gap-3" style={{ backgroundColor: '#FFF8E1', borderLeft: '4px solid #FF9800' }}>
+                <div className="rounded-xl p-4 flex gap-3 border border-amber-200 bg-gradient-to-r from-amber-50 to-amber-100/70">
                     <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5 text-amber-700" />
                     <div>
-                        <p className="text-sm font-semibold text-amber-800">CRITICAL: AI detection results are ADVISORY ONLY</p>
-                        <p className="text-xs text-amber-700 mt-1">
+                        <p className="text-sm font-semibold text-amber-900">CRITICAL: AI detection results are ADVISORY ONLY</p>
+                        <p className="text-xs text-amber-800 mt-1">
                             They will never automatically deduct points or fail submissions. Instructors review flagged submissions and make final decisions.
                         </p>
                     </div>
                 </div>
 
-                {/* Plagiarism Detection */}
-                <div className="p-5 rounded-lg border dark:border-gray-700">
-                    <div className="flex items-center justify-between mb-3">
-                        <div>
-                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Plagiarism Detection</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Compare submissions to detect code similarity between students.</p>
-                        </div>
-                        <Controller
-                            control={control}
-                            name="plagiarismEnabled"
-                            render={({ field }) => (
-                                <Switch checked={field.value} onCheckedChange={field.onChange} />
-                            )}
-                        />
-                    </div>
-                    {watchPlagiarism && (
-                        <div className="mt-4 pl-4 border-l-2 border-[#6B0000] space-y-2">
-                            <div className="flex justify-between">
-                                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                                    Sensitivity: <strong>{getSensitivityLabel(watch('plagiarismSensitivity'))}</strong>
-                                </span>
-                                <span className="text-xs text-gray-500">{watch('plagiarismSensitivity')}%</span>
-                            </div>
-                            <Controller
-                                control={control}
-                                name="plagiarismSensitivity"
-                                render={({ field }) => (
-                                    <Slider
-                                        value={[field.value]}
-                                        onValueChange={(v) => field.onChange(v[0])}
-                                        max={100}
-                                        step={1}
-                                    />
-                                )}
-                            />
-                            <div className="flex justify-between">
-                                <span className="text-[10px] text-gray-400">Low (Fewer flags)</span>
-                                <span className="text-[10px] text-gray-400">High (More flags)</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* AI Code Detection */}
-                <div className="p-5 rounded-lg border dark:border-gray-700">
-                    <div className="flex items-center justify-between mb-3">
-                        <div>
-                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">AI-Generated Code Detection</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Flag submissions that may contain AI-generated code (ChatGPT, Copilot, etc.).</p>
-                        </div>
-                        <Controller
-                            control={control}
-                            name="aiDetectionEnabled"
-                            render={({ field }) => (
-                                <Switch checked={field.value} onCheckedChange={field.onChange} />
-                            )}
-                        />
-                    </div>
-                    {watchAiDetection && (
-                        <div className="mt-4 pl-4 border-l-2 border-[#6B0000] space-y-2">
-                            <div className="flex justify-between">
-                                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                                    Sensitivity: <strong>{getSensitivityLabel(watch('aiDetectionSensitivity'))}</strong>
-                                </span>
-                                <span className="text-xs text-gray-500">{watch('aiDetectionSensitivity')}%</span>
-                            </div>
-                            <Controller
-                                control={control}
-                                name="aiDetectionSensitivity"
-                                render={({ field }) => (
-                                    <Slider
-                                        value={[field.value]}
-                                        onValueChange={(v) => field.onChange(v[0])}
-                                        max={100}
-                                        step={1}
-                                    />
-                                )}
-                            />
-                            <div className="flex justify-between">
-                                <span className="text-[10px] text-gray-400">Low (Fewer flags)</span>
-                                <span className="text-[10px] text-gray-400">High (More flags)</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
                 {/* Auto-Flag for Manual Review */}
-                <div className="p-5 rounded-lg border dark:border-gray-700">
-                    <div className="flex items-center justify-between mb-3">
+                <div className="p-6 rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FCF8F8] shadow-sm">
+                    <div className="flex items-start justify-between gap-4 mb-4">
                         <div>
-                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Auto-Flag for Manual Review</p>
-                            <p className="text-xs text-gray-500 mt-0.5">Submissions with similarity above threshold are flagged for instructor review.</p>
+                            <p className="text-[20px] leading-tight font-semibold text-gray-900 dark:text-gray-100">Auto-Flag for Manual Review</p>
+                            <p className="text-sm text-gray-600 mt-1">Submissions with similarity above threshold are flagged for instructor review.</p>
                         </div>
                         <Controller
                             control={control}
@@ -2146,37 +2051,42 @@ export function CreateAssignmentForm({
                         />
                     </div>
                     {watchAutoFlag && (
-                        <div className="mt-3 flex items-center gap-3">
-                            <Label className="text-xs whitespace-nowrap">Flag Threshold:</Label>
-                            <Input
-                                type="number"
-                                {...register('autoFlagThreshold', { valueAsNumber: true })}
-                                className="w-20"
-                                min={10}
-                                max={100}
-                            />
-                            <span className="text-xs text-gray-500">% similarity triggers review</span>
+                        <div className="mt-4 rounded-lg border border-[#E9E2E2] bg-white/80 p-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <Label className="text-xs font-medium whitespace-nowrap text-gray-800">Flag Threshold</Label>
+                                <div className="relative">
+                                    <Input
+                                        type="number"
+                                        {...register('autoFlagThreshold', { valueAsNumber: true })}
+                                        className="w-24 h-10 pr-8 text-base font-semibold"
+                                        min={10}
+                                        max={100}
+                                    />
+                                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-500">%</span>
+                                </div>
+                                <span className="text-xs text-gray-600">similarity triggers review</span>
+                            </div>
                         </div>
                     )}
                 </div>
 
                 {/* Similarity Report Settings */}
-                <div className="p-5 rounded-lg border dark:border-gray-700">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Similarity Report Settings</p>
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-3">
+                <div className="p-6 rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FAF6F6] shadow-sm">
+                    <p className="text-[20px] leading-tight font-semibold text-gray-900 dark:text-gray-100 mb-4">Similarity Report Settings</p>
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-[#F7F1F1] transition-colors">
                             <Checkbox id="show-matches" defaultChecked />
                             <label htmlFor="show-matches" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                 Show similarity percentages and source matches
                             </label>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-[#F7F1F1] transition-colors">
                             <Checkbox id="highlight-code" defaultChecked />
                             <label htmlFor="highlight-code" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                 Highlight suspicious code sections
                             </label>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-[#F7F1F1] transition-colors">
                             <Controller
                                 control={control}
                                 name="crossSectionComparison"
@@ -2202,9 +2112,6 @@ export function CreateAssignmentForm({
 
     function renderReview() {
         const values = getValues();
-        const totalTestPoints =
-            values.publicTests.reduce((s, t) => s + t.points, 0) +
-            values.privateTests.reduce((s, t) => s + t.points, 0);
         const rubricCriteria = values.rubric.flatMap((section) => section.criteria ?? []);
         const totalRubricPoints = rubricCriteria.reduce((sum, criterion) => sum + criterion.maxPoints, 0);
         const rubricGradingMethods = [...new Set(rubricCriteria.map((criterion) => criterion.gradingMethod))];
@@ -2217,7 +2124,7 @@ export function CreateAssignmentForm({
                 items: [
                     { label: 'Name', value: values.name || '—' },
                     { label: 'Short Name', value: values.shortName || '—' },
-                    { label: 'Language', value: values.language === 'python' ? 'Python 3.10' : 'Java 17' },
+                    { label: 'Language', value: values.language === 'python' ? 'Python' : 'Java' },
                     { label: 'Category', value: values.category },
                     { label: 'Due Date', value: values.dueDate ? new Date(values.dueDate).toLocaleString() : '—' },
                     { label: 'Group', value: values.isGroup ? 'Yes' : 'No' },
@@ -2246,7 +2153,6 @@ export function CreateAssignmentForm({
                 items: [
                     { label: 'Public Tests', value: `${values.publicTests.length} test(s)` },
                     { label: 'Private Tests', value: `${values.privateTests.length} test(s)` },
-                    { label: 'Total Test Points', value: String(totalTestPoints) },
                 ],
             },
             {
@@ -2278,8 +2184,6 @@ export function CreateAssignmentForm({
                 step: 7,
                 icon: ShieldAlert,
                 items: [
-                    { label: 'Plagiarism', value: values.plagiarismEnabled ? `Enabled (${getSensitivityLabel(values.plagiarismSensitivity)})` : 'Disabled' },
-                    { label: 'AI Code Detection', value: values.aiDetectionEnabled ? `Enabled (${getSensitivityLabel(values.aiDetectionSensitivity)})` : 'Disabled' },
                     { label: 'Auto-Flag', value: values.autoFlagEnabled ? `Above ${values.autoFlagThreshold}%` : 'Disabled' },
                     { label: 'Cross-Section', value: values.crossSectionComparison ? 'Enabled' : 'Disabled' },
                 ],
@@ -2912,10 +2816,10 @@ function ToggleSettingRow({
     control: any;
 }) {
     return (
-        <div className="flex items-center justify-between p-4 rounded-lg border dark:border-gray-700">
+        <div className="flex items-center justify-between p-5 rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FAF6F6] shadow-sm">
             <div>
-                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{label}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{description}</p>
+                <p className="text-[16px] leading-tight font-semibold text-gray-900 dark:text-gray-100">{label}</p>
+                <p className="text-[13px] text-gray-600 mt-1">{description}</p>
             </div>
             <Controller
                 control={control}

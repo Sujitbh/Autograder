@@ -19,7 +19,6 @@ import {
     SelectValue,
 } from './ui/select';
 import { Switch } from './ui/switch';
-import { Slider } from './ui/slider';
 import { useRouter, useParams } from 'next/navigation';
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -266,10 +265,6 @@ export function CreateAssignment() {
     const [gradingStrategy, setGradingStrategy] = useState<'latest' | 'best'>('latest');
 
     /* ── Step 6: AI Settings ── */
-    const [plagiarismEnabled, setPlagiarismEnabled] = useState(true);
-    const [plagiarismSensitivity, setPlagiarismSensitivity] = useState(50);
-    const [aiCodeDetectionEnabled, setAiCodeDetectionEnabled] = useState(true);
-    const [aiDetectionSensitivity, setAiDetectionSensitivity] = useState(50);
     const [manualReviewThreshold, setManualReviewThreshold] = useState(true);
     const [flagThresholdPercent, setFlagThresholdPercent] = useState(70);
 
@@ -390,12 +385,6 @@ export function CreateAssignment() {
         } catch {
             setCopiedRubricPrompt(null);
         }
-    };
-
-    const getSensitivityLabel = (v: number) => {
-        if (v < 33) return 'Low';
-        if (v < 67) return 'Medium';
-        return 'High';
     };
 
     /* ════════════════════════════════════════════════════════
@@ -1038,52 +1027,6 @@ export function CreateAssignment() {
                                 </div>
 
                                 <div className="p-5 rounded-lg border" style={{ borderColor: 'var(--color-border)' }}>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div>
-                                            <label style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>Plagiarism Detection</label>
-                                            <p style={{ fontSize: '12px', color: '#595959', marginTop: '2px' }}>Compare submissions to detect code similarity between students.</p>
-                                        </div>
-                                        <Switch checked={plagiarismEnabled} onCheckedChange={setPlagiarismEnabled} />
-                                    </div>
-                                    {plagiarismEnabled && (
-                                        <div className="mt-4 pl-4 border-l-2" style={{ borderColor: '#6B0000' }}>
-                                            <div className="flex justify-between mb-2">
-                                                <label style={{ fontSize: '12px', fontWeight: 500, color: '#2D2D2D' }}>Sensitivity: <strong>{getSensitivityLabel(plagiarismSensitivity)}</strong></label>
-                                                <span style={{ fontSize: '12px', color: '#595959' }}>{plagiarismSensitivity}%</span>
-                                            </div>
-                                            <Slider value={[plagiarismSensitivity]} onValueChange={v => setPlagiarismSensitivity(v[0])} max={100} step={1} />
-                                            <div className="flex justify-between mt-1">
-                                                <span style={{ fontSize: '10px', color: '#8A8A8A' }}>Low (Fewer flags)</span>
-                                                <span style={{ fontSize: '10px', color: '#8A8A8A' }}>High (More flags)</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="p-5 rounded-lg border" style={{ borderColor: 'var(--color-border)' }}>
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div>
-                                            <label style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>AI-Generated Code Detection</label>
-                                            <p style={{ fontSize: '12px', color: '#595959', marginTop: '2px' }}>Flag submissions that may contain AI-generated code (ChatGPT, Copilot, etc.).</p>
-                                        </div>
-                                        <Switch checked={aiCodeDetectionEnabled} onCheckedChange={setAiCodeDetectionEnabled} />
-                                    </div>
-                                    {aiCodeDetectionEnabled && (
-                                        <div className="mt-4 pl-4 border-l-2" style={{ borderColor: '#6B0000' }}>
-                                            <div className="flex justify-between mb-2">
-                                                <label style={{ fontSize: '12px', fontWeight: 500, color: '#2D2D2D' }}>Sensitivity: <strong>{getSensitivityLabel(aiDetectionSensitivity)}</strong></label>
-                                                <span style={{ fontSize: '12px', color: '#595959' }}>{aiDetectionSensitivity}%</span>
-                                            </div>
-                                            <Slider value={[aiDetectionSensitivity]} onValueChange={v => setAiDetectionSensitivity(v[0])} max={100} step={1} />
-                                            <div className="flex justify-between mt-1">
-                                                <span style={{ fontSize: '10px', color: '#8A8A8A' }}>Low (Fewer flags)</span>
-                                                <span style={{ fontSize: '10px', color: '#8A8A8A' }}>High (More flags)</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="p-5 rounded-lg border" style={{ borderColor: 'var(--color-border)' }}>
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <label style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>Auto-Flag for Manual Review</label>
@@ -1183,8 +1126,6 @@ export function CreateAssignment() {
                                     {
                                         title: 'AI Detection', step: 6, icon: ShieldAlert,
                                         items: [
-                                            { label: 'Plagiarism', value: plagiarismEnabled ? `Enabled (${getSensitivityLabel(plagiarismSensitivity)})` : 'Disabled' },
-                                            { label: 'AI Code Detection', value: aiCodeDetectionEnabled ? `Enabled (${getSensitivityLabel(aiDetectionSensitivity)})` : 'Disabled' },
                                             { label: 'Auto-Flag', value: manualReviewThreshold ? `Above ${flagThresholdPercent}%` : 'Disabled' },
                                         ],
                                     },

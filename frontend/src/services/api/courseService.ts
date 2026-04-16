@@ -93,6 +93,7 @@ export interface EnrollmentImportResult {
 interface CreateEnrollmentPayload {
     user_id?: number;
     email?: string;
+    sis_user_id?: string;
     role: EnrollmentRole;
 }
 

@@ -38,9 +38,9 @@ export function StudentClassmatesPage({ courseId }: StudentClassmatesPageProps) 
         { label: 'Classmates' },
       ]}
     >
-      <div className="max-w-4xl">
+      <div className="w-full max-w-none">
         {/* Header */}
-        <div className="mb-6 flex items-end justify-between gap-4 flex-wrap">
+        <div className="mb-6 flex items-end gap-6 flex-wrap">
           <div>
             <h2 className="text-2xl font-bold" style={{ color: 'var(--color-text-dark)' }}>Classmates</h2>
             <p className="text-sm mt-1" style={{ color: 'var(--color-text-mid)' }}>
@@ -49,7 +49,7 @@ export function StudentClassmatesPage({ courseId }: StudentClassmatesPageProps) 
           </div>
           {/* Search */}
           {classmates.length > 0 && (
-            <div className="relative" style={{ minWidth: '220px' }}>
+            <div className="relative" style={{ minWidth: '260px', width: 'min(420px, 100%)' }}>
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
               <input
                 type="text"

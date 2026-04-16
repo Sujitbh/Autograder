@@ -38,6 +38,7 @@ interface StudentRecord {
   section: string;
   grades: Record<string, number | null>;
   lateFlags: Record<string, boolean>;
+  assignmentStatuses: Record<string, string>;
 }
 
 /** Normalised assignment definition built from Assignment API */
@@ -157,19 +158,23 @@ export function ReportsDashboard() {
         // s.grades is { "<assignmentId>": { score, status } | number | null }
         const grades: Record<string, number | null> = {};
         const lateFlags: Record<string, boolean> = {};
+        const assignmentStatuses: Record<string, string> = {};
 
         if (s.grades && typeof s.grades === 'object') {
           for (const [aId, val] of Object.entries(s.grades)) {
             if (val === null || val === undefined) {
               grades[aId] = null;
               lateFlags[aId] = false;
+              assignmentStatuses[aId] = 'not_submitted';
             } else if (typeof val === 'number') {
               grades[aId] = val;
               lateFlags[aId] = false;
+              assignmentStatuses[aId] = 'graded';
             } else if (typeof val === 'object') {
               const g = val as any;
               grades[aId] = g.score ?? null;
               lateFlags[aId] = !!g.is_late;
+              assignmentStatuses[aId] = String(g.status ?? (g.score != null ? 'graded' : 'not_submitted'));
             }
           }
         }
@@ -188,6 +193,7 @@ export function ReportsDashboard() {
           section: '',
           grades,
           lateFlags,
+          assignmentStatuses,
         } satisfies StudentRecord;
       });
     }
@@ -400,6 +406,10 @@ export function ReportsDashboard() {
                   acc[s.id] = { ...s.lateFlags };
                   return acc;
                 }, {} as Record<string, Record<string, boolean>>)}
+                statuses={students.reduce((acc, s) => {
+                  acc[s.id] = { ...s.assignmentStatuses };
+                  return acc;
+                }, {} as Record<string, Record<string, string>>)}
                 onViewStudentReport={(studentId) => {
                   const s = students.find(st => st.id === studentId);
                   if (s) openStudentReport(s);

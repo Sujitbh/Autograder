@@ -422,14 +422,19 @@ def add_course_enrollment(
         raise HTTPException(status_code=404, detail=COURSE_NOT_FOUND)
     require_course_role(db=db, user=user, course_id=course_id, allowed_roles=["instructor"])
 
-    if payload.user_id is None and payload.email is None:
-        raise HTTPException(status_code=400, detail="Provide either user_id or email")
+    if payload.user_id is None and payload.email is None and payload.sis_user_id is None:
+        raise HTTPException(status_code=400, detail="Provide user_id, email, or CWID")
 
     target_user = None
     if payload.user_id is not None:
         target_user = db.query(User).filter(User.id == payload.user_id).first()
     elif payload.email is not None:
         target_user = db.query(User).filter(User.email == payload.email).first()
+    elif payload.sis_user_id is not None:
+        cwid = payload.sis_user_id.strip()
+        target_user = db.query(User).filter(
+            (User.sis_user_id == cwid) | (User.sis_user_id == f"{cwid}.0")
+        ).first()
 
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
