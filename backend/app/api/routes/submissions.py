@@ -448,6 +448,7 @@ def _build_integrity_report(
     submission: Submission,
     assignment: Assignment | None = None,
     ai_threshold: float | None = None,
+    match_limit: int | None = 5,
 ) -> dict:
     threshold_to_use = _effective_ai_threshold(assignment, ai_threshold)
     ai_detection_enabled = _is_ai_detection_enabled(assignment)
