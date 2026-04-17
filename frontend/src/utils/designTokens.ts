@@ -6,28 +6,28 @@
 
 export const colors = {
   // Primary Colors
-  primary: 'var(--color-primary)',           // #6B0000
-  primaryHover: 'var(--color-primary-hover)', // #8B1A1A
-  primaryBg: 'var(--color-primary-bg)',       // #F5EDED
+  primary: 'var(--color-primary)',           // var(--color-primary)
+  primaryHover: 'var(--color-primary-hover)', // var(--color-primary-hover)
+  primaryBg: 'var(--color-primary-bg)',       // var(--color-primary-bg)
   primaryLight: 'var(--color-primary-light)', // #FCEAEA
 
   // Gold Accent
   goldAccent: 'var(--color-gold-accent)',     // #C9A84C
 
   // Text Colors
-  textDark: 'var(--color-text-dark)',         // #2D2D2D
-  textMid: 'var(--color-text-mid)',           // #595959
-  textLight: 'var(--color-text-light)',       // #8A8A8A
+  textDark: 'var(--color-text-dark)',         // var(--color-text-dark)
+  textMid: 'var(--color-text-mid)',           // var(--color-text-mid)
+  textLight: 'var(--color-text-light)',       // var(--color-text-light)
 
   // Border & Backgrounds
-  border: 'var(--color-border)',              // #D9D9D9
+  border: 'var(--color-border)',              // var(--color-border)
   white: 'var(--color-white)',                // #FFFFFF
 
   // Status Colors
-  success: 'var(--color-success)',            // #2D6A2D
-  warning: 'var(--color-warning)',            // #8A5700
-  error: 'var(--color-error)',                // #8B0000
-  info: 'var(--color-info)',                  // #1A4D7A
+  success: 'var(--color-success)',            // var(--color-success)
+  warning: 'var(--color-warning)',            // var(--color-warning)
+  error: 'var(--color-error)',                // var(--color-error)
+  info: 'var(--color-info)',                  // var(--color-info)
 } as const;
 
 export const shadows = {

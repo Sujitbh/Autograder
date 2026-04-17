@@ -20,6 +20,7 @@ import { useAuth } from '@/utils/AuthContext';
 import { assignmentService, submissionService } from '@/services/api';
 import { normalizeRubricToSections } from '@/utils/rubric';
 import { codeRequiresStdin } from '@/utils/codeInputDetection';
+import type { RubricCriterion } from '@/types';
 import { toast } from 'sonner';
 import {
   Play,
@@ -894,7 +895,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                           className="h-8 px-3 text-xs"
                         >
                           {isOpeningDescriptionPdf && <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" />}
-                          Open Original PDF
+                          Open Description PDF
                         </Button>
                       </div>
                     )}

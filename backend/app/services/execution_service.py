@@ -247,6 +247,36 @@ class ExecutionService:
         return "/".join(candidate.parts)
 
     @staticmethod
+    def _infer_java_main_classname(code: str, fallback: str = "Main") -> str:
+        """
+        Infer the Java class to run.
+
+        Order:
+        1) `public class X`
+        2) `class X` containing a `public static void main(...)`
+        3) the only declared class, if exactly one exists
+        4) fallback
+        """
+        import re
+
+        public_match = re.search(r"\bpublic\s+class\s+([A-Za-z_]\w*)", code or "")
+        if public_match:
+            return public_match.group(1)
+
+        main_class_match = re.search(
+            r"\bclass\s+([A-Za-z_]\w*)\b[\s\S]*?\bpublic\s+static\s+void\s+main\s*\(",
+            code or "",
+        )
+        if main_class_match:
+            return main_class_match.group(1)
+
+        classes = re.findall(r"\bclass\s+([A-Za-z_]\w*)", code or "")
+        if len(classes) == 1:
+            return classes[0]
+
+        return fallback
+
+    @staticmethod
     def _build_workspace_files(
         tmpdir: str,
         language: str,
@@ -305,9 +335,7 @@ class ExecutionService:
 
         # Backward-compatible single-file mode
         if language == "java":
-            import re
-            match = re.search(r"public\s+class\s+(\w+)", code)
-            classname = match.group(1) if match else "Main"
+            classname = ExecutionService._infer_java_main_classname(code, fallback="Main")
             source_file = tmpdir_path / f"{classname}{ext}"
         else:
             source_file = tmpdir_path / f"solution{ext}"
@@ -345,10 +373,10 @@ class ExecutionService:
                 source_content = source_file.read_text()
             except Exception:
                 source_content = code
-            import re
-            match = re.search(r"public\s+class\s+(\w+)", source_content)
-            if match:
-                classname = match.group(1)
+            classname = ExecutionService._infer_java_main_classname(
+                source_content,
+                fallback=classname,
+            )
 
         compile_time_ms = 0.0
 

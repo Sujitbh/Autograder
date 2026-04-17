@@ -308,9 +308,6 @@ const formSchema = z.object({
 });
 
 export type AssignmentFormData = z.infer<typeof formSchema>;
-export interface AssignmentSubmitOptions {
-    descriptionPdfFile?: File | null;
-}
 
 // ── Step definitions ────────────────────────────────────────────────
 
@@ -330,8 +327,8 @@ const STEPS = [
 
 interface CreateAssignmentFormProps {
     courseId: string;
-    onSaveDraft: (data: AssignmentFormData, options?: AssignmentSubmitOptions) => void;
-    onPublish: (data: AssignmentFormData, options?: AssignmentSubmitOptions) => void;
+    onSaveDraft: (data: AssignmentFormData) => void;
+    onPublish: (data: AssignmentFormData) => void;
     onCancel: () => void;
     initialData?: Partial<AssignmentFormData>;
     initialStep?: number;
@@ -557,6 +554,10 @@ export function CreateAssignmentForm({
         const values = getValues();
         if (!values.name || !values.shortName || !values.language || !values.category || !values.dueDate) {
             setCurrentStep(0);
+            return;
+        }
+        if (!values.description) {
+            setCurrentStep(1);
             return;
         }
         if (!values.starterCode) {
@@ -904,25 +905,46 @@ export function CreateAssignmentForm({
 
     const descFileInputRef = useRef<HTMLInputElement>(null);
     const [descFileLoading, setDescFileLoading] = useState(false);
-    const [descriptionPdfFile, setDescriptionPdfFile] = useState<File | null>(null);
-    const [descriptionPdfName, setDescriptionPdfName] = useState<string | null>(null);
+    const [descPdfImages, setDescPdfImages] = useState<string[]>([]);
 
     const handleDescriptionFileUpload = async (file: File) => {
         setDescFileLoading(true);
         try {
             if (file.name.endsWith('.pdf') || file.type === 'application/pdf') {
-                setDescriptionPdfFile(file);
-                setDescriptionPdfName(file.name);
+                const arrayBuffer = await file.arrayBuffer();
+                const pdfjsLib = await import('pdfjs-dist');
+                pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+                const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                const pageImages: string[] = [];
+                let text = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    // Render page to canvas at 2× scale for crisp display
+                    const viewport = page.getViewport({ scale: 2 });
+                    const canvas = document.createElement('canvas');
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        await page.render({ canvasContext: ctx, viewport }).promise;
+                        pageImages.push(canvas.toDataURL('image/png'));
+                    }
+                    // Also extract plain text for backend storage
+                    const content = await page.getTextContent();
+                    text += content.items
+                        .filter((item) => 'str' in item)
+                        .map((item) => (item as { str: string }).str)
+                        .join(' ') + '\n\n';
+                }
+                setDescPdfImages(pageImages);
+                setValue('description', text.trim(), { shouldDirty: true });
             } else {
                 const text = await file.text();
+                setDescPdfImages([]);
                 setValue('description', text, { shouldDirty: true });
-                setDescriptionPdfFile(null);
-                setDescriptionPdfName(null);
             }
         } catch (err) {
             console.error('Description file read error', err);
-            setDescriptionPdfFile(null);
-            setDescriptionPdfName(null);
         } finally {
             setDescFileLoading(false);
             if (descFileInputRef.current) descFileInputRef.current.value = '';
@@ -1209,10 +1231,10 @@ export function CreateAssignmentForm({
                                     onClick={() => idx <= currentStep && setCurrentStep(idx)}
                                     disabled={idx > currentStep}
                                     className={`flex h-8 w-8 items-center justify-center rounded-full border-2 transition-colors ${isActive
-                                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                                        ? 'border-[#6B0000] bg-[#6B0000] text-white'
                                         : isCompleted
-                                            ? 'border-green-500 bg-[var(--color-success-bg)] text-[var(--color-success)] cursor-pointer'
-                                            : 'border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-light)] dark:border-gray-700 dark:bg-gray-800'
+                                            ? 'border-green-500 bg-green-50 text-green-600 cursor-pointer'
+                                            : 'border-gray-200 bg-white text-gray-400 dark:border-gray-700 dark:bg-gray-800'
                                         }`}
                                     aria-label={`Step ${idx + 1}: ${step.label}`}
                                     aria-current={isActive ? 'step' : undefined}
@@ -1224,7 +1246,7 @@ export function CreateAssignmentForm({
                                     )}
                                 </button>
                                 <span
-                                    className={`hidden text-xs font-medium xl:inline ${isActive ? 'text-[var(--color-primary)]' : isCompleted ? 'text-[var(--color-success)]' : 'text-[var(--color-text-light)]'
+                                    className={`hidden text-xs font-medium xl:inline ${isActive ? 'text-[#6B0000]' : isCompleted ? 'text-green-600' : 'text-gray-400'
                                         }`}
                                 >
                                     {step.label}
@@ -1249,23 +1271,23 @@ export function CreateAssignmentForm({
         return (
             <div className="space-y-6">
                 <div>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
-                        <FileText className="h-5 w-5 text-[var(--color-primary)]" /> Basic Information
+                    <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        <FileText className="h-5 w-5 text-[#6B0000]" /> Basic Information
                     </h2>
-                    <p className="text-xs text-[var(--color-text-mid)] mt-1">Configure the assignment&apos;s core details.</p>
+                    <p className="text-xs text-gray-500 mt-1">Configure the assignment&apos;s core details.</p>
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2">
                     <div className="md:col-span-2">
                         <Label htmlFor="name">Assignment Name *</Label>
                         <Input id="name" {...register('name')} placeholder="e.g. Homework 3 — Binary Trees" />
-                        {errors.name && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.name.message}</p>}
+                        {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
                     </div>
 
                     <div>
                         <Label htmlFor="shortName">Short Name *</Label>
                         <Input id="shortName" {...register('shortName')} placeholder="HW3" maxLength={10} />
-                        {errors.shortName && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.shortName.message}</p>}
+                        {errors.shortName && <p className="mt-1 text-xs text-red-600">{errors.shortName.message}</p>}
                     </div>
 
                     <div>
@@ -1304,9 +1326,9 @@ export function CreateAssignmentForm({
                     </div>
 
                     <div>
-                        <Label htmlFor="dueDate">Due Date <span className="text-xs text-[var(--color-text-light)]">(required to publish)</span></Label>
+                        <Label htmlFor="dueDate">Due Date <span className="text-xs text-gray-400">(required to publish)</span></Label>
                         <Input id="dueDate" type="datetime-local" {...register('dueDate')} />
-                        {errors.dueDate && <p className="mt-1 text-xs text-[var(--color-error)]">{errors.dueDate.message}</p>}
+                        {errors.dueDate && <p className="mt-1 text-xs text-red-600">{errors.dueDate.message}</p>}
                     </div>
 
                     <div className="flex items-center gap-3">
@@ -1323,7 +1345,7 @@ export function CreateAssignmentForm({
                         />
                         <Label htmlFor="isGroup" className="mb-0 cursor-pointer">
                             <span className="flex items-center gap-1.5">
-                                <Users className="h-4 w-4 text-[var(--color-text-light)]" /> Group Assignment
+                                <Users className="h-4 w-4 text-gray-400" /> Group Assignment
                             </span>
                         </Label>
                     </div>
@@ -1340,16 +1362,16 @@ export function CreateAssignmentForm({
         return (
             <div className="space-y-6">
                 <div>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
-                        <FileText className="h-5 w-5 text-[var(--color-primary)]" /> Assignment Description
+                    <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        <FileText className="h-5 w-5 text-[#6B0000]" /> Assignment Description
                     </h2>
-                    <p className="text-xs text-[var(--color-text-mid)] mt-1">Provide detailed instructions and requirements.</p>
+                    <p className="text-xs text-gray-500 mt-1">Provide detailed instructions and requirements.</p>
                 </div>
                 <div>
                     <div className="flex items-center justify-between mb-1.5">
                         <Label htmlFor="description">Description</Label>
                         <div className="flex items-center gap-2">
-                            {descFileLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--color-text-light)]" />}
+                            {descFileLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-gray-400" />}
                             <Button
                                 type="button"
                                 variant="outline"
@@ -1372,34 +1394,31 @@ export function CreateAssignmentForm({
                             />
                         </div>
                     </div>
-                    <Textarea
-                        id="description"
-                        {...register('description')}
-                        rows={14}
-                        placeholder="Provide detailed assignment instructions, requirements, and examples..."
-                        className="font-mono text-sm"
-                    />
-                    {descriptionPdfName && (
-                        <div className="mt-2 flex items-center justify-between rounded-md border px-3 py-2 text-xs text-[var(--color-text-mid)] dark:border-gray-700">
-                            <span>Attached PDF: {descriptionPdfName}</span>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-xs"
-                                onClick={() => {
-                                    setDescriptionPdfFile(null);
-                                    setDescriptionPdfName(null);
-                                }}
-                            >
-                                Remove PDF
-                            </Button>
+                    {descPdfImages.length > 0 ? (
+                        <div className="rounded-lg border dark:border-gray-700 overflow-auto max-h-[600px] bg-white dark:bg-gray-950 p-4 space-y-3">
+                            {descPdfImages.map((src, i) => (
+                                <img
+                                    key={i}
+                                    src={src}
+                                    alt={`Page ${i + 1}`}
+                                    className="w-full rounded shadow-sm border dark:border-gray-700"
+                                    style={{ imageRendering: 'auto' }}
+                                />
+                            ))}
                         </div>
+                    ) : (
+                        <Textarea
+                            id="description"
+                            {...register('description')}
+                            rows={14}
+                            placeholder="Provide detailed assignment instructions, requirements, and examples..."
+                            className="font-mono text-sm"
+                        />
                     )}
-                    <p className="mt-1 text-xs text-[var(--color-text-light)]">
-                        {descriptionPdfName
-                            ? 'Students will see an Open Original PDF button in the Description tab.'
-                            : 'Supports Markdown formatting. Upload .txt/.md to auto-fill text, or .pdf to attach the original document.'}
+                    <p className="mt-1 text-xs text-gray-400">
+                        {descPdfImages.length > 0
+                            ? `${descPdfImages.length} page${descPdfImages.length !== 1 ? 's' : ''} rendered from PDF — exact fonts and formatting preserved.`
+                            : 'Supports Markdown formatting. Upload a .txt, .md, or .pdf file to auto-fill.'}
                     </p>
                 </div>
             </div>
@@ -1412,16 +1431,16 @@ export function CreateAssignmentForm({
         return (
             <div className="space-y-6">
                 <div>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
-                        <Code2 className="h-5 w-5 text-[var(--color-primary)]" /> Starter Code
+                    <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        <Code2 className="h-5 w-5 text-[#6B0000]" /> Starter Code
                     </h2>
-                    <p className="text-xs text-[var(--color-text-mid)] mt-1">Optional template code that students will start with.</p>
+                    <p className="text-xs text-gray-500 mt-1">Optional template code that students will start with.</p>
                 </div>
                 <div>
                     <Label htmlFor="starterCode">Code Template</Label>
                     <div className="rounded-lg overflow-hidden border dark:border-gray-700">
                         <div className="flex items-center justify-between px-4 py-2 bg-[#1E1E2E] border-b border-gray-700">
-                            <span className="text-xs text-[var(--color-text-light)]">
+                            <span className="text-xs text-gray-400">
                                 {watchLanguage === 'python' ? 'main.py' : 'Main.java'}
                             </span>
                         </div>
@@ -1433,10 +1452,10 @@ export function CreateAssignmentForm({
                                 ? '# Write your starter code here...\n\ndef solution():\n    pass'
                                 : '// Write your starter code here...\n\npublic class Main {\n    public static void main(String[] args) {\n    }\n}'}
                             className="font-mono text-sm border-0 rounded-none focus-visible:ring-0"
-                            style={{ backgroundColor: '#1E1E2E', color: 'var(--color-border)' }}
+                            style={{ backgroundColor: '#1E1E2E', color: '#E0E0E0' }}
                         />
                     </div>
-                    <p className="mt-1 text-xs text-[var(--color-text-light)]">
+                    <p className="mt-1 text-xs text-gray-400">
                         Students will see this code pre-filled when they start the assignment.
                     </p>
                 </div>
@@ -1463,20 +1482,20 @@ export function CreateAssignmentForm({
             <div className="space-y-5">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
-                            {isPrivate ? <Lock className="h-5 w-5 text-[var(--color-primary)]" /> : <TestTube className="h-5 w-5 text-[var(--color-primary)]" />}
+                        <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                            {isPrivate ? <Lock className="h-5 w-5 text-[#6B0000]" /> : <TestTube className="h-5 w-5 text-[#6B0000]" />}
                             {isPrivate ? 'Private' : 'Public'} Test Cases
                         </h2>
-                        <p className="text-xs text-[var(--color-text-mid)] mt-1">
+                        <p className="text-xs text-gray-500 mt-1">
                             {isPrivate
                                 ? 'Hidden from students — used for final grading.'
                                 : 'Visible to students — they can run these before submitting.'}
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-1 rounded-full text-xs font-semibold" style={{
-                            backgroundColor: isPrivate ? 'var(--color-warning-bg)' : 'var(--color-info-bg)',
-                            color: isPrivate ? 'var(--color-warning)' : 'var(--color-info)',
+                        <span className="px-3 py-1.5 rounded-full text-xs font-semibold shadow-sm" style={{
+                            backgroundColor: isPrivate ? '#FFF8E1' : '#EFF6FF',
+                            color: isPrivate ? '#8A5700' : '#1976D2',
                         }}>
                             {fields.length} test{fields.length !== 1 ? 's' : ''}
                         </span>
@@ -1495,7 +1514,7 @@ export function CreateAssignmentForm({
                 </div>
 
                 {fields.length === 0 && (
-                    <div className="rounded-lg border border-dashed p-8 text-center text-sm text-[var(--color-text-light)]">
+                    <div className="rounded-xl border-2 border-dashed border-[#DCCFCF] bg-gradient-to-br from-[#FCFAFA] to-[#F8F3F3] p-10 text-center text-[16px] text-gray-400">
                         No test cases yet. Click &quot;Add Test&quot; to get started.
                     </div>
                 )}
@@ -1503,15 +1522,14 @@ export function CreateAssignmentForm({
                 {fields.map((field, idx) => (
                     <div
                         key={field.id}
-                        className="relative rounded-lg border bg-[var(--color-surface)] p-4 dark:bg-gray-900 dark:border-gray-700"
-                        style={{ backgroundColor: isPrivate ? 'var(--color-warning-bg)' : undefined }}
+                        className="relative rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FCF8F8] p-5 shadow-sm dark:bg-gray-900 dark:border-gray-700"
                     >
                         <div className="absolute right-2 top-2">
                             <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-7 w-7 text-[var(--color-text-light)] hover:text-red-500"
+                                className="h-7 w-7 text-gray-400 hover:text-red-500"
                                 onClick={() => remove(idx)}
                                 aria-label={`Remove test case ${idx + 1}`}
                             >
@@ -1523,7 +1541,7 @@ export function CreateAssignmentForm({
                             {/* Header row: label + name */}
                             <div className="md:col-span-2 flex items-center gap-2">
                                 <GripVertical className="h-4 w-4 text-gray-300" />
-                                <span className="text-xs font-semibold text-[var(--color-text-mid)]">
+                                <span className="text-xs font-semibold text-gray-500">
                                     {isPrivate ? 'Private' : 'Public'} Test {idx + 1}
                                 </span>
                                 <Input
@@ -1548,14 +1566,14 @@ export function CreateAssignmentForm({
                                                     title={t.hint}
                                                     onClick={() => typeField.onChange(t.value)}
                                                     className={`px-3 py-1 rounded-md text-xs font-medium border transition-colors ${(typeField.value ?? 'text') === t.value
-                                                        ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
-                                                        : 'bg-[var(--color-surface)] text-[var(--color-text-mid)] border-[var(--color-border)] hover:border-[var(--color-primary)] dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
+                                                        ? 'bg-[#6B0000] text-white border-[#6B0000]'
+                                                        : 'bg-white text-gray-600 border-gray-200 hover:border-[#6B0000] dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
                                                         }`}
                                                 >
                                                     {t.label}
                                                 </button>
                                             ))}
-                                            <span className="ml-2 text-xs text-[var(--color-text-light)] flex items-center">
+                                            <span className="ml-2 text-xs text-gray-400 flex items-center">
                                                 {INPUT_TYPES.find((t) => t.value === (typeField.value ?? 'text'))?.hint}
                                             </span>
                                         </div>
@@ -1609,17 +1627,6 @@ export function CreateAssignmentForm({
                     </div>
                 ))}
 
-                {fields.length > 0 && (
-                    <div className="rounded-lg p-3 text-center text-sm" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
-                        <span className="text-[var(--color-text-mid)]">Total test points: </span>
-                        <span className="font-bold text-[var(--color-primary)]">
-                            {fields.reduce((sum, _, idx) => {
-                                const val = getValues(`${prefix}.${idx}.points`);
-                                return sum + (typeof val === 'number' ? val : 0);
-                            }, 0)}
-                        </span>
-                    </div>
-                )}
             </div>
         );
     }
@@ -1668,15 +1675,21 @@ export function CreateAssignmentForm({
         return (
             <div className="space-y-5">
                 <div>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
+                    <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
                         <ClipboardList className="h-5 w-5 text-[#C9A84C]" /> Rubric Design
                     </h2>
-                    <p className="text-xs text-[var(--color-text-mid)] mt-1">Configure sections with grading criteria. Add as many sections and criteria as needed.</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                        Grade scale 0–5 per criterion. Set % weights (must total 100%). Click &quot;Edit default comments&quot; to set auto-populated comments per score.
+                    </p>
                 </div>
 
-                <div className="rounded-lg border p-4 bg-[var(--color-surface-elevated)] dark:bg-gray-900 dark:border-gray-700">
-                    <Label className="text-xs">Rubric Mode</Label>
-                    <div className="mt-2 flex flex-wrap gap-2">
+                <div
+                    className="rounded-lg border p-4 bg-white dark:bg-gray-900 dark:border-gray-700 space-y-3"
+                    role="region"
+                    aria-label="Course rubric defaults"
+                >
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Course rubric</p>
+                    <div className="flex flex-wrap gap-2">
                         <Button
                             type="button"
                             variant="outline"
@@ -1697,22 +1710,25 @@ export function CreateAssignmentForm({
                             </Button>
                         )}
                     </div>
-                    <p className="text-xs text-[var(--color-text-mid)] mt-2">
-                        Weighted mode lets you set a weight multiplier for each section and criterion.
+                    <p className="text-xs text-gray-500">
+                        Edit the full course template in the{' '}
+                        <Link href={`/courses/${courseId}/default-rubric`} className="text-[#6B0000] underline font-medium">
+                            default rubric editor
+                        </Link>.
                     </p>
                 </div>
 
                 {/* Template controls */}
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border p-4 bg-[var(--color-surface-elevated)] dark:bg-gray-900 dark:border-gray-700">
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border p-4 bg-gray-50 dark:bg-gray-900 dark:border-gray-700">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <FolderOpen className="h-4 w-4 flex-shrink-0 text-[var(--color-primary)]" />
+                        <FolderOpen className="h-4 w-4 flex-shrink-0 text-[#6B0000]" />
                         <Select value={selectedRubricTemplateId} onValueChange={handleLoadTemplate}>
                             <SelectTrigger className="h-9 max-w-xs">
                                 <SelectValue placeholder="Load saved rubric..." />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value={NO_RUBRIC_TEMPLATE_ID}>None</SelectItem>
-                                <div className="px-2 py-1.5 text-xs font-semibold text-[var(--color-text-light)]">Built-in Templates</div>
+                                <div className="px-2 py-1.5 text-xs font-semibold text-gray-400">Built-in Templates</div>
                                 {BUILTIN_RUBRIC_TEMPLATES.map((t) => {
                                     const critCount = t.sections.reduce((sum, s) => sum + (s.criteria?.length || 0), 0);
                                     return (
@@ -1723,7 +1739,7 @@ export function CreateAssignmentForm({
                                 })}
                                 {savedTemplates.length > 0 && (
                                     <>
-                                        <div className="px-2 py-1.5 text-xs font-semibold text-[var(--color-text-light)] border-t mt-1 pt-1">Your Templates</div>
+                                        <div className="px-2 py-1.5 text-xs font-semibold text-gray-400 border-t mt-1 pt-1">Your Templates</div>
                                         {savedTemplates.map((t) => {
                                             const critCount = t.sections.reduce((sum, s) => sum + (s.criteria?.length || 0), 0);
                                             return (
@@ -1765,7 +1781,7 @@ export function CreateAssignmentForm({
                             {pdfParsing ? (
                                 <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> Parsing…</>
                             ) : (
-                                <><FileUp className="h-4 w-4 mr-1.5 text-[var(--color-primary)]" /> Upload Rubric (PDF or Image)</>
+                                <><FileUp className="h-4 w-4 mr-1.5 text-[#6B0000]" /> Upload Rubric (PDF or Image)</>
                             )}
                         </Button>
                         <Button
@@ -1776,10 +1792,10 @@ export function CreateAssignmentForm({
                             className="h-9"
                             disabled={totalCriteria === 0}
                         >
-                            <BookmarkPlus className="h-4 w-4 mr-1.5 text-[var(--color-primary)]" /> Save Rubric
+                            <BookmarkPlus className="h-4 w-4 mr-1.5 text-[#6B0000]" /> Save Rubric
                         </Button>
                         {rubricSaveSuccess && (
-                            <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-[var(--color-success-bg)] text-[var(--color-success)]">
+                            <span className="flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700">
                                 <Check className="h-3.5 w-3.5" /> Saved!
                             </span>
                         )}
@@ -1787,7 +1803,7 @@ export function CreateAssignmentForm({
                 </div>
 
                 {pdfError && (
-                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-[var(--color-error-bg)] p-3 text-sm text-[var(--color-error)] dark:border-red-800 dark:bg-red-950 dark:text-red-300">
+                    <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300">
                         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
                         <div>
                             <p className="font-medium">Parsing Issue</p>
@@ -1798,11 +1814,11 @@ export function CreateAssignmentForm({
                 )}
 
                 {rubricUploadName && (
-                    <div className="rounded-lg border p-3 bg-[var(--color-surface)] dark:bg-gray-900 dark:border-gray-700">
+                    <div className="rounded-lg border p-3 bg-white dark:bg-gray-900 dark:border-gray-700">
                         <div className="flex items-center justify-between gap-3 mb-3">
                             <div>
-                                <p className="text-sm font-medium text-[var(--color-text-dark)] dark:text-gray-100">Uploaded rubric file</p>
-                                <p className="text-xs text-[var(--color-text-mid)]">{rubricUploadName}</p>
+                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Uploaded rubric file</p>
+                                <p className="text-xs text-gray-500">{rubricUploadName}</p>
                             </div>
                             <Button
                                 type="button"
@@ -1817,7 +1833,7 @@ export function CreateAssignmentForm({
                             </Button>
                         </div>
                         {rubricPreviewImages.length > 0 ? (
-                            <div className="rounded-lg border overflow-auto max-h-[420px] bg-[var(--color-surface-elevated)] dark:bg-gray-950 p-3 space-y-3">
+                            <div className="rounded-lg border overflow-auto max-h-[420px] bg-gray-50 dark:bg-gray-950 p-3 space-y-3">
                                 {rubricPreviewImages.map((src, i) => (
                                     <img
                                         key={`${rubricUploadName}-${i}`}
@@ -1829,27 +1845,27 @@ export function CreateAssignmentForm({
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-xs text-[var(--color-text-mid)]">File selected. Preview is not available for this upload.</p>
+                            <p className="text-xs text-gray-500">File selected. Preview is not available for this upload.</p>
                         )}
                     </div>
                 )}
 
                 {savedTemplates.length > 0 && (
                     <div className="rounded-lg border p-3 dark:border-gray-700">
-                        <p className="text-xs font-medium text-[var(--color-text-mid)] mb-2">Your Saved Templates:</p>
+                        <p className="text-xs font-medium text-gray-500 mb-2">Your Saved Templates:</p>
                         <div className="flex flex-wrap gap-2">
                             {savedTemplates.map((t) => (
-                                <div key={t.id} className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs bg-[var(--color-surface)] dark:bg-gray-900 dark:border-gray-700">
+                                <div key={t.id} className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs bg-white dark:bg-gray-900 dark:border-gray-700">
                                     <button
                                         type="button"
-                                        className="font-medium text-[var(--color-primary)] hover:underline"
+                                        className="font-medium text-[#6B0000] hover:underline"
                                         onClick={() => handleLoadTemplate(t.id)}
                                     >
                                         {t.name}
                                     </button>
                                     <button
                                         type="button"
-                                        className="text-[var(--color-text-light)] hover:text-red-500"
+                                        className="text-gray-400 hover:text-red-500"
                                         onClick={() => handleDeleteTemplate(t.id)}
                                         aria-label={`Delete template ${t.name}`}
                                     >
@@ -1861,28 +1877,9 @@ export function CreateAssignmentForm({
                     </div>
                 )}
 
-                {/* Add section button */}
-                <div className="flex items-center justify-between">
-                    <span className="text-sm text-[var(--color-text-mid)]">{rubricValues.length} sections, {totalCriteria} criteria defined</span>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                            appendRubric({
-                                name: `Section ${rubricValues.length + 1}`,
-                                description: '',
-                                weight: 100,
-                                criteria: [],
-                            })
-                        }
-                    >
-                        <Plus className="mr-1 h-3.5 w-3.5" /> Add Section
-                    </Button>
-                </div>
-
-                {rubricValues.length === 0 && (
-                    <div className="rounded-lg border border-dashed p-8 text-center text-sm text-[var(--color-text-light)]">
+                {/* Weighted rubric table */}
+                {rubricValues.length === 0 ? (
+                    <div className="rounded-lg border border-dashed p-8 text-center text-sm text-gray-400">
                         No rubric sections yet. Use a template, upload a PDF, or add sections manually.
                     </div>
                 ) : (
@@ -1896,23 +1893,14 @@ export function CreateAssignmentForm({
 
                 {/* Summary */}
                 {totalCriteria > 0 && (
-                    <div className="rounded-lg p-4" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
+                    <div className="rounded-lg p-4" style={{ backgroundColor: '#F5EDED' }}>
                         <div className="flex justify-between items-center">
-                            <span className="text-sm font-semibold text-[var(--color-text-mid)]">Total Rubric Points:</span>
-                            <span className="text-xl font-bold text-[var(--color-primary)]">{totalRubricPoints}</span>
-                        </div>
-                        {watchRubricMode === 'weighted' && (
-                            <div className="flex justify-between items-center mt-2">
-                                <span className="text-sm font-semibold text-[var(--color-text-mid)]">Section Weights Total:</span>
-                                <span className="text-sm font-bold" style={{ color: Math.abs(sectionWeightTotal - 100) < 0.001 ? 'var(--color-success)' : 'var(--color-error)' }}>
-                                    {sectionWeightTotal.toFixed(1)}%
-                                </span>
-                            </div>
-                        )}
-                        <div className="flex justify-between items-center mt-2">
-                            <span className="text-sm font-semibold text-[var(--color-text-mid)]">Rubric Mode:</span>
-                            <span className="text-sm font-bold text-[var(--color-primary)]">
-                                {watchRubricMode === 'weighted' ? 'Weighted' : 'Unweighted'}
+                            <span className="text-sm font-semibold text-gray-700">Total Weight:</span>
+                            <span
+                                className="text-xl font-bold"
+                                style={{ color: Math.abs(totalWeight - 100) <= WEIGHT_SUM_TOLERANCE ? '#166534' : '#991B1B' }}
+                            >
+                                {totalWeight.toFixed(1)}%
                             </span>
                         </div>
                         <div className="flex justify-between items-center mt-2">
@@ -1929,210 +1917,16 @@ export function CreateAssignmentForm({
         );
     }
 
-    // ── Rubric Section Editor Component ──────────────────────────
-
-    interface RubricSectionEditorProps {
-        sectionIdx: number;
-        watchRubricMode: 'weighted' | 'unweighted';
-        errors: any;
-        register: any;
-        control: any;
-        onRemoveSection: () => void;
-        rubricMode: 'weighted' | 'unweighted';
-    }
-
-    function RubricSectionEditor({
-        sectionIdx,
-        watchRubricMode,
-        errors,
-        register,
-        control,
-        onRemoveSection,
-        rubricMode,
-    }: RubricSectionEditorProps) {
-        const section = getValues(`rubric.${sectionIdx}`);
-        const {
-            fields: criteriaFields,
-            append: appendCriterion,
-            remove: removeCriterion,
-        } = useFieldArray({ control, name: `rubric.${sectionIdx}.criteria` });
-
-        return (
-            <div className="rounded-lg border bg-[var(--color-surface)] p-4 dark:bg-gray-900 dark:border-gray-700 space-y-4">
-                {/* Section header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 grid gap-3 md:grid-cols-3">
-                        <div className="md:col-span-2">
-                            <Label className="text-xs">Section Name *</Label>
-                            <Input
-                                {...register(`rubric.${sectionIdx}.name`)}
-                                placeholder="e.g. Correctness"
-                            />
-                            {errors.rubric?.[sectionIdx]?.name && (
-                                <p className="mt-1 text-xs text-[var(--color-error)]">{errors.rubric[sectionIdx]?.name?.message}</p>
-                            )}
-                        </div>
-                        {watchRubricMode === 'weighted' && (
-                            <div>
-                                <Label className="text-xs">Section Weight (%)</Label>
-                                <div className="flex items-center gap-2">
-                                    <Input
-                                        type="number"
-                                        step="0.1"
-                                        min={0}
-                                        max={100}
-                                        {...register(`rubric.${sectionIdx}.weight`, { valueAsNumber: true })}
-                                    />
-                                    <span className="text-xs text-[var(--color-text-mid)]">%</span>
-                                </div>
-                                {errors.rubric?.[sectionIdx]?.weight && (
-                                    <p className="mt-1 text-xs text-[var(--color-error)]">{errors.rubric[sectionIdx]?.weight?.message}</p>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-[var(--color-text-light)] hover:text-red-500 mt-6"
-                        onClick={onRemoveSection}
-                        aria-label={`Remove section ${sectionIdx + 1}`}
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                </div>
-
-                {/* Section description */}
-                <div>
-                    <Label className="text-xs">Description</Label>
-                    <Textarea
-                        {...register(`rubric.${sectionIdx}.description`)}
-                        rows={2}
-                        placeholder="What this section evaluates..."
-                        className="text-sm"
-                    />
-                </div>
-
-                {/* Criteria table header */}
-                <div className="mt-4 pt-4 border-t dark:border-gray-700">
-                    <h4 className="text-sm font-semibold text-[var(--color-text-mid)] dark:text-gray-300 mb-3">Criteria</h4>
-
-                    {/* Criteria items */}
-                    <div className="space-y-3 mb-4">
-                        {criteriaFields.map((criterionField, critIdx) => (
-                            <div
-                                key={criterionField.id}
-                                className="rounded-lg border bg-[var(--color-surface-elevated)] dark:bg-gray-800 p-3 dark:border-gray-700"
-                            >
-                                <div className="grid gap-3 md:grid-cols-2">
-                                    <div>
-                                        <Label className="text-xs">Name *</Label>
-                                        <Input
-                                            {...register(`rubric.${sectionIdx}.criteria.${critIdx}.name`)}
-                                            placeholder="e.g. Correctness"
-                                            size={30}
-                                            className="h-8 text-sm"
-                                        />
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs">Max Points *</Label>
-                                        <div className="flex gap-1">
-                                            <Input
-                                                type="number"
-                                                {...register(`rubric.${sectionIdx}.criteria.${critIdx}.maxPoints`, { valueAsNumber: true })}
-                                                className="h-8 text-sm"
-                                            />
-                                            {watchRubricMode === 'weighted' && (
-                                                <Input
-                                                    type="number"
-                                                    step="1"
-                                                    min={0}
-                                                    max={100}
-                                                    {...register(`rubric.${sectionIdx}.criteria.${critIdx}.weight`, { valueAsNumber: true })}
-                                                    placeholder="Weight %"
-                                                    className="h-8 text-sm w-24"
-                                                />
-                                            )}
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-[var(--color-text-light)] hover:text-red-500"
-                                                onClick={() => removeCriterion(critIdx)}
-                                            >
-                                                <Trash2 className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs">Grading Method</Label>
-                                        <Controller
-                                            control={control}
-                                            name={`rubric.${sectionIdx}.criteria.${critIdx}.gradingMethod`}
-                                            render={({ field }) => (
-                                                <Select value={field.value} onValueChange={field.onChange}>
-                                                    <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="auto">Auto</SelectItem>
-                                                        <SelectItem value="manual">Manual</SelectItem>
-                                                        <SelectItem value="hybrid">Hybrid</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            )}
-                                        />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <Label className="text-xs">Description</Label>
-                                        <Textarea
-                                            {...register(`rubric.${sectionIdx}.criteria.${critIdx}.description`)}
-                                            rows={2}
-                                            placeholder="Describe what this criterion evaluates..."
-                                            className="text-sm"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Add criterion button */}
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() =>
-                            appendCriterion({
-                                name: '',
-                                description: '',
-                                maxPoints: 10,
-                                weight: 100,
-                                gradingMethod: 'manual',
-                            })
-                        }
-                        className="h-8 text-sm"
-                    >
-                        <Plus className="mr-1 h-3.5 w-3.5" /> Add Criterion
-                    </Button>
-
-                    {criteriaFields.length === 0 && (
-                        <p className="text-xs text-[var(--color-text-light)] italic mt-2">No criteria yet. Click "Add Criterion" to get started.</p>
-                    )}
-                </div>
-            </div>
-        );
-    }
-
     // ── Step 6: Submission Settings ───────────────────────────────
 
     function renderSubmissionSettings() {
         return (
             <div className="space-y-7">
                 <div>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
-                        <Settings2 className="h-5 w-5 text-[var(--color-primary)]" /> Submission Settings
+                    <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        <Settings2 className="h-5 w-5 text-[#6B0000]" /> Submission Settings
                     </h2>
-                    <p className="text-xs text-[var(--color-text-mid)] mt-1">Configure how students submit their work.</p>
+                    <p className="text-xs text-gray-500 mt-1">Configure how students submit their work.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -2146,7 +1940,7 @@ export function CreateAssignmentForm({
                                 min={1}
                                 max={100}
                             />
-                            <span className="text-xs text-[var(--color-text-mid)]">attempts per student</span>
+                            <span className="text-[13px] text-gray-600">attempts per student</span>
                         </div>
                     </div>
 
@@ -2157,7 +1951,9 @@ export function CreateAssignmentForm({
                             placeholder=".py"
                             className="mt-4 h-10 text-sm font-medium"
                         />
-                        <p className="text-xs text-[var(--color-text-light)] mt-1">Comma-separated extensions</p>
+                        <p className="text-[13px] text-gray-500 mt-2">
+                            Auto-set from language: {watchLanguage === 'python' ? '.py' : '.java'}
+                        </p>
                     </div>
 
                     <div className="p-6 rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FCF8F8] shadow-sm">
@@ -2170,7 +1966,7 @@ export function CreateAssignmentForm({
                                 min={1}
                                 max={50}
                             />
-                            <span className="text-xs text-[var(--color-text-mid)]">MB per file</span>
+                            <span className="text-[13px] text-gray-600">MB per file</span>
                         </div>
                     </div>
 
@@ -2222,14 +2018,14 @@ export function CreateAssignmentForm({
         return (
             <div className="space-y-7">
                 <div>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
-                        <ShieldAlert className="h-5 w-5 text-[var(--color-primary)]" /> AI-Assisted Detection
+                    <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        <ShieldAlert className="h-5 w-5 text-[#6B0000]" /> AI-Assisted Detection
                     </h2>
-                    <p className="text-xs text-[var(--color-text-mid)] mt-1">Configure plagiarism and AI-generated code detection.</p>
+                    <p className="text-xs text-gray-500 mt-1">Configure integrity review thresholds and report display settings.</p>
                 </div>
 
                 {/* Warning banner */}
-                <div className="rounded-lg p-4 flex gap-3" style={{ backgroundColor: 'var(--color-warning-bg)', borderLeft: '4px solid #FF9800' }}>
+                <div className="rounded-xl p-4 flex gap-3 border border-amber-200 bg-gradient-to-r from-amber-50 to-amber-100/70">
                     <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5 text-amber-700" />
                     <div>
                         <p className="text-sm font-semibold text-amber-900">CRITICAL: AI detection results are ADVISORY ONLY</p>
@@ -2239,98 +2035,12 @@ export function CreateAssignmentForm({
                     </div>
                 </div>
 
-                {/* Plagiarism Detection */}
-                <div className="p-5 rounded-lg border dark:border-gray-700">
-                    <div className="flex items-center justify-between mb-3">
-                        <div>
-                            <p className="text-sm font-semibold text-[var(--color-text-dark)] dark:text-gray-100">Plagiarism Detection</p>
-                            <p className="text-xs text-[var(--color-text-mid)] mt-0.5">Compare submissions to detect code similarity between students.</p>
-                        </div>
-                        <Controller
-                            control={control}
-                            name="plagiarismEnabled"
-                            render={({ field }) => (
-                                <Switch checked={field.value} onCheckedChange={field.onChange} />
-                            )}
-                        />
-                    </div>
-                    {watchPlagiarism && (
-                        <div className="mt-4 pl-4 border-l-2 border-[var(--color-primary)] space-y-2">
-                            <div className="flex justify-between">
-                                <span className="text-xs font-medium text-[var(--color-text-mid)] dark:text-gray-300">
-                                    Sensitivity: <strong>{getSensitivityLabel(watch('plagiarismSensitivity'))}</strong>
-                                </span>
-                                <span className="text-xs text-[var(--color-text-mid)]">{watch('plagiarismSensitivity')}%</span>
-                            </div>
-                            <Controller
-                                control={control}
-                                name="plagiarismSensitivity"
-                                render={({ field }) => (
-                                    <Slider
-                                        value={[field.value]}
-                                        onValueChange={(v) => field.onChange(v[0])}
-                                        max={100}
-                                        step={1}
-                                    />
-                                )}
-                            />
-                            <div className="flex justify-between">
-                                <span className="text-[10px] text-[var(--color-text-light)]">Low (Fewer flags)</span>
-                                <span className="text-[10px] text-[var(--color-text-light)]">High (More flags)</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* AI Code Detection */}
-                <div className="p-5 rounded-lg border dark:border-gray-700">
-                    <div className="flex items-center justify-between mb-3">
-                        <div>
-                            <p className="text-sm font-semibold text-[var(--color-text-dark)] dark:text-gray-100">AI-Generated Code Detection</p>
-                            <p className="text-xs text-[var(--color-text-mid)] mt-0.5">Flag submissions that may contain AI-generated code (ChatGPT, Copilot, etc.).</p>
-                        </div>
-                        <Controller
-                            control={control}
-                            name="aiDetectionEnabled"
-                            render={({ field }) => (
-                                <Switch checked={field.value} onCheckedChange={field.onChange} />
-                            )}
-                        />
-                    </div>
-                    {watchAiDetection && (
-                        <div className="mt-4 pl-4 border-l-2 border-[var(--color-primary)] space-y-2">
-                            <div className="flex justify-between">
-                                <span className="text-xs font-medium text-[var(--color-text-mid)] dark:text-gray-300">
-                                    Sensitivity: <strong>{getSensitivityLabel(watch('aiDetectionSensitivity'))}</strong>
-                                </span>
-                                <span className="text-xs text-[var(--color-text-mid)]">{watch('aiDetectionSensitivity')}%</span>
-                            </div>
-                            <Controller
-                                control={control}
-                                name="aiDetectionSensitivity"
-                                render={({ field }) => (
-                                    <Slider
-                                        value={[field.value]}
-                                        onValueChange={(v) => field.onChange(v[0])}
-                                        max={100}
-                                        step={1}
-                                    />
-                                )}
-                            />
-                            <div className="flex justify-between">
-                                <span className="text-[10px] text-[var(--color-text-light)]">Low (Fewer flags)</span>
-                                <span className="text-[10px] text-[var(--color-text-light)]">High (More flags)</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
                 {/* Auto-Flag for Manual Review */}
                 <div className="p-6 rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FCF8F8] shadow-sm">
                     <div className="flex items-start justify-between gap-4 mb-4">
                         <div>
-                            <p className="text-sm font-semibold text-[var(--color-text-dark)] dark:text-gray-100">Auto-Flag for Manual Review</p>
-                            <p className="text-xs text-[var(--color-text-mid)] mt-0.5">Submissions with similarity above threshold are flagged for instructor review.</p>
+                            <p className="text-[20px] leading-tight font-semibold text-gray-900 dark:text-gray-100">Auto-Flag for Manual Review</p>
+                            <p className="text-sm text-gray-600 mt-1">Submissions with similarity above threshold are flagged for instructor review.</p>
                         </div>
                         <Controller
                             control={control}
@@ -2341,33 +2051,38 @@ export function CreateAssignmentForm({
                         />
                     </div>
                     {watchAutoFlag && (
-                        <div className="mt-3 flex items-center gap-3">
-                            <Label className="text-xs whitespace-nowrap">Flag Threshold:</Label>
-                            <Input
-                                type="number"
-                                {...register('autoFlagThreshold', { valueAsNumber: true })}
-                                className="w-20"
-                                min={10}
-                                max={100}
-                            />
-                            <span className="text-xs text-[var(--color-text-mid)]">% similarity triggers review</span>
+                        <div className="mt-4 rounded-lg border border-[#E9E2E2] bg-white/80 p-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <Label className="text-xs font-medium whitespace-nowrap text-gray-800">Flag Threshold</Label>
+                                <div className="relative">
+                                    <Input
+                                        type="number"
+                                        {...register('autoFlagThreshold', { valueAsNumber: true })}
+                                        className="w-24 h-10 pr-8 text-base font-semibold"
+                                        min={10}
+                                        max={100}
+                                    />
+                                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-500">%</span>
+                                </div>
+                                <span className="text-xs text-gray-600">similarity triggers review</span>
+                            </div>
                         </div>
                     )}
                 </div>
 
                 {/* Similarity Report Settings */}
-                <div className="p-5 rounded-lg border dark:border-gray-700">
-                    <p className="text-sm font-semibold text-[var(--color-text-dark)] dark:text-gray-100 mb-3">Similarity Report Settings</p>
-                    <div className="space-y-3">
-                        <div className="flex items-center gap-3">
+                <div className="p-6 rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FAF6F6] shadow-sm">
+                    <p className="text-[20px] leading-tight font-semibold text-gray-900 dark:text-gray-100 mb-4">Similarity Report Settings</p>
+                    <div className="space-y-2">
+                        <div className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-[#F7F1F1] transition-colors">
                             <Checkbox id="show-matches" defaultChecked />
-                            <label htmlFor="show-matches" className="text-xs text-[var(--color-text-mid)] dark:text-gray-300 cursor-pointer">
+                            <label htmlFor="show-matches" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                 Show similarity percentages and source matches
                             </label>
                         </div>
                         <div className="flex items-center gap-3 rounded-md px-2 py-2 hover:bg-[#F7F1F1] transition-colors">
                             <Checkbox id="highlight-code" defaultChecked />
-                            <label htmlFor="highlight-code" className="text-xs text-[var(--color-text-mid)] dark:text-gray-300 cursor-pointer">
+                            <label htmlFor="highlight-code" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                 Highlight suspicious code sections
                             </label>
                         </div>
@@ -2383,7 +2098,7 @@ export function CreateAssignmentForm({
                                     />
                                 )}
                             />
-                            <label htmlFor="cross-section" className="text-xs text-[var(--color-text-mid)] dark:text-gray-300 cursor-pointer">
+                            <label htmlFor="cross-section" className="text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
                                 Compare across course sections
                             </label>
                         </div>
@@ -2478,10 +2193,10 @@ export function CreateAssignmentForm({
         return (
             <div className="space-y-6">
                 <div>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
-                        <Eye className="h-5 w-5 text-[var(--color-primary)]" /> Review Assignment
+                    <h2 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                        <Eye className="h-5 w-5 text-[#6B0000]" /> Review Assignment
                     </h2>
-                    <p className="text-xs text-[var(--color-text-mid)] mt-1">Review all settings before publishing. Click any section to edit.</p>
+                    <p className="text-xs text-gray-500 mt-1">Review all settings before publishing. Click any section to edit.</p>
                 </div>
 
                 {sections.map((section) => (
@@ -2489,22 +2204,22 @@ export function CreateAssignmentForm({
                         key={section.step}
                         type="button"
                         onClick={() => setCurrentStep(section.step)}
-                        className="w-full text-left p-5 rounded-lg border transition-colors hover:border-[var(--color-primary)] bg-[var(--color-surface)] dark:bg-gray-900 dark:border-gray-700"
+                        className="w-full text-left p-5 rounded-lg border transition-colors hover:border-[#6B0000] bg-white dark:bg-gray-900 dark:border-gray-700"
                     >
                         <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2">
-                                <section.icon className="h-4 w-4 text-[var(--color-primary)]" />
-                                <h3 className="text-sm font-semibold text-[var(--color-text-dark)] dark:text-gray-100">{section.title}</h3>
+                                <section.icon className="h-4 w-4 text-[#6B0000]" />
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{section.title}</h3>
                             </div>
-                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--color-success-bg)] text-[var(--color-success)]">
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700">
                                 <Check className="h-3 w-3" /> Complete
                             </span>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2">
                             {section.items.map((item, i) => (
                                 <div key={i}>
-                                    <p className="text-[11px] text-[var(--color-text-light)]">{item.label}</p>
-                                    <p className="text-xs font-medium text-[var(--color-text-mid)] dark:text-gray-300">{item.value}</p>
+                                    <p className="text-[11px] text-gray-400">{item.label}</p>
+                                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">{item.value}</p>
                                 </div>
                             ))}
                         </div>
@@ -2514,8 +2229,8 @@ export function CreateAssignmentForm({
                 {/* Description preview */}
                 {values.description && (
                     <div className="rounded-lg border p-4 dark:border-gray-700">
-                        <Label className="text-xs text-[var(--color-text-light)]">Description Preview</Label>
-                        <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--color-text-mid)] dark:text-gray-300">
+                        <Label className="text-xs text-gray-400">Description Preview</Label>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
                             {values.description.slice(0, 400)}
                             {values.description.length > 400 ? '…' : ''}
                         </p>
@@ -2525,17 +2240,17 @@ export function CreateAssignmentForm({
                 {/* Rubric details */}
                 {values.rubric.length > 0 && (
                     <div className="rounded-lg border p-4 dark:border-gray-700">
-                        <Label className="text-xs text-[var(--color-text-light)] mb-2 block">Rubric Breakdown</Label>
+                        <Label className="text-xs text-gray-400 mb-2 block">Rubric Breakdown</Label>
                         <div className="space-y-2">
                             {rubricCriteria.map((criterion, i) => (
                                 <div key={i} className="flex items-center justify-between py-1.5 border-b last:border-0 dark:border-gray-700">
                                     <div>
-                                        <span className="text-sm font-medium text-[var(--color-text-mid)] dark:text-gray-300">{criterion.name}</span>
-                                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--color-primary-bg)] text-[var(--color-text-mid)] dark:bg-gray-800">
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{criterion.name}</span>
+                                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-800">
                                             {criterion.gradingMethod}
                                         </span>
                                     </div>
-                                    <span className="text-sm font-bold text-[var(--color-primary)]">{criterion.maxPoints} pts</span>
+                                    <span className="text-sm font-bold text-[#6B0000]">{criterion.maxPoints} pts</span>
                                 </div>
                             ))}
                         </div>
@@ -2547,14 +2262,14 @@ export function CreateAssignmentForm({
                     <Button
                         type="button"
                         variant="outline"
-                        onClick={() => onSaveDraft(getValues(), { descriptionPdfFile })}
+                        onClick={() => onSaveDraft(getValues())}
                         className="flex-1 h-11"
                     >
                         <Save className="h-4 w-4 mr-2" /> Save as Draft
                     </Button>
                     <Button
                         type="button"
-                        className="flex-1 h-11 bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
+                        className="flex-1 h-11 bg-[#6B0000] text-white hover:bg-[#8B1A1A]"
                         onClick={() => setShowPublishDialog(true)}
                     >
                         <Send className="h-4 w-4 mr-2" /> Publish Assignment
@@ -2583,7 +2298,7 @@ export function CreateAssignmentForm({
     return (
         <>
             <form
-                onSubmit={handleSubmit((data) => onPublish(data, { descriptionPdfFile }))}
+                onSubmit={handleSubmit(onPublish)}
                 className="mx-auto max-w-4xl space-y-6"
             >
                 {renderStepIndicator()}
@@ -2610,20 +2325,20 @@ export function CreateAssignmentForm({
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <span className="text-xs text-[var(--color-text-light)]">
+                            <span className="text-xs text-gray-400">
                                 Step {currentStep + 1} of {STEPS.length}
                             </span>
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => onSaveDraft(getValues(), { descriptionPdfFile })}
+                                onClick={() => onSaveDraft(getValues())}
                             >
                                 <Save className="mr-1 h-4 w-4" /> Save Draft
                             </Button>
 
                             <Button
                                 type="button"
-                                className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
+                                className="bg-[#6B0000] text-white hover:bg-[#8B1A1A]"
                                 onClick={handleNext}
                             >
                                 Next <ChevronRight className="ml-1 h-4 w-4" />
@@ -2652,19 +2367,19 @@ export function CreateAssignmentForm({
                                 maxLength={60}
                             />
                         </div>
-                        <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
-                            <p className="text-xs text-[var(--color-text-mid)] mb-2">This template will include:</p>
+                        <div className="rounded-lg p-3" style={{ backgroundColor: '#F5EDED' }}>
+                            <p className="text-xs text-gray-600 mb-2">This template will include:</p>
                             <ul className="space-y-1">
-                                <li className="flex items-center gap-2 text-xs text-[var(--color-text-mid)]">
-                                    <Check className="h-3.5 w-3.5 text-[var(--color-success)]" /> {rubricFields.length} rubric criteria
+                                <li className="flex items-center gap-2 text-xs text-gray-700">
+                                    <Check className="h-3.5 w-3.5 text-green-600" /> {rubricFields.length} rubric criteria
                                 </li>
-                                <li className="flex items-center gap-2 text-xs text-[var(--color-text-mid)]">
-                                    <Check className="h-3.5 w-3.5 text-[var(--color-success)]" /> Grading methods: {[
+                                <li className="flex items-center gap-2 text-xs text-gray-700">
+                                    <Check className="h-3.5 w-3.5 text-green-600" /> Grading methods: {[
                                         ...new Set(getValues('rubric').flatMap((section) => section.criteria.map((criterion) => criterion.gradingMethod))),
                                     ].join(', ') || '—'}
                                 </li>
-                                <li className="flex items-center gap-2 text-xs text-[var(--color-text-mid)]">
-                                    <Check className="h-3.5 w-3.5 text-[var(--color-success)]" /> Total: {
+                                <li className="flex items-center gap-2 text-xs text-gray-700">
+                                    <Check className="h-3.5 w-3.5 text-green-600" /> Total: {
                                         getValues('rubric').reduce(
                                             (sectionSum, section) =>
                                                 sectionSum + section.criteria.reduce((criterionSum, criterion) => criterionSum + criterion.maxPoints, 0),
@@ -2680,7 +2395,7 @@ export function CreateAssignmentForm({
                         <Button
                             onClick={handleSaveRubricTemplate}
                             disabled={!rubricTemplateName.trim()}
-                            className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
+                            className="bg-[#6B0000] text-white hover:bg-[#8B1A1A]"
                         >
                             <BookmarkPlus className="h-4 w-4 mr-2" /> Save Template
                         </Button>
@@ -2694,22 +2409,22 @@ export function CreateAssignmentForm({
                     <DialogHeader>
                         <DialogTitle>Publish Assignment?</DialogTitle>
                         <DialogDescription>
-                            <strong className="text-[var(--color-text-dark)] dark:text-gray-100">{getValues('name') || 'This assignment'}</strong> will be visible to all students immediately. They can begin submitting right away.
+                            <strong className="text-gray-900 dark:text-gray-100">{getValues('name') || 'This assignment'}</strong> will be visible to all students immediately. They can begin submitting right away.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="mt-3 rounded-lg p-4" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
+                    <div className="mt-3 rounded-lg p-4" style={{ backgroundColor: '#F5EDED' }}>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <p className="text-[11px] text-[var(--color-text-light)]">Language</p>
-                                <p className="text-xs font-medium text-[var(--color-text-mid)]">{getValues('language') === 'python' ? 'Python' : 'Java'}</p>
+                                <p className="text-[11px] text-gray-400">Language</p>
+                                <p className="text-xs font-medium text-gray-700">{getValues('language') === 'python' ? 'Python' : 'Java'}</p>
                             </div>
                             <div>
-                                <p className="text-[11px] text-[var(--color-text-light)]">Due Date</p>
-                                <p className="text-xs font-medium text-[var(--color-text-mid)]">{getValues('dueDate') ? new Date(getValues('dueDate')).toLocaleDateString() : '—'}</p>
+                                <p className="text-[11px] text-gray-400">Due Date</p>
+                                <p className="text-xs font-medium text-gray-700">{getValues('dueDate') ? new Date(getValues('dueDate')).toLocaleDateString() : '—'}</p>
                             </div>
                             <div>
-                                <p className="text-[11px] text-[var(--color-text-light)]">Test Cases</p>
-                                <p className="text-xs font-medium text-[var(--color-text-mid)]">{getValues('publicTests').length + getValues('privateTests').length}</p>
+                                <p className="text-[11px] text-gray-400">Test Cases</p>
+                                <p className="text-xs font-medium text-gray-700">{getValues('publicTests').length + getValues('privateTests').length}</p>
                             </div>
                         </div>
                     </div>
@@ -2726,14 +2441,14 @@ export function CreateAssignmentForm({
                                 }
                                 setShowPublishDialog(false);
                                 handleSubmit(
-                                    (data) => onPublish(data, { descriptionPdfFile }),
+                                    onPublish,
                                     () => {
                                         focusFirstValidationStep();
                                         toast.error('Please fix validation errors before publishing.');
                                     }
                                 )();
                             }}
-                            className="bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
+                            className="bg-[#6B0000] text-white hover:bg-[#8B1A1A]"
                         >
                             <Check className="h-4 w-4 mr-2" /> Publish Now
                         </Button>
@@ -3103,8 +2818,8 @@ function ToggleSettingRow({
     return (
         <div className="flex items-center justify-between p-5 rounded-xl border border-[#E5D7D7] bg-gradient-to-br from-white to-[#FAF6F6] shadow-sm">
             <div>
-                <p className="text-sm font-semibold text-[var(--color-text-dark)] dark:text-gray-100">{label}</p>
-                <p className="text-xs text-[var(--color-text-mid)] mt-0.5">{description}</p>
+                <p className="text-[16px] leading-tight font-semibold text-gray-900 dark:text-gray-100">{label}</p>
+                <p className="text-[13px] text-gray-600 mt-1">{description}</p>
             </div>
             <Controller
                 control={control}

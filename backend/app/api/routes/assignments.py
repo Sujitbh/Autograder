@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
 from fastapi.responses import FileResponse
@@ -13,11 +14,84 @@ from app.models.user import User
 from app.models.enrollment import Enrollment
 from app.models.ta_permission import TAPermission
 from app.schemas.assignment import AssignmentCreate, AssignmentUpdate, AssignmentOut
+from app.schemas.course_default_rubric import AssignmentRubricReplaceBody
 from app.settings import settings
 
 router = APIRouter(prefix="/assignments", tags=["assignments"])
 
 MAX_DESCRIPTION_PDF_BYTES = 25 * 1024 * 1024  # 25 MB
+_WEIGHT_SUM_TOLERANCE = 0.01
+
+
+def _criterion_payload_weight_to_db(raw_weight: Optional[float], section_weight_percent: float) -> float:
+    """
+    Persist criterion weight in DB as a fraction-of-section for compatibility.
+
+    Accepted payload forms:
+    - Legacy fraction: 0.0..1.5 (kept as-is, clamped >= 0)
+    - Percent/global style: >1.5 converted to fraction of section.
+    """
+    if raw_weight is None:
+        return 0.0
+
+    try:
+        weight_value = float(raw_weight)
+    except (TypeError, ValueError):
+        return 0.0
+
+    if weight_value < 0:
+        return 0.0
+
+    # Legacy representation already stored as fraction-of-section.
+    if weight_value <= 1.5:
+        return weight_value
+
+    sec_w = float(section_weight_percent) if section_weight_percent else 0.0
+    if sec_w <= 0:
+        return 0.0
+
+    # Convert global percent into fraction-of-section storage.
+    return weight_value / sec_w
+
+
+def _require_assignment_rubric_editor(db: Session, user: User, assignment: Assignment) -> None:
+    """
+    Authorization for rubric editing:
+    - admin: always allowed
+    - instructor enrollment: allowed
+    - TA enrollment: allowed only if ta_permissions.can_edit_rubrics == True
+    """
+    if user.role == "admin":
+        return
+
+    enrollment = (
+        db.query(Enrollment)
+        .filter(
+            Enrollment.course_id == assignment.course_id,
+            Enrollment.user_id == user.id,
+        )
+        .first()
+    )
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="Forbidden: not enrolled in this course")
+
+    if enrollment.role == "instructor":
+        return
+
+    if enrollment.role == "ta":
+        ta_perm = (
+            db.query(TAPermission)
+            .filter(TAPermission.enrollment_id == enrollment.id)
+            .first()
+        )
+        if ta_perm and ta_perm.can_edit_rubrics:
+            return
+        raise HTTPException(
+            status_code=403,
+            detail="Forbidden: TA does not have rubric edit permission",
+        )
+
+    raise HTTPException(status_code=403, detail="Forbidden: insufficient course role")
 
 
 def _assignment_description_dir() -> Path:

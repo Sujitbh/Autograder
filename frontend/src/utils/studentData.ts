@@ -58,19 +58,19 @@ export function hashStr(s: string): number {
 /* ── Helper utilities used by multiple components ── */
 
 export function gradeColor(earned: number, max: number): string {
-    if (max === 0) return '#8A8A8A';
+    if (max === 0) return 'var(--color-text-light)';
     const pct = (earned / max) * 100;
-    if (pct >= 90) return '#2D6A2D';
-    if (pct >= 80) return '#6B0000';
-    if (pct >= 70) return '#8A5700';
-    return '#8B0000';
+    if (pct >= 90) return 'var(--color-success)';
+    if (pct >= 80) return 'var(--color-primary)';
+    if (pct >= 70) return 'var(--color-warning)';
+    return 'var(--color-error)';
 }
 
 export function pctColor(pct: number): string {
-    if (pct >= 90) return '#2D6A2D';
-    if (pct >= 80) return '#6B0000';
-    if (pct >= 70) return '#8A5700';
-    return '#8B0000';
+    if (pct >= 90) return 'var(--color-success)';
+    if (pct >= 80) return 'var(--color-primary)';
+    if (pct >= 70) return 'var(--color-warning)';
+    return 'var(--color-error)';
 }
 
 export function letterGrade(pct: number): string {

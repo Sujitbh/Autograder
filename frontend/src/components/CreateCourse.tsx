@@ -306,7 +306,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
 
     const renderFieldError = (error?: string) => {
         if (!error) return null;
-        return <p style={{ fontSize: '12px', color: '#B91C1C', marginTop: '4px' }}>{error}</p>;
+        return <p style={{ fontSize: '12px', color: 'var(--color-error)', marginTop: '4px' }}>{error}</p>;
     };
 
     /* ═══════════════════════════════════════════
@@ -328,11 +328,11 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                                     className="w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300"
                                     style={{
                                         backgroundColor: (() => {
-                                            if (isComplete) return '#2D6A2D';
-                                            if (isActive) return '#6B0000';
+                                            if (isComplete) return 'var(--color-success)';
+                                            if (isActive) return 'var(--color-primary)';
                                             return '#F1F1F1';
                                         })(),
-                                        color: isComplete || isActive ? '#fff' : '#8A8A8A',
+                                        color: isComplete || isActive ? '#fff' : 'var(--color-text-light)',
                                         boxShadow: isActive ? '0 0 0 4px rgba(107,0,0,0.15)' : 'none',
                                     }}
                                 >
@@ -344,9 +344,9 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                                         fontSize: '12px',
                                         fontWeight: isActive ? 600 : 400,
                                         color: (() => {
-                                            if (isActive) return '#6B0000';
-                                            if (isComplete) return '#2D6A2D';
-                                            return '#8A8A8A';
+                                            if (isActive) return 'var(--color-primary)';
+                                            if (isComplete) return 'var(--color-success)';
+                                            return 'var(--color-text-light)';
                                         })(),
                                     }}
                                 >
@@ -358,7 +358,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                                     className="h-[2px] transition-colors duration-300"
                                     style={{
                                         width: '80px',
-                                        backgroundColor: currentStep > step.id || currentStep === 4 ? '#2D6A2D' : '#E5E5E5',
+                                        backgroundColor: currentStep > step.id || currentStep === 4 ? 'var(--color-success)' : '#E5E5E5',
                                         marginBottom: '20px',
                                     }}
                                 />
@@ -377,11 +377,11 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
         <div className="space-y-8">
             {/* Header */}
             <div className="text-center mb-2">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4" style={{ backgroundColor: '#F5EDED' }}>
-                    <GraduationCap className="w-7 h-7" style={{ color: '#6B0000' }} />
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
+                    <GraduationCap className="w-7 h-7" style={{ color: 'var(--color-primary)' }} />
                 </div>
-                <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#2D2D2D' }}>Course Information</h2>
-                <p style={{ fontSize: '14px', color: '#595959', marginTop: '4px' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-text-dark)' }}>Course Information</h2>
+                <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '4px' }}>
                     Enter the basic details for your new course
                 </p>
             </div>
@@ -390,9 +390,9 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
             <div className="grid grid-cols-2 gap-6">
                 {/* Course Code */}
                 <div ref={codeInputRef} style={{ position: 'relative' }}>
-                    <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
-                        <Hash className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
-                        Course Code <span style={{ color: '#B91C1C' }}>*</span>
+                    <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                        <Hash className="w-3.5 h-3.5" style={{ color: 'var(--color-primary)' }} />
+                        Course Code <span style={{ color: 'var(--color-error)' }}>*</span>
                     </label>
                     <Input
                         value={courseCode}
@@ -404,7 +404,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                         className="border-[var(--color-border)] h-11"
                         style={{ fontSize: '15px' }}
                     />
-                    <p style={{ fontSize: '11px', color: '#8A8A8A', marginTop: '6px' }}>
+                    <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: '6px' }}>
                         Official course code from your institution's catalog
                     </p>
                     {renderFieldError(formErrors.courseCode)}
@@ -429,11 +429,11 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                                     key={item.code + item.name}
                                     type="button"
                                     onMouseDown={() => selectCodeSuggestion(item)}
-                                    className="w-full text-left px-4 py-2.5 hover:bg-[#F5EDED] transition-colors"
-                                    style={{ fontSize: '14px', borderBottom: '1px solid #F0F0F0' }}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-[var(--color-primary-bg)] transition-colors"
+                                    style={{ fontSize: '14px', borderBottom: '1px solid var(--color-surface-elevated)' }}
                                 >
-                                    <span style={{ fontWeight: 600, color: '#6B0000' }}>{item.code}</span>
-                                    <span style={{ color: '#595959', marginLeft: '8px' }}>{item.name}</span>
+                                    <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{item.code}</span>
+                                    <span style={{ color: 'var(--color-text-mid)', marginLeft: '8px' }}>{item.name}</span>
                                 </button>
                             ))}
                         </div>
@@ -442,9 +442,9 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
 
                 {/* Course Name */}
                 <div ref={nameInputRef} style={{ position: 'relative' }}>
-                    <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
-                        <BookOpen className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
-                        Course Name <span style={{ color: '#B91C1C' }}>*</span>
+                    <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                        <BookOpen className="w-3.5 h-3.5" style={{ color: 'var(--color-primary)' }} />
+                        Course Name <span style={{ color: 'var(--color-error)' }}>*</span>
                     </label>
                     <Input
                         value={courseName}
@@ -458,7 +458,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                     />
                     <div className="flex justify-between mt-1">
                         {renderFieldError(formErrors.courseName)}
-                        <span style={{ fontSize: '11px', color: '#8A8A8A' }}>{courseName.length}/100</span>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>{courseName.length}/100</span>
                     </div>
                     {showNameSugg && nameSuggestions.length > 0 && (
                         <div
@@ -481,11 +481,11 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                                     key={item.code + item.name}
                                     type="button"
                                     onMouseDown={() => selectNameSuggestion(item)}
-                                    className="w-full text-left px-4 py-2.5 hover:bg-[#F5EDED] transition-colors"
-                                    style={{ fontSize: '14px', borderBottom: '1px solid #F0F0F0' }}
+                                    className="w-full text-left px-4 py-2.5 hover:bg-[var(--color-primary-bg)] transition-colors"
+                                    style={{ fontSize: '14px', borderBottom: '1px solid var(--color-surface-elevated)' }}
                                 >
-                                    <span style={{ fontWeight: 600, color: '#595959' }}>{item.name}</span>
-                                    <span style={{ fontSize: '12px', color: '#8A8A8A', marginLeft: '8px' }}>({item.code})</span>
+                                    <span style={{ fontWeight: 600, color: 'var(--color-text-mid)' }}>{item.name}</span>
+                                    <span style={{ fontSize: '12px', color: 'var(--color-text-light)', marginLeft: '8px' }}>({item.code})</span>
                                 </button>
                             ))}
                         </div>
@@ -496,9 +496,9 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
             {/* Semester + Section */}
             <div className={isAdmin ? '' : 'grid grid-cols-2 gap-6'}>
                 <div>
-                    <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
-                        <Calendar className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
-                        Semester <span style={{ color: '#B91C1C' }}>*</span>
+                    <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                        <Calendar className="w-3.5 h-3.5" style={{ color: 'var(--color-primary)' }} />
+                        Semester <span style={{ color: 'var(--color-error)' }}>*</span>
                     </label>
                     <Select value={semester} onValueChange={setSemester}>
                         <SelectTrigger className="border-[var(--color-border)] h-11" style={{ fontSize: '15px' }}>
@@ -514,9 +514,9 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                 </div>
                 {!isAdmin && (
                     <div>
-                        <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
-                            <FileText className="w-3.5 h-3.5" style={{ color: '#6B0000' }} />
-                            Section Number <span style={{ color: '#B91C1C' }}>*</span>
+                        <label className="flex items-center gap-2 mb-2" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                            <FileText className="w-3.5 h-3.5" style={{ color: 'var(--color-primary)' }} />
+                            Section Number <span style={{ color: 'var(--color-error)' }}>*</span>
                         </label>
                         <Input
                             value={section}
@@ -526,7 +526,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                             className="border-[var(--color-border)] h-11"
                             style={{ fontSize: '15px' }}
                         />
-                        <p style={{ fontSize: '11px', color: '#8A8A8A', marginTop: '6px' }}>
+                        <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: '6px' }}>
                             Uniquely identifies this section of the course
                         </p>
                         {renderFieldError(formErrors.section)}
@@ -543,11 +543,11 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
         <div className="space-y-8">
             {/* Header */}
             <div className="text-center mb-2">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4" style={{ backgroundColor: '#F5EDED' }}>
-                    <Users className="w-7 h-7" style={{ color: '#6B0000' }} />
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
+                    <Users className="w-7 h-7" style={{ color: 'var(--color-primary)' }} />
                 </div>
-                <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#2D2D2D' }}>Student Enrollment</h2>
-                <p style={{ fontSize: '14px', color: '#595959', marginTop: '4px' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-text-dark)' }}>Student Enrollment</h2>
+                <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '4px' }}>
                     Choose how students will join your course
                 </p>
             </div>
@@ -558,7 +558,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                 <label
                     className="flex flex-col p-6 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md"
                     style={{
-                        borderColor: enrollmentMethod === 'code' ? '#6B0000' : 'var(--color-border)',
+                        borderColor: enrollmentMethod === 'code' ? 'var(--color-primary)' : 'var(--color-border)',
                         backgroundColor: enrollmentMethod === 'code' ? '#FBF5F5' : '#fff',
                     }}
                 >
@@ -573,29 +573,29 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                         <div
                             className="w-12 h-12 rounded-xl flex items-center justify-center"
                             style={{
-                                backgroundColor: enrollmentMethod === 'code' ? '#6B0000' : '#F1F1F1',
-                                color: enrollmentMethod === 'code' ? '#fff' : '#8A8A8A',
+                                backgroundColor: enrollmentMethod === 'code' ? 'var(--color-primary)' : '#F1F1F1',
+                                color: enrollmentMethod === 'code' ? '#fff' : 'var(--color-text-light)',
                             }}
                         >
                             <Sparkles className="w-6 h-6" />
                         </div>
                         {enrollmentMethod === 'code' && (
-                            <span className="px-3 py-1 rounded-full" style={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#6B0000', color: '#fff' }}>
+                            <span className="px-3 py-1 rounded-full" style={{ fontSize: '11px', fontWeight: 700, backgroundColor: 'var(--color-primary)', color: '#fff' }}>
                                 SELECTED
                             </span>
                         )}
                     </div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#2D2D2D', marginBottom: '6px' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: '6px' }}>
                         Course Code
                     </h3>
-                    <p style={{ fontSize: '13px', color: '#595959', lineHeight: '20px', flex: 1 }}>
+                    <p style={{ fontSize: '13px', color: 'var(--color-text-mid)', lineHeight: '20px', flex: 1 }}>
                         A unique 7-character code is generated automatically. Share it in class, on your syllabus, or via email — students enter the code to join instantly.
                     </p>
                     <div className="flex items-center gap-2 mt-4 pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-                        <span className="px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: '#E8F0FF', color: '#1A4D7A' }}>
+                        <span className="px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: 'var(--color-info-bg)', color: 'var(--color-info)' }}>
                             Recommended
                         </span>
-                        <span style={{ fontSize: '11px', color: '#8A8A8A' }}>Self-service enrollment</span>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>Self-service enrollment</span>
                     </div>
                 </label>
 
@@ -603,7 +603,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                 <label
                     className="flex flex-col p-6 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md"
                     style={{
-                        borderColor: enrollmentMethod === 'manual' ? '#6B0000' : 'var(--color-border)',
+                        borderColor: enrollmentMethod === 'manual' ? 'var(--color-primary)' : 'var(--color-border)',
                         backgroundColor: enrollmentMethod === 'manual' ? '#FBF5F5' : '#fff',
                     }}
                 >
@@ -618,42 +618,42 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                         <div
                             className="w-12 h-12 rounded-xl flex items-center justify-center"
                             style={{
-                                backgroundColor: enrollmentMethod === 'manual' ? '#6B0000' : '#F1F1F1',
-                                color: enrollmentMethod === 'manual' ? '#fff' : '#8A8A8A',
+                                backgroundColor: enrollmentMethod === 'manual' ? 'var(--color-primary)' : '#F1F1F1',
+                                color: enrollmentMethod === 'manual' ? '#fff' : 'var(--color-text-light)',
                             }}
                         >
                             <ClipboardList className="w-6 h-6" />
                         </div>
                         {enrollmentMethod === 'manual' && (
-                            <span className="px-3 py-1 rounded-full" style={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#6B0000', color: '#fff' }}>
+                            <span className="px-3 py-1 rounded-full" style={{ fontSize: '11px', fontWeight: 700, backgroundColor: 'var(--color-primary)', color: '#fff' }}>
                                 SELECTED
                             </span>
                         )}
                     </div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 700, color: '#2D2D2D', marginBottom: '6px' }}>
+                    <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: '6px' }}>
                         Manual Enrollment
                     </h3>
-                    <p style={{ fontSize: '13px', color: '#595959', lineHeight: '20px', flex: 1 }}>
+                    <p style={{ fontSize: '13px', color: 'var(--color-text-mid)', lineHeight: '20px', flex: 1 }}>
                         You control who joins by adding students individually, uploading a CSV roster, or importing from your LMS (Canvas, Blackboard, etc.).
                     </p>
                     <div className="flex items-center gap-2 mt-4 pt-4" style={{ borderTop: '1px solid var(--color-border)' }}>
-                        <span className="px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: '#FFF3E0', color: '#8A5700' }}>
+                        <span className="px-2 py-0.5 rounded" style={{ fontSize: '11px', fontWeight: 600, backgroundColor: '#FFF3E0', color: 'var(--color-warning)' }}>
                             Instructor-controlled
                         </span>
-                        <span style={{ fontSize: '11px', color: '#8A8A8A' }}>Manual management</span>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-light)' }}>Manual management</span>
                     </div>
                 </label>
             </div>
 
             {/* Context Info */}
             {enrollmentMethod === 'code' ? (
-                <div className="flex items-start gap-4 p-5 rounded-xl" style={{ backgroundColor: '#E8F0FF', border: '1px solid #B3D0F0' }}>
-                    <Info className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#1A4D7A' }} />
+                <div className="flex items-start gap-4 p-5 rounded-xl" style={{ backgroundColor: 'var(--color-info-bg)', border: '1px solid #B3D0F0' }}>
+                    <Info className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-info)' }} />
                     <div>
-                        <p style={{ fontSize: '14px', fontWeight: 600, color: '#1A4D7A', marginBottom: '4px' }}>
+                        <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-info)', marginBottom: '4px' }}>
                             How course codes work
                         </p>
-                        <ul className="space-y-1" style={{ fontSize: '13px', color: '#1A4D7A', lineHeight: '20px' }}>
+                        <ul className="space-y-1" style={{ fontSize: '13px', color: 'var(--color-info)', lineHeight: '20px' }}>
                             <li>• A unique 7-character alphanumeric code is generated when you create the course</li>
                             <li>• Students enter the code in their Axiom dashboard to join instantly</li>
                             <li>• You can disable, regenerate, or share the code anytime from Course Settings</li>
@@ -663,12 +663,12 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                 </div>
             ) : (
                 <div className="flex items-start gap-4 p-5 rounded-xl" style={{ backgroundColor: '#FFF3E0', border: '1px solid #F0D8A8' }}>
-                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#8A5700' }} />
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-warning)' }} />
                     <div>
-                        <p style={{ fontSize: '14px', fontWeight: 600, color: '#8A5700', marginBottom: '4px' }}>
+                        <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-warning)', marginBottom: '4px' }}>
                             Manual enrollment only
                         </p>
-                        <ul className="space-y-1" style={{ fontSize: '13px', color: '#8A5700', lineHeight: '20px' }}>
+                        <ul className="space-y-1" style={{ fontSize: '13px', color: 'var(--color-warning)', lineHeight: '20px' }}>
                             <li>• Students cannot self-enroll — you must add each student</li>
                             <li>• Upload a CSV file or add students one by one</li>
                             <li>• You can always enable course codes later from Settings</li>
@@ -678,7 +678,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
             )}
 
             <div>
-                <label htmlFor="initial-student-emails" className="block mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
+                <label htmlFor="initial-student-emails" className="block mb-2" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                     Initial Student Emails (optional)
                 </label>
                 <Textarea
@@ -689,13 +689,13 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                     rows={2}
                     className="border-[var(--color-border)]"
                 />
-                <p style={{ fontSize: '11px', color: '#8A8A8A', marginTop: '6px' }}>
+                <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: '6px' }}>
                     Comma-separated. Existing users will be enrolled as students after course creation.
                 </p>
             </div>
 
             <div>
-                <label htmlFor="initial-ta-emails" className="block mb-2" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>
+                <label htmlFor="initial-ta-emails" className="block mb-2" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                     Initial Grading Assistant Emails (optional)
                 </label>
                 <Textarea
@@ -706,7 +706,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                     rows={2}
                     className="border-[var(--color-border)]"
                 />
-                <p style={{ fontSize: '11px', color: '#8A8A8A', marginTop: '6px' }}>
+                <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: '6px' }}>
                     Comma-separated. Existing faculty/admin users will be enrolled as course TAs.
                 </p>
             </div>
@@ -720,22 +720,22 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
         <div className="space-y-8">
             {/* Header */}
             <div className="text-center mb-2">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4" style={{ backgroundColor: '#F5EDED' }}>
-                    <ClipboardList className="w-7 h-7" style={{ color: '#6B0000' }} />
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
+                    <ClipboardList className="w-7 h-7" style={{ color: 'var(--color-primary)' }} />
                 </div>
-                <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#2D2D2D' }}>Review & Create</h2>
-                <p style={{ fontSize: '14px', color: '#595959', marginTop: '4px' }}>
+                <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-text-dark)' }}>Review & Create</h2>
+                <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '4px' }}>
                     Double-check everything before creating your course
                 </p>
             </div>
 
             {/* Error Display */}
             {formErrors.courseName && (
-                <div className="p-4 rounded-lg flex items-start gap-3" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5' }}>
-                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#DC2626' }} />
+                <div className="p-4 rounded-lg flex items-start gap-3" style={{ backgroundColor: 'var(--color-error-bg)', border: '1px solid #FCA5A5' }}>
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-error)' }} />
                     <div>
-                        <p style={{ fontSize: '14px', fontWeight: 600, color: '#DC2626', marginBottom: '2px' }}>Unable to create course</p>
-                        <p style={{ fontSize: '13px', color: '#991B1B' }}>{formErrors.courseName}</p>
+                        <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-error)', marginBottom: '2px' }}>Unable to create course</p>
+                        <p style={{ fontSize: '13px', color: 'var(--color-error)' }}>{formErrors.courseName}</p>
                     </div>
                 </div>
             )}
@@ -743,7 +743,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
             {/* Summary Card */}
             <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--color-border)', backgroundColor: '#fff' }}>
                 {/* Maroon header */}
-                <div className="px-6 py-4" style={{ backgroundColor: '#6B0000' }}>
+                <div className="px-6 py-4" style={{ backgroundColor: 'var(--color-primary)' }}>
                     <div className="flex items-center justify-between">
                         <div>
                             <span className="px-3 py-1 rounded-full" style={{ fontSize: '12px', fontWeight: 700, backgroundColor: 'rgba(255,255,255,0.2)', color: '#fff' }}>
@@ -766,17 +766,17 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                 <div className="p-6">
                     <div className="grid grid-cols-2 gap-y-5 gap-x-8">
                         <div>
-                            <p style={{ fontSize: '11px', fontWeight: 600, color: '#8A8A8A', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Semester</p>
-                            <p style={{ fontSize: '15px', fontWeight: 500, color: '#2D2D2D' }}>{semester}</p>
+                            <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Semester</p>
+                            <p style={{ fontSize: '15px', fontWeight: 500, color: 'var(--color-text-dark)' }}>{semester}</p>
                         </div>
                         <div>
-                            <p style={{ fontSize: '11px', fontWeight: 600, color: '#8A8A8A', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Section</p>
-                            <p style={{ fontSize: '15px', fontWeight: 500, color: '#2D2D2D' }}>{section.trim() || '—'}</p>
+                            <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Section</p>
+                            <p style={{ fontSize: '15px', fontWeight: 500, color: 'var(--color-text-dark)' }}>{section.trim() || '—'}</p>
                         </div>
                         <div>
-                            <p style={{ fontSize: '11px', fontWeight: 600, color: '#8A8A8A', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Enrollment Method</p>
+                            <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Enrollment Method</p>
                             <div className="flex items-center gap-2">
-                                <p style={{ fontSize: '15px', fontWeight: 500, color: '#2D2D2D' }}>
+                                <p style={{ fontSize: '15px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
                                     {enrollmentMethod === 'code' ? 'Course Code (Self-Enrollment)' : 'Manual Only'}
                                 </p>
                             </div>
@@ -785,8 +785,8 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
 
                     {description.trim() && (
                         <div className="mt-5 pt-5" style={{ borderTop: '1px solid var(--color-border)' }}>
-                            <p style={{ fontSize: '11px', fontWeight: 600, color: '#8A8A8A', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Description</p>
-                            <p style={{ fontSize: '14px', color: '#595959', lineHeight: '22px' }}>{description.trim()}</p>
+                            <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>Description</p>
+                            <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', lineHeight: '22px' }}>{description.trim()}</p>
                         </div>
                     )}
                 </div>
@@ -795,20 +795,20 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
             {/* What happens next */}
             {!isAdmin && (
                 <div className="p-5 rounded-xl" style={{ backgroundColor: '#F9FAFB', border: '1px solid var(--color-border)' }}>
-                    <p style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D', marginBottom: '10px' }}>What happens next?</p>
+                    <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '10px' }}>What happens next?</p>
                     <div className="space-y-3">
                         {[
-                            { text: 'Your course will be created and set to Active status', color: '#2D6A2D', order: 1 },
+                            { text: 'Your course will be created and set to Active status', color: 'var(--color-success)', order: 1 },
                             enrollmentMethod === 'code'
-                                ? { text: 'A unique 7-character enrollment code will be generated for students', color: '#1A4D7A', order: 2 }
-                                : { text: 'You can add students manually from the Students page', color: '#8A5700', order: 2 },
-                            { text: 'You can start creating assignments right away', color: '#6B0000', order: 3 },
+                                ? { text: 'A unique 7-character enrollment code will be generated for students', color: 'var(--color-info)', order: 2 }
+                                : { text: 'You can add students manually from the Students page', color: 'var(--color-warning)', order: 2 },
+                            { text: 'You can start creating assignments right away', color: 'var(--color-primary)', order: 3 },
                         ].map((item) => (
                             <div key={item.text} className="flex items-center gap-3">
                                 <div className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: item.color, color: '#fff' }}>
                                     <span style={{ fontSize: '11px', fontWeight: 700 }}>{item.order}</span>
                                 </div>
-                                <p style={{ fontSize: '13px', color: '#595959' }}>{item.text}</p>
+                                <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>{item.text}</p>
                             </div>
                         ))}
                     </div>
@@ -827,22 +827,22 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
             <div className="space-y-8">
                 {/* Success banner */}
                 <div className="text-center">
-                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-5" style={{ backgroundColor: '#F0FDF4' }}>
-                        <Check className="w-10 h-10" style={{ color: '#2D6A2D' }} />
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-full mb-5" style={{ backgroundColor: 'var(--color-success-bg)' }}>
+                        <Check className="w-10 h-10" style={{ color: 'var(--color-success)' }} />
                     </div>
-                    <h2 style={{ fontSize: '26px', fontWeight: 700, color: '#2D2D2D' }}>Course Created Successfully!</h2>
-                    <p className="mt-2" style={{ fontSize: '16px', color: '#595959' }}>
+                    <h2 style={{ fontSize: '26px', fontWeight: 700, color: 'var(--color-text-dark)' }}>Course Created Successfully!</h2>
+                    <p className="mt-2" style={{ fontSize: '16px', color: 'var(--color-text-mid)' }}>
                         <span style={{ fontWeight: 600 }}>{createdCourse.code}</span> — {createdCourse.title}
                     </p>
-                    <p style={{ fontSize: '14px', color: '#8A8A8A', marginTop: '2px' }}>
+                    <p style={{ fontSize: '14px', color: 'var(--color-text-light)', marginTop: '2px' }}>
                         {createdCourse.semester}{createdCourse.section ? ` · Section ${createdCourse.section}` : ''}
                     </p>
                 </div>
 
                 {/* Enrollment Code Display */}
                 {createdCourse.enrollmentCode && (
-                    <div className="rounded-2xl overflow-hidden" style={{ border: '2px solid #6B0000' }}>
-                        <div className="px-6 py-4 text-center" style={{ backgroundColor: '#6B0000' }}>
+                    <div className="rounded-2xl overflow-hidden" style={{ border: '2px solid var(--color-primary)' }}>
+                        <div className="px-6 py-4 text-center" style={{ backgroundColor: 'var(--color-primary)' }}>
                             <p style={{ fontSize: '13px', fontWeight: 500, color: '#E8CCCC', textTransform: 'uppercase', letterSpacing: '1.5px' }}>
                                 Your Course Enrollment Code
                             </p>
@@ -851,22 +851,22 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                             <p style={{
                                 fontSize: '56px',
                                 fontWeight: 700,
-                                color: '#6B0000',
+                                color: 'var(--color-primary)',
                                 letterSpacing: '12px',
                                 fontFamily: 'monospace',
                                 lineHeight: 1,
                             }}>
                                 {createdCourse.enrollmentCode}
                             </p>
-                            <p className="mt-4" style={{ fontSize: '14px', color: '#595959' }}>
+                            <p className="mt-4" style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>
                                 Share this code with your students so they can join the course
                             </p>
                         </div>
                         <div className="flex border-t" style={{ borderColor: '#E8CCCC' }}>
                             <button
                                 onClick={() => copyCode(createdCourse.enrollmentCode!)}
-                                className="flex-1 flex items-center justify-center gap-2 py-4 transition-colors hover:bg-[#F5EDED]"
-                                style={{ fontSize: '14px', fontWeight: 500, color: '#6B0000', borderRight: '1px solid #E8CCCC' }}
+                                className="flex-1 flex items-center justify-center gap-2 py-4 transition-colors hover:bg-[var(--color-primary-bg)]"
+                                style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)', borderRight: '1px solid #E8CCCC' }}
                             >
                                 {codeCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                                 {codeCopied ? 'Copied!' : 'Copy Code'}
@@ -879,8 +879,8 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                                     );
                                     window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
                                 }}
-                                className="flex-1 flex items-center justify-center gap-2 py-4 transition-colors hover:bg-[#F5EDED]"
-                                style={{ fontSize: '14px', fontWeight: 500, color: '#6B0000', borderRight: '1px solid #E8CCCC' }}
+                                className="flex-1 flex items-center justify-center gap-2 py-4 transition-colors hover:bg-[var(--color-primary-bg)]"
+                                style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)', borderRight: '1px solid #E8CCCC' }}
                             >
                                 <Mail className="w-4 h-4" /> Email Students
                             </button>
@@ -892,10 +892,10 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                                         printWin.document.writeln(`
                       <html><head><title>Course Code</title>
                       <style>body{font-family:Inter,system-ui,sans-serif;text-align:center;padding:60px}
-                      h1{color:#6B0000;font-size:28px;margin-bottom:4px}
-                      .sub{color:#595959;font-size:16px;margin-bottom:48px}
-                      .code{font-size:80px;font-weight:700;color:#6B0000;letter-spacing:16px;font-family:monospace;margin:48px 0;padding:32px 48px;border:3px solid #6B0000;border-radius:20px;display:inline-block}
-                      .help{color:#595959;font-size:15px;margin-top:48px;line-height:1.6}</style></head>
+                      h1{color:var(--color-primary);font-size:28px;margin-bottom:4px}
+                      .sub{color:var(--color-text-mid);font-size:16px;margin-bottom:48px}
+                      .code{font-size:80px;font-weight:700;color:var(--color-primary);letter-spacing:16px;font-family:monospace;margin:48px 0;padding:32px 48px;border:3px solid var(--color-primary);border-radius:20px;display:inline-block}
+                      .help{color:var(--color-text-mid);font-size:15px;margin-top:48px;line-height:1.6}</style></head>
                       <body>
                       <h1>${createdCourse.code} — ${createdCourse.title}</h1>
                       <p class="sub">${createdCourse.semester}${createdCourse.section ? ` · Section ${createdCourse.section}` : ''}</p>
@@ -909,8 +909,8 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                                         printWin.print();
                                     }
                                 }}
-                                className="flex-1 flex items-center justify-center gap-2 py-4 transition-colors hover:bg-[#F5EDED]"
-                                style={{ fontSize: '14px', fontWeight: 500, color: '#6B0000' }}
+                                className="flex-1 flex items-center justify-center gap-2 py-4 transition-colors hover:bg-[var(--color-primary-bg)]"
+                                style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-primary)' }}
                             >
                                 <Printer className="w-4 h-4" /> Print for Syllabus
                             </button>
@@ -920,34 +920,34 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
 
                 {/* Quick Actions */}
                 <div>
-                    <p style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D', marginBottom: '12px' }}>Quick Actions</p>
+                    <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '12px' }}>Quick Actions</p>
                     <div className="grid grid-cols-3 gap-4">
                         <button
                             onClick={() => router.push(`/courses/${createdCourse.id}`)}
-                            className="p-5 rounded-xl border text-left transition-all hover:shadow-md hover:border-[#6B0000]"
+                            className="p-5 rounded-xl border text-left transition-all hover:shadow-md hover:border-[var(--color-primary)]"
                             style={{ borderColor: 'var(--color-border)', backgroundColor: '#fff' }}
                         >
-                            <BookOpen className="w-6 h-6 mb-3" style={{ color: '#6B0000' }} />
-                            <p style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>Open Course</p>
-                            <p style={{ fontSize: '12px', color: '#8A8A8A', marginTop: '2px' }}>View your new course dashboard</p>
+                            <BookOpen className="w-6 h-6 mb-3" style={{ color: 'var(--color-primary)' }} />
+                            <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)' }}>Open Course</p>
+                            <p style={{ fontSize: '12px', color: 'var(--color-text-light)', marginTop: '2px' }}>View your new course dashboard</p>
                         </button>
                         <button
                             onClick={() => router.push(`/courses/${createdCourse.id}/assignment/new`)}
-                            className="p-5 rounded-xl border text-left transition-all hover:shadow-md hover:border-[#6B0000]"
+                            className="p-5 rounded-xl border text-left transition-all hover:shadow-md hover:border-[var(--color-primary)]"
                             style={{ borderColor: 'var(--color-border)', backgroundColor: '#fff' }}
                         >
-                            <FileText className="w-6 h-6 mb-3" style={{ color: '#6B0000' }} />
-                            <p style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>Create Assignment</p>
-                            <p style={{ fontSize: '12px', color: '#8A8A8A', marginTop: '2px' }}>Start building your first assignment</p>
+                            <FileText className="w-6 h-6 mb-3" style={{ color: 'var(--color-primary)' }} />
+                            <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)' }}>Create Assignment</p>
+                            <p style={{ fontSize: '12px', color: 'var(--color-text-light)', marginTop: '2px' }}>Start building your first assignment</p>
                         </button>
                         <button
                             onClick={() => router.push(`/courses/${createdCourse.id}/settings`)}
-                            className="p-5 rounded-xl border text-left transition-all hover:shadow-md hover:border-[#6B0000]"
+                            className="p-5 rounded-xl border text-left transition-all hover:shadow-md hover:border-[var(--color-primary)]"
                             style={{ borderColor: 'var(--color-border)', backgroundColor: '#fff' }}
                         >
-                            <Users className="w-6 h-6 mb-3" style={{ color: '#6B0000' }} />
-                            <p style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>Course Settings</p>
-                            <p style={{ fontSize: '12px', color: '#8A8A8A', marginTop: '2px' }}>Manage enrollment & preferences</p>
+                            <Users className="w-6 h-6 mb-3" style={{ color: 'var(--color-primary)' }} />
+                            <p style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)' }}>Course Settings</p>
+                            <p style={{ fontSize: '12px', color: 'var(--color-text-light)', marginTop: '2px' }}>Manage enrollment & preferences</p>
                         </button>
                     </div>
                 </div>
@@ -972,7 +972,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                 />
             )}
 
-            <main className="flex-1 overflow-auto" style={{ backgroundColor: '#FAFAFA' }}>
+            <main className="flex-1 overflow-auto" style={{ backgroundColor: 'var(--color-surface-elevated)' }}>
                 <div className="max-w-3xl mx-auto py-10 px-6">
 
                     {/* Step Progress (hide on success) */}
@@ -1021,7 +1021,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                             </div>
 
                             <div className="flex items-center gap-2">
-                                <span style={{ fontSize: '13px', color: '#8A8A8A' }}>
+                                <span style={{ fontSize: '13px', color: 'var(--color-text-light)' }}>
                                     {isAdmin
                                         ? `Step ${currentStep === 1 ? 1 : 2} of 2`
                                         : `Step ${currentStep} of 3`
@@ -1034,7 +1034,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                                     <Button
                                         onClick={goNext}
                                         className="text-white"
-                                        style={{ backgroundColor: '#6B0000', height: '44px', padding: '0 28px' }}
+                                        style={{ backgroundColor: 'var(--color-primary)', height: '44px', padding: '0 28px' }}
                                     >
                                         Continue
                                         <ChevronRight className="w-4 h-4 ml-2" />
@@ -1044,7 +1044,7 @@ export function CreateCourse({ isAdmin = false }: CreateCourseProps) {
                                         onClick={handleCreate}
                                         disabled={isCreating}
                                         className="text-white"
-                                        style={{ backgroundColor: '#6B0000', height: '44px', padding: '0 28px' }}
+                                        style={{ backgroundColor: 'var(--color-primary)', height: '44px', padding: '0 28px' }}
                                     >
                                         {isCreating ? (
                                             <span className="inline-flex items-center">

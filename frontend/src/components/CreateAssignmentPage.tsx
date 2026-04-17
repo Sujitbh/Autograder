@@ -11,15 +11,17 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { TopNav } from '@/components/TopNav';
 import { PageLayout } from '@/components/PageLayout';
 import { Sidebar } from '@/components/Sidebar';
-import {
-    CreateAssignmentForm,
-    type AssignmentFormData,
-    type AssignmentSubmitOptions,
-} from '@/components/CreateAssignmentForm';
+import { CreateAssignmentForm, type AssignmentFormData } from '@/components/CreateAssignmentForm';
 import { toast } from 'sonner';
 import { useCreateAssignment, useUpdateAssignment } from '@/hooks/queries';
 import type { CreateAssignmentDto } from '@/types';
-import { assignmentService } from '@/services/api';
+import { criterionWeightForAssignmentApi } from '@/lib/rubricApiWeights';
+import { courseService } from '@/services/api/courseService';
+import { assignmentService } from '@/services/api/assignmentService';
+import { testcaseService } from '@/services/api/testcaseService';
+import { courseDefaultApiToFormPartial } from '@/lib/courseDefaultRubric';
+import { Loader2 } from 'lucide-react';
+import type { Assignment } from '@/types';
 
 function lookupCourseCode(id: string) {
     try {
@@ -52,7 +54,7 @@ function assignmentToFormPartial(a: Assignment): Partial<AssignmentFormData> {
     };
 
     const rubricSections = Array.isArray(a.rubric)
-        ? (a.rubric as Array<Record<string, unknown>>)
+        ? (a.rubric as unknown as Array<Record<string, unknown>>)
             .filter((section) => Array.isArray((section as { criteria?: unknown[] }).criteria))
             .map((section) => {
                 const s = section as {
@@ -136,9 +138,6 @@ function toDto(data: AssignmentFormData, courseId: string): CreateAssignmentDto 
         maxSubmissions: data.maxAttempts ?? 5,
         rubricMode: data.rubricMode,
         isGroup: data.isGroup ?? false,
-        aiDetectionEnabled: data.aiDetectionEnabled ?? true,
-        autoFlagEnabled: data.autoFlagEnabled ?? true,
-        autoFlagThreshold: data.autoFlagThreshold ?? 70,
         starterCode: data.starterCode || undefined,
         allowLateSubmissions: false,
         latePenalty: undefined,
@@ -183,75 +182,275 @@ export function CreateAssignmentPage() {
     const draftId = searchParams.get('draftId');
     const courseCode = lookupCourseCode(cid);
     const createMutation = useCreateAssignment();
-    const uploadDescriptionPdfIfProvided = useCallback(
-        async (assignmentId: string, options?: AssignmentSubmitOptions) => {
-            const file = options?.descriptionPdfFile;
-            if (!file) return;
-            try {
-                await assignmentService.uploadDescriptionPdf(assignmentId, file);
-            } catch (err) {
-                const message = err instanceof Error ? err.message : 'Unknown error';
-                toast.error(`Assignment saved, but PDF attachment failed: ${message}`);
+    const updateMutation = useUpdateAssignment();
+    const [defaultRubricReady, setDefaultRubricReady] = useState(false);
+    const [initialData, setInitialData] = useState<Partial<AssignmentFormData>>({});
+    const [initialStep, setInitialStep] = useState(0);
+
+    useEffect(() => {
+        if (!cid) return;
+        let cancelled = false;
+        const load = async () => {
+            setDefaultRubricReady(false);
+            if (draftId) {
+                try {
+                    const localKey = `autograde_assignment_draft_edit_${draftId}`;
+                    const raw = localStorage.getItem(localKey);
+                    if (raw) {
+                        const parsed = JSON.parse(raw) as Partial<AssignmentFormData>;
+                        if (!cancelled) {
+                            setInitialData(parsed);
+                            setInitialStep(8);
+                            setDefaultRubricReady(true);
+                        }
+                        return;
+                    }
+                    const assignment = await assignmentService.getAssignment(cid, draftId);
+                    const testcases = await testcaseService.getAssignmentTestCases(draftId);
+                    const mappedPublicTests = testcases
+                        .filter((tc) => tc.is_public)
+                        .map((tc, idx) => ({
+                            name: tc.name || `Public Test ${idx + 1}`,
+                            inputType: 'text' as const,
+                            input: tc.input_data ?? '',
+                            expectedOutput: tc.expected_output ?? '',
+                            points: tc.points ?? 1,
+                        }));
+                    const mappedPrivateTests = testcases
+                        .filter((tc) => !tc.is_public)
+                        .map((tc, idx) => ({
+                            name: tc.name || `Private Test ${idx + 1}`,
+                            inputType: 'text' as const,
+                            input: tc.input_data ?? '',
+                            expectedOutput: tc.expected_output ?? '',
+                            points: tc.points ?? 1,
+                        }));
+                    if (!cancelled) {
+                        setInitialData({
+                            ...assignmentToFormPartial(assignment),
+                            publicTests: mappedPublicTests,
+                            privateTests: mappedPrivateTests,
+                        });
+                        setInitialStep(8);
+                    }
+                } catch {
+                    if (!cancelled) {
+                        setInitialData({});
+                        setInitialStep(0);
+                    }
+                } finally {
+                    if (!cancelled) setDefaultRubricReady(true);
+                }
+                return;
             }
-        },
-        []
-    );
+
+            courseService
+                .getCourseDefaultRubric(cid)
+                .then((d) => {
+                    if (!cancelled) {
+                        setInitialData(courseDefaultApiToFormPartial(d));
+                        setInitialStep(0);
+                    }
+                })
+                .catch(() => {
+                    if (!cancelled) {
+                        setInitialData({});
+                        setInitialStep(0);
+                    }
+                })
+                .finally(() => {
+                    if (!cancelled) setDefaultRubricReady(true);
+                });
+        };
+        void load();
+        return () => {
+            cancelled = true;
+        };
+    }, [cid, draftId]);
 
     const handleSaveDraft = useCallback(
-        async (data: AssignmentFormData, options?: AssignmentSubmitOptions) => {
+        (data: AssignmentFormData) => {
             const dto = { ...toDto(data, cid), status: 'draft' } as CreateAssignmentDto & { status: string };
-            try {
-                const created = await createMutation.mutateAsync(dto);
-                await uploadDescriptionPdfIfProvided(created.id, options);
-
-                // Clear local draft
-                try {
-                    localStorage.removeItem(`autograde_assignment_draft_${cid}`);
-                } catch { /* ignore */ }
-                toast.success('Assignment saved as draft!');
-                router.push(`/courses/${cid}`);
-            } catch (err) {
-                // Fallback: save to localStorage if backend fails
-                try {
-                    localStorage.setItem(
-                        `autograde_assignment_draft_${cid}`,
-                        JSON.stringify(data),
-                    );
-                } catch { /* ignore */ }
-                const message = err instanceof Error ? err.message : 'Unknown error';
-                const msg = `Failed to save draft to server: ${message}. Saved locally instead.`;
-                toast.error(msg);
-                if (typeof window !== 'undefined') {
-                    window.alert(msg);
-                }
+            if (draftId) {
+                void (async () => {
+                    try {
+                        await updateMutation.mutateAsync({
+                            courseId: cid,
+                            assignmentId: draftId,
+                            dto: {
+                                ...dto,
+                                status: 'draft',
+                            },
+                        });
+                        await testcaseService.replaceAssignmentTestCases(
+                            draftId,
+                            [
+                                ...(data.publicTests ?? []).map((t) => ({
+                                    name: t.name,
+                                    input: t.input,
+                                    expectedOutput: t.expectedOutput,
+                                    isPublic: true,
+                                    points: 1,
+                                })),
+                                ...(data.privateTests ?? []).map((t) => ({
+                                    name: t.name,
+                                    input: t.input,
+                                    expectedOutput: t.expectedOutput,
+                                    isPublic: false,
+                                    points: 1,
+                                })),
+                            ]
+                        );
+                        try {
+                            localStorage.setItem(`autograde_assignment_draft_edit_${draftId}`, JSON.stringify(data));
+                        } catch { /* ignore */ }
+                        try {
+                            localStorage.removeItem(`autograde_assignment_draft_${cid}`);
+                        } catch { /* ignore */ }
+                        toast.success('Draft updated.');
+                        router.push(`/courses/${cid}`);
+                    } catch (err: any) {
+                        try {
+                            localStorage.setItem(
+                                `autograde_assignment_draft_edit_${draftId}`,
+                                JSON.stringify(data),
+                            );
+                        } catch { /* ignore */ }
+                        const msg = `Failed to update draft on server: ${err.message}. Saved locally instead.`;
+                        toast.error(msg);
+                        if (typeof window !== 'undefined') {
+                            window.alert(msg);
+                        }
+                    }
+                })();
+                return;
             }
+
+            createMutation.mutate(dto, {
+                onSuccess: (created) => {
+                    // Persist the latest editable draft snapshot by assignment id.
+                    try {
+                        localStorage.setItem(`autograde_assignment_draft_edit_${created.id}`, JSON.stringify(data));
+                    } catch { /* ignore */ }
+                    // Clear local draft
+                    try {
+                        localStorage.removeItem(`autograde_assignment_draft_${cid}`);
+                    } catch { /* ignore */ }
+                    toast.success('Assignment saved as draft!');
+                    router.push(`/courses/${cid}`);
+                },
+                onError: (err) => {
+                    // Fallback: save to localStorage if backend fails
+                    try {
+                        localStorage.setItem(
+                            `autograde_assignment_draft_${cid}`,
+                            JSON.stringify(data),
+                        );
+                    } catch { /* ignore */ }
+                    const msg = `Failed to save draft to server: ${err.message}. Saved locally instead.`;
+                    toast.error(msg);
+                    if (typeof window !== 'undefined') {
+                        window.alert(msg);
+                    }
+                },
+            });
         },
-        [cid, createMutation, router, uploadDescriptionPdfIfProvided]
+        [cid, createMutation, updateMutation, draftId, router]
     );
 
     const handlePublish = useCallback(
-        async (data: AssignmentFormData, options?: AssignmentSubmitOptions) => {
+        (data: AssignmentFormData) => {
             const dto = toDto(data, cid);
-            try {
-                const created = await createMutation.mutateAsync(dto);
-                await uploadDescriptionPdfIfProvided(created.id, options);
+            if (draftId) {
+                void (async () => {
+                    try {
+                        await updateMutation.mutateAsync({
+                            courseId: cid,
+                            assignmentId: draftId,
+                            dto: {
+                                ...dto,
+                                status: 'published',
+                                isActive: true,
+                            },
+                        });
 
-                // Clear draft
-                try {
-                    localStorage.removeItem(`autograde_assignment_draft_${cid}`);
-                } catch { /* ignore */ }
-                toast.success('Assignment published!');
-                router.push(`/courses/${cid}`);
-            } catch (err) {
-                const message = err instanceof Error ? err.message : 'Unknown error';
-                const msg = `Failed to create assignment: ${message}`;
-                toast.error(msg);
-                if (typeof window !== 'undefined') {
-                    window.alert(msg);
-                }
+                        await assignmentService.replaceAssignmentRubric(draftId, {
+                            rubricMode: data.rubricMode,
+                            rubric: (data.rubric ?? []).map((section) => {
+                                const secW = section.weight ?? 100;
+                                return {
+                                    name: section.name,
+                                    description: section.description ?? '',
+                                    weight: secW,
+                                    criteria: (section.criteria ?? []).map((criterion) => ({
+                                        name: criterion.name,
+                                        description: criterion.description ?? '',
+                                        maxPoints: criterion.maxPoints ?? 5,
+                                        weight: criterionWeightForAssignmentApi(data.rubricMode, criterion.weight, secW),
+                                        gradingMethod: criterion.gradingMethod,
+                                        defaultComments: (criterion as Record<string, unknown>).defaultComments as Record<string, string> | undefined ?? null,
+                                    })),
+                                };
+                            }),
+                        });
+
+                        await testcaseService.replaceAssignmentTestCases(
+                            draftId,
+                            [
+                                ...(data.publicTests ?? []).map((t) => ({
+                                    name: t.name,
+                                    input: t.input,
+                                    expectedOutput: t.expectedOutput,
+                                    isPublic: true,
+                                    points: 1,
+                                })),
+                                ...(data.privateTests ?? []).map((t) => ({
+                                    name: t.name,
+                                    input: t.input,
+                                    expectedOutput: t.expectedOutput,
+                                    isPublic: false,
+                                    points: 1,
+                                })),
+                            ]
+                        );
+
+                        try {
+                            localStorage.removeItem(`autograde_assignment_draft_${cid}`);
+                            localStorage.removeItem(`autograde_assignment_draft_edit_${draftId}`);
+                        } catch { /* ignore */ }
+
+                        toast.success('Draft published!');
+                        router.push(`/courses/${cid}`);
+                    } catch (err: any) {
+                        const msg = `Failed to publish draft: ${err.message}`;
+                        toast.error(msg);
+                        if (typeof window !== 'undefined') {
+                            window.alert(msg);
+                        }
+                    }
+                })();
+                return;
             }
+
+            createMutation.mutate(dto, {
+                onSuccess: () => {
+                    // Clear draft
+                    try {
+                        localStorage.removeItem(`autograde_assignment_draft_${cid}`);
+                    } catch { /* ignore */ }
+                    toast.success('Assignment published!');
+                    router.push(`/courses/${cid}`);
+                },
+                onError: (err) => {
+                    const msg = `Failed to create assignment: ${err.message}`;
+                    toast.error(msg);
+                    if (typeof window !== 'undefined') {
+                        window.alert(msg);
+                    }
+                },
+            });
         },
-        [cid, router, createMutation, uploadDescriptionPdfIfProvided]
+        [cid, router, createMutation, draftId, updateMutation]
     );
 
     const handleCancel = useCallback(() => {

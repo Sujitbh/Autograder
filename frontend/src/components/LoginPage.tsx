@@ -75,7 +75,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       <div
         className="hidden lg:flex lg:w-1/2 items-center justify-center relative overflow-hidden"
         style={{
-          background: 'linear-gradient(135deg, #6B0000 0%, #3A0000 100%)'
+          background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--ulm-maroon-dark) 100%)'
         }}
       >
         <div className="text-center z-10 px-8">
@@ -92,7 +92,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       </div>
 
       {/* Right Panel — Login form */}
-      <div className="flex-1 flex items-center justify-center bg-white px-8">
+      <div className="flex-1 flex items-center justify-center bg-[var(--color-surface)] px-8">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
@@ -112,10 +112,10 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             {signupSuccess && !error && (
               <div
                 className="p-4 rounded-lg flex items-center gap-3"
-                style={{ backgroundColor: '#E8F5E8', border: '1px solid #2D6A2D' }}
+                style={{ backgroundColor: 'var(--color-success-bg)', border: '1px solid var(--color-success)' }}
               >
-                <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: '#2D6A2D' }} />
-                <p style={{ fontSize: '14px', fontWeight: 500, color: '#2D6A2D' }}>
+                <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--color-success)' }} />
+                <p style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-success)' }}>
                   Account created successfully! Please sign in with your credentials.
                 </p>
               </div>

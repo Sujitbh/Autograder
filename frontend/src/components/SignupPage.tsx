@@ -133,7 +133,7 @@ export function SignupPage({ onSignup }: SignupPageProps) {
       <div
         className="hidden lg:flex lg:w-1/2 items-center justify-center relative overflow-hidden"
         style={{
-          background: 'linear-gradient(135deg, #6B0000 0%, #3A0000 100%)'
+          background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--ulm-maroon-dark) 100%)'
         }}
       >
         <div className="text-center z-10 px-8">
@@ -165,7 +165,7 @@ export function SignupPage({ onSignup }: SignupPageProps) {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center bg-white px-8 overflow-auto">
+      <div className="flex-1 flex items-center justify-center bg-[var(--color-surface)] px-8 overflow-auto">
         <div className="w-full max-w-md py-8">
           <div className="lg:hidden mb-8 text-center">
             <img src="/images/axiom-logo.png" alt="Axiom" className="w-16 h-16 object-contain mx-auto mb-4" />

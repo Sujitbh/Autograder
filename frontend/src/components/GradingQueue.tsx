@@ -414,7 +414,7 @@ export function GradingQueue() {
 
                     {/* Submissions Table */}
                     {!isLoading && (
-                        <div className="bg-white rounded-lg overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
+                        <div className="bg-[var(--color-surface)] rounded-lg overflow-hidden" style={{ boxShadow: 'var(--shadow-card)' }}>
                             <table className="w-full">
                                 <thead style={{ backgroundColor: 'var(--color-primary-bg)', borderBottom: '1px solid var(--color-border)' }}>
                                     <tr>
@@ -535,7 +535,7 @@ export function GradingQueue() {
                                                     {submission.latest.aiFlag && (
                                                         <span
                                                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded"
-                                                            style={{ backgroundColor: 'var(--color-warning-bg, #FFF8E1)', fontSize: '11px', fontWeight: 600, color: 'var(--color-warning)' }}
+                                                            style={{ backgroundColor: 'var(--color-warning-bg, var(--color-warning-bg))', fontSize: '11px', fontWeight: 600, color: 'var(--color-warning)' }}
                                                         >
                                                             <AlertTriangle className="w-3 h-3" />
                                                             AI
@@ -544,7 +544,7 @@ export function GradingQueue() {
                                                     {submission.latest.lateSubmission && (
                                                         <span
                                                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded"
-                                                            style={{ backgroundColor: 'var(--color-error-bg, #FFEBEE)', fontSize: '11px', fontWeight: 600, color: 'var(--color-error)' }}
+                                                            style={{ backgroundColor: 'var(--color-error-bg, var(--color-error-bg))', fontSize: '11px', fontWeight: 600, color: 'var(--color-error)' }}
                                                         >
                                                             <Clock className="w-3 h-3" />
                                                             Late
@@ -695,7 +695,7 @@ export function GradingQueue() {
 
             {/* Grading Interface Panel */}
             {gradingSubmissionRow && (
-                <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--color-background, #f5f5f5)' }}>
+                <div className="fixed inset-0 z-50 flex flex-col" style={{ backgroundColor: 'var(--color-background, var(--color-surface-elevated))' }}>
                     {/* Header bar */}
                     <div className="flex items-center justify-between px-6 py-3 border-b" style={{ backgroundColor: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
                         <button

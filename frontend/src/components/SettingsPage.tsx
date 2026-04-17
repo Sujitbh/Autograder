@@ -201,7 +201,7 @@ export function SettingsPage() {
                     <div className="flex gap-8">
                         {/* Settings Navigation */}
                         <nav className="w-56 flex-shrink-0">
-                            <div className="bg-white rounded-lg overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                            <div className="bg-[var(--color-surface)] rounded-lg overflow-hidden" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                 {sections.map((section) => {
                                     const Icon = section.icon;
                                     return (
@@ -230,13 +230,13 @@ export function SettingsPage() {
                             {/* General Settings */}
                             {activeSection === 'general' && (
                                 <div className="space-y-6">
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '24px' }}>
                                             Course Information
                                         </h2>
 
                                         {saveError && (
-                                            <p style={{ fontSize: '13px', color: '#B91C1C', marginBottom: '12px' }}>{saveError}</p>
+                                            <p style={{ fontSize: '13px', color: 'var(--color-error)', marginBottom: '12px' }}>{saveError}</p>
                                         )}
 
                                         {isLoading ? (
@@ -302,7 +302,7 @@ export function SettingsPage() {
                             {/* Grading Policy */}
                             {activeSection === 'grading' && (
                                 <div className="space-y-6">
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '24px' }}>
                                             Grading Scale
                                         </h2>
@@ -342,7 +342,7 @@ export function SettingsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '24px' }}>
                                             AI Detection Settings
                                         </h2>
@@ -390,7 +390,7 @@ export function SettingsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '24px' }}>
                                             Auto-Grading
                                         </h2>
@@ -446,7 +446,7 @@ export function SettingsPage() {
                             {/* Notifications */}
                             {activeSection === 'notifications' && (
                                 <div className="space-y-6">
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '24px' }}>
                                             Email Notifications
                                         </h2>
@@ -479,7 +479,7 @@ export function SettingsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '24px' }}>
                                             Notification Preferences
                                         </h2>
@@ -523,7 +523,7 @@ export function SettingsPage() {
                             {/* Deadlines & Extensions */}
                             {activeSection === 'deadlines' && (
                                 <div className="space-y-6">
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '24px' }}>
                                             Late Submission Policy
                                         </h2>
@@ -592,7 +592,7 @@ export function SettingsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '24px' }}>
                                             Default Assignment Duration
                                         </h2>
@@ -627,7 +627,7 @@ export function SettingsPage() {
                                         </div>
                                     </div>
 
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '24px' }}>
                                             Submission Limits
                                         </h2>
@@ -671,7 +671,7 @@ export function SettingsPage() {
                             {activeSection === 'enrollment' && (
                                 <div className="space-y-6">
                                     {/* Course Enrollment Type */}
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '16px' }}>
                                             Course Access
                                         </h2>
@@ -699,7 +699,7 @@ export function SettingsPage() {
 
                                     {/* Course Code Card — only shown when policy uses a code */}
                                     {(enrollmentPolicy === 'code' || enrollmentPolicy === 'both') && (
-                                        <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                        <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                             <div className="flex items-start justify-between mb-6">
                                                 <div>
                                                     <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
@@ -709,24 +709,24 @@ export function SettingsPage() {
                                                         Students use this code to join your course on Axiom
                                                     </p>
                                                 </div>
-                                                <span style={{ fontSize: '12px', fontWeight: 500, color: '#2D6A2D' }}>Active</span>
+                                                <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-success)' }}>Active</span>
                                             </div>
 
                                             {/* Large Code Display */}
                                             <div
                                                 className="relative rounded-xl text-center p-8 mb-6"
                                                 style={{
-                                                    backgroundColor: '#F5EDED',
-                                                    border: '2px solid #6B0000',
+                                                    backgroundColor: 'var(--color-primary-bg)',
+                                                    border: '2px solid var(--color-primary)',
                                                 }}
                                             >
-                                                <p style={{ fontSize: '12px', fontWeight: 500, color: '#6B0000', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                                                <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-primary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
                                                     Course Code
                                                 </p>
                                                 <p style={{
                                                     fontSize: '48px',
                                                     fontWeight: 700,
-                                                    color: '#6B0000',
+                                                    color: 'var(--color-primary)',
                                                     letterSpacing: '8px',
                                                     fontFamily: 'monospace',
                                                 }}>
@@ -740,7 +740,7 @@ export function SettingsPage() {
                                                     variant="outline"
                                                     onClick={copyEnrollmentCode}
                                                     className="flex-1"
-                                                    style={{ borderColor: '#6B0000', color: '#6B0000' }}
+                                                    style={{ borderColor: 'var(--color-primary)', color: 'var(--color-primary)' }}
                                                 >
                                                     {codeCopied ? (
                                                         <><Check className="w-4 h-4 mr-2" /> Copied!</>
@@ -759,8 +759,8 @@ export function SettingsPage() {
 
                                             {/* Warning */}
                                             <div className="flex items-start gap-3 mt-4 p-3 rounded-lg" style={{ backgroundColor: '#FFF3E0' }}>
-                                                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#8A5700' }} />
-                                                <p style={{ fontSize: '12px', color: '#8A5700' }}>
+                                                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-warning)' }} />
+                                                <p style={{ fontSize: '12px', color: 'var(--color-warning)' }}>
                                                     Regenerating the code will invalidate the previous one. Students who haven't joined yet will need the new code.
                                                 </p>
                                             </div>
@@ -768,7 +768,7 @@ export function SettingsPage() {
                                     )}
 
                                     {/* Enrollment Statistics */}
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '20px' }}>
                                             Enrollment Statistics
                                         </h2>
@@ -776,24 +776,24 @@ export function SettingsPage() {
                                         <ul className="divide-y divide-[var(--color-border)]">
                                             <li className="flex items-center justify-between py-3">
                                                 <span style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>Total Enrolled</span>
-                                                <span style={{ fontSize: '20px', fontWeight: 700, color: '#6B0000' }}>{enrolledStudents.length}</span>
+                                                <span style={{ fontSize: '20px', fontWeight: 700, color: 'var(--color-primary)' }}>{enrolledStudents.length}</span>
                                             </li>
                                         </ul>
                                     </div>
 
                                     {/* Share Instructions */}
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '16px' }}>
                                             How to Share
                                         </h2>
                                         <div className="space-y-3">
-                                            <div className="flex items-start gap-3 p-3 rounded-lg" style={{ backgroundColor: '#E8F0FF' }}>
-                                                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#1A4D7A' }} />
+                                            <div className="flex items-start gap-3 p-3 rounded-lg" style={{ backgroundColor: 'var(--color-info-bg)' }}>
+                                                <Info className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-info)' }} />
                                                 <div>
-                                                    <p style={{ fontSize: '13px', fontWeight: 500, color: '#1A4D7A' }}>
+                                                    <p style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-info)' }}>
                                                         Students join your course by:
                                                     </p>
-                                                    <ol className="mt-2 space-y-1" style={{ fontSize: '12px', color: '#1A4D7A', paddingLeft: '16px', listStyle: 'decimal' }}>
+                                                    <ol className="mt-2 space-y-1" style={{ fontSize: '12px', color: 'var(--color-info)', paddingLeft: '16px', listStyle: 'decimal' }}>
                                                         <li>Logging in to Axiom</li>
                                                         <li>Clicking "Join Course" in their dashboard</li>
                                                         <li>Entering the 7-character code: <strong style={{ fontFamily: 'monospace', letterSpacing: '1px' }}>{enrollmentCode}</strong></li>
@@ -811,7 +811,7 @@ export function SettingsPage() {
                             {/* Access & Permissions */}
                             {activeSection === 'access' && (
                                 <div className="space-y-6">
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                         <TAManagement
                                             courseId={Number(courseId)}
                                             enrolledStudents={enrolledStudents}
@@ -832,7 +832,7 @@ export function SettingsPage() {
                                         />
                                     </div>
 
-                                    <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid var(--color-error)' }}>
+                                    <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid var(--color-error)' }}>
                                         <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-error)', marginBottom: '16px' }}>
                                             Danger Zone
                                         </h2>
@@ -879,18 +879,18 @@ export function SettingsPage() {
             <Dialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
                 <DialogContent className="max-w-[440px] p-6" style={{ borderRadius: '16px' }}>
                     <DialogHeader>
-                        <DialogTitle style={{ fontSize: '18px', fontWeight: 700, color: '#6B0000' }}>
+                        <DialogTitle style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-primary)' }}>
                             Regenerate Course Code?
                         </DialogTitle>
-                        <DialogDescription style={{ fontSize: '14px', color: '#595959', marginTop: '8px' }}>
+                        <DialogDescription style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '8px' }}>
                             This will create a new 7-character code and <strong>permanently invalidate</strong> the current code ({enrollmentCode}).
                             Students who haven't joined yet will need the new code.
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="flex items-start gap-3 mt-4 p-3 rounded-lg" style={{ backgroundColor: '#FFF3E0' }}>
-                        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#8A5700' }} />
-                        <p style={{ fontSize: '12px', color: '#8A5700' }}>
+                        <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: 'var(--color-warning)' }} />
+                        <p style={{ fontSize: '12px', color: 'var(--color-warning)' }}>
                             Any links or materials with the old code will no longer work.
                         </p>
                     </div>
@@ -903,7 +903,7 @@ export function SettingsPage() {
                             onClick={handleRegenerateCode}
                             disabled={isRegenerating}
                             className="text-white"
-                            style={{ backgroundColor: '#6B0000' }}
+                            style={{ backgroundColor: 'var(--color-primary)' }}
                         >
                             {isRegenerating ? (
                                 <>

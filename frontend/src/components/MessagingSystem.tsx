@@ -146,7 +146,7 @@ export function MessagingSystem({ currentUserRole }: MessagingSystemProps) {
                         </Button>
                     </div>
                     <div className="relative">
-                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-[var(--color-text-light)]" />
                         <Input
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
@@ -160,10 +160,10 @@ export function MessagingSystem({ currentUserRole }: MessagingSystemProps) {
                 <div className="flex-1 overflow-y-auto">
                     {loadingConvos ? (
                         <div className="flex justify-center p-8">
-                            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                            <Loader2 className="w-6 h-6 animate-spin text-[var(--color-text-light)]" />
                         </div>
                     ) : filteredConversations.length === 0 ? (
-                        <div className="text-center p-8 text-gray-500 text-sm">
+                        <div className="text-center p-8 text-[var(--color-text-mid)] text-sm">
                             {searchQuery ? "No conversations match your search." : "No active conversations."}
                         </div>
                     ) : (
@@ -204,7 +204,7 @@ export function MessagingSystem({ currentUserRole }: MessagingSystemProps) {
                                                         className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-red-50"
                                                         title="Delete conversation"
                                                     >
-                                                        <Trash2 className="w-3.5 h-3.5" style={{ color: '#B91C1C' }} />
+                                                        <Trash2 className="w-3.5 h-3.5" style={{ color: 'var(--color-error)' }} />
                                                     </button>
                                                     <p className="text-[11px]" style={{ color: 'var(--color-text-light)' }}>
                                                         {format(new Date(convo.last_message.created_at), 'MMM d, h:mm a')}
@@ -234,7 +234,7 @@ export function MessagingSystem({ currentUserRole }: MessagingSystemProps) {
                 {selectedThread ? (
                     <>
                         {/* Chat Header */}
-                        <div className="p-4 border-b flex items-center gap-3 z-10 bg-white" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
+                        <div className="p-4 border-b flex items-center gap-3 z-10 bg-[var(--color-surface)]" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
                             <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
                                 style={{ backgroundColor: 'var(--color-gold-accent)' }}>
                                 {getInitials(getUserName(activeInterlocutor))}
@@ -253,11 +253,11 @@ export function MessagingSystem({ currentUserRole }: MessagingSystemProps) {
                         <div className="flex-1 overflow-y-auto p-4 space-y-4">
                             {loadingThread ? (
                                 <div className="flex justify-center p-8">
-                                    <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                                    <Loader2 className="w-6 h-6 animate-spin text-[var(--color-text-light)]" />
                                 </div>
                             ) : threadMessages.length === 0 ? (
                                 <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
-                                    <MessageSquare className="w-12 h-12 mb-4 text-gray-400" />
+                                    <MessageSquare className="w-12 h-12 mb-4 text-[var(--color-text-light)]" />
                                     <p>Send a message to start the conversation.</p>
                                 </div>
                             ) : (
@@ -314,7 +314,7 @@ export function MessagingSystem({ currentUserRole }: MessagingSystemProps) {
                         </div>
 
                         {/* Input Area */}
-                        <div className="p-4 border-t bg-white" style={{ borderColor: 'var(--color-border)' }}>
+                        <div className="p-4 border-t bg-[var(--color-surface)]" style={{ borderColor: 'var(--color-border)' }}>
                             <div className="flex gap-2 items-end relative">
                                 <textarea
                                     className="flex-1 border rounded-xl px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2"
@@ -390,10 +390,10 @@ export function MessagingSystem({ currentUserRole }: MessagingSystemProps) {
             <Dialog open={deleteConfirmId !== null} onOpenChange={(open) => { if (!open) setDeleteConfirmId(null); }}>
                 <DialogContent className="max-w-[400px] p-6" style={{ borderRadius: '16px' }}>
                     <DialogHeader>
-                        <DialogTitle style={{ fontSize: '18px', fontWeight: 700, color: '#B91C1C' }}>
+                        <DialogTitle style={{ fontSize: '18px', fontWeight: 700, color: 'var(--color-error)' }}>
                             Delete Conversation?
                         </DialogTitle>
-                        <DialogDescription style={{ fontSize: '14px', color: '#595959', marginTop: '8px' }}>
+                        <DialogDescription style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '8px' }}>
                             This will permanently delete all messages in this conversation. This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
@@ -403,7 +403,7 @@ export function MessagingSystem({ currentUserRole }: MessagingSystemProps) {
                         </Button>
                         <Button
                             className="flex-1 border-0 text-white"
-                            style={{ backgroundColor: '#B91C1C' }}
+                            style={{ backgroundColor: 'var(--color-error)' }}
                             disabled={isDeleting}
                             onClick={() => {
                                 if (deleteConfirmId === null) return;
@@ -503,7 +503,7 @@ function NewMessageDialog({ open, onOpenChange, allContacts, onSelectUser }: {
 
                 <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <label className="text-sm font-medium">Recipient <span className="text-red-500">*</span></label>
+                        <label className="text-sm font-medium">Recipient <span className="text-[var(--color-error)]">*</span></label>
                         <Select value={selectedUserId} onValueChange={setSelectedUserId}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Choose a person" />
@@ -522,7 +522,7 @@ function NewMessageDialog({ open, onOpenChange, allContacts, onSelectUser }: {
                     </div>
 
                     <div className="space-y-2 mt-4">
-                        <label className="text-sm font-medium">Message <span className="text-red-500">*</span></label>
+                        <label className="text-sm font-medium">Message <span className="text-[var(--color-error)]">*</span></label>
                         <textarea
                             className="w-full border rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1"
                             style={{ borderColor: 'var(--color-border)' }}

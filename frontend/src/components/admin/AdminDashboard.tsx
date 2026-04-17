@@ -32,8 +32,8 @@ export function AdminDashboard() {
           <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--color-text-dark)' }}>Users by Role</h3>
           <div className="space-y-3">
             {[
-              { label: 'Students', count: stats?.users_by_role?.student ?? 0, color: '#2D6A2D' },
-              { label: 'Faculty', count: stats?.users_by_role?.faculty ?? 0, color: '#1A4D7A' },
+              { label: 'Students', count: stats?.users_by_role?.student ?? 0, color: 'var(--color-success)' },
+              { label: 'Faculty', count: stats?.users_by_role?.faculty ?? 0, color: 'var(--color-info)' },
               { label: 'Admins', count: stats?.users_by_role?.admin ?? 0, color: 'var(--color-primary)' },
             ].map((item) => (
               <div key={item.label} className="flex items-center justify-between">
@@ -103,8 +103,8 @@ export function AdminDashboard() {
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
                   style={{
-                    backgroundColor: item.type === 'registration' ? '#E3F2FD' : item.type === 'submission' ? '#E8F5E9' : '#FFF3CD',
-                    color: item.type === 'registration' ? '#1A4D7A' : item.type === 'submission' ? '#2D6A2D' : '#8A5700',
+                    backgroundColor: item.type === 'registration' ? 'var(--color-info-bg)' : item.type === 'submission' ? 'var(--color-success-bg)' : 'var(--color-warning-bg)',
+                    color: item.type === 'registration' ? 'var(--color-info)' : item.type === 'submission' ? 'var(--color-success)' : 'var(--color-warning)',
                   }}
                 >
                   {item.type === 'registration' ? <Users className="w-4 h-4" /> : <FileText className="w-4 h-4" />}

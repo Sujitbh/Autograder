@@ -29,7 +29,7 @@ interface TopNavProps {
  * Specifications:
  * - Position: Fixed to top of viewport, z-index 1000
  * - Dimensions: Full viewport width, height 64px
- * - Background: #6B0000 (--color-primary)
+ * - Background: var(--color-primary) (--color-primary)
  * - Horizontal padding: 24px
  * - Layout: Flexbox with space-between, align-items center
  * 
@@ -273,7 +273,7 @@ export function TopNav({
                   top: '-6px',
                   right: '-6px',
                   fontSize: '10px',
-                  color: '#6B0000',
+                  color: 'var(--color-primary)',
                   border: '2px solid var(--color-nav-bg)'
                 }}
               >
@@ -332,7 +332,7 @@ export function TopNav({
                   top: '-2px',
                   right: '-2px',
                   fontSize: '10px',
-                  color: '#6B0000',
+                  color: 'var(--color-primary)',
                   border: '2px solid var(--color-nav-bg)'
                 }}
               >

@@ -150,7 +150,7 @@ function getInitials(first: string, last: string) {
 
 /* password strength helpers */
 function getPasswordStrength(pw: string): { score: number; label: string; color: string } {
-    if (!pw) return { score: 0, label: '', color: '#D9D9D9' };
+    if (!pw) return { score: 0, label: '', color: 'var(--color-border)' };
     let score = 0;
     if (pw.length >= 8) score += 2;
     if (pw.length >= 12) score += 1;
@@ -162,10 +162,10 @@ function getPasswordStrength(pw: string): { score: number; label: string; color:
     if (/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(pw)) score += 1;
     if (pw.length >= 14 && /[A-Z]/.test(pw) && /[0-9]/.test(pw) && /[!@#$%^&*]/.test(pw)) score += 1;
 
-    if (score <= 3) return { score: Math.min(score, 3), label: 'Weak — Try adding more characters or symbols', color: '#8B0000' };
-    if (score <= 6) return { score: Math.min(score, 6), label: 'Medium — Good, but could be stronger', color: '#8A5700' };
-    if (score <= 8) return { score: Math.min(score, 9), label: 'Strong — Great password', color: '#6B0000' };
-    return { score: 10, label: 'Very Strong — Excellent password', color: '#2D6A2D' };
+    if (score <= 3) return { score: Math.min(score, 3), label: 'Weak — Try adding more characters or symbols', color: 'var(--color-error)' };
+    if (score <= 6) return { score: Math.min(score, 6), label: 'Medium — Good, but could be stronger', color: 'var(--color-warning)' };
+    if (score <= 8) return { score: Math.min(score, 9), label: 'Strong — Great password', color: 'var(--color-primary)' };
+    return { score: 10, label: 'Very Strong — Excellent password', color: 'var(--color-success)' };
 }
 
 /* ═══════════════════════════════════════════
@@ -371,15 +371,15 @@ export function AccountSettings() {
         <div
             style={{
                 backgroundColor: 'var(--color-surface)',
-                border: `1px solid ${danger ? '#dc2626' : 'var(--color-border)'}`,
+                border: `1px solid ${danger ? 'var(--color-error)' : 'var(--color-border)'}`,
                 borderRadius: '12px',
                 padding: '24px',
                 marginBottom: '20px',
-                borderLeft: danger ? '4px solid #8B0000' : undefined,
+                borderLeft: danger ? '4px solid var(--color-error)' : undefined,
             }}
         >
             {title && (
-                <h3 style={{ fontSize: '16px', fontWeight: 700, color: danger ? '#8B0000' : 'var(--color-text-dark)', marginBottom: subtitle ? '4px' : '16px' }}>{title}</h3>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: danger ? 'var(--color-error)' : 'var(--color-text-dark)', marginBottom: subtitle ? '4px' : '16px' }}>{title}</h3>
             )}
             {subtitle && (
                 <p style={{ fontSize: '13px', color: 'var(--color-text-mid)', marginBottom: '16px' }}>{subtitle}</p>
@@ -406,12 +406,12 @@ export function AccountSettings() {
                             src={user.profilePhoto}
                             alt="Profile"
                             className="rounded-full flex-shrink-0 object-cover"
-                            style={{ width: '120px', height: '120px', border: '2px solid #D9D9D9' }}
+                            style={{ width: '120px', height: '120px', border: '2px solid var(--color-border)' }}
                         />
                     ) : (
                         <div
                             className="rounded-full flex items-center justify-center text-white flex-shrink-0"
-                            style={{ width: '120px', height: '120px', backgroundColor: 'var(--color-primary)', fontSize: '36px', fontWeight: 700, border: '2px solid #D9D9D9' }}
+                            style={{ width: '120px', height: '120px', backgroundColor: 'var(--color-primary)', fontSize: '36px', fontWeight: 700, border: '2px solid var(--color-border)' }}
                         >
                             {getInitials(profile.firstName, profile.lastName)}
                         </div>
@@ -434,7 +434,7 @@ export function AccountSettings() {
                                 <button
                                     onClick={handlePhotoDelete}
                                     disabled={photoLoading}
-                                    style={{ fontSize: '13px', color: '#8B0000', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
+                                    style={{ fontSize: '13px', color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
                                 >
                                     Remove Photo
                                 </button>
@@ -448,11 +448,11 @@ export function AccountSettings() {
             <Card title="Personal Information">
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label style={labelStyle}>First Name <span style={{ color: '#dc2626' }}>*</span></label>
+                        <label style={labelStyle}>First Name <span style={{ color: 'var(--color-error)' }}>*</span></label>
                         <Input value={profile.firstName} onChange={e => updateProfile('firstName', e.target.value)} maxLength={50} />
                     </div>
                     <div>
-                        <label style={labelStyle}>Last Name <span style={{ color: '#dc2626' }}>*</span></label>
+                        <label style={labelStyle}>Last Name <span style={{ color: 'var(--color-error)' }}>*</span></label>
                         <Input value={profile.lastName} onChange={e => updateProfile('lastName', e.target.value)} maxLength={50} />
                     </div>
                     <div>
@@ -499,7 +499,7 @@ export function AccountSettings() {
                     />
                     <div className="flex justify-between mt-1">
                         <p style={helpStyle}>Tell students about your background, research interests, office hours</p>
-                        <span style={{ fontSize: '12px', color: profile.bio.length >= 480 ? '#dc2626' : 'var(--color-text-light)' }}>{profile.bio.length} / 500</span>
+                        <span style={{ fontSize: '12px', color: profile.bio.length >= 480 ? 'var(--color-error)' : 'var(--color-text-light)' }}>{profile.bio.length} / 500</span>
                     </div>
                 </div>
             </Card>
@@ -511,7 +511,7 @@ export function AccountSettings() {
                         <span style={readOnlyLabel}>Email</span>
                         <div className="flex items-center gap-2">
                             <span style={{ fontSize: '14px', color: 'var(--color-text-dark)' }}>{user?.email ?? 'N/A'}</span>
-                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: '#dcfce7', fontSize: '11px', fontWeight: 600, color: '#166534' }}>
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--color-success-bg)', fontSize: '11px', fontWeight: 600, color: 'var(--color-success)' }}>
                                 <CheckCircle2 className="w-3 h-3" />Verified
                             </span>
                         </div>
@@ -612,8 +612,8 @@ export function AccountSettings() {
                                 <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-mid)', marginBottom: '6px' }}>Password Requirements:</p>
                                 {reqs.map(r => (
                                     <div key={r.label} className="flex items-center gap-2">
-                                        <CheckCircle2 className="w-4 h-4" style={{ color: r.met ? '#2D6A2D' : '#8A8A8A' }} />
-                                        <span style={{ fontSize: '13px', color: r.met ? '#2D6A2D' : '#8A8A8A' }}>{r.label}</span>
+                                        <CheckCircle2 className="w-4 h-4" style={{ color: r.met ? 'var(--color-success)' : 'var(--color-text-light)' }} />
+                                        <span style={{ fontSize: '13px', color: r.met ? 'var(--color-success)' : 'var(--color-text-light)' }}>{r.label}</span>
                                     </div>
                                 ))}
                             </div>
@@ -639,7 +639,7 @@ export function AccountSettings() {
                                 </button>
                             </div>
                             {confirmPw && !passwordsMatch && (
-                                <p style={{ fontSize: '12px', color: '#dc2626', marginTop: '4px' }}>Passwords do not match</p>
+                                <p style={{ fontSize: '12px', color: 'var(--color-error)', marginTop: '4px' }}>Passwords do not match</p>
                             )}
                         </div>
 
@@ -669,8 +669,8 @@ export function AccountSettings() {
                         </div>
                         <p style={helpStyle}>Recommended if you suspect unauthorized access</p>
 
-                        {pwError && <p style={{ fontSize: '13px', color: '#dc2626', fontWeight: 500 }}>{pwError}</p>}
-                        {pwSuccess && <p style={{ fontSize: '13px', color: '#2D6A2D', fontWeight: 500 }}>Password updated successfully!</p>}
+                        {pwError && <p style={{ fontSize: '13px', color: 'var(--color-error)', fontWeight: 500 }}>{pwError}</p>}
+                        {pwSuccess && <p style={{ fontSize: '13px', color: 'var(--color-success)', fontWeight: 500 }}>Password updated successfully!</p>}
 
                         <Button
                             onClick={handlePasswordUpdate}
@@ -1031,7 +1031,7 @@ export function AccountSettings() {
                         <div className="flex items-center gap-3 mb-1">
                             <h4 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-dark)' }}>Canvas LMS</h4>
                             {canvasConnected && (
-                                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: '#dcfce7', fontSize: '11px', fontWeight: 600, color: '#166534' }}>
+                                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--color-success-bg)', fontSize: '11px', fontWeight: 600, color: 'var(--color-success)' }}>
                                     <CheckCircle2 className="w-3 h-3" />Connected
                                 </span>
                             )}
@@ -1059,7 +1059,7 @@ export function AccountSettings() {
                                     </Button>
                                     <button
                                         onClick={() => setDisconnectCanvas(true)}
-                                        style={{ fontSize: '13px', color: '#8B0000', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
+                                        style={{ fontSize: '13px', color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
                                     >
                                         Disconnect
                                     </button>
@@ -1207,7 +1207,7 @@ export function AccountSettings() {
                 {currentSession && (
                     <Card>
                         <div className="flex items-start gap-4">
-                            <div className="flex items-center justify-center rounded-lg" style={{ width: '48px', height: '48px', backgroundColor: '#dcfce7' }}>
+                            <div className="flex items-center justify-center rounded-lg" style={{ width: '48px', height: '48px', backgroundColor: 'var(--color-success-bg)' }}>
                                 {getDeviceIcon(currentSession.icon)}
                             </div>
                             <div className="flex-1">
@@ -1215,7 +1215,7 @@ export function AccountSettings() {
                                     <h4 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                                         {currentSession.device} — {currentSession.browser} on {currentSession.os}
                                     </h4>
-                                    <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: '#dcfce7', fontSize: '11px', fontWeight: 600, color: '#166534' }}>
+                                    <span className="px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--color-success-bg)', fontSize: '11px', fontWeight: 600, color: 'var(--color-success)' }}>
                                         Current Session
                                     </span>
                                 </div>
@@ -1249,7 +1249,7 @@ export function AccountSettings() {
                             ))}
                         </div>
                         <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
-                            <Button variant="outline" onClick={() => setSignOutAllOpen(true)} style={{ color: '#8B0000', borderColor: '#8B0000' }}>
+                            <Button variant="outline" onClick={() => setSignOutAllOpen(true)} style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }}>
                                 Sign Out All Other Devices
                             </Button>
                         </div>
@@ -1289,7 +1289,7 @@ export function AccountSettings() {
     /* ── Danger Zone ── */
     const renderDangerZone = () => (
         <div>
-            <h2 style={{ fontSize: '22px', fontWeight: 700, color: '#8B0000', marginBottom: '4px' }}>Danger Zone</h2>
+            <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--color-error)', marginBottom: '4px' }}>Danger Zone</h2>
             <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginBottom: '28px' }}>Irreversible actions that affect your account</p>
 
             <Card title="Deactivate Account" danger>
@@ -1303,15 +1303,15 @@ export function AccountSettings() {
                         <li>All data is preserved</li>
                     </ul>
                 </div>
-                <Button onClick={() => setDeactivateOpen(true)} style={{ backgroundColor: '#8B0000', color: 'white' }}>
+                <Button onClick={() => setDeactivateOpen(true)} style={{ backgroundColor: 'var(--color-error)', color: 'white' }}>
                     Deactivate Account
                 </Button>
             </Card>
 
             <Card title="Delete Account" danger>
-                <div className="flex items-start gap-2 p-3 rounded-lg mb-4" style={{ backgroundColor: '#fef2f2' }}>
-                    <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: '#dc2626' }} />
-                    <p style={{ fontSize: '13px', fontWeight: 600, color: '#991b1b' }}>PERMANENT — This action cannot be undone</p>
+                <div className="flex items-start gap-2 p-3 rounded-lg mb-4" style={{ backgroundColor: 'var(--color-error-bg)' }}>
+                    <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-error)' }} />
+                    <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-error)' }}>PERMANENT — This action cannot be undone</p>
                 </div>
                 <div className="space-y-1.5 mb-4" style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
                     <p>When deleted:</p>
@@ -1322,7 +1322,7 @@ export function AccountSettings() {
                         <li>All other data is deleted after 30-day grace period</li>
                     </ul>
                 </div>
-                <Button onClick={() => setDeleteOpen(true)} style={{ backgroundColor: '#dc2626', color: 'white' }}>
+                <Button onClick={() => setDeleteOpen(true)} style={{ backgroundColor: 'var(--color-error)', color: 'white' }}>
                     <Trash2 className="w-4 h-4 mr-2" />Delete Account
                 </Button>
             </Card>
@@ -1382,17 +1382,17 @@ export function AccountSettings() {
                                         fontSize: '14px',
                                         fontWeight: isActive ? 600 : 400,
                                         color: s.id === 'danger'
-                                            ? (isActive ? '#8B0000' : '#991b1b')
+                                            ? (isActive ? 'var(--color-error)' : 'var(--color-error)')
                                             : (isActive ? 'var(--color-primary)' : 'var(--color-text-mid)'),
                                         backgroundColor: isActive
-                                            ? (s.id === 'danger' ? '#fef2f2' : 'rgba(107, 0, 0, 0.06)')
+                                            ? (s.id === 'danger' ? 'var(--color-error-bg)' : 'rgba(107, 0, 0, 0.06)')
                                             : 'transparent',
-                                        borderLeft: isActive ? `3px solid ${s.id === 'danger' ? '#8B0000' : 'var(--color-primary)'}` : '3px solid transparent',
+                                        borderLeft: isActive ? `3px solid ${s.id === 'danger' ? 'var(--color-error)' : 'var(--color-primary)'}` : '3px solid transparent',
                                         cursor: 'pointer',
                                         border: 'none',
                                         borderLeftWidth: '3px',
                                         borderLeftStyle: 'solid',
-                                        borderLeftColor: isActive ? (s.id === 'danger' ? '#8B0000' : 'var(--color-primary)') : 'transparent',
+                                        borderLeftColor: isActive ? (s.id === 'danger' ? 'var(--color-error)' : 'var(--color-primary)') : 'transparent',
                                         textAlign: 'left',
                                     }}
                                 >
@@ -1425,7 +1425,7 @@ export function AccountSettings() {
                     }}
                 >
                     <div className="flex items-center justify-between w-full" style={{ maxWidth: '800px', padding: '0 24px' }}>
-                        <span style={{ fontSize: '14px', fontWeight: 500, color: '#595959' }}>You have unsaved changes</span>
+                        <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-mid)' }}>You have unsaved changes</span>
                         <div className="flex gap-3">
                             <Button variant="outline" onClick={handleDiscard}>Discard Changes</Button>
                             <Button onClick={handleSave} disabled={saving} className="text-white" style={{ backgroundColor: 'var(--color-primary)' }}>
@@ -1469,7 +1469,7 @@ export function AccountSettings() {
                     </DialogHeader>
                     <DialogFooter className="mt-4">
                         <Button variant="outline" onClick={() => setDisconnectCanvas(false)}>Cancel</Button>
-                        <Button onClick={() => { setCanvasConnected(false); setDisconnectCanvas(false); setToast('Canvas disconnected'); }} style={{ backgroundColor: '#dc2626', color: 'white' }}>
+                        <Button onClick={() => { setCanvasConnected(false); setDisconnectCanvas(false); setToast('Canvas disconnected'); }} style={{ backgroundColor: 'var(--color-error)', color: 'white' }}>
                             Disconnect Canvas
                         </Button>
                     </DialogFooter>
@@ -1505,7 +1505,7 @@ export function AccountSettings() {
                     </DialogHeader>
                     <DialogFooter className="mt-4">
                         <Button variant="outline" onClick={() => setDisableAllEmail(false)}>Cancel</Button>
-                        <Button onClick={disableAllEmailConfirmed} style={{ backgroundColor: '#dc2626', color: 'white' }}>Disable All</Button>
+                        <Button onClick={disableAllEmailConfirmed} style={{ backgroundColor: 'var(--color-error)', color: 'white' }}>Disable All</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -1552,7 +1552,7 @@ export function AccountSettings() {
                         <Button
                             disabled={deactivateText !== 'DEACTIVATE'}
                             onClick={() => { setDeactivateOpen(false); setDeactivateText(''); setToast('Account deactivated. Contact support@ulm.edu to reactivate.'); }}
-                            style={{ backgroundColor: deactivateText === 'DEACTIVATE' ? '#8B0000' : undefined, color: deactivateText === 'DEACTIVATE' ? 'white' : undefined }}
+                            style={{ backgroundColor: deactivateText === 'DEACTIVATE' ? 'var(--color-error)' : undefined, color: deactivateText === 'DEACTIVATE' ? 'white' : undefined }}
                         >
                             Deactivate Account
                         </Button>
@@ -1564,12 +1564,12 @@ export function AccountSettings() {
             <Dialog open={deleteOpen} onOpenChange={(open) => { setDeleteOpen(open); if (!open) { setDeleteEmail(''); setDeleteConfirm(false); } }}>
                 <DialogContent style={{ maxWidth: '520px' }}>
                     <DialogHeader>
-                        <DialogTitle style={{ color: '#dc2626' }}>Delete Your Account?</DialogTitle>
+                        <DialogTitle style={{ color: 'var(--color-error)' }}>Delete Your Account?</DialogTitle>
                         <DialogDescription asChild>
                             <div className="space-y-3 pt-2">
-                                <div className="flex items-start gap-2 p-3 rounded-lg" style={{ backgroundColor: '#fef2f2' }}>
-                                    <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: '#dc2626' }} />
-                                    <p style={{ fontSize: '13px', fontWeight: 700, color: '#991b1b' }}>THIS ACTION IS PERMANENT AND CANNOT BE UNDONE</p>
+                                <div className="flex items-start gap-2 p-3 rounded-lg" style={{ backgroundColor: 'var(--color-error-bg)' }}>
+                                    <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-error)' }} />
+                                    <p style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-error)' }}>THIS ACTION IS PERMANENT AND CANNOT BE UNDONE</p>
                                 </div>
                                 <p>Deleting your account will:</p>
                                 <ol className="list-decimal pl-5 space-y-1">
@@ -1587,7 +1587,7 @@ export function AccountSettings() {
                                 <p className="font-medium pt-2">To proceed, type your email address below:</p>
                                 <Input value={deleteEmail} onChange={e => setDeleteEmail(e.target.value)} placeholder={user?.email ?? 'your@email.edu'} />
                                 <label className="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" checked={deleteConfirm} onChange={e => setDeleteConfirm(e.target.checked)} style={{ accentColor: '#dc2626' }} />
+                                    <input type="checkbox" checked={deleteConfirm} onChange={e => setDeleteConfirm(e.target.checked)} style={{ accentColor: 'var(--color-error)' }} />
                                     <span style={{ fontSize: '13px', color: 'var(--color-text-dark)' }}>I understand this action is permanent and cannot be undone</span>
                                 </label>
                             </div>
@@ -1599,7 +1599,7 @@ export function AccountSettings() {
                             disabled={deleteEmail !== (user?.email ?? '') || !deleteConfirm}
                             onClick={() => { setDeleteOpen(false); setDeleteEmail(''); setDeleteConfirm(false); setToast('Account deletion scheduled. You have 30 days to cancel via email.'); }}
                             style={{
-                                backgroundColor: (deleteEmail === (user?.email ?? '') && deleteConfirm) ? '#dc2626' : undefined,
+                                backgroundColor: (deleteEmail === (user?.email ?? '') && deleteConfirm) ? 'var(--color-error)' : undefined,
                                 color: (deleteEmail === (user?.email ?? '') && deleteConfirm) ? 'white' : undefined,
                             }}
                         >

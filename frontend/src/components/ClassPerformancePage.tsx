@@ -56,15 +56,15 @@ interface ClassPerformanceResponse {
 
 function statusBadge(status: StudentPerf['submission_status']) {
   if (status === 'graded') {
-    return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">Graded</span>;
+    return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-[var(--color-success)]">Graded</span>;
   }
   if (status === 'pending' || status === 'grading') {
     return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">Pending</span>;
   }
   if (status === 'error') {
-    return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">Error</span>;
+    return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-red-100 text-[var(--color-error)]">Error</span>;
   }
-  return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">Missing</span>;
+  return <span className="px-2 py-1 rounded-full text-xs font-semibold bg-[var(--color-primary-bg)] text-[var(--color-text-mid)]">Missing</span>;
 }
 
 export function ClassPerformancePage({ courseId, assignmentId }: ClassPerformancePageProps) {
@@ -172,11 +172,11 @@ export function ClassPerformancePage({ courseId, assignmentId }: ClassPerformanc
               </div>
 
               <div className="rounded-xl border p-4" style={{ borderColor: 'var(--color-border)', backgroundColor: '#ECFDF3' }}>
-                <div className="flex items-center gap-2 text-sm text-green-700">
+                <div className="flex items-center gap-2 text-sm text-[var(--color-success)]">
                   <CheckCircle2 className="w-4 h-4" />
                   Graded
                 </div>
-                <p className="text-2xl font-bold mt-1 text-green-700">{data.summary.graded}</p>
+                <p className="text-2xl font-bold mt-1 text-[var(--color-success)]">{data.summary.graded}</p>
               </div>
 
               <div className="rounded-xl border p-4" style={{ borderColor: 'var(--color-border)', backgroundColor: '#FFF7ED' }}>
@@ -187,12 +187,12 @@ export function ClassPerformancePage({ courseId, assignmentId }: ClassPerformanc
                 <p className="text-2xl font-bold mt-1 text-amber-700">{data.summary.pending}</p>
               </div>
 
-              <div className="rounded-xl border p-4" style={{ borderColor: 'var(--color-border)', backgroundColor: '#FEF2F2' }}>
-                <div className="flex items-center gap-2 text-sm text-red-700">
+              <div className="rounded-xl border p-4" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-error-bg)' }}>
+                <div className="flex items-center gap-2 text-sm text-[var(--color-error)]">
                   <AlertTriangle className="w-4 h-4" />
                   Missing
                 </div>
-                <p className="text-2xl font-bold mt-1 text-red-700">{data.summary.missing}</p>
+                <p className="text-2xl font-bold mt-1 text-[var(--color-error)]">{data.summary.missing}</p>
               </div>
 
               <div className="rounded-xl border p-4" style={{ borderColor: 'var(--color-border)', backgroundColor: '#EEF2FF' }}>

@@ -29,15 +29,15 @@ interface CalendarAssignment {
    ═══════════════════════════════════════════ */
 
 const COURSE_COLORS: Record<string, string> = {
-    'CS-1001': '#6B0000',
+    'CS-1001': 'var(--color-primary)',
     'CS-2050': '#1E40AF',
-    'CS-3100': '#15803D',
-    'CS-4200': '#B45309',
+    'CS-3100': 'var(--color-success)',
+    'CS-4200': 'var(--color-warning)',
     'CS-3500': '#7C3AED',
 };
 
 function getCourseColor(courseCode: string): string {
-    return COURSE_COLORS[courseCode] || '#6B0000';
+    return COURSE_COLORS[courseCode] || 'var(--color-primary)';
 }
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -572,8 +572,8 @@ export function CalendarPage() {
                                                                 display: 'inline-block', marginTop: '3px',
                                                                 fontSize: '10px', fontWeight: 700,
                                                                 padding: '1px 6px', borderRadius: '4px',
-                                                                backgroundColor: isDark ? 'rgba(212,84,76,.22)' : '#FEF2F2',
-                                                                color: isDark ? '#FFD1CE' : '#991B1B',
+                                                                backgroundColor: isDark ? 'rgba(212,84,76,.22)' : 'var(--color-error-bg)',
+                                                                color: isDark ? '#FFD1CE' : 'var(--color-error)',
                                                                 border: isDark ? '1px solid rgba(212,84,76,.45)' : 'none',
                                                             }}>
                                                                 {(() => {

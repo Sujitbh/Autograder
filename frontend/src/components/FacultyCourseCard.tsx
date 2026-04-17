@@ -55,15 +55,15 @@ interface FacultyCourseCardProps {
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function getPendingGradeColor(count: number): string {
-    if (count === 0) return 'text-gray-400';
-    if (count <= 10) return 'text-orange-600';
-    return 'text-red-600';
+    if (count === 0) return 'text-[var(--color-text-light)]';
+    if (count <= 10) return 'text-[var(--color-warning)]';
+    return 'text-[var(--color-error)]';
 }
 
 function getPendingGradeBg(count: number): string {
-    if (count === 0) return 'bg-gray-50';
-    if (count <= 10) return 'bg-orange-50';
-    return 'bg-red-50';
+    if (count === 0) return 'bg-[var(--color-surface-elevated)]';
+    if (count <= 10) return 'bg-[var(--color-warning-bg)]';
+    return 'bg-[var(--color-error-bg)]';
 }
 
 // ── Component ───────────────────────────────────────────────────────
@@ -81,15 +81,15 @@ export function FacultyCourseCard({
             {/* Card */}
             <div
                 role="article"
-                className="group relative flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:border-gray-700 dark:bg-gray-900"
+                className="group relative flex flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:border-gray-700 dark:bg-gray-900"
             >
                 {/* Top maroon bar */}
-                <div className="h-2 w-full bg-[#6B0000]" />
+                <div className="h-2 w-full bg-[var(--color-primary)]" />
 
                 {/* Header row */}
                 <div className="flex items-start justify-between gap-2 px-5 pt-4">
                     {/* Course code badge */}
-                    <span className="inline-flex items-center rounded-full bg-[#6B0000] px-3 py-0.5 text-xs font-semibold text-white">
+                    <span className="inline-flex items-center rounded-full bg-[var(--color-primary)] px-3 py-0.5 text-xs font-semibold text-white">
                         {course.code}
                     </span>
 
@@ -97,7 +97,7 @@ export function FacultyCourseCard({
                         {/* Enrollment code */}
                         {course.enrollmentCode && (
                             <span
-                                className="hidden text-xs text-gray-400 sm:inline"
+                                className="hidden text-xs text-[var(--color-text-light)] sm:inline"
                                 title="Enrollment Code"
                             >
                                 {course.enrollmentCode}
@@ -131,7 +131,7 @@ export function FacultyCourseCard({
                                     )}
                                     {onDelete && (
                                         <DropdownMenuItem
-                                            className="text-red-600 focus:text-red-600"
+                                            className="text-[var(--color-error)] focus:text-red-600"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setShowDeleteDialog(true);
@@ -149,35 +149,35 @@ export function FacultyCourseCard({
 
                 {/* Course name + semester */}
                 <div className="flex-1 px-5 pt-3 pb-4">
-                    <h3 className="text-lg font-semibold leading-snug text-gray-900 dark:text-gray-100">
+                    <h3 className="text-lg font-semibold leading-snug text-[var(--color-text-dark)] dark:text-gray-100">
                         {course.name}
                     </h3>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    <p className="mt-1 text-sm text-[var(--color-text-mid)] dark:text-gray-400">
                         {course.semester}
                         {course.section ? ` · ${course.section}` : ''}
                     </p>
                 </div>
 
                 {/* Metrics row */}
-                <div className="grid grid-cols-3 gap-px border-t border-gray-100 bg-gray-100 dark:border-gray-800 dark:bg-gray-800">
+                <div className="grid grid-cols-3 gap-px border-t border-[var(--color-border)] bg-[var(--color-primary-bg)] dark:border-gray-800 dark:bg-gray-800">
                     {/* Students */}
-                    <div className="flex flex-col items-center gap-1 bg-white py-3 dark:bg-gray-900">
-                        <Users className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    <div className="flex flex-col items-center gap-1 bg-[var(--color-surface)] py-3 dark:bg-gray-900">
+                        <Users className="h-4 w-4 text-[var(--color-text-light)]" />
+                        <span className="text-sm font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
                             {course.students}
                         </span>
-                        <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                        <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-light)]">
                             Students
                         </span>
                     </div>
 
                     {/* Assignments */}
-                    <div className="flex flex-col items-center gap-1 bg-white py-3 dark:bg-gray-900">
-                        <FileText className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                    <div className="flex flex-col items-center gap-1 bg-[var(--color-surface)] py-3 dark:bg-gray-900">
+                        <FileText className="h-4 w-4 text-[var(--color-text-light)]" />
+                        <span className="text-sm font-semibold text-[var(--color-text-dark)] dark:text-gray-100">
                             {course.assignments}
                         </span>
-                        <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                        <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-light)]">
                             Assignments
                         </span>
                     </div>
@@ -192,20 +192,20 @@ export function FacultyCourseCard({
                         >
                             {course.pendingGrades}
                         </span>
-                        <span className="text-[10px] uppercase tracking-wide text-gray-400">
+                        <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-light)]">
                             Pending
                         </span>
                     </div>
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-between border-t border-gray-100 px-5 py-3 dark:border-gray-800">
+                <div className="flex items-center justify-between border-t border-[var(--color-border)] px-5 py-3 dark:border-gray-800">
                     <span
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${course.status === 'active'
-                                ? 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                ? 'bg-[var(--color-success-bg)] text-[var(--color-success)] dark:bg-green-900/30 dark:text-green-400'
                                 : course.status === 'draft'
-                                    ? 'bg-yellow-50 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                                    : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                                    ? 'bg-[var(--color-warning-bg)] text-[var(--color-warning)] dark:bg-yellow-900/30 dark:text-yellow-400'
+                                    : 'bg-[var(--color-primary-bg)] text-[var(--color-text-mid)] dark:bg-gray-800 dark:text-gray-400'
                             }`}
                     >
                         {course.status === 'active'
@@ -217,7 +217,7 @@ export function FacultyCourseCard({
 
                     <Button
                         size="sm"
-                        className="gap-1 bg-[#6B0000] text-white hover:bg-[#8B1A1A]"
+                        className="gap-1 bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]"
                         onClick={() => onOpen(course.id)}
                         aria-label={`Open ${course.name}`}
                     >

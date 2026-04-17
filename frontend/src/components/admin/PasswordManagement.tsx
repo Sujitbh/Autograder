@@ -54,10 +54,10 @@ export function PasswordManagement() {
       {successMsg && (
         <div
           className="flex items-center gap-3 p-4 rounded-lg mb-6"
-          style={{ backgroundColor: '#E8F5E9', border: '1px solid #2D6A2D' }}
+          style={{ backgroundColor: 'var(--color-success-bg)', border: '1px solid var(--color-success)' }}
         >
-          <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: '#2D6A2D' }} />
-          <p className="text-sm font-medium" style={{ color: '#2D6A2D' }}>{successMsg}</p>
+          <CheckCircle2 className="w-5 h-5 shrink-0" style={{ color: 'var(--color-success)' }} />
+          <p className="text-sm font-medium" style={{ color: 'var(--color-success)' }}>{successMsg}</p>
         </div>
       )}
 
@@ -112,7 +112,7 @@ export function PasswordManagement() {
                     <span
                       className="inline-block px-2.5 py-0.5 rounded text-xs font-semibold uppercase text-white"
                       style={{
-                        backgroundColor: u.role === 'admin' ? 'var(--color-primary)' : u.role === 'faculty' ? '#1A4D7A' : '#2D6A2D',
+                        backgroundColor: u.role === 'admin' ? 'var(--color-primary)' : u.role === 'faculty' ? 'var(--color-info)' : 'var(--color-success)',
                       }}
                     >
                       {u.role}

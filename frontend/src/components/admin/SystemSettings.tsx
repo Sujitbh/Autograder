@@ -91,7 +91,7 @@ export function SystemSettings() {
           onClick={handleSave}
           disabled={updateMutation.isPending}
           className="text-white"
-          style={{ backgroundColor: saved ? '#2D6A2D' : 'var(--color-primary)' }}
+          style={{ backgroundColor: saved ? 'var(--color-success)' : 'var(--color-primary)' }}
         >
           {updateMutation.isPending ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -121,8 +121,8 @@ export function SystemSettings() {
                 fontWeight: 700,
                 padding: '4px 10px',
                 borderRadius: 999,
-                backgroundColor: detector?.model_available ? '#DCFCE7' : '#FEE2E2',
-                color: detector?.model_available ? '#166534' : '#991B1B',
+                backgroundColor: detector?.model_available ? 'var(--color-success-bg)' : 'var(--color-error-bg)',
+                color: detector?.model_available ? 'var(--color-success)' : 'var(--color-error)',
                 border: detector?.model_available ? '1px solid #86EFAC' : '1px solid #FCA5A5',
               }}
             >

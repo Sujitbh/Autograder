@@ -62,7 +62,7 @@ export function DesignSystem() {
         </div>
 
         {/* Color Palette */}
-        <section className="bg-white rounded-lg p-6 mb-6" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
+        <section className="bg-[var(--color-surface)] rounded-lg p-6 mb-6" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
           <h2 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '24px' }}>
             1.1 Color Palette
           </h2>
@@ -93,7 +93,7 @@ export function DesignSystem() {
         </section>
 
         {/* Typography Scale */}
-        <section className="bg-white rounded-lg p-6 mb-6" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
+        <section className="bg-[var(--color-surface)] rounded-lg p-6 mb-6" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
           <h2 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '24px' }}>
             1.2 Typography Scale
           </h2>
@@ -120,7 +120,7 @@ export function DesignSystem() {
         </section>
 
         {/* Spacing Scale */}
-        <section className="bg-white rounded-lg p-6 mb-6" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
+        <section className="bg-[var(--color-surface)] rounded-lg p-6 mb-6" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
           <h2 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '24px' }}>
             1.3 Spacing Scale (8px Grid)
           </h2>
@@ -149,14 +149,14 @@ export function DesignSystem() {
         </section>
 
         {/* Shadows */}
-        <section className="bg-white rounded-lg p-6 mb-6" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
+        <section className="bg-[var(--color-surface)] rounded-lg p-6 mb-6" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
           <h2 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '24px' }}>
             1.4 Shadows
           </h2>
 
           <div className="grid grid-cols-3 gap-6">
             <div className="text-center">
-              <div className="bg-white rounded-lg p-6 mb-2" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
+              <div className="bg-[var(--color-surface)] rounded-lg p-6 mb-2" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
                 <p style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>Card Shadow</p>
               </div>
               <code style={{ fontSize: '11px', color: 'var(--color-text-mid)', fontFamily: 'JetBrains Mono, monospace' }}>
@@ -165,7 +165,7 @@ export function DesignSystem() {
             </div>
 
             <div className="text-center">
-              <div className="bg-white rounded-lg p-6 mb-2" style={{ boxShadow: '0 4px 12px rgba(107, 0, 0, 0.10)' }}>
+              <div className="bg-[var(--color-surface)] rounded-lg p-6 mb-2" style={{ boxShadow: '0 4px 12px rgba(107, 0, 0, 0.10)' }}>
                 <p style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>Dropdown Shadow</p>
               </div>
               <code style={{ fontSize: '11px', color: 'var(--color-text-mid)', fontFamily: 'JetBrains Mono, monospace' }}>
@@ -174,7 +174,7 @@ export function DesignSystem() {
             </div>
 
             <div className="text-center">
-              <div className="bg-white rounded-lg p-6 mb-2" style={{ boxShadow: '0 8px 24px rgba(107, 0, 0, 0.15)' }}>
+              <div className="bg-[var(--color-surface)] rounded-lg p-6 mb-2" style={{ boxShadow: '0 8px 24px rgba(107, 0, 0, 0.15)' }}>
                 <p style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>Modal Shadow</p>
               </div>
               <code style={{ fontSize: '11px', color: 'var(--color-text-mid)', fontFamily: 'JetBrains Mono, monospace' }}>
@@ -185,7 +185,7 @@ export function DesignSystem() {
         </section>
 
         {/* Border Radius */}
-        <section className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
+        <section className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0, 0, 0, 0.08)' }}>
           <h2 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--color-primary)', marginBottom: '24px' }}>
             1.5 Border Radius
           </h2>

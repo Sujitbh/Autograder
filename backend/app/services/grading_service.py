@@ -32,6 +32,7 @@ class GradingService:
         *,
         run_tests: bool = True,
         apply_rubric: bool = True,
+        grader_id: Optional[int] = None,
     ) -> dict:
         """
         Grade a submission against test cases and rubric.
@@ -145,6 +146,39 @@ class GradingService:
         results["feedback"] = GradingService._generate_feedback(results)
 
         return results
+
+    @staticmethod
+    def get_latest_submissions_for_assignment(
+        db: Session,
+        assignment_id: int,
+    ) -> List[Submission]:
+        """
+        Return only the latest submission for each student in an assignment.
+        Latest is determined by (created_at, id) descending.
+        """
+        submissions = db.query(Submission).filter(
+            Submission.assignment_id == assignment_id
+        ).all()
+
+        latest_by_student: dict[int, Submission] = {}
+        for sub in submissions:
+            existing = latest_by_student.get(sub.student_id)
+            if existing is None:
+                latest_by_student[sub.student_id] = sub
+                continue
+
+            current_key = (
+                sub.created_at or datetime.min,
+                sub.id,
+            )
+            existing_key = (
+                existing.created_at or datetime.min,
+                existing.id,
+            )
+            if current_key > existing_key:
+                latest_by_student[sub.student_id] = sub
+
+        return list(latest_by_student.values())
 
     @staticmethod
     def _run_tests(

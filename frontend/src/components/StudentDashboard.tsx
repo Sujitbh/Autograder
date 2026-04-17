@@ -188,7 +188,7 @@ function StudentDashboard() {
 
         {/* Error state */}
         {error && !isLoading && (
-          <div className="flex flex-col items-center justify-center py-20 gap-2" style={{ color: 'var(--color-danger, #ef4444)' }}>
+          <div className="flex flex-col items-center justify-center py-20 gap-2" style={{ color: 'var(--color-danger, var(--color-error))' }}>
             <AlertTriangle className="w-6 h-6" />
             <span>Failed to load courses.</span>
           </div>

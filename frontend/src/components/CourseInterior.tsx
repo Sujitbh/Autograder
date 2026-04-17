@@ -24,6 +24,7 @@ import {
 import { useAssignments, useDeleteAssignment, useUpdateAssignment } from '@/hooks/queries';
 import { useQueries } from '@tanstack/react-query';
 import { submissionService } from '@/services/api';
+import type { AssignmentStatus } from '@/types';
 
 interface Assignment {
   id: string;
@@ -76,6 +77,13 @@ function getStatus(a: Assignment): 'draft' | 'open' | 'graded' | 'closed' {
   if (needsGrade === 0 && a.submissions > 0) return 'graded';
   if (a.dueDate && new Date(a.dueDate).getTime() > 0 && new Date(a.dueDate) < NOW && needsGrade === 0) return 'closed';
   return 'open';
+}
+
+function normalizeAssignmentStatus(status: string): AssignmentStatus {
+  if (status === 'draft' || status === 'published' || status === 'closed') {
+    return status;
+  }
+  return 'published';
 }
 
 function getSubmittedPct(a: Assignment): number {
@@ -277,10 +285,10 @@ export function CourseInterior() {
   // Status badge per spec: pill shape, light bg + colored text
   const getStatusBadge = (status: ReturnType<typeof getStatus>, isVisibleToStudents: boolean) => {
     const cfg = {
-      draft: { bg: '#F5F5F5', text: '#595959' },
-      open: { bg: '#E8F0FF', text: '#1A4D7A' },
-      graded: { bg: '#E8F5E8', text: '#2D6A2D' },
-      closed: { bg: '#F0F0F0', text: '#8A8A8A' },
+      draft: { bg: 'var(--color-surface-elevated)', text: 'var(--color-text-mid)' },
+      open: { bg: 'var(--color-info-bg)', text: 'var(--color-info)' },
+      graded: { bg: 'var(--color-success-bg)', text: 'var(--color-success)' },
+      closed: { bg: 'var(--color-surface-elevated)', text: 'var(--color-text-light)' },
     };
     const s = cfg[status];
     return (
@@ -314,7 +322,7 @@ export function CourseInterior() {
         courseId,
         assignmentId: assignment.id,
         dto: {
-          status: assignment.isDraft ? 'published' : (assignment.backendStatus || 'published'),
+          status: assignment.isDraft ? 'published' : normalizeAssignmentStatus(assignment.backendStatus),
           isActive: nextVisible,
         },
       },
@@ -334,8 +342,8 @@ export function CourseInterior() {
     <span
       style={{
         display: 'inline-block',
-        backgroundColor: '#F5F5F5',
-        color: '#2D2D2D',
+        backgroundColor: 'var(--color-surface-elevated)',
+        color: 'var(--color-text-dark)',
         fontSize: '12px',
         fontWeight: 500,
         padding: '4px 10px',
@@ -398,7 +406,7 @@ export function CourseInterior() {
 
           {/* Error state */}
           {fetchError && !isLoading && (
-            <div className="flex flex-col items-center justify-center py-20 gap-2" style={{ color: '#ef4444' }}>
+            <div className="flex flex-col items-center justify-center py-20 gap-2" style={{ color: 'var(--color-error)' }}>
               <AlertTriangle className="w-6 h-6" />
               <span>Failed to load assignments.</span>
               <span style={{ fontSize: '12px', opacity: 0.7 }}>{(fetchError as Error).message}</span>
@@ -462,7 +470,7 @@ export function CourseInterior() {
             {assignmentsWithStats.length === 0 ? (
               /* Empty State: No Assignments at all */
               <div className="text-center py-20">
-                <ClipboardX className="w-16 h-16 mx-auto mb-4" style={{ color: '#D9D9D9' }} />
+                <ClipboardX className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--color-border)' }} />
                 <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '8px' }}>
                   No Assignments Yet
                 </p>
@@ -481,7 +489,7 @@ export function CourseInterior() {
             ) : sorted.length === 0 ? (
               /* Empty State: No Filter Results */
               <div className="text-center py-20">
-                <FilterX className="w-12 h-12 mx-auto mb-4" style={{ color: '#D9D9D9' }} />
+                <FilterX className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-border)' }} />
                 <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '8px' }}>
                   No {tabs.find(t => t.id === activeTab)?.label} Assignments
                 </p>
@@ -544,10 +552,10 @@ export function CourseInterior() {
                       const overdue = isOverdue(assignment);
 
                       // Submitted color per spec: green ≥80%, orange 50-79%, red <50%
-                      const submittedColor = pct >= 80 ? '#2D6A2D' : pct >= 50 ? '#8A5700' : '#8B0000';
+                      const submittedColor = pct >= 80 ? 'var(--color-success)' : pct >= 50 ? 'var(--color-warning)' : 'var(--color-error)';
 
                       // Needs Grade color: gray if 0, orange 1-10, red >10, dash for draft
-                      const needsGradeColor = needsGrade === 0 ? '#8A8A8A' : needsGrade <= 10 ? '#8A5700' : '#8B0000';
+                      const needsGradeColor = needsGrade === 0 ? 'var(--color-text-light)' : needsGrade <= 10 ? 'var(--color-warning)' : 'var(--color-error)';
 
                       // Due date overdue if past AND status is open
                       const dueDateOverdue = !!assignment.dueDate && new Date(assignment.dueDate) < NOW && status === 'open';
@@ -561,7 +569,7 @@ export function CourseInterior() {
                           className="border-b transition-colors"
                           style={{
                             borderColor: 'var(--color-border)',
-                            borderLeft: overdue ? '4px solid #8B0000' : '4px solid transparent',
+                            borderLeft: overdue ? '4px solid var(--color-error)' : '4px solid transparent',
                             cursor: 'pointer',
                           }}
                           tabIndex={0}
@@ -579,14 +587,14 @@ export function CourseInterior() {
                               }
                             }
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F5EDED'}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-primary-bg)'}
                           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ''}
                         >
                           {/* Assignment Name */}
                           <td className="px-6 py-4">
                             <span
                               className="assignment-name"
-                              style={{ fontSize: '14px', fontWeight: 600, color: '#6B0000' }}
+                              style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}
                             >
                               {assignment.name}
                             </span>
@@ -601,11 +609,11 @@ export function CourseInterior() {
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-1.5">
                               {dueDateOverdue && (
-                                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#8B0000' }} />
+                                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-error)' }} />
                               )}
                               <span style={{
                                 fontSize: '13px',
-                                color: dueDateOverdue ? '#8B0000' : '#595959',
+                                color: dueDateOverdue ? 'var(--color-error)' : 'var(--color-text-mid)',
                                 fontWeight: dueDateOverdue ? 500 : 400,
                               }}>
                                 {assignment.dueDate
@@ -635,7 +643,7 @@ export function CourseInterior() {
                           {/* Needs Grade — color-coded count or dash for draft */}
                           <td className="px-5 py-4">
                             {status === 'draft' ? (
-                              <span style={{ fontSize: '16px', fontWeight: 700, color: '#8A8A8A' }}>—</span>
+                              <span style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text-light)' }}>—</span>
                             ) : (
                               <span style={{ fontSize: '16px', fontWeight: 700, color: needsGradeColor }}>
                                 {needsGrade}
@@ -691,7 +699,7 @@ export function CourseInterior() {
                                 title="Delete"
                                 onClick={() => setDeleteTarget(assignment)}
                               >
-                                <Trash2 className="w-4.5 h-4.5 text-[var(--color-text-mid)] group-hover:text-[#8B0000]" />
+                                <Trash2 className="w-4.5 h-4.5 text-[var(--color-text-mid)] group-hover:text-[var(--color-error)]" />
                               </button>
 
                               <DropdownMenu>
@@ -761,7 +769,7 @@ export function CourseInterior() {
             <Button variant="outline" onClick={() => setDeleteTarget(null)} className="border-[var(--color-border)]">
               Cancel
             </Button>
-            <Button onClick={handleDeleteAssignment} className="text-white" style={{ backgroundColor: '#8B0000' }}>
+            <Button onClick={handleDeleteAssignment} className="text-white" style={{ backgroundColor: 'var(--color-error)' }}>
               <Trash2 className="w-4 h-4 mr-2" /> Delete
             </Button>
           </DialogFooter>

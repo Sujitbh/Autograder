@@ -129,7 +129,7 @@ function AssignTADialog({
           </div>
 
           {error && (
-            <p className="text-sm font-medium" style={{ color: 'var(--color-error, #dc2626)' }}>
+            <p className="text-sm font-medium" style={{ color: 'var(--color-error, var(--color-error))' }}>
               {error}
             </p>
           )}
@@ -277,7 +277,7 @@ function RemoveDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent style={{ maxWidth: '440px' }}>
         <DialogHeader>
-          <DialogTitle style={{ color: 'var(--color-error, #dc2626)' }}>Remove TA</DialogTitle>
+          <DialogTitle style={{ color: 'var(--color-error, var(--color-error))' }}>Remove TA</DialogTitle>
           <DialogDescription>
             Are you sure you want to remove <strong>{assignment?.user_name}</strong> as TA from{' '}
             <strong>{assignment?.course_name}</strong>? This will revoke all their TA permissions
@@ -292,7 +292,7 @@ function RemoveDialog({
             onClick={handleRemove}
             disabled={removeTA.isPending}
             className="text-white"
-            style={{ backgroundColor: 'var(--color-error, #dc2626)' }}
+            style={{ backgroundColor: 'var(--color-error, var(--color-error))' }}
           >
             {removeTA.isPending ? (
               <>
@@ -354,15 +354,15 @@ export function AdminTAManagement() {
   });
 
   const statusIcon = (status: string) => {
-    if (status === 'accepted') return <CheckCircle2 className="w-4 h-4" style={{ color: '#2D6A2D' }} />;
+    if (status === 'accepted') return <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--color-success)' }} />;
     if (status === 'declined') return <XCircle className="w-4 h-4" style={{ color: 'var(--color-error)' }} />;
-    return <Clock className="w-4 h-4" style={{ color: '#8A5700' }} />;
+    return <Clock className="w-4 h-4" style={{ color: 'var(--color-warning)' }} />;
   };
 
   const statusColor = (status: string) => {
-    if (status === 'accepted') return { bg: '#E8F5E9', color: '#2D6A2D' };
-    if (status === 'declined') return { bg: '#FFE6E6', color: '#8B0000' };
-    return { bg: '#FFF3CD', color: '#8A5700' };
+    if (status === 'accepted') return { bg: 'var(--color-success-bg)', color: 'var(--color-success)' };
+    if (status === 'declined') return { bg: 'var(--color-error-bg)', color: 'var(--color-error)' };
+    return { bg: 'var(--color-warning-bg)', color: 'var(--color-warning)' };
   };
 
   return (
@@ -511,7 +511,7 @@ export function AdminTAManagement() {
                             size="sm"
                             onClick={() => setRemoveTarget(a)}
                             title="Remove TA"
-                            style={{ borderColor: 'var(--color-error, #dc2626)', color: 'var(--color-error, #dc2626)' }}
+                            style={{ borderColor: 'var(--color-error, var(--color-error))', color: 'var(--color-error, var(--color-error))' }}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>

@@ -63,11 +63,11 @@ export default function TASubmissionsPage({ courseId, courseName }: Readonly<TAS
 
     const getStatusBadge = (status: string) => {
         const map: Record<string, { color: string; bg: string; label: string }> = {
-            pending: { color: '#D97706', bg: '#FEF3C7', label: 'Pending' },
-            submitted: { color: '#D97706', bg: '#FEF3C7', label: 'Submitted' },
-            graded: { color: '#059669', bg: '#D1FAE5', label: 'Graded' },
-            in_review: { color: '#2563EB', bg: '#DBEAFE', label: 'In Review' },
-            failed: { color: '#DC2626', bg: '#FEE2E2', label: 'Failed' },
+            pending: { color: 'var(--color-warning)', bg: 'var(--color-warning-bg)', label: 'Pending' },
+            submitted: { color: 'var(--color-warning)', bg: 'var(--color-warning-bg)', label: 'Submitted' },
+            graded: { color: 'var(--color-success)', bg: 'var(--color-success-bg)', label: 'Graded' },
+            in_review: { color: 'var(--color-info)', bg: 'var(--color-info-bg)', label: 'In Review' },
+            failed: { color: 'var(--color-error)', bg: 'var(--color-error-bg)', label: 'Failed' },
         };
         const s = map[status] || { color: '#6B7280', bg: '#F3F4F6', label: status };
         return (

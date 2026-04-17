@@ -24,6 +24,7 @@ export {
     useSubmission,
     useSubmitCode,
     useGradeSubmission,
+    useOverrideSubmissionScore,
 } from './useSubmissions';
 
 export {

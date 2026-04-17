@@ -31,13 +31,6 @@ export default function Home() {
     }
   }, [isAuthenticated, role, isLoading, router]);
 
-        if (isAuthenticated && role) {
-            router.replace(dashboardForRole(role));
-        } else {
-            router.replace('/landing');
-        }
-    }, [isAuthenticated, role, isLoading, router]);
-
   if (isAuthenticated && role) {
     return null;
   }

@@ -104,8 +104,8 @@ export function AdminAccountSettings() {
           <h3 className="text-lg font-semibold mb-6" style={{ color: 'var(--color-text-dark)' }}>Change Password</h3>
 
           {error && (
-            <div className="p-3 rounded-lg mb-4" style={{ backgroundColor: '#FFE6E6', border: '1px solid #8B0000' }}>
-              <p className="text-sm" style={{ color: '#8B0000' }}>{error}</p>
+            <div className="p-3 rounded-lg mb-4" style={{ backgroundColor: 'var(--color-error-bg)', border: '1px solid var(--color-error)' }}>
+              <p className="text-sm" style={{ color: 'var(--color-error)' }}>{error}</p>
             </div>
           )}
 

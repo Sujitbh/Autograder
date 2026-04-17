@@ -158,8 +158,8 @@ export default function TAAssignmentsPage({ courseId, courseName }: Readonly<TAA
                                                     style={{
                                                         fontSize: '10px',
                                                         fontWeight: 600,
-                                                        color: assignment.is_active ? '#059669' : '#6B7280',
-                                                        backgroundColor: assignment.is_active ? '#D1FAE5' : '#F3F4F6',
+                                                        color: assignment.is_active ? 'var(--color-success)' : '#6B7280',
+                                                        backgroundColor: assignment.is_active ? 'var(--color-success-bg)' : '#F3F4F6',
                                                     }}
                                                 >
                                                     {assignment.is_active ? 'ACTIVE' : 'INACTIVE'}
@@ -180,8 +180,8 @@ export default function TAAssignmentsPage({ courseId, courseName }: Readonly<TAA
                                     <div className="flex items-center gap-6 mb-4">
                                         {assignment.due_date && (
                                             <div className="flex items-center gap-1.5">
-                                                <Calendar className="w-3.5 h-3.5" style={{ color: isPastDue ? '#DC2626' : 'var(--color-text-light)' }} />
-                                                <span style={{ fontSize: '12px', color: isPastDue ? '#DC2626' : 'var(--color-text-light)' }}>
+                                                <Calendar className="w-3.5 h-3.5" style={{ color: isPastDue ? 'var(--color-error)' : 'var(--color-text-light)' }} />
+                                                <span style={{ fontSize: '12px', color: isPastDue ? 'var(--color-error)' : 'var(--color-text-light)' }}>
                                                     {isPastDue ? 'Past due: ' : 'Due: '}
                                                     {new Date(assignment.due_date).toLocaleDateString('en-US', {
                                                         month: 'short', day: 'numeric', year: 'numeric',
@@ -223,7 +223,7 @@ export default function TAAssignmentsPage({ courseId, courseName }: Readonly<TAA
                                                 className="h-full rounded-full transition-all"
                                                 style={{
                                                     width: `${progressPct}%`,
-                                                    backgroundColor: progressPct === 100 ? '#059669' : 'var(--color-primary)',
+                                                    backgroundColor: progressPct === 100 ? 'var(--color-success)' : 'var(--color-primary)',
                                                 }}
                                             />
                                         </div>
@@ -233,10 +233,10 @@ export default function TAAssignmentsPage({ courseId, courseName }: Readonly<TAA
                                     {assignment.pending_count > 0 && (
                                         <div
                                             className="flex items-center gap-2 mt-3 px-3 py-2 rounded-lg"
-                                            style={{ backgroundColor: '#FEF3C7', border: '1px solid #FDE68A' }}
+                                            style={{ backgroundColor: 'var(--color-warning-bg)', border: '1px solid #FDE68A' }}
                                         >
-                                            <Clock className="w-3.5 h-3.5" style={{ color: '#D97706' }} />
-                                            <span style={{ fontSize: '12px', fontWeight: 500, color: '#92400E' }}>
+                                            <Clock className="w-3.5 h-3.5" style={{ color: 'var(--color-warning)' }} />
+                                            <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-warning)' }}>
                                                 {assignment.pending_count} submissions awaiting grading
                                             </span>
                                         </div>

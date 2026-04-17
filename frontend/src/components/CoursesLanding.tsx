@@ -235,7 +235,7 @@ export function CoursesLanding() {
         )}
 
         {error && !isLoading && (
-          <div className="flex flex-col items-center justify-center py-20 gap-2" style={{ color: 'var(--color-danger, #ef4444)' }}>
+          <div className="flex flex-col items-center justify-center py-20 gap-2" style={{ color: 'var(--color-danger, var(--color-error))' }}>
             <AlertTriangle className="w-6 h-6" />
             <span>Failed to load courses. Is the backend running at {config.apiUrl}?</span>
             <span style={{ fontSize: '12px', opacity: 0.7 }}>{error.message}</span>
@@ -331,7 +331,7 @@ export function CoursesLanding() {
                 {/* Alerts */}
                 <div style={{ marginTop: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {course.pendingGrades > 0 && (
-                    <div className="flex items-center gap-2" style={{ fontSize: '13px', color: '#B45309', fontFamily: 'Inter, sans-serif' }}>
+                    <div className="flex items-center gap-2" style={{ fontSize: '13px', color: 'var(--color-warning)', fontFamily: 'Inter, sans-serif' }}>
                       <AlertTriangle className="w-4 h-4 shrink-0" />
                       <span><strong>{course.pendingGrades}</strong> submissions need grading</span>
                     </div>
@@ -387,7 +387,7 @@ export function CoursesLanding() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenuItem
-                          className="text-red-600 focus:text-red-600 focus:bg-red-50 cursor-pointer"
+                          className="text-[var(--color-error)] focus:text-red-600 focus:bg-red-50 cursor-pointer"
                           onClick={() => setCourseToDelete(course)}
                         >
                           <Trash2 className="w-4 h-4 mr-2" />
@@ -431,7 +431,7 @@ export function CoursesLanding() {
               <Button
                 onClick={handleDeleteCourse}
                 className="text-white"
-                style={{ backgroundColor: '#dc2626' }}
+                style={{ backgroundColor: 'var(--color-error)' }}
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete Course

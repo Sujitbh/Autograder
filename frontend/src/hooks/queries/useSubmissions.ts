@@ -54,3 +54,31 @@ export function useGradeSubmission() {
         },
     });
 }
+
+export function useOverrideSubmissionScore() {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({
+            submissionId,
+            score,
+            maxScore,
+            feedback,
+        }: {
+            submissionId: string;
+            score: number;
+            maxScore?: number;
+            feedback?: string;
+        }) =>
+            submissionService.overrideSubmissionScore(submissionId, {
+                score,
+                max_score: maxScore,
+                feedback,
+            }),
+        onSuccess: (_updated, { submissionId }) => {
+            qc.invalidateQueries({ queryKey: ['submission', submissionId] });
+            qc.invalidateQueries({ queryKey: ['submissions'] });
+            qc.invalidateQueries({ queryKey: ['grades'] });
+        },
+    });
+}

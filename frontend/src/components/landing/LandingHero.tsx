@@ -334,7 +334,7 @@ function TestRow({ label, status, time }: { label: string; status: 'pass' | 'fai
       {status === 'pass' ? (
         <CheckCircle2 size={14} style={{ color: '#4ade80', flexShrink: 0 }} />
       ) : (
-        <XCircle size={14} style={{ color: '#f87171', flexShrink: 0 }} />
+        <XCircle size={14} style={{ color: 'var(--color-error)', flexShrink: 0 }} />
       )}
       <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-body)', fontWeight: 500, flex: 1 }}>
         {label}

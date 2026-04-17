@@ -86,20 +86,20 @@ export function getDaysUntil(date: Date | string): number {
  * - < 70% → red
  */
 export function getGradeColor(percentage: number): string {
-    if (percentage >= 90) return 'text-green-600';
-    if (percentage >= 80) return 'text-[#6B0000]';
-    if (percentage >= 70) return 'text-orange-600';
-    return 'text-red-600';
+    if (percentage >= 90) return 'text-[var(--color-success)]';
+    if (percentage >= 80) return 'text-[var(--color-primary)]';
+    if (percentage >= 70) return 'text-[var(--color-warning)]';
+    return 'text-[var(--color-error)]';
 }
 
 /**
  * Get a Tailwind bg-color class based on grade percentage (for badges, cells).
  */
 export function getGradeBgColor(percentage: number): string {
-    if (percentage >= 90) return 'bg-green-50 text-green-700';
-    if (percentage >= 80) return 'bg-red-50 text-[#6B0000]';
-    if (percentage >= 70) return 'bg-orange-50 text-orange-700';
-    return 'bg-red-50 text-red-700';
+    if (percentage >= 90) return 'bg-[var(--color-success-bg)] text-[var(--color-success)]';
+    if (percentage >= 80) return 'bg-[var(--color-error-bg)] text-[var(--color-primary)]';
+    if (percentage >= 70) return 'bg-[var(--color-warning-bg)] text-[var(--color-warning)]';
+    return 'bg-[var(--color-error-bg)] text-[var(--color-error)]';
 }
 
 /**

@@ -105,7 +105,7 @@ export function StudentAccountSettings() {
                 src={user.profilePhoto}
                 alt="Profile"
                 className="rounded-full flex-shrink-0 object-cover"
-                style={{ width: '80px', height: '80px', border: '2px solid #D9D9D9' }}
+                style={{ width: '80px', height: '80px', border: '2px solid var(--color-border)' }}
               />
             ) : (
               <div
@@ -116,7 +116,7 @@ export function StudentAccountSettings() {
                   backgroundColor: 'var(--color-primary)',
                   fontSize: '28px',
                   fontWeight: 700,
-                  border: '2px solid #D9D9D9',
+                  border: '2px solid var(--color-border)',
                 }}
               >
                 {`${((user as any)?.firstName || 'S')[0]}${((user as any)?.lastName || '')[0] || ''}`.toUpperCase()}
@@ -147,7 +147,7 @@ export function StudentAccountSettings() {
                   <button
                     onClick={handlePhotoDelete}
                     disabled={photoLoading}
-                    style={{ fontSize: '13px', color: '#8B0000', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
+                    style={{ fontSize: '13px', color: 'var(--color-error)', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}
                   >
                     Remove Photo
                   </button>

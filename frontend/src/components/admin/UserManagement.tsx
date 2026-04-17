@@ -11,8 +11,8 @@ import { useAdminUsers, useUpdateUserRole, useToggleUserActive } from '@/hooks/q
 
 const roleBadgeColors: Record<string, { bg: string; text: string }> = {
   admin: { bg: 'var(--color-primary)', text: '#fff' },
-  faculty: { bg: '#1A4D7A', text: '#fff' },
-  student: { bg: '#2D6A2D', text: '#fff' },
+  faculty: { bg: 'var(--color-info)', text: '#fff' },
+  student: { bg: 'var(--color-success)', text: '#fff' },
 };
 
 export function UserManagement() {
@@ -119,8 +119,8 @@ export function UserManagement() {
                       <span
                         className="inline-block px-2.5 py-0.5 rounded text-xs font-semibold"
                         style={{
-                          backgroundColor: u.is_active ? 'var(--color-success-bg, #E8F5E9)' : 'var(--color-error-bg, #FFE6E6)',
-                          color: u.is_active ? 'var(--color-success, #2D6A2D)' : 'var(--color-error, #8B0000)',
+                          backgroundColor: u.is_active ? 'var(--color-success-bg, var(--color-success-bg))' : 'var(--color-error-bg, var(--color-error-bg))',
+                          color: u.is_active ? 'var(--color-success, var(--color-success))' : 'var(--color-error, var(--color-error))',
                         }}
                       >
                         {u.is_active ? 'Active' : 'Inactive'}

@@ -25,10 +25,10 @@ export function AuditLog() {
   const totalPages = Math.ceil(total / limit);
 
   const actionColor = (action: string) => {
-    if (action.startsWith('create') || action === 'registration') return { bg: '#E8F5E9', color: '#2D6A2D' };
-    if (action.startsWith('delete') || action === 'deactivate') return { bg: '#FFE6E6', color: '#8B0000' };
-    if (action.startsWith('update') || action === 'role_change') return { bg: '#E3F2FD', color: '#1A4D7A' };
-    return { bg: '#FFF3CD', color: '#8A5700' };
+    if (action.startsWith('create') || action === 'registration') return { bg: 'var(--color-success-bg)', color: 'var(--color-success)' };
+    if (action.startsWith('delete') || action === 'deactivate') return { bg: 'var(--color-error-bg)', color: 'var(--color-error)' };
+    if (action.startsWith('update') || action === 'role_change') return { bg: 'var(--color-info-bg)', color: 'var(--color-info)' };
+    return { bg: 'var(--color-warning-bg)', color: 'var(--color-warning)' };
   };
 
   const handleExportCSV = () => {

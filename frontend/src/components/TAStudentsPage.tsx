@@ -6,15 +6,15 @@ import { useTACourseStudents, useTACoursePermissions } from '@/hooks/queries/use
 import { Search, Loader2, Users, User, Mail } from 'lucide-react';
 
 function getGradeColor(grade: number) {
-    if (grade >= 90) return '#059669';
-    if (grade >= 70) return '#D97706';
-    return '#DC2626';
+    if (grade >= 90) return 'var(--color-success)';
+    if (grade >= 70) return 'var(--color-warning)';
+    return 'var(--color-error)';
 }
 
 function getGradeBg(grade: number) {
-    if (grade >= 90) return '#D1FAE5';
-    if (grade >= 70) return '#FEF3C7';
-    return '#FEE2E2';
+    if (grade >= 90) return 'var(--color-success-bg)';
+    if (grade >= 70) return 'var(--color-warning-bg)';
+    return 'var(--color-error-bg)';
 }
 
 interface TAStudentsPageProps {
@@ -78,7 +78,7 @@ function StudentRow({ student }: Readonly<{ student: StudentRowStudent }>) {
                             className="h-full rounded-full"
                             style={{
                                 width: `${progressPct}%`,
-                                backgroundColor: progressPct === 100 ? '#059669' : 'var(--color-primary)',
+                                backgroundColor: progressPct === 100 ? 'var(--color-success)' : 'var(--color-primary)',
                             }}
                         />
                     </div>
@@ -110,8 +110,8 @@ function StudentRow({ student }: Readonly<{ student: StudentRowStudent }>) {
                     style={{
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: student.is_active ? '#059669' : '#6B7280',
-                        backgroundColor: student.is_active ? '#D1FAE5' : '#F3F4F6',
+                        color: student.is_active ? 'var(--color-success)' : '#6B7280',
+                        backgroundColor: student.is_active ? 'var(--color-success-bg)' : '#F3F4F6',
                     }}
                 >
                     {student.is_active ? 'Active' : 'Inactive'}

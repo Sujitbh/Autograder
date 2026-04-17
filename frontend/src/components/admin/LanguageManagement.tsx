@@ -84,7 +84,7 @@ export function LanguageManagement() {
                       <Button size="sm" variant="outline" onClick={() => openEdit(l)}>
                         <Edit2 className="w-3.5 h-3.5" />
                       </Button>
-                      <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => deleteMutation.mutate(l.id)}>
+                      <Button size="sm" variant="outline" className="text-[var(--color-error)] hover:text-red-700" onClick={() => deleteMutation.mutate(l.id)}>
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>

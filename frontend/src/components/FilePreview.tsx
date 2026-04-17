@@ -24,6 +24,11 @@ export function FilePreview({ fileId, filename, onClose }: FilePreviewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const inferFileType = (name: string): string => {
+    const ext = name.split('.').pop()?.toLowerCase();
+    return ext || 'text';
+  };
+
   useEffect(() => {
     loadPreview();
   }, [fileId]);
@@ -33,11 +38,22 @@ export function FilePreview({ fileId, filename, onClose }: FilePreviewProps) {
     setError(null);
     
     try {
-      const data = await submissionService.previewFile(fileId);
-      setPreviewData(data);
-    } catch (err: any) {
+      const blob = await submissionService.downloadFile(fileId);
+      const content = await blob.text();
+      setPreviewData({
+        filename,
+        content,
+        file_type: inferFileType(filename),
+        size_bytes: blob.size,
+        encoding: 'utf-8',
+        line_count: content.split(/\r?\n/).length,
+        can_preview: true,
+      });
+    } catch (err: unknown) {
       console.error('Failed to load preview:', err);
-      setError(err.response?.data?.detail || 'Failed to load file preview');
+      const message =
+        err instanceof Error ? err.message : 'Failed to load file preview';
+      setError(message);
     } finally {
       setIsLoading(false);
     }

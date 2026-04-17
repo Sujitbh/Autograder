@@ -158,7 +158,7 @@ export function TAManagement({
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div
-            className="bg-white rounded-lg p-6 max-w-md w-full mx-4 space-y-4"
+            className="bg-[var(--color-surface)] rounded-lg p-6 max-w-md w-full mx-4 space-y-4"
             style={{ boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
           >
             <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>

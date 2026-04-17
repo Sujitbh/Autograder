@@ -70,7 +70,7 @@ export function SemesterManagement() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold" style={{ fontSize: '17px', color: 'var(--color-text-dark)' }}>{s.name}</h3>
                 {s.is_current && (
-                  <span className="px-2 py-0.5 rounded text-xs font-semibold text-white" style={{ backgroundColor: '#2D6A2D' }}>Current</span>
+                  <span className="px-2 py-0.5 rounded text-xs font-semibold text-white" style={{ backgroundColor: 'var(--color-success)' }}>Current</span>
                 )}
               </div>
               <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
@@ -80,7 +80,7 @@ export function SemesterManagement() {
                 <Button size="sm" variant="outline" onClick={() => openEdit(s)}>
                   <Edit2 className="w-3.5 h-3.5 mr-1" /> Edit
                 </Button>
-                <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700" onClick={() => deleteMutation.mutate(s.id)}>
+                <Button size="sm" variant="outline" className="text-[var(--color-error)] hover:text-red-700" onClick={() => deleteMutation.mutate(s.id)}>
                   <Trash2 className="w-3.5 h-3.5 mr-1" /> Delete
                 </Button>
               </div>

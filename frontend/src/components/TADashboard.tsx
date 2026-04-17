@@ -19,8 +19,8 @@ type SortOrder = 'asc' | 'desc';
 
 function getStatusBadge(isActive: boolean) {
     const cfg = isActive
-        ? { bg: '#E8F5E8', text: '#2D6A2D', label: 'Active' }
-        : { bg: '#F5F5F5', text: '#595959', label: 'Inactive' };
+        ? { bg: 'var(--color-success-bg)', text: 'var(--color-success)', label: 'Active' }
+        : { bg: 'var(--color-surface-elevated)', text: 'var(--color-text-mid)', label: 'Inactive' };
     return (
         <span
             style={{
@@ -43,10 +43,10 @@ function getStatusBadge(isActive: boolean) {
 
 function getPendingBadge(count: number) {
     if (count === 0) {
-        return <span style={{ fontSize: '14px', fontWeight: 400, color: '#8A8A8A' }}>0</span>;
+        return <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--color-text-light)' }}>0</span>;
     }
     return (
-        <span style={{ fontSize: '14px', fontWeight: 700, color: '#D97706' }}>
+        <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-warning)' }}>
             {count}
         </span>
     );
@@ -221,7 +221,7 @@ export default function TADashboard() {
                 {/* Courses Table */}
                 {courses.length === 0 ? (
                     <div className="text-center py-20">
-                        <BookOpen className="w-16 h-16 mx-auto mb-4" style={{ color: '#D9D9D9' }} />
+                        <BookOpen className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--color-border)' }} />
                         <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '8px' }}>
                             No TA Assignments Yet
                         </p>
@@ -231,7 +231,7 @@ export default function TADashboard() {
                     </div>
                 ) : sorted.length === 0 ? (
                     <div className="text-center py-20">
-                        <FilterX className="w-12 h-12 mx-auto mb-4" style={{ color: '#D9D9D9' }} />
+                        <FilterX className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-border)' }} />
                         <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '8px' }}>
                             No Matching Courses
                         </p>
@@ -295,7 +295,7 @@ export default function TADashboard() {
                                         className="border-b transition-colors"
                                         style={{
                                             borderColor: 'var(--color-border)',
-                                            borderLeft: course.pending_grading > 0 ? '4px solid #D97706' : '4px solid transparent',
+                                            borderLeft: course.pending_grading > 0 ? '4px solid var(--color-warning)' : '4px solid transparent',
                                             cursor: 'pointer',
                                         }}
                                         tabIndex={0}
@@ -308,7 +308,7 @@ export default function TADashboard() {
                                                 router.push(`/ta/courses/${course.id}`);
                                             }
                                         }}
-                                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#F5EDED')}
+                                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary-bg)')}
                                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
                                     >
                                         {/* Course Code */}
@@ -329,14 +329,14 @@ export default function TADashboard() {
 
                                         {/* Course Name */}
                                         <td className="px-5 py-4">
-                                            <span style={{ fontSize: '14px', fontWeight: 600, color: '#6B0000' }}>
+                                            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>
                                                 {course.name}
                                             </span>
                                         </td>
 
                                         {/* Instructor */}
                                         <td className="px-5 py-4 hidden md:table-cell">
-                                            <span style={{ fontSize: '13px', color: '#595959' }}>
+                                            <span style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
                                                 {course.instructor_name ?? '—'}
                                             </span>
                                         </td>

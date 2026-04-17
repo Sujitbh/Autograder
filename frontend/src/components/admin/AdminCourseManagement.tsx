@@ -140,7 +140,7 @@ export function AdminCourseManagement() {
                     <span
                       className="inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase"
                       style={{
-                        backgroundColor: course.is_active ? 'var(--color-success, #2D6A2D)' : 'var(--color-text-light)',
+                        backgroundColor: course.is_active ? 'var(--color-success, var(--color-success))' : 'var(--color-text-light)',
                         color: '#fff',
                       }}
                     >
@@ -149,7 +149,7 @@ export function AdminCourseManagement() {
                     <button
                       onClick={() => handleDelete(course.id, course.name)}
                       disabled={isDeleting}
-                      className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded px-2 py-0.5 text-xs font-semibold transition-colors disabled:opacity-50"
+                      className="text-[var(--color-error)] hover:text-red-700 bg-[var(--color-error-bg)] hover:bg-red-100 rounded px-2 py-0.5 text-xs font-semibold transition-colors disabled:opacity-50"
                       title="Delete Course"
                     >
                       Delete
@@ -238,7 +238,7 @@ export function AdminCourseManagement() {
               <span
                 className="inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase w-fit"
                 style={{
-                  backgroundColor: course.is_active ? 'var(--color-success, #2D6A2D)' : 'var(--color-text-light)',
+                  backgroundColor: course.is_active ? 'var(--color-success, var(--color-success))' : 'var(--color-text-light)',
                   color: '#fff',
                 }}
               >
@@ -248,7 +248,7 @@ export function AdminCourseManagement() {
               <button
                 onClick={() => handleDelete(course.id, course.name)}
                 disabled={isDeleting}
-                className="text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded px-2 py-0.5 text-xs font-semibold transition-colors disabled:opacity-50"
+                className="text-[var(--color-error)] hover:text-red-700 bg-[var(--color-error-bg)] hover:bg-red-100 rounded px-2 py-0.5 text-xs font-semibold transition-colors disabled:opacity-50"
               >
                 Delete
               </button>

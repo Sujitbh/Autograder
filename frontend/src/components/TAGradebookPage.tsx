@@ -21,16 +21,16 @@ export default function TAGradebookPage({ courseId, courseName }: Readonly<TAGra
 
     const getGradeColor = (score: number, maxScore: number) => {
         const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
-        if (pct >= 90) return '#059669';
-        if (pct >= 70) return '#D97706';
-        return '#DC2626';
+        if (pct >= 90) return 'var(--color-success)';
+        if (pct >= 70) return 'var(--color-warning)';
+        return 'var(--color-error)';
     };
 
     const getGradeBg = (score: number, maxScore: number) => {
         const pct = maxScore > 0 ? (score / maxScore) * 100 : 0;
-        if (pct >= 90) return '#D1FAE5';
-        if (pct >= 70) return '#FEF3C7';
-        return '#FEE2E2';
+        if (pct >= 90) return 'var(--color-success-bg)';
+        if (pct >= 70) return 'var(--color-warning-bg)';
+        return 'var(--color-error-bg)';
     };
 
     return (

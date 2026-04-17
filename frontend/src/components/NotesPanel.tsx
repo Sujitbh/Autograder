@@ -39,8 +39,8 @@ type TabId = 'notes' | 'todos';
 const NOTE_COLORS = [
     { value: 'default', bg: 'var(--color-surface)', label: 'Default' },
     { value: 'yellow', bg: '#FEF9C3', label: 'Yellow' },
-    { value: 'green', bg: '#DCFCE7', label: 'Green' },
-    { value: 'blue', bg: '#DBEAFE', label: 'Blue' },
+    { value: 'green', bg: 'var(--color-success-bg)', label: 'Green' },
+    { value: 'blue', bg: 'var(--color-info-bg)', label: 'Blue' },
     { value: 'pink', bg: '#FCE7F3', label: 'Pink' },
     { value: 'purple', bg: '#F3E8FF', label: 'Purple' },
 ];

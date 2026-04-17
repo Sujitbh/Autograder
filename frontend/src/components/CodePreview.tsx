@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Copy, Check } from 'lucide-react';
 
 interface CodePreviewProps {
@@ -17,6 +15,7 @@ export function CodePreview({
   showLineNumbers = true,
 }: CodePreviewProps) {
   const [copied, setCopied] = useState(false);
+  const lines = content.split(/\r?\n/);
 
   const handleCopy = async () => {
     try {
@@ -77,27 +76,40 @@ export function CodePreview({
       </div>
 
       {/* Code Content */}
-      <div className="code-preview-content" style={{ maxHeight: '500px', overflow: 'auto' }}>
-        <SyntaxHighlighter
-          language={language || 'text'}
-          style={vscDarkPlus}
-          showLineNumbers={showLineNumbers}
-          customStyle={{
+      <div
+        className="code-preview-content"
+        style={{ maxHeight: '500px', overflow: 'auto', backgroundColor: '#1E1E1E' }}
+      >
+        <pre
+          style={{
             margin: 0,
             borderRadius: 0,
             fontSize: '13px',
             lineHeight: '1.5',
             padding: '16px',
-          }}
-          lineNumberStyle={{
-            minWidth: '3em',
-            paddingRight: '1em',
-            color: '#6B7280',
-            userSelect: 'none',
+            color: '#D1D5DB',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
           }}
         >
-          {content}
-        </SyntaxHighlighter>
+          {lines.map((line, idx) => (
+            <div key={`${idx}-${line.slice(0, 8)}`} style={{ whiteSpace: 'pre' }}>
+              {showLineNumbers && (
+                <span
+                  style={{
+                    display: 'inline-block',
+                    minWidth: '3em',
+                    paddingRight: '1em',
+                    color: '#6B7280',
+                    userSelect: 'none',
+                  }}
+                >
+                  {idx + 1}
+                </span>
+              )}
+              <code>{line || ' '}</code>
+            </div>
+          ))}
+        </pre>
       </div>
     </div>
   );

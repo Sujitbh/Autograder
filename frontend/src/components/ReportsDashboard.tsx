@@ -317,7 +317,7 @@ export function ReportsDashboard() {
 
   const hoverBg = 'var(--color-primary-bg)';
   const summaryBg = '#F9F9F9';
-  const rowBgFor = (isEven: boolean) => isEven ? '#FAFAFA' : 'var(--color-surface)';
+  const rowBgFor = (isEven: boolean) => isEven ? 'var(--color-surface-elevated)' : 'var(--color-surface)';
 
   const onRowEnter = (e: React.MouseEvent<HTMLTableRowElement>) => {
     e.currentTarget.querySelectorAll('td').forEach(el => {
@@ -352,7 +352,7 @@ export function ReportsDashboard() {
           {isLoading && (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto mb-4" style={{ borderColor: '#6B0000' }} />
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto mb-4" style={{ borderColor: 'var(--color-primary)' }} />
                 <p style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>Loading grade data...</p>
               </div>
             </div>
@@ -362,7 +362,7 @@ export function ReportsDashboard() {
           {!isLoading && students.length === 0 && view === 'gradebook' && (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
-                <FileText className="w-12 h-12 mx-auto mb-4" style={{ color: '#8A8A8A' }} />
+                <FileText className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-text-light)' }} />
                 <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>No grade data available</h2>
                 <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '8px' }}>
                   Grades will appear here once students submit assignments and they are graded.
@@ -454,7 +454,7 @@ export function ReportsDashboard() {
                 <button
                   onClick={() => { setView('gradebook'); setSelectedStudent(null); }}
                   className="flex items-center gap-1 mb-5 hover:underline transition-colors"
-                  style={{ fontSize: '13px', color: '#6B0000' }}
+                  style={{ fontSize: '13px', color: 'var(--color-primary)' }}
                 >
                   <ChevronLeft className="w-5 h-5" /> Back to All Students
                 </button>
@@ -463,12 +463,12 @@ export function ReportsDashboard() {
                 <div className="rounded-lg p-6 mb-6" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
                   <div className="flex items-start justify-between flex-wrap gap-4">
                     <div className="flex items-start gap-5">
-                      <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center flex-shrink-0 text-white" style={{ backgroundColor: '#6B0000', fontSize: '22px', fontWeight: 700 }}>
+                      <div className="w-[72px] h-[72px] rounded-full flex items-center justify-center flex-shrink-0 text-white" style={{ backgroundColor: 'var(--color-primary)', fontSize: '22px', fontWeight: 700 }}>
                         {s.firstName[0] || ''}{s.lastName[0] || ''}
                       </div>
                       <div>
                         <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-text-dark)' }}>{s.firstName} {s.lastName}</h1>
-                        <div className="mt-2 space-y-1" style={{ fontSize: '14px', color: '#595959' }}>
+                        <div className="mt-2 space-y-1" style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>
                           <p>Student ID: <strong>{s.id}</strong> &nbsp;·&nbsp; CWID: <strong>{s.sisUserId}</strong></p>
                           <p>Username: <strong>{s.sisLoginId}</strong>{s.section && <> &nbsp;·&nbsp; Section: <strong>{s.section}</strong></>}</p>
                           {s.email && <p>Email: <strong>{s.email}</strong></p>}
@@ -488,27 +488,27 @@ export function ReportsDashboard() {
                   <div className="rounded-lg p-5" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
                     <p style={{ fontSize: '12px', color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Current Grade</p>
                     <p style={{ fontSize: '32px', fontWeight: 700, color: pctColor(pct) }}>{pct.toFixed(1)}%</p>
-                    <p style={{ fontSize: '14px', color: '#595959', marginTop: '6px' }}>{grade} · Rank: {ordinal(rank)}/{students.length}</p>
+                    <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '6px' }}>{grade} · Rank: {ordinal(rank)}/{students.length}</p>
                   </div>
                   <div className="rounded-lg p-5" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
                     <p style={{ fontSize: '12px', color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Total Points</p>
-                    <p style={{ fontSize: '32px', fontWeight: 700, color: 'var(--color-text-dark)' }}>{stats.earned} <span style={{ fontSize: '18px', fontWeight: 400, color: '#8A8A8A' }}>/ {stats.possible}</span></p>
-                    <p style={{ fontSize: '14px', color: '#595959', marginTop: '6px' }}>Missing: {stats.possible - stats.earned} pts</p>
+                    <p style={{ fontSize: '32px', fontWeight: 700, color: 'var(--color-text-dark)' }}>{stats.earned} <span style={{ fontSize: '18px', fontWeight: 400, color: 'var(--color-text-light)' }}>/ {stats.possible}</span></p>
+                    <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '6px' }}>Missing: {stats.possible - stats.earned} pts</p>
                   </div>
                   <div className="rounded-lg p-5" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
                     <p style={{ fontSize: '12px', color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Submissions</p>
-                    <p style={{ fontSize: '32px', fontWeight: 700, color: 'var(--color-text-dark)' }}>{stats.submitted}<span style={{ fontSize: '18px', fontWeight: 400, color: '#8A8A8A' }}>/{stats.total}</span></p>
-                    <p style={{ fontSize: '14px', color: '#595959', marginTop: '6px' }}>On time: {onTime} · Late: {lateCount}</p>
+                    <p style={{ fontSize: '32px', fontWeight: 700, color: 'var(--color-text-dark)' }}>{stats.submitted}<span style={{ fontSize: '18px', fontWeight: 400, color: 'var(--color-text-light)' }}>/{stats.total}</span></p>
+                    <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '6px' }}>On time: {onTime} · Late: {lateCount}</p>
                   </div>
                   <div className="rounded-lg p-5" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
                     <p style={{ fontSize: '12px', color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>Grade Breakdown</p>
                     <div className="space-y-0.5" style={{ fontSize: '14px' }}>
-                      {gradeCounts.A > 0 && <p><span style={{ color: '#2D6A2D', fontWeight: 600 }}>A:</span> {gradeCounts.A} assignments</p>}
-                      {gradeCounts.B > 0 && <p><span style={{ color: '#6B0000', fontWeight: 600 }}>B:</span> {gradeCounts.B} assignments</p>}
-                      {gradeCounts.C > 0 && <p><span style={{ color: '#8A5700', fontWeight: 600 }}>C:</span> {gradeCounts.C} assignments</p>}
-                      {gradeCounts.D > 0 && <p><span style={{ color: '#8B0000', fontWeight: 600 }}>D:</span> {gradeCounts.D} assignments</p>}
-                      {gradeCounts.F > 0 && <p><span style={{ color: '#8B0000', fontWeight: 600 }}>F:</span> {gradeCounts.F} assignments</p>}
-                      {gradeCounts.missing > 0 && <p><span style={{ color: '#8A8A8A', fontWeight: 600 }}>Missing:</span> {gradeCounts.missing}</p>}
+                      {gradeCounts.A > 0 && <p><span style={{ color: 'var(--color-success)', fontWeight: 600 }}>A:</span> {gradeCounts.A} assignments</p>}
+                      {gradeCounts.B > 0 && <p><span style={{ color: 'var(--color-primary)', fontWeight: 600 }}>B:</span> {gradeCounts.B} assignments</p>}
+                      {gradeCounts.C > 0 && <p><span style={{ color: 'var(--color-warning)', fontWeight: 600 }}>C:</span> {gradeCounts.C} assignments</p>}
+                      {gradeCounts.D > 0 && <p><span style={{ color: 'var(--color-error)', fontWeight: 600 }}>D:</span> {gradeCounts.D} assignments</p>}
+                      {gradeCounts.F > 0 && <p><span style={{ color: 'var(--color-error)', fontWeight: 600 }}>F:</span> {gradeCounts.F} assignments</p>}
+                      {gradeCounts.missing > 0 && <p><span style={{ color: 'var(--color-text-light)', fontWeight: 600 }}>Missing:</span> {gradeCounts.missing}</p>}
                     </div>
                   </div>
                 </div>
@@ -519,15 +519,15 @@ export function ReportsDashboard() {
                     <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>Assignment-by-Assignment Breakdown</h2>
                   </div>
                   <table className="w-full">
-                    <thead style={{ backgroundColor: '#FAFAFA' }}>
-                      <tr style={{ borderBottom: '2px solid #D9D9D9' }}>
+                    <thead style={{ backgroundColor: 'var(--color-surface-elevated)' }}>
+                      <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
                         <th style={{ width: 40 }} />
-                        <th className="text-left px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Assignment</th>
-                        <th className="text-left px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Category</th>
-                        <th className="text-center px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Max Pts</th>
-                        <th className="text-left px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Status</th>
-                        <th className="text-center px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>Earned</th>
-                        <th className="text-center px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D' }}>%</th>
+                        <th className="text-left px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>Assignment</th>
+                        <th className="text-left px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>Category</th>
+                        <th className="text-center px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>Max Pts</th>
+                        <th className="text-left px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>Status</th>
+                        <th className="text-center px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>Earned</th>
+                        <th className="text-center px-4 py-3" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>%</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -537,28 +537,28 @@ export function ReportsDashboard() {
                         const aPct = isNull ? 0 : (earned / a.maxPoints) * 100;
                         const isLate = s.lateFlags[a.id] && !isNull;
                         const expanded = expandedRows.has(a.id);
-                        const altBg = aIdx % 2 ? '#FAFAF8' : '#fff';
+                        const altBg = aIdx % 2 ? 'var(--color-surface-elevated)' : '#fff';
 
                         return (
                           <Fragment key={a.id}>
                             <tr
                               className="cursor-pointer transition-colors"
-                              style={{ borderBottom: expanded ? 'none' : '1px solid #E8E8E8', backgroundColor: altBg }}
+                              style={{ borderBottom: expanded ? 'none' : '1px solid var(--color-border)', backgroundColor: altBg }}
                               onClick={() => !isNull && toggleExpand(a.id)}
                               onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--color-primary-bg)'; }}
                               onMouseLeave={e => { e.currentTarget.style.backgroundColor = altBg; }}
                             >
                               <td className="text-center px-2 py-3">
                                 {!isNull && (expanded
-                                  ? <ChevronDown className="w-4 h-4 mx-auto" style={{ color: '#6B0000' }} />
-                                  : <ChevronRight className="w-4 h-4 mx-auto" style={{ color: '#8A8A8A' }} />
+                                  ? <ChevronDown className="w-4 h-4 mx-auto" style={{ color: 'var(--color-primary)' }} />
+                                  : <ChevronRight className="w-4 h-4 mx-auto" style={{ color: 'var(--color-text-light)' }} />
                                 )}
                               </td>
-                              <td className="px-4 py-3" style={{ fontSize: '14px', fontWeight: 500, color: '#2D2D2D' }}>
+                              <td className="px-4 py-3" style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
                                 <span className="flex items-center gap-1.5">
                                   {a.fullName}
                                   {a.isGroup && (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ backgroundColor: '#F5EDED', color: '#6B0000', border: '1px solid #E8D5D5' }}>
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold" style={{ backgroundColor: 'var(--color-primary-bg)', color: 'var(--color-primary)', border: '1px solid #E8D5D5' }}>
                                       <Users className="w-3 h-3" /> Group
                                     </span>
                                   )}
@@ -566,33 +566,33 @@ export function ReportsDashboard() {
                               </td>
                               <td className="px-4 py-3">
                                 <span className="px-2 py-0.5 rounded text-xs" style={{
-                                  backgroundColor: a.category === 'Homework' ? '#E3F2FD' : a.category === 'Quiz' ? '#FFF8E1' : '#F3E8FF',
-                                  color: a.category === 'Homework' ? '#1565C0' : a.category === 'Quiz' ? '#8A5700' : '#6B21A8',
+                                  backgroundColor: a.category === 'Homework' ? 'var(--color-info-bg)' : a.category === 'Quiz' ? 'var(--color-warning-bg)' : '#F3E8FF',
+                                  color: a.category === 'Homework' ? 'var(--color-info)' : a.category === 'Quiz' ? 'var(--color-warning)' : '#6B21A8',
                                   fontWeight: 600,
                                 }}>
                                   {a.category}
                                 </span>
                               </td>
-                              <td className="text-center px-4 py-3" style={{ color: '#595959' }}>{a.maxPoints}</td>
+                              <td className="text-center px-4 py-3" style={{ color: 'var(--color-text-mid)' }}>{a.maxPoints}</td>
                               <td className="px-4 py-3">
                                 {isNull ? (
-                                  <span className="flex items-center gap-1 text-xs" style={{ color: '#8B0000', fontWeight: 600 }}>
+                                  <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-error)', fontWeight: 600 }}>
                                     <XCircle className="w-3.5 h-3.5" /> Missing
                                   </span>
                                 ) : isLate ? (
-                                  <span className="flex items-center gap-1 text-xs" style={{ color: '#8A5700', fontWeight: 600 }}>
+                                  <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-warning)', fontWeight: 600 }}>
                                     <Clock className="w-3.5 h-3.5" /> Late
                                   </span>
                                 ) : (
-                                  <span className="flex items-center gap-1 text-xs" style={{ color: '#2D6A2D', fontWeight: 600 }}>
+                                  <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--color-success)', fontWeight: 600 }}>
                                     <CheckCircle2 className="w-3.5 h-3.5" /> Graded
                                   </span>
                                 )}
                               </td>
-                              <td className="text-center px-4 py-3" style={{ fontWeight: 600, color: isNull ? '#8A8A8A' : gradeColor(earned!, a.maxPoints) }}>
+                              <td className="text-center px-4 py-3" style={{ fontWeight: 600, color: isNull ? 'var(--color-text-light)' : gradeColor(earned!, a.maxPoints) }}>
                                 {isNull ? '0' : earned}
                               </td>
-                              <td className="text-center px-4 py-3" style={{ fontWeight: 600, color: isNull ? '#8A8A8A' : gradeColor(earned!, a.maxPoints) }}>
+                              <td className="text-center px-4 py-3" style={{ fontWeight: 600, color: isNull ? 'var(--color-text-light)' : gradeColor(earned!, a.maxPoints) }}>
                                 {isNull ? '0%' : `${aPct.toFixed(0)}%`}
                                 {!isNull && aPct >= 90 && <span style={{ marginLeft: 4 }}>&#10003;</span>}
                                 {isNull && <span style={{ marginLeft: 4 }}>&#10007;</span>}
@@ -601,9 +601,9 @@ export function ReportsDashboard() {
                             </tr>
 
                             {expanded && !isNull && (
-                              <tr style={{ borderBottom: '1px solid #E8E8E8' }}>
-                                <td colSpan={7} className="px-6 py-5" style={{ backgroundColor: '#FAFAFA' }}>
-                                  <div className="space-y-2" style={{ fontSize: '13px', color: '#595959' }}>
+                              <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                                <td colSpan={7} className="px-6 py-5" style={{ backgroundColor: 'var(--color-surface-elevated)' }}>
+                                  <div className="space-y-2" style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>
                                     <p><strong>Score:</strong> {earned} / {a.maxPoints} ({aPct.toFixed(1)}%)</p>
                                     {a.dueDate && (
                                       <p><strong>Due:</strong> {new Date(a.dueDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} at 11:59 PM</p>
@@ -623,7 +623,7 @@ export function ReportsDashboard() {
                 {/* Footer Summary */}
                 <div className="rounded-lg p-6" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
                   <h3 className="mb-4" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>Summary Statistics</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ fontSize: '14px', color: '#595959', lineHeight: '1.8' }}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6" style={{ fontSize: '14px', color: 'var(--color-text-mid)', lineHeight: '1.8' }}>
                     <div>
                       <p><strong>Total Earned:</strong> {stats.earned} / {stats.possible} points ({pct.toFixed(1)}%)</p>
                       <p><strong>Assignments Completed:</strong> {stats.submitted} / {stats.total} ({stats.total > 0 ? ((stats.submitted / stats.total) * 100).toFixed(1) : 0}%)</p>

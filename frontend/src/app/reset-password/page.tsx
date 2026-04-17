@@ -22,7 +22,7 @@ function ResetPasswordContent() {
 
   if (!token) {
     return (
-      <div className="flex h-screen items-center justify-center bg-white px-8">
+      <div className="flex h-screen items-center justify-center bg-[var(--color-surface)] px-8">
         <div className="w-full max-w-md text-center">
           <div
             className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-6"
@@ -83,7 +83,7 @@ function ResetPasswordContent() {
       {/* Left Branding Panel */}
       <div
         className="hidden lg:flex lg:w-1/2 items-center justify-center relative overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #6B0000 0%, #3A0000 100%)' }}
+        style={{ background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--ulm-maroon-dark) 100%)' }}
       >
         <div className="text-center z-10 px-8">
           <div className="mb-8 flex justify-center">
@@ -99,7 +99,7 @@ function ResetPasswordContent() {
       </div>
 
       {/* Right Panel */}
-      <div className="flex-1 flex items-center justify-center bg-white px-8">
+      <div className="flex-1 flex items-center justify-center bg-[var(--color-surface)] px-8">
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
@@ -110,9 +110,9 @@ function ResetPasswordContent() {
             <div className="text-center">
               <div
                 className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-6"
-                style={{ backgroundColor: '#E8F5E8' }}
+                style={{ backgroundColor: 'var(--color-success-bg)' }}
               >
-                <CheckCircle className="w-8 h-8" style={{ color: '#2D6A2D' }} />
+                <CheckCircle className="w-8 h-8" style={{ color: 'var(--color-success)' }} />
               </div>
               <h2 className="mb-3" style={{ fontSize: '24px', fontWeight: 700, color: 'var(--color-text-dark)' }}>
                 Password Reset Complete
