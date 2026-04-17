@@ -77,8 +77,10 @@ export interface Assignment {
     category: AssignmentCategory;
     dueDate: string;
     maxPoints: number;
+    maxSubmissions?: number;
     rubricMode?: 'weighted' | 'unweighted';
     status: AssignmentStatus;
+    isActive?: boolean;
     isGroup: boolean;
     allowLateSubmissions: boolean;
     aiDetectionEnabled?: boolean;
@@ -248,6 +250,7 @@ export interface CreateAssignmentDto {
     category: AssignmentCategory;
     dueDate: string;
     maxPoints: number;
+    maxSubmissions?: number;
     rubricMode?: 'weighted' | 'unweighted';
     isGroup: boolean;
     allowLateSubmissions: boolean;
@@ -270,6 +273,7 @@ export interface CreateRubricSectionDto extends Omit<RubricSection, 'id' | 'crit
 
 export interface UpdateAssignmentDto extends Partial<CreateAssignmentDto> {
     status?: AssignmentStatus;
+    isActive?: boolean;
 }
 
 export interface SubmitCodeDto {

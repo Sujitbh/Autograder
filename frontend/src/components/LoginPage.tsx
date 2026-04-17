@@ -151,7 +151,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
               <Input
                 id="email"
                 type="email"
-                placeholder=""
+                placeholder="lon.smith@ulm.edu"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
@@ -164,7 +164,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                     if (validationError) setEmailError(validationError);
                   }
                 }}
-                className={`h-12 border-2 focus:border-[var(--color-primary)] focus:ring-0 ${emailError ? 'border-[var(--color-error)] bg-[var(--color-error-bg)]' : 'border-[var(--color-border)]'}`}
+                className={`h-12 border-2 focus:border-[var(--color-primary)] focus:ring-0 ${emailError ? 'border-[var(--color-error)] bg-[var(--color-error-bg)]' : 'border-[var(--color-border)] bg-[#F8FAFC]'}`}
                 style={{ fontSize: '14px', ...(emailError && { borderColor: 'var(--color-error)', backgroundColor: 'var(--color-error-bg)' }) }}
                 required
               />
@@ -199,7 +199,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                     setPassword(e.target.value);
                     setError(null);
                   }}
-                  className={`h-12 pr-12 border-[var(--color-border)] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)] ${error ? 'border-[var(--color-error)]' : ''}`}
+                  className={`h-12 pr-12 border-[var(--color-border)] bg-[#F8FAFC] focus:border-[var(--color-primary)] focus:ring-[var(--color-primary)] ${error ? 'border-[var(--color-error)] !bg-[var(--color-error-bg)]' : ''}`}
                   required
                 />
                 <button

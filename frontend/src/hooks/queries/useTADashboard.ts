@@ -80,7 +80,17 @@ export function useTAGradeSubmission(courseId: number) {
     return useMutation({
         mutationFn: ({ submissionId, payload }: {
             submissionId: number;
-            payload: { score?: number; max_score?: number; feedback?: string; is_draft?: boolean };
+            payload: {
+                score?: number;
+                max_score?: number;
+                feedback?: string;
+                is_draft?: boolean;
+                rubric_breakdown?: Array<{
+                    rubric_id: number;
+                    score_awarded: number;
+                    feedback?: string | null;
+                }>;
+            };
         }) => taDashboardService.gradeSubmission(courseId, submissionId, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['ta-submissions', courseId] });

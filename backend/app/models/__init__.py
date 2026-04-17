@@ -12,6 +12,7 @@ from .rubric import Rubric
 from .rubric_section import RubricSection, RubricCriterion
 from .group import Group, GroupMembership
 from .submission_result import SubmissionResult
+from .submission_rubric_score import SubmissionRubricScore
 from .language import Language
 from .ta_invitation import TAInvitation
 from .semester import Semester
@@ -36,6 +37,7 @@ __all__ = [
 	"Group",
 	"GroupMembership",
 	"SubmissionResult",
+	"SubmissionRubricScore",
 	"Language",
 	"TAInvitation",
 	"Semester",

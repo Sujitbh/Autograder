@@ -128,6 +128,13 @@ export interface TASubmissionDetail {
             order?: number | null;
         }>;
     }>;
+    rubric_scores?: Array<{
+        id: number;
+        rubric_id: number;
+        score_awarded: number;
+        feedback: string | null;
+        grader_id: number | null;
+    }>;
     permissions: TAPermissions;
 }
 
@@ -207,7 +214,17 @@ export const taDashboardService = {
     async gradeSubmission(
         courseId: number,
         submissionId: number,
-        payload: { score?: number; max_score?: number; feedback?: string; is_draft?: boolean }
+        payload: {
+            score?: number;
+            max_score?: number;
+            feedback?: string;
+            is_draft?: boolean;
+            rubric_breakdown?: Array<{
+                rubric_id: number;
+                score_awarded: number;
+                feedback?: string | null;
+            }>;
+        }
     ): Promise<{ id: number; status: string; score: number | null; message: string }> {
         const { data } = await api.post(`/ta-dashboard/courses/${courseId}/submissions/${submissionId}/grade`, payload);
         return data;

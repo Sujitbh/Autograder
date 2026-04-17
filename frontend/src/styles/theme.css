@@ -317,3 +317,54 @@
     font-family: 'JetBrains Mono', 'Courier New', monospace;
   }
 }
+
+/* Axiom marketing landing only: navy primary, cool neutrals, precision accent */
+.axiom-landing {
+  --landing-primary: #0c4a6e;
+  --landing-primary-dark: #082f47;
+  --landing-primary-light: #155e8c;
+  --landing-bg: #f1f5f9;
+  --landing-surface: #ffffff;
+  --landing-ink: #0f172a;
+  --landing-ink-soft: #334155;
+  --landing-muted: #64748b;
+  --landing-border: #e2e8f0;
+  --landing-gold: #0369a1;
+  --landing-gold-light: #0ea5e9;
+}
+
+@keyframes axiom-float-1 {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-0.5deg);
+    opacity: 0.22;
+  }
+  50% {
+    transform: translate(8px, -18px) rotate(0.5deg);
+    opacity: 0.32;
+  }
+}
+
+@keyframes axiom-float-2 {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0.3deg);
+    opacity: 0.18;
+  }
+  50% {
+    transform: translate(-12px, -12px) rotate(-0.3deg);
+    opacity: 0.28;
+  }
+}
+
+@keyframes axiom-float-3 {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.15;
+  }
+  50% {
+    transform: translate(6px, -22px);
+    opacity: 0.25;
+  }
+}

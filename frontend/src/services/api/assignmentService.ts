@@ -45,6 +45,7 @@ interface BackendAssignment {
             max_points: number | null;
             weight?: number | null;
             grading_method?: 'auto' | 'manual' | 'hybrid' | null;
+            default_comments?: Record<string, string> | null;
         }>;
     }>;
 }
@@ -62,8 +63,10 @@ function mapAssignment(a: BackendAssignment): Assignment {
         dueDate: a.due_date ?? '',
         starterCode: a.starter_code ?? undefined,
         maxPoints: a.max_points ?? 100,
+        maxSubmissions: a.max_submissions ?? undefined,
         rubricMode: (a.rubric_mode as 'weighted' | 'unweighted' | undefined) ?? 'unweighted',
         status: (a.status as 'draft' | 'published' | 'closed') ?? (a.is_active ? 'published' : 'draft'),
+        isActive: a.is_active,
         isGroup: false,
         allowLateSubmissions: false,
         aiDetectionEnabled: a.ai_detection_enabled ?? true,
@@ -80,9 +83,10 @@ function mapAssignment(a: BackendAssignment): Assignment {
                 id: String(c.id),
                 name: c.name,
                 description: c.description ?? '',
-                maxPoints: c.max_points ?? 0,
-                weight: c.weight ?? 1,
+                maxPoints: c.max_points ?? 5,
+                weight: c.weight ?? 0,
                 gradingMethod: (c.grading_method ?? 'manual') as 'auto' | 'manual' | 'hybrid',
+                defaultComments: c.default_comments ?? null,
             })),
         })),
         createdAt: a.created_at ?? '',
@@ -149,7 +153,7 @@ export const assignmentService = {
             allowed_languages: dto.language ?? 'python',
             max_points: dto.maxPoints ?? 100,
             rubric_mode: dto.rubricMode ?? 'unweighted',
-            max_submissions: (dto as any).maxSubmissions ?? null,
+            max_submissions: dto.maxSubmissions ?? null,
             status: dto.status ?? 'published',
             ai_detection_enabled: dto.aiDetectionEnabled ?? true,
             auto_flag_enabled: dto.autoFlagEnabled ?? true,
@@ -198,9 +202,10 @@ export const assignmentService = {
                         ? r.criteria.map((c: any) => ({
                             name: c.name,
                             description: c.description ?? '',
-                            maxPoints: c.maxPoints ?? 0,
-                            weight: c.weight ?? 1,
+                            maxPoints: c.maxPoints ?? 5,
+                            weight: c.weight ?? 0,
                             gradingMethod: c.gradingMethod ?? 'manual',
+                            defaultComments: c.defaultComments ?? null,
                         }))
                         : [],
                 }));
@@ -216,9 +221,24 @@ export const assignmentService = {
         assignmentId: string,
         dto: UpdateAssignmentDto
     ): Promise<Assignment> {
+        const payload: Record<string, unknown> = {};
+        if (dto.name != null) payload.title = dto.name;
+        if (dto.description != null) payload.description = dto.description;
+        if (dto.courseId != null) payload.course_id = Number(dto.courseId) || null;
+        if (dto.language != null) payload.allowed_languages = dto.language;
+        if (dto.maxPoints != null) payload.max_points = dto.maxPoints;
+        if (dto.maxSubmissions != null) payload.max_submissions = dto.maxSubmissions;
+        if (dto.rubricMode != null) payload.rubric_mode = dto.rubricMode;
+        if (dto.starterCode !== undefined) payload.starter_code = dto.starterCode;
+        if (dto.status != null) payload.status = dto.status;
+        if (dto.isActive !== undefined) payload.is_active = dto.isActive;
+        if (dto.dueDate !== undefined) {
+            payload.due_date = dto.dueDate ? new Date(dto.dueDate).toISOString() : null;
+        }
+
         const { data } = await api.put<BackendAssignment>(
             `/assignments/${assignmentId}`,
-            dto
+            payload
         );
         return mapAssignment(data);
     },
@@ -226,6 +246,33 @@ export const assignmentService = {
     /** Delete an assignment. */
     async deleteAssignment(_courseId: string, assignmentId: string): Promise<void> {
         await api.delete(`/assignments/${assignmentId}`);
+    },
+
+    /**
+     * Replace rubric sections on an existing assignment.
+     * Instructors or TAs with `can_edit_rubrics` (backend).
+     */
+    async replaceAssignmentRubric(
+        assignmentId: string,
+        body: {
+            rubricMode?: 'weighted' | 'unweighted';
+            rubric: Array<{
+                name: string;
+                description?: string;
+                weight: number;
+                criteria: Array<{
+                    name: string;
+                    description?: string;
+                    maxPoints: number;
+                    weight: number;
+                    gradingMethod: 'auto' | 'manual' | 'hybrid';
+                    defaultComments?: Record<string, string> | null;
+                }>;
+            }>;
+        }
+    ): Promise<Assignment> {
+        const { data } = await api.post<BackendAssignment>(`/assignments/${assignmentId}/rubric`, body);
+        return mapAssignment(data);
     },
 
     /** Publish a draft assignment (toggle is_active). */

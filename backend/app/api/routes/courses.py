@@ -1,6 +1,7 @@
 import csv
 import io
 import re
+from datetime import datetime, UTC
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from app.services.email_service import EmailService
@@ -30,6 +31,8 @@ from app.schemas.course import (
     EnrollmentImportResult,
     EnrollmentImportRowOut,
 )
+from app.schemas.course_default_rubric import CourseDefaultRubricOut, CourseDefaultRubricPut
+import app.services.course_default_rubric as course_default_rubric_service
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -78,6 +81,21 @@ def _build_email_from_row(row: dict, default_domain: str) -> Optional[str]:
             return f"{login}@{default_domain}"
 
     return None
+
+
+def _submission_status_for_gradebook(assignment: Assignment, submission: Optional[Submission]) -> str:
+    """Return a report-friendly assignment status."""
+    if submission and submission.status == "graded" and submission.score is not None:
+        return "graded"
+    if submission is not None:
+        return "ungraded"
+
+    due_date = assignment.due_date
+    if due_date is None:
+        return "not_submitted"
+
+    now = datetime.now(due_date.tzinfo) if due_date.tzinfo else datetime.now(UTC).replace(tzinfo=None)
+    return "missing" if due_date < now else "not_submitted"
 
 
 def _parse_dict_rows(decoded_text: str) -> list[dict]:
@@ -149,6 +167,28 @@ def generate_enrollment_code(db: Session) -> str:
     raise HTTPException(status_code=500, detail="Unable to generate unique enrollment code")
 
 
+def _ensure_creator_enrolled_as_instructor(db: Session, course_id: int, user: User) -> None:
+    """
+    List courses only returns rows where the user has an enrollment.
+    The 'existing course' branch of create_course updates a row but previously skipped
+    enrollment, so the creator saw an empty My Courses list.
+    """
+    if user.role not in ("faculty", "instructor", "admin"):
+        return
+    en = (
+        db.query(Enrollment)
+        .filter(Enrollment.course_id == course_id, Enrollment.user_id == user.id)
+        .first()
+    )
+    if en is None:
+        db.add(Enrollment(course_id=course_id, user_id=user.id, role="instructor"))
+        db.commit()
+    elif en.role != "instructor":
+        en.role = "instructor"
+        db.add(en)
+        db.commit()
+
+
 @router.get("/semesters")
 def list_semesters_for_faculty(db: DbSession, user: CurrentUser):
     """Return all semesters, accessible to any authenticated faculty or admin (used in course creation form)."""
@@ -205,6 +245,8 @@ def create_course(payload: CourseCreate, db: DbSession, user: CurrentUser):
         db.add(existing_course)
         db.commit()
         db.refresh(existing_course)
+        _ensure_creator_enrolled_as_instructor(db, existing_course.id, user)
+        db.refresh(existing_course)
         return existing_course
 
     # Otherwise, create a new course (for new section or new code)
@@ -254,6 +296,64 @@ def get_course_catalog(db: DbSession, user: CurrentUser):
             catalog.append({"code": code.strip().upper(), "name": name.strip()})
     catalog.sort(key=lambda x: x["code"])
     return catalog
+
+
+@router.get("/{course_id}/default-rubric", response_model=CourseDefaultRubricOut)
+def get_course_default_rubric(course_id: int, db: DbSession, user: CurrentUser):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail=COURSE_NOT_FOUND)
+    require_course_role(db=db, user=user, course_id=course_id, allowed_roles=["instructor", "ta"])
+
+    updater_name = None
+    if course.default_rubric_updated_by_id:
+        u = db.query(User).filter(User.id == course.default_rubric_updated_by_id).first()
+        if u:
+            updater_name = (getattr(u, "name", None) or getattr(u, "email", None) or "").strip() or None
+
+    return course_default_rubric_service.course_row_to_out(
+        rubric_json=course.default_rubric_json,
+        weight_policy=course.default_rubric_weight_policy or "percent",
+        updated_at=course.default_rubric_updated_at,
+        updated_by_id=course.default_rubric_updated_by_id,
+        updated_by_name=updater_name,
+    )
+
+
+@router.put("/{course_id}/default-rubric", response_model=CourseDefaultRubricOut)
+def put_course_default_rubric(
+    course_id: int,
+    payload: CourseDefaultRubricPut,
+    db: DbSession,
+    user: CurrentUser,
+):
+    require_role(user.role, {"faculty", "admin"})
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail=COURSE_NOT_FOUND)
+    require_course_role(db=db, user=user, course_id=course_id, allowed_roles=["instructor"])
+
+    try:
+        normalized = course_default_rubric_service.validate_and_normalize_put(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    course.default_rubric_json = course_default_rubric_service.put_payload_to_json(normalized)
+    course.default_rubric_weight_policy = normalized.weightPolicy
+    course.default_rubric_updated_at = datetime.now(UTC)
+    course.default_rubric_updated_by_id = user.id
+    db.add(course)
+    db.commit()
+    db.refresh(course)
+
+    updater_name = (getattr(user, "name", None) or getattr(user, "email", None) or "").strip() or None
+    return course_default_rubric_service.course_row_to_out(
+        rubric_json=course.default_rubric_json,
+        weight_policy=course.default_rubric_weight_policy,
+        updated_at=course.default_rubric_updated_at,
+        updated_by_id=course.default_rubric_updated_by_id,
+        updated_by_name=updater_name,
+    )
 
 
 @router.get("/{course_id}", response_model=CourseOut, responses={404: {"description": "Resource not found"}})
@@ -322,14 +422,19 @@ def add_course_enrollment(
         raise HTTPException(status_code=404, detail=COURSE_NOT_FOUND)
     require_course_role(db=db, user=user, course_id=course_id, allowed_roles=["instructor"])
 
-    if payload.user_id is None and payload.email is None:
-        raise HTTPException(status_code=400, detail="Provide either user_id or email")
+    if payload.user_id is None and payload.email is None and payload.sis_user_id is None:
+        raise HTTPException(status_code=400, detail="Provide user_id, email, or CWID")
 
     target_user = None
     if payload.user_id is not None:
         target_user = db.query(User).filter(User.id == payload.user_id).first()
     elif payload.email is not None:
         target_user = db.query(User).filter(User.email == payload.email).first()
+    elif payload.sis_user_id is not None:
+        cwid = payload.sis_user_id.strip()
+        target_user = db.query(User).filter(
+            (User.sis_user_id == cwid) | (User.sis_user_id == f"{cwid}.0")
+        ).first()
 
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -822,20 +927,33 @@ def get_course_grades(
                 sub = db.query(Submission).filter(
                     Submission.student_id == student.id,
                     Submission.assignment_id == a.id,
-                    Submission.status == "graded",
-                ).order_by(Submission.created_at.desc()).first()
+                ).order_by(Submission.created_at.desc(), Submission.id.desc()).first()
 
-                if sub and sub.score is not None:
+                status = _submission_status_for_gradebook(a, sub)
+
+                if sub and sub.status == "graded" and sub.score is not None:
                     grades[str(a.id)] = {
                         "score": float(sub.score),
                         "max_score": float(sub.max_score) if sub.max_score else float(a.max_points or 100),
                         "submission_id": sub.id,
                         "is_late": False,
+                        "status": status,
+                        "raw_submission_status": sub.status,
                     }
                     total_earned += float(sub.score)
                     total_possible += float(sub.max_score) if sub.max_score else float(a.max_points or 100)
                 else:
-                    grades[str(a.id)] = None
+                    grades[str(a.id)] = {
+                        "score": None,
+                        "max_score": float(a.max_points or 100),
+                        "submission_id": sub.id if sub else None,
+                        "is_late": False,
+                        "status": status,
+                        "raw_submission_status": sub.status if sub else None,
+                    }
+
+                    if status == "missing":
+                        total_possible += float(a.max_points or 100)
 
             students_data.append({
                 "student_id": student.id,
@@ -896,6 +1014,7 @@ def get_course_grades(
     
     for assignment in assignments:
         sub = latest_submissions.get(assignment.id)
+        status = _submission_status_for_gradebook(assignment, sub)
         if sub and sub.status == "graded" and sub.score is not None and sub.max_score is not None and sub.max_score > 0:
             percentage = (sub.score / sub.max_score) * 100
             graded_scores.append(percentage)
@@ -906,6 +1025,7 @@ def get_course_grades(
                 "max_score": sub.max_score,
                 "percentage": round(percentage, 1),
                 "submitted": True,
+                "status": status,
                 "feedback": sub.feedback,
                 "graded_at": sub.graded_at.isoformat() if sub.graded_at else None,
             })
@@ -917,6 +1037,7 @@ def get_course_grades(
                 "max_score": assignment.max_points,
                 "percentage": None,
                 "submitted": sub is not None,
+                "status": status,
                 "feedback": sub.feedback if sub is not None else None,
                 "graded_at": sub.graded_at.isoformat() if sub and sub.graded_at else None,
             })

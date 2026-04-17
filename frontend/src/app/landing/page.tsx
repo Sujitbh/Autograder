@@ -1,32 +1,12 @@
 import type { Metadata } from 'next';
-import LandingNav from '@/components/landing/LandingNav';
-import LandingHero from '@/components/landing/LandingHero';
-import LandingFeatures from '@/components/landing/LandingFeatures';
-import LandingRoles from '@/components/landing/LandingRoles';
-import LandingHowItWorks from '@/components/landing/LandingHowItWorks';
-import LandingAISecurity from '@/components/landing/LandingAISecurity';
-import LandingCTA from '@/components/landing/LandingCTA';
-import LandingFooter from '@/components/landing/LandingFooter';
+import ModernTechLanding from '@/components/landing/ModernTechLanding';
 
 export const metadata: Metadata = {
-  title: 'Axiom — Automated Grading System',
+  title: 'Axiom | Rigorous assessment for ULM Computer Science',
   description:
-    'Axiom is the automated grading platform for the University of Louisiana Monroe — streamlining code evaluation for students, faculty, and administrators.',
+    'Axiom is ULM Computer Science’s grading platform: less weekend busywork, clearer TA alignment, and faculty authority preserved. Built for courses that process serious submission volume.',
 };
 
 export default function LandingPage() {
-  return (
-    <div style={{ backgroundColor: 'var(--landing-bg)', scrollBehavior: 'smooth' }}>
-      <LandingNav />
-      <main>
-        <LandingHero />
-        <LandingFeatures />
-        <LandingRoles />
-        <LandingHowItWorks />
-        <LandingAISecurity />
-        <LandingCTA />
-      </main>
-      <LandingFooter />
-    </div>
-  );
+  return <ModernTechLanding />;
 }

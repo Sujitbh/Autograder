@@ -28,6 +28,11 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+logger.info(
+    "Auth: MFA_ENABLED=%s (if True, login sends email OTP unless email is in MFA_BYPASS_ACCOUNTS)",
+    settings.MFA_ENABLED,
+)
+
 
 app = FastAPI(
     title="Autograder API",
@@ -66,6 +71,11 @@ try:
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo VARCHAR"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMPTZ"))
+        conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS default_rubric_json TEXT"))
+        conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS default_rubric_weight_policy VARCHAR DEFAULT 'percent'"))
+        conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS default_rubric_updated_at TIMESTAMPTZ"))
+        conn.execute(text("ALTER TABLE courses ADD COLUMN IF NOT EXISTS default_rubric_updated_by_id INTEGER REFERENCES users(id)"))
+        conn.execute(text("ALTER TABLE rubric_criteria ADD COLUMN IF NOT EXISTS default_comments TEXT"))
         conn.execute(text("SELECT 1"))
         conn.commit()
     logger.info(f"Database connection OK: {settings.DATABASE_URL.split('@')[1]}")

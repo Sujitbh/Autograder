@@ -36,7 +36,7 @@ interface CodeEditorProps {
 }
 
 /* ── Custom Monaco themes matching the Axiom maroon brand ── */
-function defineAxiomThemes(monaco: typeof import('monaco-editor')) {
+export function defineAxiomThemes(monaco: typeof import('monaco-editor')) {
   monaco.editor.defineTheme('axiom-light', {
     base: 'vs',
     inherit: true,

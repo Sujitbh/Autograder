@@ -24,7 +24,8 @@ class RubricInline(BaseModel):
     description: Optional[str] = None
     maxPoints: Optional[int] = 10
     weight: Optional[float] = 1.0
-    gradingMethod: Optional[str] = None  # auto | manual | hybrid
+    gradingMethod: Optional[str] = None
+    defaultComments: Optional[dict[str, str]] = None
 
 
 class RubricSectionInline(BaseModel):
@@ -106,8 +107,8 @@ class AssignmentOut(BaseModel):
     auto_flag_enabled: bool = True
     auto_flag_threshold: float = 0.70
     created_at: Optional[datetime] = None
-    # Keep API key as "rubrics" but source data from Assignment.rubric_sections.
-    rubrics: List[RubricSectionOut] = Field(default_factory=list, validation_alias="rubric_sections")
+    # Keep API key as "rubrics" but source data via Assignment.rubrics_out.
+    rubrics: List[RubricSectionOut] = Field(default_factory=list, validation_alias="rubrics_out")
 
     class Config:
         from_attributes = True

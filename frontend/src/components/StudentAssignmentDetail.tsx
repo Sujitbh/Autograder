@@ -13,6 +13,7 @@ import { useAssignment } from '@/hooks/queries/useAssignments';
 import { useSubmissions } from '@/hooks/queries/useSubmissions';
 import { useCourses } from '@/hooks/queries/useCourses';
 import { useAssignmentTestCases } from '@/hooks/queries/useTestCases';
+import { useAssignmentRubrics } from '@/hooks/queries/useRubrics';
 import { useCodeExecution } from '@/hooks/useCodeExecution';
 import { useTestCaseRunner } from '@/hooks/useTestCaseRunner';
 import { useAuth } from '@/utils/AuthContext';
@@ -139,6 +140,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const { data: assignment, isLoading: assignmentLoading } = useAssignment(courseId, assignmentId);
   const { data: submissions, isLoading: submissionsLoading, refetch: refetchSubmissions } = useSubmissions(assignmentId);
   const { data: testCases } = useAssignmentTestCases(assignmentId);
+  const { data: legacyRubrics } = useAssignmentRubrics(assignmentId);
 
   // Determine language from assignment
   const assignmentLang = assignment?.language ?? (assignment as any)?.allowed_languages ?? 'python';
@@ -250,10 +252,26 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     if (weight == null || Number.isNaN(weight)) return 100;
     return weight <= 1.5 ? weight * 100 : weight;
   };
-  const rubricSections = normalizeRubricToSections(assignment?.rubric);
+  const criterionWeightPercent = sectionWeightPercent;
+  const rubricFromAssignment = normalizeRubricToSections(assignment?.rubric);
+  const rubricSections =
+    rubricFromAssignment.length > 0
+      ? rubricFromAssignment
+      : normalizeRubricToSections(
+          (legacyRubrics ?? []).map(
+            (r) =>
+              ({
+                name: r.name,
+                description: r.description ?? '',
+                maxPoints: r.max_points ?? 0,
+                weight: r.weight ?? 1,
+                gradingMethod: 'manual' as const,
+              }) as RubricCriterion
+          )
+        );
   const rubricTotalPoints = rubricSections.reduce(
     (sum, section) =>
-      sum + section.criteria.reduce((sectionSum, crit) => sectionSum + (crit.maxPoints ?? 0), 0),
+      sum + (section.criteria || []).reduce((sectionSum, crit) => sectionSum + (crit.maxPoints ?? 0), 0),
     0
   );
   const getSectionFallbackPoints = (section: any) => {
@@ -263,9 +281,9 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     if (isWeightedRubric) return Math.round((assignmentMaxPoints * sectionWeightPercent(section.weight)) / 100);
     return null;
   };
-  const inferredWeightedRubric = rubricSections.some((section) => 
-    Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 || 
-    section.criteria.some((crit) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
+  const inferredWeightedRubric = rubricSections.some((section) =>
+    Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 ||
+    (section.criteria || []).some((crit) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
   );
   const isWeightedRubric = assignment?.rubricMode === 'weighted' || inferredWeightedRubric;
 
@@ -706,17 +724,41 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                   window.addEventListener('mousemove', onMove);
                   window.addEventListener('mouseup', onUp);
                 }}
-                style={{ height: 5, cursor: 'ns-resize', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-surface-elevated)' }}
+                style={{
+                  height: 7,
+                  cursor: 'ns-resize',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: 'linear-gradient(180deg, var(--color-surface) 0%, var(--color-surface-elevated) 100%)',
+                }}
               >
-                <div style={{ width: 28, height: 3, borderRadius: 2, background: 'var(--color-border)' }} />
+                <div style={{ width: 40, height: 3, borderRadius: 999, background: 'var(--color-border)' }} />
               </div>
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '6px 14px', background: 'var(--color-surface-elevated)',
+                padding: '7px 14px', background: 'var(--color-surface-elevated)',
                 borderBottom: '1px solid var(--color-border)',
                 fontSize: 11, fontWeight: 600, color: 'var(--color-text-light)', flexShrink: 0,
               }}>
-                <span>⬤ OUTPUT</span>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '3px 8px',
+                    borderRadius: 999,
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-text-mid)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '.04em',
+                  }}
+                >
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--color-primary)' }} />
+                  Output
+                </span>
                 <button
                   onClick={() => setOutputOpen(false)}
                   style={{
@@ -966,7 +1008,6 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                               alignItems: 'center',
                             }}>
                               <span>{section.name}</span>
-                              {isWeightedRubric && <span style={{ fontSize: 11, color: 'var(--color-text-light)' }}>Weight: {sectionWeightPercent(section.weight).toFixed(1)}%</span>}
                             </div>
 
                             {(section.criteria || []).length > 0 ? (
@@ -1019,12 +1060,6 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12 }}>
                                     <span style={{ color: 'var(--color-text-light)', fontWeight: 600 }}>Points</span>
                                     <span style={{ color: isDark ? '#4ade80' : 'var(--color-success)', fontWeight: 700 }}>{getSectionFallbackPoints(section)}</span>
-                                  </div>
-                                )}
-                                {isWeightedRubric && (
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12 }}>
-                                    <span style={{ color: 'var(--color-text-light)', fontWeight: 600 }}>Section Weight</span>
-                                    <span style={{ color: 'var(--color-text-dark)', fontWeight: 700 }}>{sectionWeightPercent(section.weight).toFixed(1)}%</span>
                                   </div>
                                 )}
                               </div>
@@ -1240,19 +1275,33 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
         <div style={{
           height: 28, background: 'var(--color-primary)', color: '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 12px', fontSize: 11, fontWeight: 500, flexShrink: 0,
+          padding: '6px 12px',
+          fontSize: 11,
+          fontWeight: 600,
+          flexShrink: 0,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: .9 }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: 'var(--color-surface-elevated)',
+                border: '1px solid var(--color-border)',
+                color: 'var(--color-primary)',
+              }}
+            >
               {language.charAt(0).toUpperCase() + language.slice(1)}
             </span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: .9 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: .95 }}>
               {editorFiles.length} file{editorFiles.length !== 1 ? 's' : ''} open
             </span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             {lastSaved && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: .9 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, opacity: .95, color: 'var(--color-text-light)' }}>
                 ✓ Saved at {lastSaved}
               </span>
             )}

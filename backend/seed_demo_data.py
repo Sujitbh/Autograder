@@ -36,14 +36,14 @@ from app.models.submission_result import SubmissionResult
 
 # ── Demo students ─────────────────────────────────────────────────────────────
 DEMO_STUDENTS = [
-    {"name": "Emma Johnson",     "email": "ejohnson@warhawks.ulm.edu",  "sis": "10000001"},
+    {"name": "Emma Johnson",     "email": "ejohnsonh@warhawks.ulm.edu",  "sis": "10000001"},
     {"name": "Lucas Williams",   "email": "lwilliams@warhawks.ulm.edu", "sis": "10000002"},
     {"name": "Olivia Brown",     "email": "obrown@warhawks.ulm.edu",    "sis": "10000003"},
     {"name": "Noah Davis",       "email": "ndavis@warhawks.ulm.edu",    "sis": "10000004"},
     {"name": "Ava Martinez",     "email": "amartinez@warhawks.ulm.edu", "sis": "10000005"},
     {"name": "Ethan Wilson",     "email": "ewilson@warhawks.ulm.edu",   "sis": "10000006"},
     {"name": "Isabella Moore",   "email": "imoore@warhawks.ulm.edu",    "sis": "10000007"},
-    {"name": "Liam Taylor",      "email": "ltaylor@warhawks.ulm.edu",   "sis": "10000008"},
+    {"name": "Liam Taylor",      "email": "in ",   "sis": "10000008"},
     {"name": "Sophia Anderson",  "email": "sanderson@warhawks.ulm.edu", "sis": "10000009"},
     {"name": "Mason Thomas",     "email": "mthomas@warhawks.ulm.edu",   "sis": "10000010"},
     {"name": "Charlotte Jackson","email": "cjackson@warhawks.ulm.edu",  "sis": "10000011"},

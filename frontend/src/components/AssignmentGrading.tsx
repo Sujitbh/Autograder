@@ -23,7 +23,7 @@ import {
 
 import { useAssignment } from '@/hooks/queries';
 import { useSubmissions } from '@/hooks/queries/useSubmissions';
-import { submissionService } from '@/services/api';
+import { courseService, submissionService } from '@/services/api';
 
 /* ─── Rubric criterion ─── */
 interface RubricCriterion {
@@ -67,8 +67,16 @@ interface StudentSubmission {
     flagged: boolean;
 }
 
-type SortField = 'studentName' | 'submittedAt' | 'autoScore' | 'finalGrade';
+type SortField = 'studentName' | 'submittedAt' | 'finalGrade';
 type SortOrder = 'asc' | 'desc';
+
+function getDisplayStudentName(sub: StudentSubmission): string {
+    return sub.studentName;
+}
+
+function getDisplayAvatarInitials(sub: StudentSubmission): string {
+    return sub.avatarInitials;
+}
 
 function scoreColor(score: number, max: number): string {
     const pct = (score / max) * 100;
@@ -85,6 +93,53 @@ export function AssignmentGrading() {
     // Fetch from API
     const { data: apiAssignment, isLoading: isLoadingAssignment } = useAssignment(courseId, assignmentId);
     const { data: apiSubmissions, isLoading: isLoadingSubmissions, refetch: refetchSubmissions } = useSubmissions(assignmentId);
+    const [rosterStudents, setRosterStudents] = useState<Array<{
+        id: string;
+        name: string;
+        sisUserId: string;
+        avatarInitials: string;
+    }>>([]);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadRoster = async () => {
+            if (!courseId) return;
+            try {
+                const enrollments = await courseService.getEnrollments(courseId);
+                const students = enrollments
+                    .filter((enrollment) => enrollment.role === 'student' && enrollment.user)
+                    .map((enrollment) => {
+                        const userId = String(enrollment.user?.id ?? enrollment.user_id ?? '');
+                        const name = enrollment.user?.name ?? 'Student';
+                        const initials = name
+                            .split(' ')
+                            .map((n) => n[0])
+                            .join('')
+                            .toUpperCase()
+                            .slice(0, 2);
+                        return {
+                            id: userId,
+                            name,
+                            sisUserId: enrollment.user?.sis_user_id ?? userId,
+                            avatarInitials: initials,
+                        };
+                    });
+                if (isMounted) {
+                    setRosterStudents(students);
+                }
+            } catch {
+                if (isMounted) {
+                    setRosterStudents([]);
+                }
+            }
+        };
+
+        loadRoster();
+        return () => {
+            isMounted = false;
+        };
+    }, [courseId]);
 
     // Derive assignment metadata from API data or localStorage fallback
     const meta: AssignmentMeta | undefined = useMemo(() => {
@@ -136,7 +191,7 @@ export function AssignmentGrading() {
                     language: found.language ?? 'Python',
                     dueDate: found.dueDate ?? '',
                     createdDate: found.createdDate ?? new Date().toISOString().slice(0, 10),
-                    totalStudents: found.totalStudents ?? 42,
+                    totalStudents: found.totalStudents ?? 0,
                     totalPoints: found.totalPoints ?? 100,
                     description: found.description ?? '',
                     instructions: found.instructions ?? '',
@@ -169,29 +224,35 @@ export function AssignmentGrading() {
                 .toUpperCase()
                 .slice(0, 2);
 
-        // Keep only the latest submission per student
+        // Keep only the latest submission per student when a stable student id exists.
+        // If missing, fall back to submission id so entries remain gradeable.
         const latestByStudent = new Map<string, any>();
         for (const sub of apiSubmissions as any[]) {
             const uid = String(sub.student?.id ?? sub.studentId ?? sub.student_id ?? '');
-            const existing = latestByStudent.get(uid);
+            const key = uid || `submission-${String(sub.id ?? '')}`;
+            const existing = latestByStudent.get(key);
             if (!existing) {
-                latestByStudent.set(uid, sub);
+                latestByStudent.set(key, sub);
             } else {
                 const existingTime = new Date(existing.created_at ?? existing.submittedAt ?? 0).getTime();
                 const newTime = new Date(sub.created_at ?? sub.submittedAt ?? 0).getTime();
-                if (newTime > existingTime) latestByStudent.set(uid, sub);
+                if (newTime > existingTime) latestByStudent.set(key, sub);
             }
         }
 
-        return Array.from(latestByStudent.values()).map((sub: any) => {
-            const studentName = sub.student?.name ?? 'Student';
-            const studentIdentifier = sub.student?.student_id ?? String(sub.studentId ?? sub.student_id ?? sub.student?.id ?? '');
+        const rows: StudentSubmission[] = [];
+        const studentsWithSubmission = new Set<string>();
+
+        Array.from(latestByStudent.values()).forEach((sub: any) => {
+            const studentName = sub.student?.name ?? sub.studentName ?? 'Student';
+            const studentUid = String(sub.student?.id ?? sub.studentId ?? sub.student_id ?? '');
+            const studentIdentifier = (sub.student?.sis_user_id ?? sub.student?.student_id ?? studentUid) || String(sub.id ?? '');
             const submittedAt = sub.created_at ?? sub.submittedAt ?? null;
             const score = sub.score ?? sub.grade?.totalScore ?? null;
             const maxScore = sub.max_score ?? sub.grade?.maxScore ?? meta?.totalPoints ?? 100;
             const status = sub.status === 'graded' || score != null ? 'graded' : 'submitted';
 
-            return {
+            const row = {
                 id: String(sub.id),
                 studentName,
                 studentId: studentIdentifier,
@@ -204,8 +265,32 @@ export function AssignmentGrading() {
                 late: false,
                 flagged: false,
             } as StudentSubmission;
+
+            if (studentUid) {
+                studentsWithSubmission.add(studentUid);
+            }
+            rows.push(row);
         });
-    }, [apiSubmissions, isLoadingSubmissions, meta]);
+
+        for (const student of rosterStudents) {
+            if (studentsWithSubmission.has(student.id)) continue;
+            rows.push({
+                id: `missing-${student.id}`,
+                studentName: student.name,
+                studentId: student.sisUserId,
+                avatarInitials: student.avatarInitials,
+                submittedAt: null,
+                autoScore: null,
+                finalGrade: null,
+                maxPoints: meta?.totalPoints ?? 100,
+                status: 'not-submitted',
+                late: false,
+                flagged: false,
+            });
+        }
+
+        return rows;
+    }, [apiSubmissions, isLoadingSubmissions, meta, rosterStudents]);
 
     const [submissionsState, setSubmissionsState] = useState<StudentSubmission[]>(submissions);
     // Update local state when API data changes
@@ -231,6 +316,7 @@ export function AssignmentGrading() {
     const [showBulkGradeDialog, setShowBulkGradeDialog] = useState(false);
     const [pageSection, setPageSection] = useState<'overview' | 'submissions'>('overview');
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+    const isDraftAssignment = apiAssignment?.status === 'draft';
     const [showEditDialog, setShowEditDialog] = useState(false);
     const [editName, setEditName] = useState(meta?.name ?? '');
     const [editDescription, setEditDescription] = useState(meta?.description ?? '');
@@ -305,7 +391,7 @@ export function AssignmentGrading() {
         setIsGradingAll(true);
         try {
             const result = await submissionService.gradeAllSubmissions(assignmentId);
-            window.alert(`Graded ${result.total_graded} submission(s). Errors: ${result.total_errors}.`);
+            window.alert(`Executed grading for ${result.total_considered ?? result.total_graded} latest submission(s). Graded: ${result.total_graded}. Errors: ${result.total_errors}.`);
             refetchSubmissions();
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to grade submissions';
@@ -339,7 +425,7 @@ export function AssignmentGrading() {
             if (activeTab !== 'all' && s.status !== activeTab) return false;
             if (searchQuery) {
                 const q = searchQuery.toLowerCase();
-                return s.studentName.toLowerCase().includes(q) || s.studentId.includes(q);
+                return getDisplayStudentName(s).toLowerCase().includes(q) || s.studentId.includes(q);
             }
             return true;
         });
@@ -350,11 +436,10 @@ export function AssignmentGrading() {
         return [...filtered].sort((a, b) => {
             let cmp = 0;
             switch (sortField) {
-                case 'studentName': cmp = a.studentName.localeCompare(b.studentName); break;
+                case 'studentName': cmp = getDisplayStudentName(a).localeCompare(getDisplayStudentName(b)); break;
                 case 'submittedAt':
                     cmp = (a.submittedAt ? new Date(a.submittedAt).getTime() : Infinity) - (b.submittedAt ? new Date(b.submittedAt).getTime() : Infinity);
                     break;
-                case 'autoScore': cmp = (a.autoScore ?? -1) - (b.autoScore ?? -1); break;
                 case 'finalGrade': cmp = (a.finalGrade ?? -1) - (b.finalGrade ?? -1); break;
             }
             return sortOrder === 'asc' ? cmp : -cmp;
@@ -420,49 +505,61 @@ export function AssignmentGrading() {
                     {/* Back link */}
                     <button
                         onClick={() => router.push(`/courses/${courseId}`)}
-                        className="flex items-center gap-1 mb-5 hover:underline transition-colors"
-                        style={{ fontSize: '13px', color: 'var(--color-primary)' }}
+                        className="flex items-center gap-1.5 mb-5 hover:underline transition-colors"
+                        style={{ fontSize: '13px', color: '#6B0000', fontWeight: 500 }}
                     >
-                        <ChevronLeft className="w-5 h-5" />
+                        <ChevronLeft className="w-4 h-4" />
                         Back to Assignments
                     </button>
 
                     {/* Page Header */}
-                    <div className="flex items-start justify-between mb-4 flex-wrap gap-4">
+                    <div className="flex items-start justify-between mb-5 flex-wrap gap-4 pb-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
                         <div>
-                            <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#6B0000', lineHeight: '32px' }}>
+                            <h1
+                                style={{
+                                    fontSize: '32px',
+                                    fontWeight: 700,
+                                    letterSpacing: '-0.015em',
+                                    lineHeight: '38px',
+                                    color: '#111827',
+                                }}
+                            >
                                 {meta.name}
                             </h1>
                             <div className="flex items-center gap-3 mt-3 flex-wrap">
-                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#595959', backgroundColor: '#F5F5F5', padding: '6px 12px', borderRadius: '8px' }}>
+                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#4B5563', backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', padding: '6px 12px', borderRadius: '10px' }}>
                                     <Calendar className="w-4 h-4" />
                                     Due: {new Date(meta.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                 </span>
-                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#595959', backgroundColor: '#F5F5F5', padding: '6px 12px', borderRadius: '8px' }}>
+                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#4B5563', backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', padding: '6px 12px', borderRadius: '10px' }}>
                                     <Code className="w-4 h-4" />
                                     {meta.language}
                                 </span>
-                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#595959', backgroundColor: '#F5F5F5', padding: '6px 12px', borderRadius: '8px' }}>
+                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#4B5563', backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', padding: '6px 12px', borderRadius: '10px' }}>
                                     <Users className="w-4 h-4" />
-                                    {submissionsState.length} Students
+                                    {rosterStudents.length} Students
                                 </span>
-                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#595959', backgroundColor: '#F5F5F5', padding: '6px 12px', borderRadius: '8px' }}>
+                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#4B5563', backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', padding: '6px 12px', borderRadius: '10px' }}>
                                     <Star className="w-4 h-4" />
                                     {meta.totalPoints} Points
                                 </span>
                                 {meta.isGroupAssignment && (
-                                    <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#fff', backgroundColor: '#6B0000', padding: '6px 12px', borderRadius: '8px' }}>
+                                    <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#6B0000', backgroundColor: '#FFF7ED', border: '1px solid #F3D5B5', padding: '6px 12px', borderRadius: '10px' }}>
                                         <UserCheck className="w-4 h-4" />
                                         Group Assignment
                                     </span>
                                 )}
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <Button
                                 variant="outline"
-                                className="border-[var(--color-border)] h-9"
+                                className="border-[var(--color-border)] bg-white h-10 px-4"
                                 onClick={() => {
+                                    if (isDraftAssignment) {
+                                        router.push(`/courses/${courseId}/assignment/new?draftId=${assignmentId}`);
+                                        return;
+                                    }
                                     setEditName(meta.name);
                                     setEditDescription(meta.description);
                                     setEditDueDate(meta.dueDate);
@@ -475,7 +572,7 @@ export function AssignmentGrading() {
                             </Button>
                             <Button
                                 variant="outline"
-                                className="border-red-200 text-red-700 hover:bg-red-50 h-9"
+                                className="border-red-200 text-red-700 hover:bg-red-50 bg-white h-10 px-4"
                                 onClick={() => setShowDeleteDialog(true)}
                             >
                                 <Trash2 className="w-4 h-4 mr-2" />
@@ -483,7 +580,7 @@ export function AssignmentGrading() {
                             </Button>
                             <Button
                                 variant="outline"
-                                className="border-[var(--color-border)] h-9"
+                                className="border-[var(--color-border)] bg-white h-10 px-4"
                                 onClick={handleDownloadZip}
                                 disabled={isDownloadingZip}
                             >
@@ -494,7 +591,7 @@ export function AssignmentGrading() {
                     </div>
 
                     {/* ── Section Tabs ── */}
-                    <div className="flex items-center gap-1 mb-6" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                    <div className="flex items-center gap-2 mb-6">
                         {([
                             { id: 'overview' as const, label: 'Overview', icon: FileText },
                             { id: 'submissions' as const, label: 'Submissions', icon: Users },
@@ -504,24 +601,19 @@ export function AssignmentGrading() {
                                 <button
                                     key={sec.id}
                                     onClick={() => setPageSection(sec.id)}
-                                    className="flex items-center gap-2 px-5 py-3 transition-colors relative"
+                                    className="flex items-center gap-2 px-4 py-2.5 transition-all rounded-lg"
                                     style={{
-                                        fontSize: '14px',
+                                        fontSize: '13px',
                                         fontWeight: active ? 600 : 400,
                                         color: active ? '#6B0000' : '#595959',
-                                        borderBottom: active ? '2px solid #6B0000' : '2px solid transparent',
-                                        marginBottom: '-1px',
+                                        backgroundColor: active ? '#F9F1F1' : 'transparent',
+                                        border: active ? '1px solid #E7D4D4' : '1px solid transparent',
                                     }}
                                     onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = '#6B0000'; }}
                                     onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = '#595959'; }}
                                 >
                                     <sec.icon className="w-4 h-4" />
                                     {sec.label}
-                                    {sec.id === 'submissions' && (
-                                        <span style={{ fontSize: '11px', fontWeight: 600, backgroundColor: active ? '#6B0000' : '#E0E0E0', color: active ? '#fff' : '#595959', padding: '1px 7px', borderRadius: '10px' }}>
-                                            {counts.all}
-                                        </span>
-                                    )}
                                 </button>
                             );
                         })}
@@ -529,9 +621,9 @@ export function AssignmentGrading() {
 
                     {/* ══════════════════ OVERVIEW SECTION ══════════════════ */}
                     {pageSection === 'overview' && (
-                        <div className="space-y-6">
-                            {/* Description Card */}
-                            <div className="rounded-lg p-6" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
+                            <div className="space-y-5">
+                                {/* Description Card */}
+                                <div className="rounded-xl p-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
                                 <h2 className="flex items-center gap-2 mb-4" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                                     <BookOpen className="w-5 h-5" style={{ color: '#6B0000' }} />
                                     Description
@@ -539,8 +631,8 @@ export function AssignmentGrading() {
                                 <p style={{ fontSize: '14px', color: '#595959', lineHeight: '1.7' }}>{meta.description}</p>
                             </div>
 
-                            {/* Instructions Card */}
-                            <div className="rounded-lg p-6" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
+                                {/* Instructions Card */}
+                                <div className="rounded-xl p-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
                                 <h2 className="flex items-center gap-2 mb-4" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                                     <FileText className="w-5 h-5" style={{ color: '#6B0000' }} />
                                     Instructions
@@ -555,7 +647,7 @@ export function AssignmentGrading() {
                             {/* Settings + Class Stats Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Class Statistics */}
-                                <div className="rounded-lg p-6" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
+                                <div className="rounded-xl p-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
                                     <h2 className="flex items-center gap-2 mb-4" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                                         <BarChart3 className="w-5 h-5" style={{ color: '#6B0000' }} />
                                         Class Statistics
@@ -585,7 +677,7 @@ export function AssignmentGrading() {
                                 </div>
 
                                 {/* Assignment Settings */}
-                                <div className="rounded-lg p-6" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
+                                <div className="rounded-xl p-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
                                     <h2 className="flex items-center gap-2 mb-4" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                                         <Settings2 className="w-5 h-5" style={{ color: '#6B0000' }} />
                                         Settings
@@ -618,7 +710,10 @@ export function AssignmentGrading() {
                     {pageSection === 'submissions' && (
                         <>
                             {/* Top bar: Grade All + filter tabs */}
-                            <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+                            <div
+                                className="flex items-center justify-between mb-5 flex-wrap gap-3 rounded-xl p-3"
+                                style={{ backgroundColor: '#FCFCFC', border: '1px solid var(--color-border)' }}
+                            >
                                 <div className="flex items-center gap-2 flex-wrap">
                                     {tabs.map(tab => {
                                         const active = activeTab === tab.id;
@@ -628,15 +723,16 @@ export function AssignmentGrading() {
                                                 onClick={() => setActiveTab(tab.id)}
                                                 className="transition-colors"
                                                 style={{
-                                                    padding: '8px 16px',
-                                                    borderRadius: '20px',
-                                                    fontSize: '13px',
+                                                    padding: '7px 14px',
+                                                    borderRadius: '10px',
+                                                    fontSize: '12px',
                                                     fontWeight: active ? 600 : 400,
-                                                    backgroundColor: active ? '#6B0000' : 'transparent',
-                                                    color: active ? '#fff' : '#595959',
+                                                    backgroundColor: active ? '#F2E4E4' : '#FFFFFF',
+                                                    color: active ? '#6B0000' : '#595959',
+                                                    border: active ? '1px solid #DABBBB' : '1px solid #E5E5E5',
                                                 }}
-                                                onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = '#F5EDED'; }}
-                                                onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                                                onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = '#F8F8F8'; }}
+                                                onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
                                             >
                                                 {tab.label}
                                                 {tab.count > 0 && (
@@ -645,7 +741,7 @@ export function AssignmentGrading() {
                                                             marginLeft: '6px',
                                                             fontSize: '11px',
                                                             fontWeight: 600,
-                                                            color: active ? '#fff' : '#9A6A6A',
+                                                            color: active ? '#6B0000' : '#7A7A7A',
                                                         }}
                                                     >
                                                         {tab.count}
@@ -657,14 +753,14 @@ export function AssignmentGrading() {
                                 </div>
                                 <Button
                                     variant="outline"
-                                    className="border-[var(--color-border)] h-9"
+                                    className="border-[var(--color-border)] h-9 bg-white"
                                     onClick={() => router.push(`/courses/${courseId}/assignments/${assignmentId}/performance`)}
                                 >
                                     <BarChart3 className="w-4 h-4 mr-2" />
                                     Class Performance
                                 </Button>
                                 <Button
-                                    className="text-white h-9"
+                                    className="text-white h-9 px-5"
                                     style={{ backgroundColor: 'var(--color-primary)' }}
                                     onClick={() => setShowBulkGradeDialog(true)}
                                 >
@@ -675,13 +771,13 @@ export function AssignmentGrading() {
 
                             {/* Search */}
                             <div className="mb-5">
-                                <div className="relative max-w-md">
+                                <div className="relative max-w-lg">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-light)]" />
                                     <Input
                                         placeholder="Search students by name or ID..."
                                         value={searchQuery}
                                         onChange={e => setSearchQuery(e.target.value)}
-                                        className="pl-10 border-[var(--color-border)]"
+                                        className="pl-10 border-[var(--color-border)] bg-white h-11 rounded-lg"
                                     />
                                 </div>
                             </div>
@@ -712,9 +808,9 @@ export function AssignmentGrading() {
                                     <button onClick={() => { setActiveTab('all'); setSearchQuery(''); }} className="hover:underline" style={{ fontSize: '14px', color: 'var(--color-primary)' }}>Clear filters</button>
                                 </div>
                             ) : (
-                                <div className="rounded-lg overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', boxShadow: 'var(--shadow-card)' }}>
+                                <div className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: '0 6px 18px rgba(10,10,10,0.05)' }}>
                                     <table className="w-full">
-                                        <thead style={{ backgroundColor: 'var(--color-primary-bg)', borderBottom: '1px solid var(--color-border)' }}>
+                                        <thead style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid var(--color-border)' }}>
                                             <tr>
                                                 <th className="text-left px-6 py-4">
                                                     <button onClick={() => handleSort('studentName')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
@@ -728,11 +824,6 @@ export function AssignmentGrading() {
                                                     </button>
                                                 </th>
                                                 <th className="text-left px-5 py-4">
-                                                    <button onClick={() => handleSort('autoScore')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                        Auto Score <SortIcon field="autoScore" />
-                                                    </button>
-                                                </th>
-                                                <th className="text-left px-5 py-4">
                                                     <button onClick={() => handleSort('finalGrade')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
                                                         Grade <SortIcon field="finalGrade" />
                                                     </button>
@@ -743,6 +834,8 @@ export function AssignmentGrading() {
                                         <tbody>
                                             {sorted.map((sub) => {
                                                 const rowFlagged = sub.flagged;
+                                                const displayStudentName = getDisplayStudentName(sub);
+                                                const displayAvatarInitials = getDisplayAvatarInitials(sub);
                                                 return (
                                                     <tr
                                                         key={sub.id}
@@ -754,7 +847,7 @@ export function AssignmentGrading() {
                                                             cursor: sub.status !== 'not-submitted' ? 'pointer' : 'default',
                                                             opacity: sub.status === 'graded' ? 0.85 : 1,
                                                         }}
-                                                        onMouseEnter={(e) => { if (sub.status !== 'not-submitted') e.currentTarget.style.backgroundColor = rowFlagged ? '#FFF0E6' : '#F5EDED'; }}
+                                                        onMouseEnter={(e) => { if (sub.status !== 'not-submitted') e.currentTarget.style.backgroundColor = rowFlagged ? '#FFF0E6' : '#FAF7F7'; }}
                                                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = rowFlagged ? '#FFF9F5' : ''; }}
                                                         onClick={() => {
                                                             if (sub.status === 'not-submitted') return;
@@ -763,13 +856,15 @@ export function AssignmentGrading() {
                                                     >
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center gap-3">
-                                                                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--color-primary-bg)', color: 'var(--color-primary)', fontSize: '11px', fontWeight: 700 }}>
-                                                                    {sub.avatarInitials}
-                                                                </div>
+                                                                {displayAvatarInitials && (
+                                                                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#F7F1F1', color: 'var(--color-primary)', fontSize: '11px', fontWeight: 700 }}>
+                                                                        {displayAvatarInitials}
+                                                                    </div>
+                                                                )}
                                                                 <div>
                                                                     <div className="flex items-center gap-2">
                                                                         {rowFlagged && <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#FF6B00' }} />}
-                                                                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>{sub.studentName}</span>
+                                                                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>{displayStudentName}</span>
                                                                     </div>
                                                                     {meta.isGroupAssignment && (
                                                                         <span style={{ fontSize: '11px', color: '#6B0000', fontWeight: 500 }}>
@@ -793,13 +888,6 @@ export function AssignmentGrading() {
                                                                 </div>
                                                             ) : (
                                                                 <span style={{ fontSize: '13px', color: '#8A8A8A' }}>Not Yet</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-5 py-4">
-                                                            {sub.autoScore !== null ? (
-                                                                <span style={{ fontSize: '14px', fontWeight: 600, color: scoreColor(sub.autoScore, sub.maxPoints) }}>{sub.autoScore} / {sub.maxPoints}</span>
-                                                            ) : (
-                                                                <span style={{ fontSize: '14px', color: '#8A8A8A' }}>—</span>
                                                             )}
                                                         </td>
                                                         <td className="px-5 py-4">
@@ -838,22 +926,30 @@ export function AssignmentGrading() {
                 <DialogContent className="max-w-md" style={{ boxShadow: '0 8px 24px rgba(107,0,0,.15)' }}>
                     <DialogHeader>
                         <DialogTitle style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                            Apply Auto-Scores as Final Grades
+                            Run Bulk Execution Across Class
                         </DialogTitle>
                         <DialogDescription style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '8px' }}>
-                            This will use automated test scores as final grades for all ungraded submissions. Manual review is recommended for accuracy.
+                            This will rerun automated grading for the latest submission from every student who has submitted work, then refresh class-wide test dataset performance.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="mt-3 p-3 rounded-lg flex items-start gap-2" style={{ backgroundColor: '#FFF8E1' }}>
                         <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#8A5700' }} />
                         <p style={{ fontSize: '12px', color: '#8A5700' }}>
-                            {counts.submitted + counts.needsReview} ungraded submission(s) will receive their auto-score as the final grade.
+                            {gradableStudents.length} latest submission(s) will be executed. Existing automated results for those submissions will be replaced.
                         </p>
                     </div>
                     <DialogFooter className="mt-4">
                         <Button variant="outline" onClick={() => setShowBulkGradeDialog(false)} className="border-[var(--color-border)]">Cancel</Button>
-                        <Button onClick={() => setShowBulkGradeDialog(false)} className="text-white" style={{ backgroundColor: 'var(--color-primary)' }}>
-                            <CheckCircle2 className="w-4 h-4 mr-2" /> Apply Grades
+                        <Button
+                            onClick={async () => {
+                                setShowBulkGradeDialog(false);
+                                await handleGradeAll();
+                            }}
+                            className="text-white"
+                            style={{ backgroundColor: 'var(--color-primary)' }}
+                            disabled={isGradingAll}
+                        >
+                            <CheckCircle2 className="w-4 h-4 mr-2" /> {isGradingAll ? 'Running...' : 'Run Bulk Execution'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

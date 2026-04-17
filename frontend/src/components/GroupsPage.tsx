@@ -82,7 +82,7 @@ export function GroupsPage() {
     const [allStudents, setAllStudents] = useState<Student[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
     /* ── Fetch enrolled students from API ── */
     useEffect(() => {
@@ -127,6 +127,55 @@ export function GroupsPage() {
     const [autoGroupSize, setAutoGroupSize] = useState(4);
     const [autoStrategy, setAutoStrategy] = useState<'random' | 'alphabetical'>('random');
     const [autoNaming, setAutoNaming] = useState<'greek' | 'numbered'>('greek');
+    const [groupsHydrated, setGroupsHydrated] = useState(false);
+    const groupsStorageKey = useMemo(() => (
+        courseId ? `autograde_groups_${courseId}` : null
+    ), [courseId]);
+
+    useEffect(() => {
+        if (!groupsStorageKey) {
+            setGroupsHydrated(true);
+            return;
+        }
+        try {
+            const raw = localStorage.getItem(groupsStorageKey);
+            if (raw) {
+                const parsed = JSON.parse(raw) as unknown;
+                if (Array.isArray(parsed)) {
+                    const normalized: Group[] = parsed
+                        .filter((g): g is Group => !!g && typeof g === 'object' && 'id' in g && 'name' in g && 'members' in g)
+                        .map((g) => ({
+                            id: String(g.id),
+                            name: String(g.name),
+                            members: Array.isArray(g.members)
+                                ? g.members.map((m) => ({
+                                    id: String((m as Student).id),
+                                    name: String((m as Student).name),
+                                    studentId: String((m as Student).studentId),
+                                    email: String((m as Student).email ?? ''),
+                                }))
+                                : [],
+                            maxSize: Number(g.maxSize) || 4,
+                            createdAt: String(g.createdAt ?? new Date().toISOString().slice(0, 10)),
+                        }));
+                    setGroups(normalized);
+                }
+            }
+        } catch {
+            // ignore malformed local state
+        } finally {
+            setGroupsHydrated(true);
+        }
+    }, [groupsStorageKey]);
+
+    useEffect(() => {
+        if (!groupsStorageKey || !groupsHydrated) return;
+        try {
+            localStorage.setItem(groupsStorageKey, JSON.stringify(groups));
+        } catch {
+            // ignore storage failures
+        }
+    }, [groups, groupsStorageKey, groupsHydrated]);
 
     /* ── Computed ── */
     const assignedIds = useMemo(() => {
@@ -155,7 +204,11 @@ export function GroupsPage() {
     const handleDeleteGroup = (group: Group) => {
         setGroups(prev => prev.filter(g => g.id !== group.id));
         setShowDeleteConfirm(null);
-        if (expandedGroup === group.id) setExpandedGroup(null);
+        setExpandedGroups(prev => {
+            const next = new Set(prev);
+            next.delete(group.id);
+            return next;
+        });
     };
 
     const handleRemoveMember = (groupId: string, memberId: string) => {
@@ -188,7 +241,7 @@ export function GroupsPage() {
         setNewGroupMaxSize(4);
         setNewGroupSelectedStudents(new Set());
         setCreateSearch('');
-        setExpandedGroup(newGroup.id);
+        setExpandedGroups(new Set([newGroup.id]));
     };
 
     const handleEditGroup = () => {
@@ -256,7 +309,7 @@ export function GroupsPage() {
 
         setGroups(newGroups);
         setShowAutoAssignModal(false);
-        setExpandedGroup(newGroups[0]?.id ?? null);
+        setExpandedGroups(newGroups[0] ? new Set([newGroups[0].id]) : new Set());
     };
 
     const autoPreviewGroupCount = Math.ceil(totalStudents / autoGroupSize);
@@ -367,52 +420,79 @@ export function GroupsPage() {
                                 className="pl-10 border-[var(--color-border)]"
                             />
                         </div>
-                        <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
-                            <button
-                                onClick={() => setViewMode('cards')}
-                                className="px-3 py-1.5 rounded-md text-sm transition-colors"
-                                style={{
-                                    backgroundColor: viewMode === 'cards' ? 'var(--color-surface)' : 'transparent',
-                                    color: viewMode === 'cards' ? 'var(--color-primary)' : 'var(--color-text-mid)',
-                                    fontWeight: viewMode === 'cards' ? 500 : 400,
-                                    boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                }}
-                            >
-                                Cards
-                            </button>
-                            <button
-                                onClick={() => setViewMode('list')}
-                                className="px-3 py-1.5 rounded-md text-sm transition-colors"
-                                style={{
-                                    backgroundColor: viewMode === 'list' ? 'var(--color-surface)' : 'transparent',
-                                    color: viewMode === 'list' ? 'var(--color-primary)' : 'var(--color-text-mid)',
-                                    fontWeight: viewMode === 'list' ? 500 : 400,
-                                    boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                }}
-                            >
-                                List
-                            </button>
+                        <div className="flex items-center gap-3">
+                            {viewMode === 'cards' && (
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => setExpandedGroups(new Set(filteredGroups.map(g => g.id)))}
+                                        className="px-3 py-1.5 rounded-md text-sm transition-colors border"
+                                        style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-mid)', backgroundColor: 'var(--color-surface)' }}
+                                    >
+                                        Display all
+                                    </button>
+                                    <button
+                                        onClick={() => setExpandedGroups(new Set())}
+                                        className="px-3 py-1.5 rounded-md text-sm transition-colors border"
+                                        style={{ borderColor: 'var(--color-border)', color: 'var(--color-text-mid)', backgroundColor: 'var(--color-surface)' }}
+                                    >
+                                        Collapse all
+                                    </button>
+                                </div>
+                            )}
+                            <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: 'var(--color-primary-bg)' }}>
+                                <button
+                                    onClick={() => setViewMode('cards')}
+                                    className="px-3 py-1.5 rounded-md text-sm transition-colors"
+                                    style={{
+                                        backgroundColor: viewMode === 'cards' ? 'var(--color-surface)' : 'transparent',
+                                        color: viewMode === 'cards' ? 'var(--color-primary)' : 'var(--color-text-mid)',
+                                        fontWeight: viewMode === 'cards' ? 500 : 400,
+                                        boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                    }}
+                                >
+                                    Cards
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('list')}
+                                    className="px-3 py-1.5 rounded-md text-sm transition-colors"
+                                    style={{
+                                        backgroundColor: viewMode === 'list' ? 'var(--color-surface)' : 'transparent',
+                                        color: viewMode === 'list' ? 'var(--color-primary)' : 'var(--color-text-mid)',
+                                        fontWeight: viewMode === 'list' ? 500 : 400,
+                                        boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                    }}
+                                >
+                                    List
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     {/* ──────── Cards View ──────── */}
                     {viewMode === 'cards' ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
                             {filteredGroups.map((group) => {
-                                const isExpanded = expandedGroup === group.id;
+                                const isExpanded = expandedGroups.has(group.id);
                                 const isFull = group.members.length >= group.maxSize;
                                 const fillPct = Math.min((group.members.length / group.maxSize) * 100, 100);
 
                                 return (
                                     <div
                                         key={group.id}
-                                        className="bg-white rounded-xl overflow-hidden transition-shadow hover:shadow-md"
-                                        style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid var(--color-border)' }}
+                                        className={`bg-white rounded-xl overflow-hidden transition-all hover:shadow-md h-fit ${isExpanded ? 'md:col-span-2' : ''}`}
+                                        style={{ boxShadow: isExpanded ? '0 8px 20px rgba(15,23,42,0.07)' : '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid var(--color-border)' }}
                                     >
                                         {/* Header */}
                                         <div
                                             className="px-5 py-4 flex items-center justify-between cursor-pointer select-none"
-                                            onClick={() => setExpandedGroup(isExpanded ? null : group.id)}
+                                            onClick={() => {
+                                                setExpandedGroups(prev => {
+                                                    const next = new Set(prev);
+                                                    if (next.has(group.id)) next.delete(group.id);
+                                                    else next.add(group.id);
+                                                    return next;
+                                                });
+                                            }}
                                         >
                                             <div className="flex items-center gap-3 min-w-0">
                                                 <div
@@ -442,25 +522,30 @@ export function GroupsPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-1 flex-shrink-0">
+                                            <div className="flex items-center gap-1.5 flex-shrink-0">
                                                 <button
-                                                    className="p-1.5 hover:bg-[var(--color-primary-bg)] rounded transition-colors"
+                                                    className="p-1.5 hover:bg-[var(--color-primary-bg)] rounded-md transition-colors"
                                                     aria-label="Edit group"
                                                     onClick={(e) => { e.stopPropagation(); openEditModal(group); }}
                                                 >
                                                     <Edit className="w-4 h-4 text-[var(--color-text-mid)]" />
                                                 </button>
                                                 <button
-                                                    className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                                                    className="p-1.5 hover:bg-red-50 rounded-md transition-colors"
                                                     aria-label="Delete group"
                                                     onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(group); }}
                                                 >
                                                     <Trash2 className="w-4 h-4 text-[var(--color-error)]" />
                                                 </button>
-                                                {isExpanded
-                                                    ? <ChevronUp className="w-5 h-5 text-[var(--color-text-light)]" />
-                                                    : <ChevronDown className="w-5 h-5 text-[var(--color-text-light)]" />
-                                                }
+                                                <div
+                                                    className="w-7 h-7 rounded-md flex items-center justify-center"
+                                                    style={{ backgroundColor: isExpanded ? 'var(--color-primary-bg)' : 'transparent' }}
+                                                >
+                                                    {isExpanded
+                                                        ? <ChevronUp className="w-4.5 h-4.5 text-[var(--color-text-mid)]" />
+                                                        : <ChevronDown className="w-4.5 h-4.5 text-[var(--color-text-light)]" />
+                                                    }
+                                                </div>
                                             </div>
                                         </div>
 
@@ -492,7 +577,7 @@ export function GroupsPage() {
 
                                         {/* Expanded: member list */}
                                         {isExpanded && (
-                                            <div className="px-5 pb-5" style={{ borderTop: '1px solid var(--color-border)' }}>
+                                            <div className="px-5 pb-5" style={{ borderTop: '1px solid var(--color-border)', backgroundColor: '#FCFCFC' }}>
                                                 {/* Capacity bar */}
                                                 <div className="pt-4 mb-4">
                                                     <div className="flex justify-between mb-1.5">

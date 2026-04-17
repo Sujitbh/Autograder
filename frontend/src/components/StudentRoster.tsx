@@ -45,6 +45,7 @@ export function StudentRoster() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [newMemberCwid, setNewMemberCwid] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<EnrollmentRole>('student');
   const [importRole, setImportRole] = useState<EnrollmentRole>('student');
   const [importDomain, setImportDomain] = useState('warhawks.ulm.edu');
@@ -141,18 +142,22 @@ export function StudentRoster() {
   }, [members, searchQuery]);
 
   const handleAddMember = async () => {
-    if (!newMemberEmail.trim()) return;
+    const email = newMemberEmail.trim().toLowerCase();
+    const cwid = newMemberCwid.trim();
+    if (!email && !cwid) return;
     setIsSaving(true);
     setError(null);
     setStatusMessage(null);
     setStatusMessage(null);
     try {
       await courseService.addEnrollment(cid, {
-        email: newMemberEmail.trim().toLowerCase(),
+        ...(email ? { email } : {}),
+        ...(cwid ? { sis_user_id: cwid } : {}),
         role: newMemberRole,
       });
       setShowAddModal(false);
       setNewMemberEmail('');
+      setNewMemberCwid('');
       setNewMemberRole('student');
       await loadRoster();
     } catch (e) {
@@ -322,7 +327,12 @@ export function StudentRoster() {
                 Import Roster File
               </Button>
               <Button
-                onClick={() => setShowAddModal(true)}
+                onClick={() => {
+                  setNewMemberEmail('');
+                  setNewMemberCwid('');
+                  setNewMemberRole('student');
+                  setShowAddModal(true);
+                }}
                 className="text-white hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: 'var(--color-primary)' }}
               >
@@ -383,6 +393,17 @@ export function StudentRoster() {
             </div>
             <div>
               <p className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
+                CWID
+              </p>
+              <Input
+                type="text"
+                placeholder="e.g. 30155679"
+                value={newMemberCwid}
+                onChange={(e) => setNewMemberCwid(e.target.value)}
+              />
+            </div>
+            <div>
+              <p className="block mb-2" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
                 Class Role
               </p>
               <Select
@@ -405,7 +426,7 @@ export function StudentRoster() {
             <Button variant="outline" onClick={() => setShowAddModal(false)} disabled={isSaving}>
               Cancel
             </Button>
-            <Button onClick={handleAddMember} disabled={isSaving || !newMemberEmail.trim()}>
+            <Button onClick={handleAddMember} disabled={isSaving || (!newMemberEmail.trim() && !newMemberCwid.trim())}>
               {isSaving ? 'Adding...' : 'Add Member'}
             </Button>
           </DialogFooter>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Save, Shield, Bell, Clock, Users, FileText, Check, Copy, RefreshCw, Info, Link2, AlertTriangle } from 'lucide-react';
+import { Save, Shield, Bell, Clock, Users, FileText, Check, Copy, RefreshCw, Info, Link2, AlertTriangle, ClipboardList } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
 import { Sidebar } from './Sidebar';
@@ -25,6 +25,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from './ui/dialog';
+import Link from 'next/link';
 
 /* ── Course code generator ── */
 const CODE_CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -114,6 +115,7 @@ export function SettingsPage() {
     const sections = [
         { id: 'general', icon: FileText, label: 'General' },
         { id: 'grading', icon: Shield, label: 'Grading Policy' },
+        { id: 'rubric', icon: ClipboardList, label: 'Default Rubric' },
         { id: 'notifications', icon: Bell, label: 'Notifications' },
         { id: 'deadlines', icon: Clock, label: 'Deadlines & Extensions' },
         { id: 'enrollment', icon: Link2, label: 'Enrollment' },
@@ -419,6 +421,25 @@ export function SettingsPage() {
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            )}
+
+                            {activeSection === 'rubric' && (
+                                <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                    <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '12px' }}>
+                                        Default assignment rubric
+                                    </h2>
+                                    <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginBottom: '20px', maxWidth: '560px' }}>
+                                        Set the weighted template used when instructors create new assignments. You can still override rubrics per assignment.
+                                        Only instructors can change the course default; teaching assistants may edit rubrics on individual assignments if allowed.
+                                    </p>
+                                    <Link
+                                        href={`/courses/${courseId}/default-rubric`}
+                                        className="inline-flex items-center rounded-md px-4 py-2 text-sm font-medium text-white"
+                                        style={{ backgroundColor: 'var(--color-primary)' }}
+                                    >
+                                        Open default rubric editor
+                                    </Link>
                                 </div>
                             )}
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import type { AxiosError } from 'axios';
@@ -9,6 +9,7 @@ import { codeRequiresStdin } from '@/utils/codeInputDetection';
 import { PageLayout } from './PageLayout';
 import { TopNav } from './TopNav';
 import { CodeEditor } from './CodeEditor';
+import { PlagiarismCompareModal } from './PlagiarismCompareModal';
 import { OutputPanel } from './OutputPanel';
 import { useCodeExecution } from '@/hooks/useCodeExecution';
 import { submissionService } from '@/services/api';
@@ -28,6 +29,8 @@ import {
     FileText,
     Play,
     Zap,
+    ScanSearch,
+    Search,
 } from 'lucide-react';
 
 interface FacultyGradingPageProps {
@@ -67,6 +70,25 @@ function getBandLabel(scoreBand: 'low' | 'medium' | 'high') {
     return scoreBand.charAt(0).toUpperCase() + scoreBand.slice(1);
 }
 
+function getPlagiarismZeroMatchesExplanation(plagiarism: {
+    checked_against: number;
+    peers_with_latest_submission?: number;
+    peers_skipped_no_file_rows?: number;
+    peers_skipped_unreadable_on_disk?: number;
+}): string | null {
+    const peers = plagiarism.peers_with_latest_submission ?? 0;
+    const noRows = plagiarism.peers_skipped_no_file_rows ?? 0;
+    const badDisk = plagiarism.peers_skipped_unreadable_on_disk ?? 0;
+    if (plagiarism.checked_against > 0) return null;
+    if (peers === 0) {
+        return 'No other students have a submission on this assignment yet, so there is nothing to compare against. The scan is working — add more submissions to see matches.';
+    }
+    if (noRows > 0 || badDisk > 0) {
+        return `The scan found ${peers} classmate(s) with submissions, but none could be compared: ${noRows} had no uploaded file records and ${badDisk} had files missing or unreadable on the server (paths often break after moving the database without the backend/data folder).`;
+    }
+    return null;
+}
+
 export default function FacultyGradingPage({ courseId, submissionId }: Readonly<FacultyGradingPageProps>) {
     const router = useRouter();
     const { isDark } = useTheme();
@@ -76,6 +98,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         queryKey: ['faculty-submission-detail', submissionId],
         queryFn: () => submissionService.getSubmissionDetail(submissionId),
     });
+
+    const anonymizedStudentLabel = detail
+        ? `Student #${detail.student?.id ?? submissionId}`
+        : `Student #${submissionId}`;
 
     const gradeMutation = useMutation({
         mutationFn: (payload: { score: number; max_score: number; feedback?: string }) =>
@@ -101,12 +127,13 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const [expandedTests, setExpandedTests] = useState<Set<number>>(new Set());
     const [showExplorer, setShowExplorer] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
-    const [infoPanelWidth, setInfoPanelWidth] = useState(380);
+    const [infoPanelWidth, setInfoPanelWidth] = useState(400);
     const [outputOpen, setOutputOpen] = useState(false);
     const [outputPanelHeight, setOutputPanelHeight] = useState(280);
     const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading' | 'rubric' | 'integrity'>('grading');
     const [stdinValue, setStdinValue] = useState('');
     const [showInlineInput, setShowInlineInput] = useState(false);
+    const [studentSearch, setStudentSearch] = useState('');
     const [autoGradeResult, setAutoGradeResult] = useState<any>(null);
     const [liveTestResults, setLiveTestResults] = useState<any[] | null>(null);
     const [showFlaggedSections, setShowFlaggedSections] = useState(false);
@@ -125,7 +152,12 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
     // Helper: flatten rubric sections into flat array of criteria for scoring
     const flattenRubrics = (sections: any[]) => {
-        return sections.flatMap((section) => (section.criteria || []).map((crit: any) => ({
+        return sections.flatMap((section) => (section.criteria || [])
+            .filter((crit: any) => {
+                const w = crit?.weight;
+                return w == null || Number(w) > 0;
+            })
+            .map((crit: any) => ({
             ...crit,
             section_name: section.name,
             section_weight: section.weight ?? 1,
@@ -172,14 +204,83 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         if (isWeightedRubric) return Math.round((assignmentMaxPoints * sectionWeightPercent(section.weight)) / 100);
         return null;
     };
-    const getTotalScore = () => rubricScores.reduce((s, n) => s + (Number(n) || 0), 0);
-    const getTotalMax = () => rubrics.reduce((s: number, r: any) => s + (r.max_points || 0), 0);
+    const unweightedMaxTotal = rubrics.reduce((s: number, r: any) => s + (r.max_points || 0), 0);
+    const getWeightedScore = () => {
+        let weightedEarned = 0;
+        let totalWeight = 0;
+
+        rubrics.forEach((r: any, idx: number) => {
+            const maxPts = Number(r.max_points) || 0;
+            if (maxPts <= 0) return;
+            const entered = Number(rubricScores[idx]) || 0;
+            const ratio = Math.max(0, Math.min(entered / maxPts, 1));
+            const critWeight = criterionWeightPercent(r.weight);
+            const secWeight = sectionWeightPercent(r.section_weight);
+            const effectiveWeight = critWeight * (secWeight / 100);
+            weightedEarned += ratio * effectiveWeight;
+            totalWeight += effectiveWeight;
+        });
+
+        if (totalWeight <= 0) return 0;
+        const ratio = weightedEarned / totalWeight;
+        return ratio * resolvedMaxPoints;
+    };
+    const getTotalScore = () => {
+        if (!isWeightedRubric) {
+            return rubricScores.reduce((s, n) => s + (Number(n) || 0), 0);
+        }
+        return getWeightedScore();
+    };
+    const getTotalMax = () => (isWeightedRubric ? resolvedMaxPoints : unweightedMaxTotal);
     const resultPointsTotal = (detail?.results ?? []).reduce((s, r) => s + (r.points || 0), 0);
-    const resolvedMaxPoints = getTotalMax() || detail?.max_score || resultPointsTotal || detail?.assignment?.max_points || 100;
+    const resolvedMaxPoints = detail?.assignment?.max_points || unweightedMaxTotal || detail?.max_score || resultPointsTotal || 100;
+
+    const distributeScoreAcrossRubrics = useCallback((totalScore: number, flatRubrics: any[]) => {
+        if (flatRubrics.length === 0) return [] as number[];
+        const rubricMaxTotal = flatRubrics.reduce((s: number, r: any) => s + (Number(r.max_points) || 0), 0);
+        const safeDenominator = isWeightedRubric
+            ? Math.max(1, Number(resolvedMaxPoints) || 1)
+            : Math.max(1, rubricMaxTotal);
+
+        return flatRubrics.map((r: any) => {
+            const maxPoints = Number(r.max_points) || 0;
+            const scaled = (Math.max(0, Number(totalScore) || 0) / safeDenominator) * maxPoints;
+            return Math.max(0, Math.min(Math.round(scaled), maxPoints));
+        });
+    }, [isWeightedRubric, resolvedMaxPoints]);
+
+    // Initialise form when detail loads
+    useEffect(() => {
+        if (!detail) return;
+        setFeedback(detail.feedback || '');
+        const rubricSections = detail.rubrics ?? [];
+        const flatRubrics = flattenRubrics(rubricSections);
+
+        if (flatRubrics.length > 0) {
+            // If already graded, distribute score proportionally across criteria
+            if (detail.score != null && flatRubrics.length > 0) {
+                setRubricScores(distributeScoreAcrossRubrics(detail.score, flatRubrics));
+            } else {
+                setRubricScores(flatRubrics.map(() => 0));
+            }
+        }
+    }, [detail?.id, distributeScoreAcrossRubrics]);
 
     const updateRubricScore = (idx: number, val: string) => {
-        const num = Math.max(0, Math.min(Number(val) || 0, rubrics[idx]?.max_points ?? 0));
-        setRubricScores(prev => { const next = [...prev]; next[idx] = num; return next; });
+        const maxPoints = Number(rubrics[idx]?.max_points ?? 0);
+        const digitsOnly = String(val ?? '').replace(/[^\d]/g, '');
+
+        // For single-digit rubrics (most 0-5 style criteria), keep only latest typed digit
+        // so typing a new number replaces the old one instead of appending (e.g., 2 -> 3).
+        const normalized = maxPoints <= 9 ? digitsOnly.slice(-1) : digitsOnly;
+        const parsed = normalized === '' ? 0 : Number(normalized);
+        const num = Math.max(0, Math.min(Number.isFinite(parsed) ? parsed : 0, maxPoints));
+
+        setRubricScores(prev => {
+            const next = [...prev];
+            next[idx] = num;
+            return next;
+        });
     };
 
     const getGradeErrorMessage = () => {
@@ -215,10 +316,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
             setAutoGradeResult(result);
             // Populate score fields
             if (result.score != null && rubrics.length > 0) {
-                const totalMax = rubrics.reduce((s: number, r: any) => s + r.max_points, 0);
-                setRubricScores(rubrics.map((r: any) =>
-                    totalMax > 0 ? Math.round((result.score / totalMax) * r.max_points) : 0
-                ));
+                setRubricScores(distributeScoreAcrossRubrics(result.score, rubrics));
             }
             if (result.feedback) setFeedback(result.feedback);
             // Update live test results
@@ -236,11 +334,36 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                 })));
             }
         } catch (e) { /* handled by mutation state */ }
-    }, [rubrics, autoGradeMutation]);
+    }, [rubrics, autoGradeMutation, distributeScoreAcrossRubrics]);
 
-    const sortedAssignmentSubmissions = [...assignmentSubmissions].sort(
-        (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+    const sortedAssignmentSubmissions = useMemo(
+        () => [...assignmentSubmissions].sort(
+            (a, b) => new Date(b.submittedAt ?? 0).getTime() - new Date(a.submittedAt ?? 0).getTime()
+        ),
+        [assignmentSubmissions]
     );
+
+    const studentLatestSubmissions = useMemo(() => {
+        const latestByStudent = new Map<string, any>();
+        sortedAssignmentSubmissions.forEach((submission: any) => {
+            const key = String(submission.studentId ?? submission.id);
+            if (!latestByStudent.has(key)) {
+                latestByStudent.set(key, submission);
+            }
+        });
+        return Array.from(latestByStudent.values()).sort((a: any, b: any) =>
+            String(a.studentName ?? '').localeCompare(String(b.studentName ?? ''))
+        );
+    }, [sortedAssignmentSubmissions]);
+
+    const visibleStudentRows = useMemo(() => {
+        const q = studentSearch.trim().toLowerCase();
+        if (!q) return studentLatestSubmissions;
+        return studentLatestSubmissions.filter((s: any) =>
+            `${s.studentName ?? ''} ${s.studentEmail ?? ''} ${s.studentId ?? ''}`.toLowerCase().includes(q)
+        );
+    }, [studentLatestSubmissions, studentSearch]);
+
     const currentSubmissionIndex = sortedAssignmentSubmissions.findIndex((s) => s.id === submissionId);
     const nextSubmissionId =
         currentSubmissionIndex >= 0 && currentSubmissionIndex < sortedAssignmentSubmissions.length - 1
@@ -276,12 +399,22 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         const normalizedMax = Math.max(1, Math.round(resolvedMaxPoints));
         const feedbackToSave = feedback.trim() || 'Reviewed by instructor.';
         await gradeMutation.mutateAsync({ score: normalizedScore, max_score: normalizedMax, feedback: feedbackToSave });
+
+        // Keep assignment list and gradebook views in sync immediately after manual grading.
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ['faculty-submission-detail', submissionId] }),
+            queryClient.invalidateQueries({ queryKey: ['submissions'] }),
+            queryClient.invalidateQueries({ queryKey: ['faculty-assignment-submissions'] }),
+            queryClient.invalidateQueries({ queryKey: ['grades'] }),
+        ]);
+
         if (!isDraft) {
             if (moveToNext && nextSubmissionId) {
                 router.push(`/courses/${courseId}/submissions/${nextSubmissionId}/grade`);
                 return;
             }
-            router.push(`/courses/${courseId}/assignments/${detail?.assignment.id}/grading`);
+            router.replace(`/courses/${courseId}/assignments/${detail?.assignment.id}/grading`);
+            router.refresh();
         }
     };
 
@@ -418,39 +551,140 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
                     {/* -- LEFT: File Explorer -- */}
                     {showExplorer && (
-                        <div className="flex flex-col shrink-0 overflow-hidden"
-                            style={{ width: 220, minWidth: 220, background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)' }}>
-                            <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
-                                Explorer
-                            </div>
-                            <div className="flex-1 overflow-y-auto" style={{ padding: '4px 0' }}>
-                                {detail.files.map((file, idx) => {
-                                    const isActive = idx === activeFileIndex;
-                                    return (
-                                        <div key={file.id} onClick={() => setActiveFileIndex(idx)}
+                        <div className="flex shrink-0 overflow-hidden" style={{ borderRight: '1px solid var(--color-border)' }}>
+                            <div
+                                className="flex flex-col overflow-hidden"
+                                style={{ width: 220, minWidth: 220, background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)' }}
+                            >
+                                <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
+                                    Students
+                                </div>
+                                <div style={{ padding: '0 10px 10px', borderBottom: '1px solid var(--color-border)' }}>
+                                    <div style={{ fontSize: 10, color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
+                                        Roster ({studentLatestSubmissions.length})
+                                    </div>
+                                    <div style={{ position: 'relative', marginBottom: 8 }}>
+                                        <Search style={{ width: 13, height: 13, position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
+                                        <input
+                                            type="text"
+                                            value={studentSearch}
+                                            onChange={(e) => setStudentSearch(e.target.value)}
+                                            placeholder="Find student..."
                                             style={{
-                                                display: 'flex', alignItems: 'center', padding: '5px 14px', cursor: 'pointer',
-                                                fontSize: 13, color: isActive ? 'var(--color-text-dark)' : 'var(--color-text-mid)',
-                                                borderLeft: isActive ? '3px solid var(--color-primary)' : '3px solid transparent',
-                                                background: isActive ? 'var(--color-surface-elevated)' : 'transparent',
-                                                gap: 6, transition: 'background .15s',
+                                                width: '100%',
+                                                padding: '6px 8px 6px 28px',
+                                                borderRadius: 6,
+                                                border: '1px solid var(--color-border)',
+                                                fontSize: 12,
+                                                outline: 'none',
+                                                background: 'var(--color-surface-elevated)',
+                                                color: 'var(--color-text-dark)',
                                             }}
-                                            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
-                                            onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
-                                        >
-                                            <span style={{ fontSize: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', width: 16, height: 16 }}>{getFileIcon(file.filename)}</span>
-                                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{file.filename}</span>
-                                        </div>
-                                    );
-                                })}
+                                        />
+                                    </div>
+                                    <div style={{ maxHeight: 520, overflowY: 'auto', paddingRight: 2 }}>
+                                        {visibleStudentRows.length === 0 ? (
+                                            <p style={{ fontSize: 11, color: 'var(--color-text-light)', padding: '4px 2px' }}>No student found.</p>
+                                        ) : (
+                                            visibleStudentRows.map((s: any) => {
+                                                const isCurrent = String(s.id) === String(submissionId);
+                                                const isGraded = s.status === 'graded';
+                                                return (
+                                                    <button
+                                                        key={s.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (!isCurrent) {
+                                                                router.push(`/courses/${courseId}/submissions/${s.id}/grade`);
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            width: '100%',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'space-between',
+                                                            gap: 8,
+                                                            padding: '7px 8px',
+                                                            borderRadius: 7,
+                                                            border: isCurrent ? '1px solid var(--color-primary)' : '1px solid transparent',
+                                                            background: isCurrent ? 'var(--color-primary-bg)' : 'transparent',
+                                                            cursor: isCurrent ? 'default' : 'pointer',
+                                                            marginBottom: 2,
+                                                            textAlign: 'left',
+                                                        }}
+                                                        onMouseEnter={(e) => {
+                                                            if (!isCurrent) e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                                                        }}
+                                                        onMouseLeave={(e) => {
+                                                            if (!isCurrent) e.currentTarget.style.background = 'transparent';
+                                                        }}
+                                                    >
+                                                        <div style={{ minWidth: 0 }}>
+                                                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-dark)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                {s.studentName || `Student ${s.studentId ?? ''}`}
+                                                            </div>
+                                                            <div style={{ fontSize: 10.5, color: 'var(--color-text-light)' }}>
+                                                                {isGraded
+                                                                    ? `Graded${s.grade ? ` · ${s.grade.totalScore}/${s.grade.maxScore}` : ''}`
+                                                                    : 'Needs grading'}
+                                                            </div>
+                                                        </div>
+                                                        <span
+                                                            style={{
+                                                                width: 7,
+                                                                height: 7,
+                                                                borderRadius: '50%',
+                                                                flexShrink: 0,
+                                                                background: isGraded ? '#16a34a' : '#f59e0b',
+                                                            }}
+                                                        />
+                                                    </button>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
+                                <div style={{ padding: '8px 10px', borderTop: '1px solid var(--color-border)', marginTop: 'auto' }}>
+                                    <button onClick={() => router.push(`/courses/${courseId}/assignments/${detail.assignment.id}/grading`)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--color-text-mid)', background: 'transparent', border: 'none', cursor: 'pointer', width: '100%', transition: 'background .15s' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-elevated)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                        <ArrowLeft style={{ width: 15, height: 15 }} /> Back to Grading
+                                    </button>
+                                </div>
                             </div>
-                            <div style={{ padding: '8px 10px', borderTop: '1px solid var(--color-border)' }}>
-                                <button onClick={() => router.push(`/courses/${courseId}/assignments/${detail.assignment.id}/grading`)}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--color-text-mid)', background: 'transparent', border: 'none', cursor: 'pointer', width: '100%', transition: 'background .15s' }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-elevated)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                    <ArrowLeft style={{ width: 15, height: 15 }} /> Back to Grading
-                                </button>
+
+                            <div
+                                className="flex flex-col overflow-hidden"
+                                style={{ width: 180, minWidth: 180, background: 'var(--color-surface)' }}
+                            >
+                                <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
+                                    Explorer
+                                </div>
+                                <div style={{ padding: '8px 14px 6px', fontSize: 10, fontWeight: 700, letterSpacing: '.06em', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
+                                    Files
+                                </div>
+                                <div className="flex-1 overflow-y-auto" style={{ padding: '4px 0' }}>
+                                    {detail.files.map((file, idx) => {
+                                        const isActive = idx === activeFileIndex;
+                                        return (
+                                            <div key={file.id} onClick={() => setActiveFileIndex(idx)}
+                                                style={{
+                                                    display: 'flex', alignItems: 'center', padding: '5px 14px', cursor: 'pointer',
+                                                    fontSize: 13, color: isActive ? 'var(--color-text-dark)' : 'var(--color-text-mid)',
+                                                    borderLeft: isActive ? '3px solid var(--color-primary)' : '3px solid transparent',
+                                                    background: isActive ? 'var(--color-surface-elevated)' : 'transparent',
+                                                    gap: 6, transition: 'background .15s',
+                                                }}
+                                                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
+                                                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                                            >
+                                                <span style={{ fontSize: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', width: 16, height: 16 }}>{getFileIcon(file.filename)}</span>
+                                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{file.filename}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
                     )}
@@ -458,14 +692,14 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                     {/* -- CENTER: Editor -- */}
                     <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
                         {/* Editor Topbar */}
-                        <div style={{ height: 38, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, flexShrink: 0 }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                        <div style={{ height: 42, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 8, flexShrink: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden' }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-dark)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>
                                 {activeFile?.filename ?? 'No file open'}
                             </span>
                             <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#3b1a1a' : 'var(--color-warning-bg)', color: isDark ? '#fca5a5' : 'var(--color-warning)', display: 'inline-flex', alignItems: 'center' }}>
                                 {language.charAt(0).toUpperCase() + language.slice(1)}
                             </span>
-                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#d1d5db' : '#374151', display: 'inline-flex', alignItems: 'center' }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '4px 10px', borderRadius: 10, background: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#d1d5db' : '#374151', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap', lineHeight: 1, minWidth: 68, flexShrink: 0 }}>
                                 View Only
                             </span>
                             <div style={{ flex: 1 }} />
@@ -480,17 +714,18 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                 onClick={handleOpenInlineInput}
                                 disabled={isExecutingCode || autoGradeMutation.isPending}
                                 style={{
-                                    padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                                    padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700,
                                     background: 'var(--color-surface-elevated)', color: 'var(--color-text-dark)', letterSpacing: '.3px',
                                     transition: 'background .15s', opacity: isExecutingCode ? 0.7 : 1,
-                                    cursor: isExecutingCode ? 'not-allowed' : 'pointer', border: '1px solid var(--color-border)'
+                                    cursor: isExecutingCode ? 'not-allowed' : 'pointer', border: '1px solid var(--color-border)',
+                                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap', lineHeight: 1.1
                                 }}
                                 onMouseEnter={e => { if (!isExecutingCode) e.currentTarget.style.background = 'var(--color-border)'; }}
                                 onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
                             >
                                 ⌨ Input
                             </button>
-                            <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 6px' }} />
+                            <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 4px' }} />
                             {/* Auto Grade */}
                             <button onClick={handleAutoGrade} disabled={autoGradeMutation.isPending}
                                 style={{ padding: '5px 16px', borderRadius: 5, fontSize: 12, fontWeight: 700, background: isDark ? 'var(--color-primary)' : 'var(--color-error)', color: '#fff', letterSpacing: '.3px', transition: 'all .15s', opacity: autoGradeMutation.isPending ? 0.7 : 1, cursor: autoGradeMutation.isPending ? 'not-allowed' : 'pointer', border: 'none', display: 'flex', alignItems: 'center', gap: 6 }}
@@ -498,7 +733,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                 onMouseLeave={e => { e.currentTarget.style.background = isDark ? 'var(--color-primary)' : 'var(--color-error)'; }}>
                                 {autoGradeMutation.isPending ? <><Loader2 style={{ width: 14, height: 14 }} className="animate-spin" /> Grading...</> : <><Zap style={{ width: 14, height: 14 }} /> Auto Grade</>}
                             </button>
-                            <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 6px' }} />
+                            <div style={{ width: 1, height: 16, background: 'var(--color-border)', margin: '0 4px' }} />
                             {/* Layout toggles */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 {[
@@ -574,7 +809,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                     const startX = e.clientX;
                                     const startWidth = infoPanelWidth;
                                     const onMove = (ev: MouseEvent) => {
-                                        const next = Math.max(300, Math.min(760, startWidth + (startX - ev.clientX)));
+                                        const next = Math.max(360, Math.min(620, startWidth + (startX - ev.clientX)));
                                         setInfoPanelWidth(next);
                                     };
                                     const onUp = () => {
@@ -618,8 +853,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                 <User className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
                                             </div>
                                             <div>
-                                                <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{detail.student.name}</p>
-                                                <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>{detail.student.email}</p>
+                                                <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{anonymizedStudentLabel}</p>
+                                                <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>Identity hidden for blind grading</p>
                                             </div>
                                         </div>
                                         <div className="space-y-3">
@@ -761,6 +996,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                         {rubricSections.length > 0 ? (
                                             <div className="space-y-4">
                                                 {rubricSections.map((section: any, sectionIdx: number) => (
+                                                    (() => {
+                                                        const sectionCriteria = (section.criteria || []).filter(hasPositiveCriterionWeight);
+                                                        if (sectionCriteria.length === 0) return null;
+                                                        return (
                                                     <div key={sectionIdx}>
                                                         {/* Section header */}
                                                         <div style={{
@@ -776,7 +1015,6 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                             alignItems: 'center',
                                                         }}>
                                                             <span>{section.name}</span>
-                                                            {isWeightedRubric && <span style={{ fontSize: 11, color: 'var(--color-text-light)' }}>Weight: {sectionWeightPercent(section.weight).toFixed(1)}%</span>}
                                                         </div>
 
                                                         {/* Criteria for this section */}
@@ -787,8 +1025,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                             border: '1px solid var(--color-border)',
                                                             borderTop: 'none',
                                                         }}>
-                                                            {(section.criteria || []).length > 0 ? (
-                                                                (section.criteria || []).map((criterion: any, critIdx: number) => {
+                                                            {sectionCriteria.length > 0 ? (
+                                                                sectionCriteria.map((criterion: any, critIdx: number) => {
                                                                     const flatIdx = rubrics.findIndex((r: any) => 
                                                                         r.name === criterion.name && r.section_name === section.name
                                                                     );
@@ -797,7 +1035,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                             key={critIdx}
                                                                             className="rounded-lg p-3"
                                                                             style={{
-                                                                                borderBottom: critIdx < ((section.criteria || []).length - 1) ? '1px solid var(--color-border)' : 'none',
+                                                                                borderBottom: critIdx < (sectionCriteria.length - 1) ? '1px solid var(--color-border)' : 'none',
                                                                                 backgroundColor: 'var(--color-surface-elevated)',
                                                                             }}
                                                                         >
@@ -826,15 +1064,12 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                             Points: {getSectionFallbackPoints(section)}
                                                                         </p>
                                                                     )}
-                                                                    {isWeightedRubric && (
-                                                                        <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: 8 }}>
-                                                                            Section Weight: {sectionWeightPercent(section.weight).toFixed(1)}%
-                                                                        </p>
-                                                                    )}
                                                                 </div>
                                                             )}
                                                         </div>
                                                     </div>
+                                                        );
+                                                    })()
                                                 ))}
                                             </div>
                                         ) : (
@@ -848,7 +1083,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                     <div>
                                         <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-dark)', marginBottom: 12 }}>Integrity Check</h2>
 
-                                        {detail.integrity ? (
+                                        {integrityForPanel ? (
                                             <div className="mb-5 rounded-lg p-3" style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface-elevated)' }}>
                                                 <div className="mb-3 p-2 rounded" style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}>
                                                     <div className="flex items-center justify-between">
@@ -926,17 +1161,44 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
                                                 <div>
                                                     <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: 6 }}>
-                                                        Similarity with other student submissions
+                                                        Plagiarism checker — similarity with other students
                                                     </p>
                                                     <p style={{ fontSize: '10px', color: 'var(--color-text-light)', marginBottom: 8 }}>
-                                                        Compared against {detail.integrity.plagiarism.checked_against} latest submissions from classmates.
+                                                        Compared against {integrityForPanel.plagiarism.checked_against} classmate submission(s) with readable source
+                                                        {plagiarismScanOverride ? ' (full list)' : ' (top matches; run scan for all)'}.
+                                                        {(integrityForPanel.plagiarism.peers_with_latest_submission ?? 0) > 0 && (
+                                                            <span>
+                                                                {' '}
+                                                                · {integrityForPanel.plagiarism.peers_with_latest_submission} other student(s) have a latest submission on this assignment.
+                                                            </span>
+                                                        )}
                                                     </p>
+                                                    {(() => {
+                                                        const explain = getPlagiarismZeroMatchesExplanation(integrityForPanel.plagiarism);
+                                                        if (!explain) return null;
+                                                        return (
+                                                            <p
+                                                                style={{
+                                                                    fontSize: 11,
+                                                                    lineHeight: 1.5,
+                                                                    marginBottom: 10,
+                                                                    padding: '8px 10px',
+                                                                    borderRadius: 8,
+                                                                    background: 'var(--color-primary-bg)',
+                                                                    border: '1px solid var(--color-border)',
+                                                                    color: 'var(--color-text-dark)',
+                                                                }}
+                                                            >
+                                                                {explain}
+                                                            </p>
+                                                        );
+                                                    })()}
 
-                                                    {detail.integrity.plagiarism.top_matches.length === 0 ? (
-                                                        <p style={{ fontSize: '11px', color: 'var(--color-text-mid)' }}>No comparable submissions found yet.</p>
+                                                    {integrityForPanel.plagiarism.top_matches.length === 0 ? (
+                                                        <p style={{ fontSize: '11px', color: 'var(--color-text-mid)' }}>No similarity matches to list.</p>
                                                     ) : (
                                                         <div className="space-y-2">
-                                                            {detail.integrity.plagiarism.top_matches.map((m) => (
+                                                            {integrityForPanel.plagiarism.top_matches.map((m) => (
                                                                 <div
                                                                     key={m.submission_id}
                                                                     className="rounded-md px-2 py-2"
@@ -964,28 +1226,46 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                             Submitted {new Date(m.submitted_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                                                                         </p>
                                                                     )}
-                                                                    <button
-                                                                        onClick={() => router.push(`/courses/${courseId}/submissions/${m.submission_id}/grade`)}
-                                                                        style={{
-                                                                            marginTop: 6,
-                                                                            fontSize: '11px',
-                                                                            fontWeight: 600,
-                                                                            color: 'var(--color-primary)',
-                                                                            background: 'transparent',
-                                                                            border: 'none',
-                                                                            padding: 0,
-                                                                            cursor: 'pointer',
-                                                                        }}
-                                                                    >
-                                                                        Open matched submission
-                                                                    </button>
+                                                                    <div className="flex flex-wrap gap-3" style={{ marginTop: 8 }}>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setCompareOtherSubmissionId(m.submission_id)}
+                                                                            style={{
+                                                                                fontSize: '11px',
+                                                                                fontWeight: 600,
+                                                                                color: '#fff',
+                                                                                background: 'var(--color-primary)',
+                                                                                border: 'none',
+                                                                                padding: '4px 10px',
+                                                                                borderRadius: 6,
+                                                                                cursor: 'pointer',
+                                                                            }}
+                                                                        >
+                                                                            Side-by-side compare
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => router.push(`/courses/${courseId}/submissions/${m.submission_id}/grade`)}
+                                                                            style={{
+                                                                                fontSize: '11px',
+                                                                                fontWeight: 600,
+                                                                                color: 'var(--color-primary)',
+                                                                                background: 'transparent',
+                                                                                border: 'none',
+                                                                                padding: '4px 0',
+                                                                                cursor: 'pointer',
+                                                                            }}
+                                                                        >
+                                                                            Open matched submission
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     )}
 
                                                     <p style={{ marginTop: 8, fontSize: '10px', color: 'var(--color-text-light)' }}>
-                                                        {detail.integrity.plagiarism.note}
+                                                        {integrityForPanel.plagiarism.note}
                                                     </p>
                                                 </div>
                                             </div>
@@ -1035,6 +1315,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                 </div>
                                                 <div className="space-y-4">
                                                     {rubricSections.map((section: any, sectionIdx: number) => (
+                                                        (() => {
+                                                            const sectionCriteria = (section.criteria || []).filter(hasPositiveCriterionWeight);
+                                                            if (sectionCriteria.length === 0) return null;
+                                                            return (
                                                         <div key={sectionIdx}>
                                                             {/* Section header */}
                                                             {sectionIdx === 0 || rubricSections[sectionIdx - 1].name !== section.name ? (
@@ -1051,7 +1335,6 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                     alignItems: 'center',
                                                                 }}>
                                                                     <span>{section.name}</span>
-                                                                    {isWeightedRubric && <span style={{ fontSize: 11, color: 'var(--color-text-light)' }}>Weight: {(section.weight ?? 1).toFixed(2)}x</span>}
                                                                 </div>
                                                             ) : null}
 
@@ -1063,7 +1346,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                 marginBottom: sectionIdx < rubricSections.length - 1 ? 12 : 0,
                                                                 overflow: 'hidden',
                                                             }}>
-                                                                {(section.criteria || []).map((criterion: any, critIdx: number, critArray: any[]) => {
+                                                                {sectionCriteria.map((criterion: any, critIdx: number, critArray: any[]) => {
                                                                     // Find the index in the flattened rubrics array
                                                                     const flatIdx = rubrics.findIndex((r: any) => 
                                                                         r.name === criterion.name && r.section_name === section.name
@@ -1081,16 +1364,17 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                                     <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{criterion.name}</p>
                                                                                     {criterion.description && <p style={{ fontSize: '11px', color: 'var(--color-text-mid)', marginTop: 2 }}>{criterion.description}</p>}
                                                                                     {isWeightedRubric && <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: 3 }}>
-                                                                                        Weight: {((criterion.weight ?? 1) * 100).toFixed(0)}%
+                                                                                        Weight: {criterionWeightPercent(criterion.weight).toFixed(0)}%
                                                                                     </p>}
                                                                                 </div>
                                                                                 <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', flexShrink: 0, marginLeft: 8 }}>
                                                                                     {rubricScores[flatIdx] ?? 0} / {criterion.max_points}
                                                                                 </span>
                                                                             </div>
-                                                                            <input type="number" min={0} max={criterion.max_points}
+                                                                            <input type="text" inputMode="numeric" pattern="[0-9]*"
                                                                                 value={rubricScores[flatIdx] ?? 0}
                                                                                 onChange={e => flatIdx >= 0 && updateRubricScore(flatIdx, e.target.value)}
+                                                                                onFocus={(e) => e.currentTarget.select()}
                                                                                 className="w-full px-3 py-1.5 rounded-md focus:outline-none transition-shadow"
                                                                                 style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-dark)' }} />
                                                                         </div>
@@ -1098,13 +1382,15 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                 })}
                                                             </div>
                                                         </div>
+                                                            );
+                                                        })()
                                                     ))}
                                                 </div>
 
                                                 {/* Total Score */}
                                                 <div className="mt-4 px-4 py-3 rounded-lg flex items-center justify-between" style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}>
                                                     <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-dark)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Total</span>
-                                                    <span style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-primary)' }}>{getTotalScore()} / {getTotalMax()}</span>
+                                                    <span style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-primary)' }}>{Math.round(getTotalScore())} / {getTotalMax()}</span>
                                                 </div>
                                             </div>
                                         ) : (
@@ -1122,6 +1408,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                             const clamped = Math.max(0, Math.min(Number.isFinite(raw) ? raw : 0, resolvedMaxPoints));
                                                             setRubricScores([clamped]);
                                                         }}
+                                                        onFocus={(e) => e.currentTarget.select()}
                                                         className="w-full px-3 py-2 rounded-lg focus:outline-none"
                                                         style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-dark)' }} />
                                                 </div>
@@ -1334,6 +1621,13 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                 </div>
             </div>
 
+            <PlagiarismCompareModal
+                open={compareOtherSubmissionId != null}
+                onClose={() => setCompareOtherSubmissionId(null)}
+                baseSubmissionId={submissionId}
+                otherSubmissionId={compareOtherSubmissionId ?? 0}
+                assignmentLanguage={detail?.assignment?.language ?? 'java'}
+            />
         </PageLayout>
     );
 }

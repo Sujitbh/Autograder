@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Plus, MoreVertical, Edit, Trash2, Copy, Search, FileText, Clock, AlertTriangle, ChevronUp, ChevronDown, ClipboardX, FilterX, RefreshCw, Download, BarChart3, Eye, Archive, Loader2 } from 'lucide-react';
+import { Plus, MoreVertical, Edit, Trash2, Copy, Search, FileText, Clock, AlertTriangle, ChevronUp, ChevronDown, ClipboardX, FilterX, RefreshCw, Download, BarChart3, Eye, Archive, Loader2, CheckCircle2 } from 'lucide-react';
 import { TopNav } from './TopNav';
 import { PageLayout } from './PageLayout';
 import { Sidebar } from './Sidebar';
@@ -21,7 +21,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from './ui/dialog';
-import { useAssignments, useDeleteAssignment } from '@/hooks/queries';
+import { useAssignments, useDeleteAssignment, useUpdateAssignment } from '@/hooks/queries';
 import { useQueries } from '@tanstack/react-query';
 import { submissionService } from '@/services/api';
 
@@ -33,7 +33,9 @@ interface Assignment {
   submissions: number;
   totalStudents: number;
   gradedCount: number;
-  published: boolean;
+  isDraft: boolean;
+  isVisibleToStudents: boolean;
+  backendStatus: string;
   courseId?: string;
 }
 
@@ -47,7 +49,13 @@ function mapApiAssignment(a: any): Assignment {
     submissions: a.submissions ?? 0,
     totalStudents: a.totalStudents ?? 0,
     gradedCount: a.gradedCount ?? 0,
-    published: a.status === 'published' || a.is_active === true || a.published === true,
+    isDraft: a.status === 'draft',
+    isVisibleToStudents: typeof a.isActive === 'boolean'
+      ? a.isActive
+      : typeof a.is_active === 'boolean'
+      ? a.is_active
+      : (a.status === 'published' || a.status === 'closed' || a.published === true),
+    backendStatus: String(a.status ?? ''),
     courseId: String(a.courseId ?? a.course_id ?? ''),
   };
 }
@@ -63,7 +71,7 @@ function getNeedsGrade(a: Assignment): number {
 }
 
 function getStatus(a: Assignment): 'draft' | 'open' | 'graded' | 'closed' {
-  if (!a.published) return 'draft';
+  if (a.isDraft) return 'draft';
   const needsGrade = getNeedsGrade(a);
   if (needsGrade === 0 && a.submissions > 0) return 'graded';
   if (a.dueDate && new Date(a.dueDate).getTime() > 0 && new Date(a.dueDate) < NOW && needsGrade === 0) return 'closed';
@@ -100,13 +108,15 @@ export function CourseInterior() {
   const [_showGradingModal, _setShowGradingModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('dueDate');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [deleteTarget, setDeleteTarget] = useState<Assignment | null>(null);
   const [duplicateTarget, setDuplicateTarget] = useState<Assignment | null>(null);
 
   // Fetch assignments from API
   const { data: apiAssignments, isLoading, error: fetchError, refetch } = useAssignments(courseId);
   const deleteMutation = useDeleteAssignment();
+  const updateMutation = useUpdateAssignment();
+  const [visibilityUpdatingId, setVisibilityUpdatingId] = useState<string | null>(null);
 
   // Map API data to local UI shape
   const assignments: Assignment[] = useMemo(
@@ -200,24 +210,17 @@ export function CourseInterior() {
   // Derived counts for tabs
   const tabCounts = useMemo(() => {
     const all = assignmentsWithStats.length;
-    const recent = assignmentsWithStats.filter(a => {
-      if (getStatus(a) === 'draft') return false;
-      if (!a.dueDate) return true;
-      const due = new Date(a.dueDate);
-      return due >= NOW;
-    }).length;
     const pastDeadline = assignmentsWithStats.filter(a => {
       if (getStatus(a) === 'draft') return false;
       if (!a.dueDate) return false;
       return new Date(a.dueDate) < NOW;
     }).length;
     const draft = assignmentsWithStats.filter(a => getStatus(a) === 'draft').length;
-    return { all, recent, pastDeadline, draft };
+    return { all, pastDeadline, draft };
   }, [assignmentsWithStats]);
 
   const tabs = [
     { id: 'all', label: 'All', count: tabCounts.all },
-    { id: 'recent', label: 'Recent', count: tabCounts.recent },
     { id: 'pastDeadline', label: 'Past Deadline', count: tabCounts.pastDeadline },
     { id: 'draft', label: 'Drafts', count: tabCounts.draft },
   ];
@@ -226,10 +229,6 @@ export function CourseInterior() {
   const filtered = useMemo(() => {
     return assignmentsWithStats.filter(a => {
       const status = getStatus(a);
-      if (activeTab === 'recent') {
-        if (status === 'draft') return false;
-        if (a.dueDate && new Date(a.dueDate) < NOW) return false;
-      }
       if (activeTab === 'pastDeadline') {
         if (status === 'draft') return false;
         if (!a.dueDate || new Date(a.dueDate) >= NOW) return false;
@@ -276,7 +275,7 @@ export function CourseInterior() {
   };
 
   // Status badge per spec: pill shape, light bg + colored text
-  const getStatusBadge = (status: ReturnType<typeof getStatus>) => {
+  const getStatusBadge = (status: ReturnType<typeof getStatus>, isVisibleToStudents: boolean) => {
     const cfg = {
       draft: { bg: '#F5F5F5', text: '#595959' },
       open: { bg: '#E8F0FF', text: '#1A4D7A' },
@@ -287,7 +286,9 @@ export function CourseInterior() {
     return (
       <span
         style={{
-          display: 'inline-block',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
           backgroundColor: s.bg,
           color: s.text,
           fontSize: '11px',
@@ -299,10 +300,34 @@ export function CourseInterior() {
           letterSpacing: '0.5px',
         }}
       >
+        {isVisibleToStudents && <CheckCircle2 className="w-3.5 h-3.5" style={{ color: '#2D6A2D' }} />}
         {status}
       </span>
     );
   };
+
+  const handleToggleVisibility = useCallback((assignment: Assignment) => {
+    const nextVisible = !assignment.isVisibleToStudents;
+    setVisibilityUpdatingId(assignment.id);
+    updateMutation.mutate(
+      {
+        courseId,
+        assignmentId: assignment.id,
+        dto: {
+          status: assignment.isDraft ? 'published' : (assignment.backendStatus || 'published'),
+          isActive: nextVisible,
+        },
+      },
+      {
+        onSuccess: () => {
+          refetch();
+        },
+        onSettled: () => {
+          setVisibilityUpdatingId(null);
+        },
+      }
+    );
+  }, [courseId, updateMutation, refetch]);
 
   // Language chip: neutral gray pill
   const getLanguageChip = (language: string) => (
@@ -526,6 +551,9 @@ export function CourseInterior() {
 
                       // Due date overdue if past AND status is open
                       const dueDateOverdue = !!assignment.dueDate && new Date(assignment.dueDate) < NOW && status === 'open';
+                      const assignmentOpenPath = status === 'draft'
+                        ? `/courses/${courseId}/assignment/new?draftId=${assignment.id}`
+                        : `/courses/${courseId}/assignments/${assignment.id}/grading`;
 
                       return (
                         <tr
@@ -541,13 +569,13 @@ export function CourseInterior() {
                           aria-label={`View grading for ${assignment.name}`}
                           onClick={(e) => {
                             if ((e.target as HTMLElement).closest('.actions-column')) return;
-                            router.push(`/courses/${courseId}/assignments/${assignment.id}/grading`);
+                            router.push(assignmentOpenPath);
                           }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
                               e.preventDefault();
                               if (!(e.target as HTMLElement).closest('.actions-column')) {
-                                router.push(`/courses/${courseId}/assignments/${assignment.id}/grading`);
+                                router.push(assignmentOpenPath);
                               }
                             }
                           }}
@@ -617,17 +645,35 @@ export function CourseInterior() {
 
                           {/* Status */}
                           <td className="px-5 py-4">
-                            {getStatusBadge(status)}
+                            {getStatusBadge(status, assignment.isVisibleToStudents)}
                           </td>
 
                           {/* Actions — Edit, Duplicate, Delete (red on hover), More dropdown */}
                           <td className="px-5 py-4 actions-column" onClick={(e) => e.stopPropagation()} style={{ cursor: 'default' }}>
                             <div className="flex items-center gap-1">
                               <button
+                                className="p-1.5 rounded transition-colors hover:bg-green-50"
+                                aria-label={assignment.isVisibleToStudents ? "Hide assignment from students" : "Show assignment to students"}
+                                title={assignment.isVisibleToStudents ? "Hide from students" : "Show to students"}
+                                onClick={() => handleToggleVisibility(assignment)}
+                                disabled={visibilityUpdatingId === assignment.id}
+                              >
+                                {visibilityUpdatingId === assignment.id ? (
+                                  <Loader2 className="w-4.5 h-4.5 animate-spin text-[var(--color-text-mid)]" />
+                                ) : (
+                                  <CheckCircle2
+                                    className="w-4.5 h-4.5"
+                                    style={assignment.isVisibleToStudents
+                                      ? { color: '#FFFFFF', fill: '#2D6A2D', stroke: '#FFFFFF' }
+                                      : { color: '#B0B0B0', fill: '#FFFFFF', stroke: '#B0B0B0' }}
+                                  />
+                                )}
+                              </button>
+                              <button
                                 className="p-1.5 hover:bg-[var(--color-primary-bg)] rounded transition-colors"
                                 aria-label="Edit assignment"
                                 title="Edit"
-                                onClick={() => router.push(`/courses/${courseId}/assignments/${assignment.id}/grading`)}
+                                onClick={() => router.push(assignmentOpenPath)}
                               >
                                 <Edit className="w-4.5 h-4.5 text-[var(--color-text-mid)]" />
                               </button>
@@ -661,7 +707,7 @@ export function CourseInterior() {
                                 <DropdownMenuContent align="end" className="w-48">
                                   <DropdownMenuItem
                                     className="flex items-center gap-2 cursor-pointer"
-                                    onClick={() => router.push(`/courses/${courseId}/assignments/${assignment.id}/grading`)}
+                                    onClick={() => router.push(assignmentOpenPath)}
                                   >
                                     <Eye className="w-4 h-4" /> View Submissions
                                   </DropdownMenuItem>

@@ -58,6 +58,8 @@ interface ReportsTableProps {
   grades: Record<string, Record<string, number | null>>;
   /** studentId → assignmentId → true if late. */
   lateFlags?: Record<string, Record<string, boolean>>;
+  /** studentId → assignmentId → graded | ungraded | not_submitted | missing */
+  statuses?: Record<string, Record<string, string>>;
   onViewStudentReport?: (studentId: string) => void;
   onExport?: (format: 'csv' | 'excel' | 'pdf' | 'canvas') => void;
 }
@@ -74,6 +76,7 @@ export function ReportsTable({
   students,
   grades,
   lateFlags,
+  statuses,
   onViewStudentReport,
   onExport,
 }: ReportsTableProps) {
@@ -366,10 +369,18 @@ export function ReportsTable({
                       {assignments.map((a) => {
                         const g = grades[student.id]?.[a.id] ?? null;
                         const isLate = lateFlags?.[student.id]?.[a.id] ?? false;
+                        const statusRaw = statuses?.[student.id]?.[a.id] ?? (g == null ? 'not_submitted' : 'graded');
+                        const statusLabel =
+                          statusRaw === 'ungraded' ? 'Submitted'
+                            : statusRaw === 'missing' ? 'Missing'
+                              : statusRaw === 'not_submitted' ? 'Not Submitted'
+                                : 'Submitted';
                         return (
                           <td key={a.id} className="px-3 py-3 text-center" style={{ fontSize: '14px' }}>
                             {g === null ? (
-                              <span style={{ color: 'var(--color-text-light)' }}>—</span>
+                              <span style={{ color: 'var(--color-text-light)', fontSize: '12px', fontWeight: 500 }}>
+                                {statusLabel}
+                              </span>
                             ) : (
                               <span style={{ fontWeight: 500, color: 'var(--color-text-dark)' }}>
                                 {g}{isLate && <sup style={{ color: 'var(--color-text-light)', fontSize: '10px' }}>L</sup>}
@@ -439,7 +450,7 @@ export function ReportsTable({
 
       {/* Minimal legend */}
       <div style={{ fontSize: '12px', color: 'var(--color-text-light)' }}>
-        <sup>L</sup> Late submission &nbsp;·&nbsp; — Not submitted
+        <sup>L</sup> Late submission
       </div>
     </div>
   );

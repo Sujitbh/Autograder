@@ -18,6 +18,12 @@ class Course(Base):
     is_active = Column(Boolean, default=True)
     faculty_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 
+    # Course default rubric (JSON document; see schemas.course_default_rubric)
+    default_rubric_json = Column(Text, nullable=True)
+    default_rubric_weight_policy = Column(String, nullable=False, default="percent")
+    default_rubric_updated_at = Column(DateTime(timezone=True), nullable=True)
+    default_rubric_updated_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -26,7 +32,8 @@ class Course(Base):
     assignments = relationship("Assignment", back_populates="course", cascade="all, delete-orphan")
     enrollments = relationship("Enrollment", back_populates="course", cascade="all, delete-orphan")
     messages = relationship("Message", back_populates="course", cascade="all, delete-orphan")
-    faculty = relationship("User")
+    faculty = relationship("User", foreign_keys=[faculty_id])
+    default_rubric_updated_by = relationship("User", foreign_keys=[default_rubric_updated_by_id])
 
     @property
     def student_count(self) -> int:

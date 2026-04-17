@@ -5,7 +5,8 @@ import { Toaster } from '@/components/ui/sonner';
 
 export const metadata: Metadata = {
     title: 'Axiom',
-    description: 'Axiom – Automated Grading Platform',
+    description:
+        'Grading and assessment for ULM Computer Science. Faculty stay in charge while the system handles the tedious parts of evaluation and keeps integrity visible in the workflow.',
 };
 
 export default function RootLayout({

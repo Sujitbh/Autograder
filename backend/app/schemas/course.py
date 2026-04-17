@@ -60,6 +60,7 @@ class EnrollmentUserOut(BaseModel):
 class EnrollmentCreate(BaseModel):
     user_id: Optional[int] = None
     email: Optional[EmailStr] = None
+    sis_user_id: Optional[str] = None
     role: Literal["student", "ta", "instructor"] = "student"
 
 
