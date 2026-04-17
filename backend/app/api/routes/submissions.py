@@ -647,7 +647,8 @@ def get_submissions_by_assignment(
                 "id": student.id,
                 "name": student.name,
                 "email": student.email,
-                "student_id": getattr(student, "student_id", None),
+                "student_id": getattr(student, "sis_user_id", None),
+                "sis_user_id": getattr(student, "sis_user_id", None),
             } if student else None,
             "files": [{"id": f.id, "filename": f.filename, "file_size": f.file_size} for f in files]
         })

@@ -126,7 +126,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const [expandedTests, setExpandedTests] = useState<Set<number>>(new Set());
     const [showExplorer, setShowExplorer] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
-    const [infoPanelWidth, setInfoPanelWidth] = useState(340);
+    const [infoPanelWidth, setInfoPanelWidth] = useState(400);
     const [outputOpen, setOutputOpen] = useState(false);
     const [outputPanelHeight, setOutputPanelHeight] = useState(280);
     const [infoTab, setInfoTab] = useState<'desc' | 'tests' | 'grading' | 'rubric' | 'integrity'>('grading');
@@ -169,7 +169,12 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
     // Helper: flatten rubric sections into flat array of criteria for scoring
     const flattenRubrics = (sections: any[]) => {
-        return sections.flatMap((section) => (section.criteria || []).map((crit: any) => ({
+        return sections.flatMap((section) => (section.criteria || [])
+            .filter((crit: any) => {
+                const w = crit?.weight;
+                return w == null || Number(w) > 0;
+            })
+            .map((crit: any) => ({
             ...crit,
             section_name: section.name,
             section_weight: section.weight ?? 1,
@@ -183,6 +188,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const criterionWeightPercent = (weight?: number | null) => {
         if (weight == null || Number.isNaN(weight)) return 100;
         return weight <= 1.5 ? weight * 100 : weight;
+    };
+    const hasPositiveCriterionWeight = (criterion: any) => {
+        const w = criterion?.weight;
+        return w == null || Number(w) > 0;
     };
 
     const rubricSections = detail?.rubrics ?? [];
@@ -262,8 +271,20 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     }, [detail?.id, distributeScoreAcrossRubrics]);
 
     const updateRubricScore = (idx: number, val: string) => {
-        const num = Math.max(0, Math.min(Number(val) || 0, rubrics[idx]?.max_points ?? 0));
-        setRubricScores(prev => { const next = [...prev]; next[idx] = num; return next; });
+        const maxPoints = Number(rubrics[idx]?.max_points ?? 0);
+        const digitsOnly = String(val ?? '').replace(/[^\d]/g, '');
+
+        // For single-digit rubrics (most 0-5 style criteria), keep only latest typed digit
+        // so typing a new number replaces the old one instead of appending (e.g., 2 -> 3).
+        const normalized = maxPoints <= 9 ? digitsOnly.slice(-1) : digitsOnly;
+        const parsed = normalized === '' ? 0 : Number(normalized);
+        const num = Math.max(0, Math.min(Number.isFinite(parsed) ? parsed : 0, maxPoints));
+
+        setRubricScores(prev => {
+            const next = [...prev];
+            next[idx] = num;
+            return next;
+        });
     };
 
     const getGradeErrorMessage = () => {
@@ -789,7 +810,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                     const startX = e.clientX;
                                     const startWidth = infoPanelWidth;
                                     const onMove = (ev: MouseEvent) => {
-                                        const next = Math.max(280, Math.min(620, startWidth + (startX - ev.clientX)));
+                                        const next = Math.max(360, Math.min(620, startWidth + (startX - ev.clientX)));
                                         setInfoPanelWidth(next);
                                     };
                                     const onUp = () => {
@@ -976,6 +997,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                         {rubricSections.length > 0 ? (
                                             <div className="space-y-4">
                                                 {rubricSections.map((section: any, sectionIdx: number) => (
+                                                    (() => {
+                                                        const sectionCriteria = (section.criteria || []).filter(hasPositiveCriterionWeight);
+                                                        if (sectionCriteria.length === 0) return null;
+                                                        return (
                                                     <div key={sectionIdx}>
                                                         {/* Section header */}
                                                         <div style={{
@@ -1001,8 +1026,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                             border: '1px solid var(--color-border)',
                                                             borderTop: 'none',
                                                         }}>
-                                                            {(section.criteria || []).length > 0 ? (
-                                                                (section.criteria || []).map((criterion: any, critIdx: number) => {
+                                                            {sectionCriteria.length > 0 ? (
+                                                                sectionCriteria.map((criterion: any, critIdx: number) => {
                                                                     const flatIdx = rubrics.findIndex((r: any) => 
                                                                         r.name === criterion.name && r.section_name === section.name
                                                                     );
@@ -1011,7 +1036,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                             key={critIdx}
                                                                             className="rounded-lg p-3"
                                                                             style={{
-                                                                                borderBottom: critIdx < ((section.criteria || []).length - 1) ? '1px solid var(--color-border)' : 'none',
+                                                                                borderBottom: critIdx < (sectionCriteria.length - 1) ? '1px solid var(--color-border)' : 'none',
                                                                                 backgroundColor: 'var(--color-surface-elevated)',
                                                                             }}
                                                                         >
@@ -1044,6 +1069,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                             )}
                                                         </div>
                                                     </div>
+                                                        );
+                                                    })()
                                                 ))}
                                             </div>
                                         ) : (
@@ -1272,6 +1299,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                 </div>
                                                 <div className="space-y-4">
                                                     {rubricSections.map((section: any, sectionIdx: number) => (
+                                                        (() => {
+                                                            const sectionCriteria = (section.criteria || []).filter(hasPositiveCriterionWeight);
+                                                            if (sectionCriteria.length === 0) return null;
+                                                            return (
                                                         <div key={sectionIdx}>
                                                             {/* Section header */}
                                                             {sectionIdx === 0 || rubricSections[sectionIdx - 1].name !== section.name ? (
@@ -1299,7 +1330,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                 marginBottom: sectionIdx < rubricSections.length - 1 ? 12 : 0,
                                                                 overflow: 'hidden',
                                                             }}>
-                                                                {(section.criteria || []).map((criterion: any, critIdx: number, critArray: any[]) => {
+                                                                {sectionCriteria.map((criterion: any, critIdx: number, critArray: any[]) => {
                                                                     // Find the index in the flattened rubrics array
                                                                     const flatIdx = rubrics.findIndex((r: any) => 
                                                                         r.name === criterion.name && r.section_name === section.name
@@ -1324,9 +1355,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                                     {rubricScores[flatIdx] ?? 0} / {criterion.max_points}
                                                                                 </span>
                                                                             </div>
-                                                                            <input type="number" min={0} max={criterion.max_points}
+                                                                            <input type="text" inputMode="numeric" pattern="[0-9]*"
                                                                                 value={rubricScores[flatIdx] ?? 0}
                                                                                 onChange={e => flatIdx >= 0 && updateRubricScore(flatIdx, e.target.value)}
+                                                                                onFocus={(e) => e.currentTarget.select()}
                                                                                 className="w-full px-3 py-1.5 rounded-md focus:outline-none transition-shadow"
                                                                                 style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-dark)' }} />
                                                                         </div>
@@ -1334,6 +1366,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                 })}
                                                             </div>
                                                         </div>
+                                                            );
+                                                        })()
                                                     ))}
                                                 </div>
 
@@ -1358,6 +1392,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                             const clamped = Math.max(0, Math.min(Number.isFinite(raw) ? raw : 0, resolvedMaxPoints));
                                                             setRubricScores([clamped]);
                                                         }}
+                                                        onFocus={(e) => e.currentTarget.select()}
                                                         className="w-full px-3 py-2 rounded-lg focus:outline-none"
                                                         style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-dark)' }} />
                                                 </div>

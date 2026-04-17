@@ -67,18 +67,15 @@ interface StudentSubmission {
     flagged: boolean;
 }
 
-type SortField = 'studentName' | 'submittedAt' | 'autoScore' | 'finalGrade';
+type SortField = 'studentName' | 'submittedAt' | 'finalGrade';
 type SortOrder = 'asc' | 'desc';
 
 function getDisplayStudentName(sub: StudentSubmission): string {
-    if (sub.status === 'not-submitted' || sub.status === 'graded') return sub.studentName;
-    const token = (sub.studentId || sub.id || '').replace(/^missing-/, '');
-    return `Student #${token}`;
+    return sub.studentName;
 }
 
 function getDisplayAvatarInitials(sub: StudentSubmission): string {
-    if (sub.status === 'not-submitted' || sub.status === 'graded') return sub.avatarInitials;
-    return '';
+    return sub.avatarInitials;
 }
 
 function scoreColor(score: number, max: number): string {
@@ -249,7 +246,7 @@ export function AssignmentGrading() {
         Array.from(latestByStudent.values()).forEach((sub: any) => {
             const studentName = sub.student?.name ?? sub.studentName ?? 'Student';
             const studentUid = String(sub.student?.id ?? sub.studentId ?? sub.student_id ?? '');
-            const studentIdentifier = (sub.student?.student_id ?? sub.student?.sis_user_id ?? studentUid) || String(sub.id ?? '');
+            const studentIdentifier = (sub.student?.sis_user_id ?? sub.student?.student_id ?? studentUid) || String(sub.id ?? '');
             const submittedAt = sub.created_at ?? sub.submittedAt ?? null;
             const score = sub.score ?? sub.grade?.totalScore ?? null;
             const maxScore = sub.max_score ?? sub.grade?.maxScore ?? meta?.totalPoints ?? 100;
@@ -443,7 +440,6 @@ export function AssignmentGrading() {
                 case 'submittedAt':
                     cmp = (a.submittedAt ? new Date(a.submittedAt).getTime() : Infinity) - (b.submittedAt ? new Date(b.submittedAt).getTime() : Infinity);
                     break;
-                case 'autoScore': cmp = (a.autoScore ?? -1) - (b.autoScore ?? -1); break;
                 case 'finalGrade': cmp = (a.finalGrade ?? -1) - (b.finalGrade ?? -1); break;
             }
             return sortOrder === 'asc' ? cmp : -cmp;
@@ -828,11 +824,6 @@ export function AssignmentGrading() {
                                                     </button>
                                                 </th>
                                                 <th className="text-left px-5 py-4">
-                                                    <button onClick={() => handleSort('autoScore')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                                        Auto Score <SortIcon field="autoScore" />
-                                                    </button>
-                                                </th>
-                                                <th className="text-left px-5 py-4">
                                                     <button onClick={() => handleSort('finalGrade')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
                                                         Grade <SortIcon field="finalGrade" />
                                                     </button>
@@ -897,13 +888,6 @@ export function AssignmentGrading() {
                                                                 </div>
                                                             ) : (
                                                                 <span style={{ fontSize: '13px', color: '#8A8A8A' }}>Not Yet</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-5 py-4">
-                                                            {sub.autoScore !== null ? (
-                                                                <span style={{ fontSize: '14px', fontWeight: 600, color: scoreColor(sub.autoScore, sub.maxPoints) }}>{sub.autoScore} / {sub.maxPoints}</span>
-                                                            ) : (
-                                                                <span style={{ fontSize: '14px', color: '#8A8A8A' }}>—</span>
                                                             )}
                                                         </td>
                                                         <td className="px-5 py-4">
