@@ -520,9 +520,9 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
             <div style={{
               minHeight: 44, background: 'var(--color-surface)',
               borderBottom: '1px solid var(--color-border)',
-              display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, flexShrink: 0,
+              display: 'flex', alignItems: 'center', padding: '6px 16px 0', gap: 10, rowGap: 6, flexShrink: 0, flexWrap: 'wrap',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 100%', minWidth: 0, width: '100%', order: 2, borderTop: '1px solid var(--color-border)', paddingTop: 6, paddingBottom: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, overflowX: 'auto', padding: '6px 0' }}>
                   {editorFiles.map((f, idx) => {
                     const isActive = idx === activeFileIdx;
@@ -665,23 +665,24 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                   className="hidden"
                   onChange={handleEditorUploadSelect}
                 />
-                <span style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  textTransform: 'uppercase' as const,
-                  letterSpacing: '.6px',
-                  padding: '2px 8px',
-                  borderRadius: 10,
-                  background: isDark ? '#3b1a1a' : 'var(--color-warning-bg)',
-                  color: isDark ? '#fca5a5' : 'var(--color-warning)',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  flexShrink: 0,
-                }}>
-                  {language.charAt(0).toUpperCase() + language.slice(1)}
-                </span>
               </div>
+
+              <span style={{
+                fontSize: 10,
+                fontWeight: 700,
+                textTransform: 'uppercase' as const,
+                letterSpacing: '.6px',
+                padding: '2px 8px',
+                borderRadius: 10,
+                background: isDark ? '#3b1a1a' : 'var(--color-warning-bg)',
+                color: isDark ? '#fca5a5' : 'var(--color-warning)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                flexShrink: 0,
+              }}>
+                {language.charAt(0).toUpperCase() + language.slice(1)}
+              </span>
 
               {/* Run button */}
               <button

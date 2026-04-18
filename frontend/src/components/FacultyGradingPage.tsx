@@ -785,8 +785,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                     {/* ── CENTER: Editor ── */}
                     <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
                         {/* Editor Topbar */}
-                        <div style={{ minHeight: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 8, flexShrink: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                        <div style={{ minHeight: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', padding: '6px 12px 0', gap: 8, rowGap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 100%', minWidth: 0, width: '100%', order: 2, borderTop: '1px solid var(--color-border)', paddingTop: 6, paddingBottom: 6 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, overflowX: 'auto', padding: '6px 0' }}>
                                     {editorFiles.map((file, idx) => {
                                         const isActive = idx === activeFileIndex;
@@ -901,10 +901,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                     className="hidden"
                                     onChange={handleUploadSelect}
                                 />
-                                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#3b1a1a' : '#fef3c7', color: isDark ? '#fca5a5' : '#92400e', display: 'inline-flex', alignItems: 'center' }}>
-                                    {language.charAt(0).toUpperCase() + language.slice(1)}
-                                </span>
                             </div>
+                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#3b1a1a' : '#fef3c7', color: isDark ? '#fca5a5' : '#92400e', display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+                                {language.charAt(0).toUpperCase() + language.slice(1)}
+                            </span>
                             {/* Run Code */}
                             <button onClick={handleRunCode} disabled={isExecutingCode || autoGradeMutation.isPending}
                                 style={{ padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: '#16a34a', color: '#fff', letterSpacing: '.3px', transition: 'background .15s', opacity: isExecutingCode ? 0.7 : 1, cursor: isExecutingCode ? 'not-allowed' : 'pointer', border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap', lineHeight: 1.1 }}
