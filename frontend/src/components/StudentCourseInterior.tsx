@@ -8,6 +8,7 @@ import { useCourses } from '@/hooks/queries/useCourses';
 import { submissionService } from '@/services/api';
 import { StudentLayout } from './StudentLayout';
 import { Input } from './ui/input';
+import { useTheme } from '@/utils/ThemeContext';
 import {
   Search,
   ChevronUp,
@@ -44,10 +45,10 @@ function getStudentStatus(
 
 function getStatusBadge(status: StudentStatus) {
   const cfg: Record<StudentStatus, { bg: string; text: string; border: string; label: string }> = {
-    not_submitted: { bg: '#F8F8F8', text: '#4F4F4F', border: '#E6E6E6', label: 'Not Submitted' },
-    submitted: { bg: '#EEF4FF', text: '#1A4D7A', border: '#D7E6FF', label: 'Submitted' },
-    grading: { bg: '#FFF8EC', text: '#8A5700', border: '#FFE4B5', label: 'In Review' },
-    graded: { bg: '#EAF7EA', text: '#256D2D', border: '#CBE8CF', label: 'Graded' },
+    not_submitted: { bg: 'var(--color-surface-elevated)', text: 'var(--color-text-mid)', border: 'var(--color-border)', label: 'Not Submitted' },
+    submitted: { bg: 'var(--color-info-bg)', text: 'var(--color-info)', border: 'var(--color-border)', label: 'Submitted' },
+    grading: { bg: 'var(--color-warning-bg)', text: 'var(--color-warning)', border: 'var(--color-border)', label: 'In Review' },
+    graded: { bg: 'var(--color-success-bg)', text: 'var(--color-success)', border: 'var(--color-border)', label: 'Graded' },
   };
   const s = cfg[status];
   return (
@@ -75,6 +76,7 @@ function getStatusBadge(status: StudentStatus) {
 
 export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) {
   const router = useRouter();
+  const { isDark } = useTheme();
   const { data: courses } = useCourses();
   const { data: assignments, isLoading, error: fetchError } = useAssignments(courseId);
 
@@ -196,13 +198,13 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
               fontWeight: 500,
               letterSpacing: '-0.02em',
               lineHeight: '1.05',
-              color: '#1F2937',
+              color: 'var(--color-text-dark)',
               marginBottom: '10px',
             }}
           >
             Assignments
           </h1>
-          <p style={{ fontSize: '16px', color: '#616161', fontWeight: 400 }}>
+          <p style={{ fontSize: '16px', color: 'var(--color-text-mid)', fontWeight: 400 }}>
             {(assignments ?? []).length} assignment{(assignments ?? []).length !== 1 ? 's' : ''} · {course?.code ?? ''} {course?.name ?? ''}
           </p>
         </div>
@@ -225,19 +227,19 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
         {!isLoading && !fetchError && (<>
           <div className="mb-5">
             <div className="relative max-w-[760px]">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: '#9CA3AF' }} />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5" style={{ color: 'var(--color-text-light)' }} />
               <Input
                 placeholder="Search assignments..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-12 h-14 rounded-2xl border-2 focus-visible:ring-0"
                 style={{
-                  borderColor: '#D6D6D6',
-                  backgroundColor: '#FFFFFF',
+                  borderColor: 'var(--color-border)',
+                  backgroundColor: 'var(--color-surface)',
                   fontSize: '16px',
                   fontWeight: 400,
-                  color: '#1F2937',
-                  boxShadow: '0 4px 12px rgba(15, 23, 42, 0.03)',
+                  color: 'var(--color-text-dark)',
+                  boxShadow: 'var(--shadow-card)',
                 }}
               />
             </div>
@@ -253,13 +255,13 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
                   className="transition-all relative flex items-center gap-2.5 rounded-full"
                   style={{
                     padding: '8px 14px',
-                    backgroundColor: isActive ? '#6B0000' : '#FFFFFF',
-                    border: isActive ? '1px solid #6B0000' : '1px solid #D3D6DB',
-                    color: isActive ? '#FFFFFF' : '#4B5563',
+                    backgroundColor: isActive ? 'var(--color-primary)' : 'var(--color-surface)',
+                    border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                    color: isActive ? '#FFFFFF' : 'var(--color-text-mid)',
                     fontSize: '14px',
                     fontWeight: 600,
                     lineHeight: 1,
-                    boxShadow: isActive ? '0 8px 16px rgba(107, 0, 0, 0.16)' : '0 1px 2px rgba(17, 24, 39, 0.05)',
+                    boxShadow: isActive ? 'var(--shadow-dropdown)' : 'var(--shadow-card)',
                   }}
                 >
                   <span>{tab.label}</span>
@@ -274,8 +276,8 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
                         fontSize: '12px',
                         fontWeight: 700,
                         borderRadius: '999px',
-                        backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : '#F3F4F6',
-                        color: isActive ? '#FFFFFF' : '#4B5563',
+                        backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : 'var(--color-surface-elevated)',
+                        color: isActive ? '#FFFFFF' : 'var(--color-text-mid)',
                         padding: '0 6px',
                       }}
                     >
@@ -288,8 +290,8 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
           </div>
 
           {(assignments ?? []).length === 0 ? (
-            <div className="text-center py-20 rounded-2xl" style={{ border: '1px dashed #D8D8D8', backgroundColor: '#FFFFFF' }}>
-              <ClipboardX className="w-16 h-16 mx-auto mb-4" style={{ color: '#D9D9D9' }} />
+            <div className="text-center py-20 rounded-2xl" style={{ border: '1px dashed var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
+              <ClipboardX className="w-16 h-16 mx-auto mb-4" style={{ color: 'var(--color-text-light)' }} />
               <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '8px' }}>
                 No Assignments Yet
               </p>
@@ -298,8 +300,8 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
               </p>
             </div>
           ) : sorted.length === 0 ? (
-            <div className="text-center py-20 rounded-2xl" style={{ border: '1px dashed #D8D8D8', backgroundColor: '#FFFFFF' }}>
-              <FilterX className="w-12 h-12 mx-auto mb-4" style={{ color: '#D9D9D9' }} />
+            <div className="text-center py-20 rounded-2xl" style={{ border: '1px dashed var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
+              <FilterX className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-text-light)' }} />
               <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '8px' }}>
                 No {tabs.find((t) => t.id === activeTab)?.label} Assignments
               </p>
@@ -318,32 +320,32 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
             <div
               className="overflow-hidden"
               style={{
-                backgroundColor: '#FFFFFF',
+                backgroundColor: 'var(--color-surface)',
                 borderRadius: '20px',
-                border: '1px solid #E4E4E7',
-                boxShadow: '0 12px 28px rgba(15, 23, 42, 0.08)',
+                border: '1px solid var(--color-border)',
+                boxShadow: 'var(--shadow-card)',
               }}
             >
               <table className="w-full">
-                <thead style={{ background: 'linear-gradient(180deg, #FAFAFA 0%, #F5F5F5 100%)', borderBottom: '1px solid #E5E7EB' }}>
+                <thead style={{ background: 'var(--color-surface-elevated)', borderBottom: '1px solid var(--color-border)' }}>
                   <tr>
                     <th className="text-left px-8 py-4">
-                      <button onClick={() => handleSort('name')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#374151', letterSpacing: '0', textTransform: 'none' }}>
+                      <button onClick={() => handleSort('name')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)', letterSpacing: '0', textTransform: 'none' }}>
                         Assignment Name <SortIcon field="name" />
                       </button>
                     </th>
                     <th className="text-left px-6 py-4">
-                      <button onClick={() => handleSort('dueDate')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#374151', letterSpacing: '0', textTransform: 'none' }}>
+                      <button onClick={() => handleSort('dueDate')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)', letterSpacing: '0', textTransform: 'none' }}>
                         Due Date <SortIcon field="dueDate" />
                       </button>
                     </th>
                     <th className="text-left px-6 py-4">
-                      <button onClick={() => handleSort('score')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#374151', letterSpacing: '0', textTransform: 'none' }}>
+                      <button onClick={() => handleSort('score')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)', letterSpacing: '0', textTransform: 'none' }}>
                         Score <SortIcon field="score" />
                       </button>
                     </th>
                     <th className="text-left px-6 py-4">
-                      <button onClick={() => handleSort('status')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#374151', letterSpacing: '0', textTransform: 'none' }}>
+                      <button onClick={() => handleSort('status')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)', letterSpacing: '0', textTransform: 'none' }}>
                         Status <SortIcon field="status" />
                       </button>
                     </th>
@@ -361,8 +363,8 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
                         key={assignment.id}
                         className="border-b transition-colors"
                         style={{
-                          borderColor: '#ECECEE',
-                          borderLeft: isOverdue ? '3px solid #8B0000' : '3px solid transparent',
+                          borderColor: 'var(--color-border)',
+                          borderLeft: isOverdue ? '3px solid var(--color-error)' : '3px solid transparent',
                           cursor: 'pointer',
                         }}
                         tabIndex={0}
@@ -377,11 +379,11 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
                             router.push(`/student/courses/${courseId}/assignments/${assignment.id}`);
                           }
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#FAFAFA')}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = isDark ? 'var(--color-surface-elevated)' : 'var(--color-primary-bg)')}
                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
                       >
                         <td className="px-8 py-5">
-                          <span style={{ fontSize: '16px', fontWeight: 600, color: '#6B0000', letterSpacing: '-0.01em' }}>
+                          <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-primary)', letterSpacing: '-0.01em' }}>
                             {assignment.name}
                           </span>
                         </td>
@@ -389,12 +391,12 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-2">
                             {isOverdue && (
-                              <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#8B0000' }} />
+                              <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--color-error)' }} />
                             )}
                             <span
                               style={{
                                 fontSize: '16px',
-                                color: isOverdue ? '#8B0000' : '#4B5563',
+                                color: isOverdue ? 'var(--color-error)' : 'var(--color-text-mid)',
                                 fontWeight: isOverdue ? 500 : 400,
                               }}
                             >
@@ -411,11 +413,11 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
 
                         <td className="px-6 py-5">
                           {sub?.score != null ? (
-                            <span style={{ fontSize: '16px', fontWeight: 600, color: '#256D2D' }}>
+                            <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-success)' }}>
                               {sub.score} / {sub.maxScore ?? '?'}
                             </span>
                           ) : (
-                            <span style={{ fontSize: '16px', fontWeight: 400, color: '#9CA3AF' }}>—</span>
+                            <span style={{ fontSize: '16px', fontWeight: 400, color: 'var(--color-text-light)' }}>—</span>
                           )}
                         </td>
 

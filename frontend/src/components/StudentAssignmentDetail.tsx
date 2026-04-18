@@ -36,6 +36,8 @@ import {
   AlertCircle,
   Loader2,
   FilePlus,
+  Plus,
+  Upload,
 } from 'lucide-react';
 
 interface StudentAssignmentDetailProps {
@@ -173,7 +175,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const [outputPanelHeight, setOutputPanelHeight] = useState(280);
 
   // Panel visibility
-  const [showExplorer, setShowExplorer] = useState(true);
+  const showExplorer = false;
   const [showInfoPanel, setShowInfoPanel] = useState(true);
   const [infoPanelWidth, setInfoPanelWidth] = useState(360);
 
@@ -402,6 +404,31 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     if (activeFileIdx >= idx && activeFileIdx > 0) setActiveFileIdx(prev => prev - 1);
   };
 
+  const handleEditorUploadSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const content = (ev.target?.result as string) ?? '';
+        setEditorFiles((prev) => {
+          const existing = prev.findIndex((ef) => ef.name === file.name);
+          if (existing >= 0) {
+            const updated = [...prev];
+            updated[existing] = { name: file.name, content, savedContent: content };
+            setActiveFileIdx(existing);
+            return updated;
+          }
+          const next = [...prev, { name: file.name, content, savedContent: content }];
+          setActiveFileIdx(next.length - 1);
+          return next;
+        });
+      };
+      reader.readAsText(file);
+    });
+    e.target.value = '';
+  }, []);
+
   // Submit
   const handleSubmit = async () => {
     setConfirmSubmitOpen(false);
@@ -592,23 +619,170 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
             {/* Editor Topbar (matches codelab.html) */}
             <div style={{
-              height: 38, background: 'var(--color-surface)',
+              minHeight: 44, background: 'var(--color-surface)',
               borderBottom: '1px solid var(--color-border)',
               display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, flexShrink: 0,
             }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                {activeFile?.name ?? 'No file open'}
-              </span>
-              <span style={{
-                fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const,
-                letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10,
-                background: isDark ? '#3b1a1a' : 'var(--color-warning-bg)',
-                color: isDark ? '#fca5a5' : 'var(--color-warning)',
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-              }}>
-                {language.charAt(0).toUpperCase() + language.slice(1)}
-              </span>
-              <div style={{ flex: 1 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, overflowX: 'auto', padding: '6px 0' }}>
+                  {editorFiles.map((f, idx) => {
+                    const isActive = idx === activeFileIdx;
+                    const isModified = f.content !== f.savedContent;
+                    return (
+                      <button
+                        key={f.name}
+                        type="button"
+                        onClick={() => setActiveFileIdx(idx)}
+                        className="group"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '5px 10px',
+                          borderRadius: 8,
+                          border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                          background: isActive ? 'var(--color-primary)' : 'var(--color-surface-elevated)',
+                          color: isActive ? '#fff' : 'var(--color-text-mid)',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          whiteSpace: 'nowrap',
+                          cursor: isActive ? 'default' : 'pointer',
+                          transition: 'all .15s',
+                          maxWidth: 240,
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = 'var(--color-primary-bg)';
+                            e.currentTarget.style.color = 'var(--color-text-dark)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) {
+                            e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                            e.currentTarget.style.color = 'var(--color-text-mid)';
+                          }
+                        }}
+                      >
+                        <span style={{ fontSize: 13, flexShrink: 0, display: 'inline-flex', alignItems: 'center', width: 14, height: 14 }}>
+                          {getFileIcon(f.name)}
+                        </span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{f.name}</span>
+                        {isModified && (
+                          <span style={{ color: isActive ? '#fff' : 'var(--color-primary)', fontSize: 12, lineHeight: 1, flexShrink: 0 }}>
+                            •
+                          </span>
+                        )}
+                        {editorFiles.length > 1 && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              closeEditorFile(idx);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                closeEditorFile(idx);
+                              }
+                            }}
+                            className="opacity-0 group-hover:opacity-100"
+                            style={{
+                              marginLeft: 2,
+                              fontSize: 12,
+                              color: isActive ? '#fff' : 'var(--color-text-light)',
+                              transition: 'opacity .15s',
+                              flexShrink: 0,
+                            }}
+                          >
+                            ×
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNewFileDialogOpen(true)}
+                  title="Add new file"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-surface-elevated)',
+                    color: 'var(--color-text-mid)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--color-primary-bg)';
+                    e.currentTarget.style.color = 'var(--color-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                    e.currentTarget.style.color = 'var(--color-text-mid)';
+                  }}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('upload-input-topbar')?.click()}
+                  title="Upload files"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 6,
+                    border: '1px solid var(--color-border)',
+                    background: 'var(--color-surface-elevated)',
+                    color: 'var(--color-text-mid)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--color-primary-bg)';
+                    e.currentTarget.style.color = 'var(--color-primary)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                    e.currentTarget.style.color = 'var(--color-text-mid)';
+                  }}
+                >
+                  <Upload className="w-4 h-4" />
+                </button>
+                <input
+                  type="file"
+                  id="upload-input-topbar"
+                  multiple
+                  className="hidden"
+                  onChange={handleEditorUploadSelect}
+                />
+                <span style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  textTransform: 'uppercase' as const,
+                  letterSpacing: '.6px',
+                  padding: '2px 8px',
+                  borderRadius: 10,
+                  background: isDark ? '#3b1a1a' : 'var(--color-warning-bg)',
+                  color: isDark ? '#fca5a5' : 'var(--color-warning)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  flexShrink: 0,
+                }}>
+                  {language.charAt(0).toUpperCase() + language.slice(1)}
+                </span>
+              </div>
 
               {/* Run button */}
               <button
@@ -668,23 +842,6 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
               {/* Layout toggles (matching codelab SVG icons) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <button
-                  onClick={() => setShowExplorer(v => !v)}
-                  title="Toggle Explorer"
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-                    borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: showExplorer ? 'var(--color-text-dark)' : 'var(--color-text-light)',
-                    transition: 'background .12s, color .12s',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-elevated)'; e.currentTarget.style.color = 'var(--color-text-dark)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = showExplorer ? 'var(--color-text-dark)' : 'var(--color-text-light)'; }}
-                >
-                  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.2} width={16} height={16}>
-                    <rect x="1" y="1" width="4.5" height="14" rx="1" fill="currentColor" opacity=".35" />
-                    <rect x="1" y="1" width="14" height="14" rx="1.5" />
-                  </svg>
-                </button>
                 <button
                   onClick={() => setOutputOpen(v => !v)}
                   title="Toggle Output Panel"

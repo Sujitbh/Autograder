@@ -86,11 +86,20 @@
   opacity: 1;
 }
 
-.monaco-editor .cursor {
-  background-color: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
+html:not(.dark) .monaco-editor .cursors-layer .cursor {
+  background-color: #6B0000 !important;
+  border-left-color: #6B0000 !important;
 }
 
-.monaco-editor textarea.inputarea {
-  caret-color: var(--color-primary) !important;
+html.dark .monaco-editor .cursors-layer .cursor {
+  background-color: #D4544C !important;
+  border-left-color: #D4544C !important;
+}
+
+html:not(.dark) .monaco-editor textarea.inputarea {
+  caret-color: #6B0000 !important;
+}
+
+html.dark .monaco-editor textarea.inputarea {
+  caret-color: #D4544C !important;
 }
