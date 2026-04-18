@@ -207,7 +207,7 @@ def list_courses(db: DbSession, user: CurrentUser):
       - student: courses where user is enrolled as student (excludes ta-only enrollments)
     """
     if user.role == "admin":
-        return db.query(Course).all()
+        return db.query(Course).options(joinedload(Course.enrollments), joinedload(Course.assignments)).all()
 
     # For students, only return courses where they are enrolled with role="student".
     # This ensures courses where the user is a TA do not appear in the student dashboard.
@@ -223,7 +223,7 @@ def list_courses(db: DbSession, user: CurrentUser):
     course_ids = [e.course_id for e in enrollments]
     if not course_ids:
         return []
-    return db.query(Course).filter(Course.id.in_(course_ids)).all()
+    return db.query(Course).options(joinedload(Course.enrollments), joinedload(Course.assignments)).filter(Course.id.in_(course_ids)).all()
 
 
 @router.post("/", response_model=CourseOut, responses={500: {"description": "Internal server error"}})
@@ -246,8 +246,9 @@ def create_course(payload: CourseCreate, db: DbSession, user: CurrentUser):
         db.commit()
         db.refresh(existing_course)
         _ensure_creator_enrolled_as_instructor(db, existing_course.id, user)
-        db.refresh(existing_course)
-        return existing_course
+        # Refresh with eager loading to avoid lazy-load issues
+        persisted = db.query(Course).options(joinedload(Course.enrollments), joinedload(Course.assignments)).filter(Course.id == existing_course.id).first()
+        return persisted
 
     # Otherwise, create a new course (for new section or new code)
     course = Course(
@@ -271,7 +272,7 @@ def create_course(payload: CourseCreate, db: DbSession, user: CurrentUser):
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to persist course")
 
-    persisted = db.query(Course).filter(Course.id == course.id).first()
+    persisted = db.query(Course).options(joinedload(Course.enrollments), joinedload(Course.assignments)).filter(Course.id == course.id).first()
     if not persisted:
         raise HTTPException(status_code=500, detail="Course was not persisted")
     return persisted

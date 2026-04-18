@@ -36,4 +36,9 @@ class Submission(Base):
         back_populates="submission",
         cascade="all, delete-orphan",
     )
+    rubric_criterion_scores = relationship(
+        "SubmissionRubricCriterionScore",
+        back_populates="submission",
+        cascade="all, delete-orphan",
+    )
 

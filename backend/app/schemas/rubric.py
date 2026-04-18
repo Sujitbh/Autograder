@@ -1,6 +1,36 @@
 import json as _json
 from pydantic import BaseModel, field_validator
 from typing import Dict, Optional, List
+from datetime import datetime
+
+
+# ── Criterion Score Schema (for submission grading) ─────────────────
+
+class RubricCriterionScoreBase(BaseModel):
+    grade: int  # 0-5
+    percent_weight: float  # 1-100%
+    points_awarded: float
+    feedback: Optional[str] = None
+
+
+class RubricCriterionScoreCreate(RubricCriterionScoreBase):
+    criterion_id: int
+
+
+class RubricCriterionScoreUpdate(RubricCriterionScoreBase):
+    pass
+
+
+class RubricCriterionScoreOut(RubricCriterionScoreBase):
+    id: int
+    submission_id: int
+    criterion_id: int
+    grader_id: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 # ── Criterion Schema ────────────────────────────────────────────────

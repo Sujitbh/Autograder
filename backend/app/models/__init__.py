@@ -10,6 +10,7 @@ from .enrollment import Enrollment
 from .testcase import TestCase
 from .rubric import Rubric
 from .rubric_section import RubricSection, RubricCriterion
+from .submission_rubric_criterion_score import SubmissionRubricCriterionScore
 from .group import Group, GroupMembership
 from .submission_result import SubmissionResult
 from .submission_rubric_score import SubmissionRubricScore

@@ -13,6 +13,7 @@ from app.api.routes import (
     courses,
     testcases,
     rubrics,
+    rubric_criterion_scores,
     submissions,
     faculty_downloads,
     grading,
@@ -68,6 +69,13 @@ try:
     with engine.connect() as conn:
         # Backward-compatible schema patch for existing databases.
         conn.execute(text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS rubric_mode VARCHAR NOT NULL DEFAULT 'unweighted'"))
+        conn.execute(text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS ai_detection_enabled BOOLEAN NOT NULL DEFAULT true"))
+        conn.execute(text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS auto_flag_enabled BOOLEAN NOT NULL DEFAULT true"))
+        conn.execute(text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS auto_flag_threshold FLOAT NOT NULL DEFAULT 0.70"))
+        conn.execute(text("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS ai_confidence FLOAT"))
+        conn.execute(text("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS ai_flagged BOOLEAN"))
+        conn.execute(text("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS ai_threshold_used FLOAT"))
+        conn.execute(text("ALTER TABLE submissions ADD COLUMN IF NOT EXISTS ai_model_language VARCHAR"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo VARCHAR"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMPTZ"))
@@ -94,6 +102,7 @@ app.include_router(assignments.router, prefix="/api")
 app.include_router(courses.router, prefix="/api")
 app.include_router(testcases.router, prefix="/api")
 app.include_router(rubrics.router, prefix="/api")
+app.include_router(rubric_criterion_scores.router, prefix="/api")
 app.include_router(submissions.router, prefix="/api")
 app.include_router(grading.router, prefix="/api")
 app.include_router(faculty_downloads.router, prefix="/api")

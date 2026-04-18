@@ -1679,7 +1679,43 @@ export function CreateAssignmentForm({
                         <ClipboardList className="h-5 w-5 text-[#C9A84C]" /> Rubric Design
                     </h2>
                     <p className="text-xs text-gray-500 mt-1">
-                        Grade scale 0–5 per criterion. Set % weights (must total 100%). Click &quot;Edit default comments&quot; to set auto-populated comments per score.
+                        Choose your rubric mode, then configure criteria and weights.
+                    </p>
+                </div>
+
+                {/* Rubric Mode Toggle */}
+                <div className="rounded-lg border p-4 bg-white dark:bg-gray-900 dark:border-gray-700 space-y-3">
+                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Rubric Mode</label>
+                    <div className="flex gap-2">
+                        <Button
+                            type="button"
+                            variant={watchRubricMode === 'unweighted' ? 'default' : 'outline'}
+                            className={`h-10 flex-1 ${
+                                watchRubricMode === 'unweighted'
+                                    ? 'bg-[#6B0000] text-white hover:bg-[#8B1A1A]'
+                                    : 'border-gray-300 hover:border-[#6B0000]'
+                            }`}
+                            onClick={() => setValue('rubricMode', 'unweighted')}
+                        >
+                            Unweighted (Points-based)
+                        </Button>
+                        <Button
+                            type="button"
+                            variant={watchRubricMode === 'weighted' ? 'default' : 'outline'}
+                            className={`h-10 flex-1 ${
+                                watchRubricMode === 'weighted'
+                                    ? 'bg-[#6B0000] text-white hover:bg-[#8B1A1A]'
+                                    : 'border-gray-300 hover:border-[#6B0000]'
+                            }`}
+                            onClick={() => setValue('rubricMode', 'weighted')}
+                        >
+                            Weighted (Percentage-based)
+                        </Button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                        {watchRubricMode === 'weighted'
+                            ? 'Assign percentage weights to criteria (must total 100%)'
+                            : 'Assign point values to criteria (total determines max score)'}
                     </p>
                 </div>
 
