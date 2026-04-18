@@ -571,7 +571,7 @@ export default function WeightedRubricTable({
                                 <td className="border border-gray-300 dark:border-gray-600" />
                             )}
                             <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm">
-                                Totals
+                                Total Weight = 100%
                             </td>
                             {(isGrading || isPreview) && (
                                 <td className="border border-gray-300 dark:border-gray-600" />
@@ -601,8 +601,8 @@ export default function WeightedRubricTable({
 
             {/* Weight validation */}
             {Math.abs(totalWeight - 100) > 0.5 && (
-                <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
-                    ⚠ Total weight is {Math.round(totalWeight * 100) / 100}% — should be 100%.
+                <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-3 py-2">
+                    ⚠ This rubric is {Math.abs(totalWeight - 100).toFixed(1)}% {totalWeight > 100 ? 'over' : 'under'} 100%. Adjust the section and criterion weights so the total reaches 100%.
                 </p>
             )}
 

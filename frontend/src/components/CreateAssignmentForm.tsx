@@ -69,6 +69,7 @@ import { useAuth } from '@/utils/AuthContext';
 import { courseService } from '@/services/api/courseService';
 import { courseDefaultApiToFormPartial, formRubricToCoursePutApi } from '@/lib/courseDefaultRubric';
 import WeightedRubricTable from '@/components/rubric/WeightedRubricTable';
+import UnweightedRubricTable from '@/components/rubric/UnweightedRubricTable';
 import type { RubricSection as WeightedRubricSection } from '@/components/rubric/WeightedRubricTable';
 
 
@@ -126,6 +127,39 @@ function distributePercentAcrossParts(parts: number[], targetTotal: number): num
     let drift = Math.round((targetTotal - rounded.reduce((a, b) => a + b, 0)) * 1000) / 1000;
     rounded[n - 1] = Math.max(0, Math.round((rounded[n - 1] + drift) * 1000) / 1000);
     return rounded;
+}
+
+function distributePointsAcrossCriteria(
+    sections: AssignmentFormData['rubric'],
+    targetTotal: number,
+): AssignmentFormData['rubric'] {
+    const flatCriteria = sections.flatMap((section, sectionIndex) =>
+        (section.criteria ?? []).map((criterion, criterionIndex) => ({
+            sectionIndex,
+            criterionIndex,
+            points: Math.max(0, criterion.maxPoints ?? 0),
+        })),
+    );
+
+    if (flatCriteria.length === 0) return sections;
+
+    const distributed = distributePercentAcrossParts(
+        flatCriteria.map((item) => item.points),
+        targetTotal,
+    );
+
+    return sections.map((section, sectionIndex) => ({
+        ...section,
+        criteria: (section.criteria ?? []).map((criterion, criterionIndex) => {
+            const flatIndex = flatCriteria.findIndex(
+                (item) => item.sectionIndex === sectionIndex && item.criterionIndex === criterionIndex,
+            );
+            return {
+                ...criterion,
+                maxPoints: distributed[flatIndex] ?? criterion.maxPoints ?? 0,
+            };
+        }),
+    }));
 }
 
 function normalizeCriterionWeightsForSection(criteria: RubricCriterion[], sectionWeightPercent: number): number[] {
@@ -470,36 +504,46 @@ export function CreateAssignmentForm({
     useEffect(() => {
         const prev = rubricModePrevRef.current;
         rubricModePrevRef.current = watchRubricMode;
-        if (prev === undefined) return;
         if (prev === watchRubricMode) return;
 
         const rubric = getValues('rubric') as AssignmentFormData['rubric'];
         if (!rubric?.length) return;
 
         if (watchRubricMode === 'unweighted') {
-            const nSec = rubric.length;
-            const perSec = nSec ? Math.round((100 / nSec) * 100) / 100 : 100;
-            rubric.forEach((_, idx) => setValue(`rubric.${idx}.weight`, perSec));
-            const totalCrit = rubric.reduce((s, r) => s + (r.criteria?.length || 0), 0);
-            if (totalCrit > 0) {
-                const w = Math.round((100 / totalCrit) * 1000) / 1000;
-                rubric.forEach((sec, si) => {
-                    (sec.criteria || []).forEach((_, ci) => {
-                        setValue(`rubric.${si}.criteria.${ci}.weight`, w);
-                    });
-                });
-            }
-        } else {
-            rubric.forEach((section, si) => {
-                const sw = toSectionWeightPercent(section.weight);
-                const n = section.criteria?.length || 0;
-                if (n === 0) return;
-                const each = Math.round((sw / n) * 1000) / 1000;
-                (section.criteria || []).forEach((_, ci) => {
-                    setValue(`rubric.${si}.criteria.${ci}.weight`, each);
+            const normalized = distributePointsAcrossCriteria(rubric, 100);
+            normalized.forEach((section, si) => {
+                setValue(`rubric.${si}.weight`, 1);
+                (section.criteria || []).forEach((criterion, ci) => {
+                    setValue(`rubric.${si}.criteria.${ci}.maxPoints`, criterion.maxPoints ?? 0);
+                    setValue(`rubric.${si}.criteria.${ci}.weight`, 1);
                 });
             });
+            return;
         }
+
+        const sectionParts = rubric.map((section) =>
+            toSectionWeightPercent(
+                section.weight ?? (section.criteria || []).reduce((sum, c) => sum + toCriterionWeightPercent(c.weight), 0),
+            ),
+        );
+        const normalizedSectionWeights = distributePercentAcrossParts(sectionParts, 100);
+
+        rubric.forEach((section, si) => {
+            const sectionWeight = normalizedSectionWeights[si] ?? 0;
+            setValue(`rubric.${si}.weight`, sectionWeight);
+
+            const normalizedCriteria = normalizeCriterionWeightsForSection(
+                (section.criteria || []).map((criterion) => ({
+                    ...criterion,
+                    weight: toCriterionWeightPercent(criterion.weight),
+                })),
+                sectionWeight,
+            );
+
+            (section.criteria || []).forEach((_, ci) => {
+                setValue(`rubric.${si}.criteria.${ci}.weight`, normalizedCriteria[ci] ?? 0);
+            });
+        });
     }, [watchRubricMode, getValues, setValue]);
 
     // Keep allowed file type aligned with selected language.
@@ -1637,7 +1681,11 @@ export function CreateAssignmentForm({
         const rubricValues = watchRubric ?? [];
         const totalCriteria = rubricValues.reduce((sum, section) => sum + (section.criteria?.length || 0), 0);
         const totalWeight = rubricValues.reduce(
-            (sum, section) => sum + (section.criteria || []).reduce((s, c) => s + (c.weight ?? 0), 0),
+            (sum, section) => sum + (section.weight ?? (section.criteria || []).reduce((s, c) => s + (c.weight ?? 0), 0)),
+            0,
+        );
+        const totalPoints = rubricValues.reduce(
+            (sum, section) => sum + (section.criteria || []).reduce((s, c) => s + (c.maxPoints ?? 0), 0),
             0,
         );
 
@@ -1645,7 +1693,7 @@ export function CreateAssignmentForm({
             const formSections = newSections.map((s) => ({
                 name: s.name,
                 description: s.description ?? '',
-                weight: (s.criteria ?? []).reduce((sum, c) => sum + (c.weight ?? 0), 0),
+                weight: s.weight ?? (s.criteria ?? []).reduce((sum, c) => sum + (c.weight ?? 0), 0),
                 criteria: (s.criteria ?? []).map((c) => ({
                     name: c.name,
                     description: c.description ?? '',
@@ -1658,15 +1706,34 @@ export function CreateAssignmentForm({
             setValue('rubric', formSections, { shouldDirty: true });
         };
 
+        const handleUnweightedTableChange = (newSections: WeightedRubricSection[]) => {
+            const formSections = newSections.map((s) => ({
+                name: s.name,
+                description: s.description ?? '',
+                weight: 1,
+                criteria: (s.criteria ?? []).map((c) => ({
+                    name: c.name,
+                    description: c.description ?? '',
+                    maxPoints: c.maxPoints ?? 5,
+                    weight: 1,
+                    gradingMethod: c.gradingMethod ?? ('manual' as const),
+                    defaultComments: c.defaultComments ?? undefined,
+                })),
+            }));
+            setValue('rubric', formSections, { shouldDirty: true });
+        };
+
         const tableSections: WeightedRubricSection[] = rubricValues.map((s) => ({
             name: s.name ?? '',
             description: s.description ?? '',
-            weight: (s.criteria ?? []).reduce((sum, c) => sum + (c.weight ?? 0), 0),
+            weight: watchRubricMode === 'weighted'
+                ? (s.weight ?? (s.criteria ?? []).reduce((sum, c) => sum + (c.weight ?? 0), 0))
+                : 1,
             criteria: (s.criteria ?? []).map((c) => ({
                 name: c.name ?? '',
                 description: c.description ?? '',
                 maxPoints: c.maxPoints ?? 5,
-                weight: c.weight ?? 0,
+                weight: watchRubricMode === 'weighted' ? (c.weight ?? 0) : 1,
                 gradingMethod: (c.gradingMethod as 'auto' | 'manual' | 'hybrid') ?? 'manual',
                 defaultComments: (c as Record<string, unknown>).defaultComments as Record<string, string> | null ?? null,
             })),
@@ -1679,8 +1746,44 @@ export function CreateAssignmentForm({
                         <ClipboardList className="h-5 w-5 text-[#C9A84C]" /> Rubric Design
                     </h2>
                     <p className="text-xs text-gray-500 mt-1">
-                        Grade scale 0–5 per criterion. Set % weights (must total 100%). Click &quot;Edit default comments&quot; to set auto-populated comments per score.
+                        Choose between weighted and point-based rubrics. Weighted rubrics use percentages; unweighted rubrics use fixed points only.
                     </p>
+                </div>
+
+                <div className="rounded-lg border p-4 bg-white dark:bg-gray-900 dark:border-gray-700 space-y-3">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div>
+                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Rubric mode</p>
+                            <p className="text-xs text-gray-500">
+                                Weighted rubrics use percentages. Unweighted rubrics sum points directly.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-full bg-gray-100 p-1 dark:bg-gray-800">
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant={watchRubricMode === 'weighted' ? 'default' : 'ghost'}
+                                className={watchRubricMode === 'weighted' ? 'bg-[#6B0000] text-white hover:bg-[#8B1A1A]' : ''}
+                                onClick={() => setValue('rubricMode', 'weighted', { shouldDirty: true })}
+                            >
+                                Weighted
+                            </Button>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant={watchRubricMode === 'unweighted' ? 'default' : 'ghost'}
+                                className={watchRubricMode === 'unweighted' ? 'bg-[#6B0000] text-white hover:bg-[#8B1A1A]' : ''}
+                                onClick={() => setValue('rubricMode', 'unweighted', { shouldDirty: true })}
+                            >
+                                Unweighted
+                            </Button>
+                        </div>
+                    </div>
+                    {watchRubricMode === 'unweighted' && (
+                        <p className="text-xs text-gray-500">
+                            This assignment will use point totals only. Section and criterion weights are hidden and ignored.
+                        </p>
+                    )}
                 </div>
 
                 <div
@@ -1877,32 +1980,56 @@ export function CreateAssignmentForm({
                     </div>
                 )}
 
-                {/* Weighted rubric table */}
+                {/* Rubric editor */}
                 {rubricValues.length === 0 ? (
                     <div className="rounded-lg border border-dashed p-8 text-center text-sm text-gray-400">
                         No rubric sections yet. Use a template, upload a PDF, or add sections manually.
                     </div>
                 ) : (
-                    <WeightedRubricTable
-                        sections={tableSections}
-                        onChange={handleTableChange}
-                        mode="edit"
-                        allowReorder
-                    />
+                    watchRubricMode === 'weighted' ? (
+                        <WeightedRubricTable
+                            sections={tableSections}
+                            onChange={handleTableChange}
+                            mode="edit"
+                            allowReorder
+                        />
+                    ) : (
+                        <UnweightedRubricTable
+                            sections={tableSections}
+                            onChange={handleUnweightedTableChange}
+                            allowReorder
+                        />
+                    )
                 )}
 
                 {/* Summary */}
                 {totalCriteria > 0 && (
                     <div className="rounded-lg p-4" style={{ backgroundColor: '#F5EDED' }}>
-                        <div className="flex justify-between items-center">
-                            <span className="text-sm font-semibold text-gray-700">Total Weight:</span>
-                            <span
-                                className="text-xl font-bold"
-                                style={{ color: Math.abs(totalWeight - 100) <= WEIGHT_SUM_TOLERANCE ? '#166534' : '#991B1B' }}
-                            >
-                                {totalWeight.toFixed(1)}%
-                            </span>
-                        </div>
+                        {watchRubricMode === 'weighted' ? (
+                            <>
+                                <div className="flex justify-between items-center gap-3">
+                                    <span className="text-sm font-semibold text-gray-700">Total Weight = 100%</span>
+                                    <span
+                                        className="text-xl font-bold"
+                                        style={{ color: Math.abs(totalWeight - 100) <= WEIGHT_SUM_TOLERANCE ? '#166534' : '#991B1B' }}
+                                    >
+                                        {totalWeight.toFixed(1)}%
+                                    </span>
+                                </div>
+                                {Math.abs(totalWeight - 100) > WEIGHT_SUM_TOLERANCE && (
+                                    <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                                        You are {Math.abs(totalWeight - 100).toFixed(1)}% {totalWeight > 100 ? 'over' : 'under'} 100%. Adjust the weights so the rubric totals 100%.
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm font-semibold text-gray-700">Total Points:</span>
+                                <span className="text-xl font-bold text-[#166534]">
+                                    {totalPoints.toFixed(1)} pts
+                                </span>
+                            </div>
+                        )}
                         <div className="flex justify-between items-center mt-2">
                             <span className="text-sm font-semibold text-gray-700">Sections:</span>
                             <span className="text-sm font-bold text-[#6B0000]">{rubricValues.length}</span>
