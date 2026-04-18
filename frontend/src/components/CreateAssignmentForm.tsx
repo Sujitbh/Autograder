@@ -2496,7 +2496,6 @@ export function CreateAssignmentForm({
                                 </Button>
                             )}
                             <Button
-                                    onClick={() => onSaveDraft(getSanitizedValues())}
                                 variant="ghost"
                                 onClick={() => onCancel()}
                             >
