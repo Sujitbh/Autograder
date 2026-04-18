@@ -38,6 +38,7 @@ import {
   FilePlus,
   Plus,
   Upload,
+  ArrowLeft,
 } from 'lucide-react';
 
 interface StudentAssignmentDetailProps {
@@ -683,6 +684,36 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
               }}>
                 {language.charAt(0).toUpperCase() + language.slice(1)}
               </span>
+
+              <button
+                type="button"
+                onClick={() => router.push(`/student/courses/${courseId}`)}
+                title="Back to assignments"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '5px 10px',
+                  borderRadius: 8,
+                  border: '1px solid var(--color-border)',
+                  background: 'var(--color-surface-elevated)',
+                  color: 'var(--color-text-mid)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--color-primary-bg)';
+                  e.currentTarget.style.color = 'var(--color-primary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                  e.currentTarget.style.color = 'var(--color-text-mid)';
+                }}
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back to Assignments
+              </button>
 
               {/* Run button */}
               <button
