@@ -2535,6 +2535,10 @@
     background-color: lab(94.3811% 2.78392 1.0079 / .6);
   }
 
+  .bg-\[\#F8F3F3\] {
+    background-color: #f8f3f3;
+  }
+
   .bg-\[\#F8FAFC\] {
     background-color: #f8fafc;
   }
@@ -6031,6 +6035,10 @@
     .xl\:grid-cols-3 {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
+  }
+
+  :where(.dark\:divide-gray-700:is(.dark *) > :not(:last-child)) {
+    border-color: var(--color-gray-700);
   }
 
   .dark\:border-blue-800:is(.dark *) {

@@ -472,6 +472,24 @@ export function CreateAssignmentForm({
         mode: 'onChange',
     });
 
+    const sanitizeRubricForSubmission = useCallback((values: AssignmentFormData): AssignmentFormData => {
+        return {
+            ...values,
+            rubric: (values.rubric ?? []).map((section) => ({
+                ...section,
+                criteria: (section.criteria ?? []).map((criterion) => ({
+                    ...criterion,
+                    maxPoints: Math.max(0, Math.round(criterion.maxPoints ?? 0)),
+                })),
+            })),
+        };
+    }, []);
+
+    const getSanitizedValues = useCallback(
+        () => sanitizeRubricForSubmission(getValues()),
+        [getValues, sanitizeRubricForSubmission],
+    );
+
     const {
         fields: publicTestFields,
         append: appendPublicTest,
@@ -2241,7 +2259,15 @@ export function CreateAssignmentForm({
         const values = getValues();
         const rubricCriteria = values.rubric.flatMap((section) => section.criteria ?? []);
         const totalRubricPoints = rubricCriteria.reduce((sum, criterion) => sum + criterion.maxPoints, 0);
+        const totalRubricWeight = rubricCriteria.reduce(
+            (sum, criterion) => sum + toCriterionWeightPercent(criterion.weight),
+            0,
+        );
         const rubricGradingMethods = [...new Set(rubricCriteria.map((criterion) => criterion.gradingMethod))];
+        const rubricTotalLabel = values.rubricMode === 'weighted' ? 'Total Rubric Weight' : 'Total Rubric Points';
+        const rubricTotalValue = values.rubricMode === 'weighted'
+            ? `${Math.round(totalRubricWeight * 1000) / 1000}%`
+            : String(totalRubricPoints);
 
         const sections = [
             {
@@ -2288,7 +2314,7 @@ export function CreateAssignmentForm({
                 icon: ClipboardList,
                 items: [
                     { label: 'Criteria', value: `${rubricCriteria.length} criterion/criteria` },
-                    { label: 'Total Rubric Points', value: String(totalRubricPoints) },
+                    { label: rubricTotalLabel, value: rubricTotalValue },
                     { label: 'Rubric Mode', value: values.rubricMode === 'weighted' ? 'Weighted' : 'Unweighted' },
                     { label: 'Grading Methods', value: rubricGradingMethods.join(', ') || '—' },
                 ],
@@ -2367,17 +2393,44 @@ export function CreateAssignmentForm({
                 {/* Rubric details */}
                 {values.rubric.length > 0 && (
                     <div className="rounded-lg border p-4 dark:border-gray-700">
-                        <Label className="text-xs text-gray-400 mb-2 block">Rubric Breakdown</Label>
-                        <div className="space-y-2">
-                            {rubricCriteria.map((criterion, i) => (
-                                <div key={i} className="flex items-center justify-between py-1.5 border-b last:border-0 dark:border-gray-700">
-                                    <div>
-                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{criterion.name}</span>
-                                        <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-800">
-                                            {criterion.gradingMethod}
+                        <div className="mb-3 flex items-center justify-between">
+                            <Label className="text-xs text-gray-400 block">Rubric Breakdown</Label>
+                            <span className="text-[11px] font-semibold text-gray-600">
+                                {values.rubricMode === 'weighted' ? 'Weighted Rubric (%)' : 'Unweighted Rubric (pts)'}
+                            </span>
+                        </div>
+
+                        <div className="space-y-3">
+                            {values.rubric.map((section, si) => (
+                                <div key={`${section.name}-${si}`} className="rounded-md border border-[#E9E2E2] dark:border-gray-700">
+                                    <div className="flex items-center justify-between bg-[#F8F3F3] px-3 py-2">
+                                        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                            {section.name || `Section ${si + 1}`}
+                                        </span>
+                                        <span className="text-xs font-semibold text-[#6B0000]">
+                                            {values.rubricMode === 'weighted'
+                                                ? `${Math.round(toSectionWeightPercent(section.weight) * 1000) / 1000}%`
+                                                : `${Math.round((section.criteria || []).reduce((sum, criterion) => sum + (criterion.maxPoints ?? 0), 0) * 1000) / 1000} pts`}
                                         </span>
                                     </div>
-                                    <span className="text-sm font-bold text-[#6B0000]">{criterion.maxPoints} pts</span>
+
+                                    <div className="divide-y dark:divide-gray-700">
+                                        {(section.criteria || []).map((criterion, ci) => (
+                                            <div key={`${si}-${ci}`} className="flex items-center justify-between px-3 py-2">
+                                                <div>
+                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{criterion.name}</span>
+                                                    <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-800">
+                                                        {criterion.gradingMethod}
+                                                    </span>
+                                                </div>
+                                                <span className="text-sm font-bold text-[#6B0000]">
+                                                    {values.rubricMode === 'weighted'
+                                                        ? `${Math.round(toCriterionWeightPercent(criterion.weight) * 1000) / 1000}%`
+                                                        : `${criterion.maxPoints} pts`}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -2425,7 +2478,7 @@ export function CreateAssignmentForm({
     return (
         <>
             <form
-                onSubmit={handleSubmit(onPublish)}
+                onSubmit={handleSubmit((values) => onPublish(sanitizeRubricForSubmission(values)))}
                 className="mx-auto max-w-4xl space-y-6"
             >
                 {renderStepIndicator()}
@@ -2443,7 +2496,7 @@ export function CreateAssignmentForm({
                                 </Button>
                             )}
                             <Button
-                                type="button"
+                                    onClick={() => onSaveDraft(getSanitizedValues())}
                                 variant="ghost"
                                 onClick={() => onCancel()}
                             >
@@ -2458,7 +2511,7 @@ export function CreateAssignmentForm({
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => onSaveDraft(getValues())}
+                                onClick={() => onSaveDraft(getSanitizedValues())}
                             >
                                 <Save className="mr-1 h-4 w-4" /> Save Draft
                             </Button>
@@ -2568,7 +2621,7 @@ export function CreateAssignmentForm({
                                 }
                                 setShowPublishDialog(false);
                                 handleSubmit(
-                                    onPublish,
+                                    (values) => onPublish(sanitizeRubricForSubmission(values)),
                                     () => {
                                         focusFirstValidationStep();
                                         toast.error('Please fix validation errors before publishing.');
