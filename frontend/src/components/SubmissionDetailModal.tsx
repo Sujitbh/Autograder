@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, FileText, Clock, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from './ui/button';
@@ -36,6 +36,13 @@ interface SubmissionDetailModalProps {
 export function SubmissionDetailModal({ open, onClose, submissionId, assignmentName }: SubmissionDetailModalProps) {
   const [expandedTests, setExpandedTests] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState<'code' | 'results'>('code');
+
+  useEffect(() => {
+    if (open && submissionId != null) {
+      setActiveTab('code');
+      setExpandedTests(new Set());
+    }
+  }, [open, submissionId]);
 
   const { data: submission, isLoading } = useQuery({
     queryKey: ['submissionDetail', submissionId],

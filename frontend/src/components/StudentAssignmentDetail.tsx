@@ -21,6 +21,12 @@ import { useAuth } from '@/utils/AuthContext';
 import { assignmentService, submissionService } from '@/services/api';
 import { normalizeRubricToSections } from '@/utils/rubric';
 import { codeRequiresStdin } from '@/utils/codeInputDetection';
+import {
+  buildResolvedWeightedCriteria,
+  formatPointValue,
+  toCriterionKey,
+  toWeightPercent,
+} from '@/lib/weightedRubricScoring';
 import type { RubricCriterion } from '@/types';
 import { toast } from 'sonner';
 import {
@@ -252,11 +258,8 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
   const course = courses?.find((c) => c.id === courseId);
   const latestSubmission = submissions && submissions.length > 0 ? submissions[0] : null;
-  const sectionWeightPercent = (weight?: number | null) => {
-    if (weight == null || Number.isNaN(weight)) return 100;
-    return weight <= 1.5 ? weight * 100 : weight;
-  };
-  const criterionWeightPercent = sectionWeightPercent;
+  const sectionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 100);
+  const criterionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 0);
   const rubricFromAssignment = normalizeRubricToSections(assignment?.rubric);
   const rubricSections =
     rubricFromAssignment.length > 0
@@ -280,23 +283,32 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   );
   const inferredWeightedRubric = rubricSections.some((section) =>
     Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 ||
-    (section.criteria || []).some((crit) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
+    (section.criteria || []).some((crit) => Math.abs((criterionWeightPercent(crit.weight) || 0) - 100) > 0.0001)
   );
   const isWeightedRubric = assignment?.rubricMode === 'weighted' || inferredWeightedRubric;
+  const resolvedWeightedCriteria = isWeightedRubric
+    ? buildResolvedWeightedCriteria(rubricSections as any[])
+    : [];
+  const weightedByKey = new Map(
+    resolvedWeightedCriteria.map((row) => [row.key, row.effectiveWeightPercent])
+  );
+  const weightedRubricMaxPoints = resolvedWeightedCriteria.reduce(
+    (sum, row) => sum + row.effectiveWeightPercent,
+    0,
+  );
   const rubricCriterionScaleMax = 5;
   const rubricPointsColumnLabel = isWeightedRubric ? 'Score (0-5)' : 'Points';
   const getCriterionDisplayMaxPoints = (criterion: RubricCriterion) =>
     isWeightedRubric ? rubricCriterionScaleMax : (criterion.maxPoints ?? 0);
-  const getCriterionAssignmentWeightPercent = (section: any, criterion: RubricCriterion) => {
-    const sectionPercent = sectionWeightPercent(section.weight);
-    const criterionPercent = criterionWeightPercent(criterion.weight);
-    return Math.round(((sectionPercent * criterionPercent) / 100) * 1000) / 1000;
+  const getCriterionAssignmentWeightPercent = (section: any, criterion: RubricCriterion, sectionIdx: number, critIdx: number) => {
+    const key = toCriterionKey(section, criterion, sectionIdx, critIdx);
+    return weightedByKey.get(key) ?? 0;
   };
   const getSectionFallbackPoints = (section: any) => {
     const assignmentMaxPoints = assignment?.maxPoints ?? 0;
     if (assignmentMaxPoints <= 0) return null;
     if (rubricSections.length === 1) return assignmentMaxPoints;
-    if (isWeightedRubric) return Math.round((assignmentMaxPoints * sectionWeightPercent(section.weight)) / 100);
+    if (isWeightedRubric) return Math.round((weightedRubricMaxPoints * sectionWeightPercent(section.weight)) / 100);
     return null;
   };
 
@@ -1077,12 +1089,9 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                       {isWeightedRubric && (
                                         <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--color-text-dark)', fontWeight: 600 }}>
                                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
-                                            <span>{getCriterionAssignmentWeightPercent(section, criterion).toFixed(1)}%</span>
+                                            <span>{formatPointValue(getCriterionAssignmentWeightPercent(section, criterion, sectionIdx, critIdx))}%</span>
                                             <span style={{ fontSize: 10, color: 'var(--color-text-light)' }}>
                                               of assignment
-                                            </span>
-                                            <span style={{ fontSize: 10, color: 'var(--color-text-light)' }}>
-                                              {((criterion.weight ?? 1) * 100).toFixed(0)}% of section
                                             </span>
                                           </div>
                                         </td>
@@ -1132,7 +1141,10 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                             fontSize: 13,
                             lineHeight: 1.5,
                           }}>
-                            <span>Weighted rubrics are scored from 0 to 5 per criterion, then converted using the weight column.</span>
+                            <span>
+                              Weighted formula: points = (rating / 5) * criterion weight. Max weighted points: {formatPointValue(weightedRubricMaxPoints)}.
+                              {latestSubmission?.grade ? ` Your graded total: ${latestSubmission.grade.totalScore} / ${latestSubmission.grade.maxScore}.` : ''}
+                            </span>
                           </div>
                         ) : (
                           <div style={{

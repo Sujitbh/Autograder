@@ -64,6 +64,19 @@ interface ReportsTableProps {
   onExport?: (format: 'csv' | 'excel' | 'pdf' | 'canvas') => void;
 }
 
+function normalizeAssignmentStatusLabel(statusRaw: string, hasGrade: boolean): string {
+  const status = String(statusRaw || '').toLowerCase();
+
+  if (status === 'missing') return 'Missed Deadline';
+  if (status === 'not_submitted') return 'Not Submitted';
+  if (status === 'graded' || (hasGrade && status !== 'ungraded')) return 'Graded';
+  if (status === 'ungraded' || status === 'submitted' || status === 'pending' || status === 'grading') {
+    return 'Submitted - Needs Grading';
+  }
+
+  return hasGrade ? 'Graded' : 'Not Submitted';
+}
+
 type SortField = 'name' | 'studentId' | 'total' | string;
 type SortDir = 'asc' | 'desc';
 type FilterPerformance = 'all' | 'high' | 'mid' | 'low' | 'failing';
@@ -370,21 +383,24 @@ export function ReportsTable({
                         const g = grades[student.id]?.[a.id] ?? null;
                         const isLate = lateFlags?.[student.id]?.[a.id] ?? false;
                         const statusRaw = statuses?.[student.id]?.[a.id] ?? (g == null ? 'not_submitted' : 'graded');
-                        const statusLabel =
-                          statusRaw === 'ungraded' ? 'Submitted'
-                            : statusRaw === 'missing' ? 'Missing'
-                              : statusRaw === 'not_submitted' ? 'Not Submitted'
-                                : 'Submitted';
+                        const statusLabel = normalizeAssignmentStatusLabel(statusRaw, g != null);
+                        const statusColor =
+                          statusLabel === 'Graded'
+                            ? 'var(--color-success)'
+                            : statusLabel === 'Submitted - Needs Grading'
+                              ? 'var(--color-warning)'
+                              : statusLabel === 'Missed Deadline'
+                                ? 'var(--color-error)'
+                                : 'var(--color-text-light)';
                         return (
                           <td key={a.id} className="px-3 py-3 text-center" style={{ fontSize: '14px' }}>
-                            {g === null ? (
-                              <span style={{ color: 'var(--color-text-light)', fontSize: '12px', fontWeight: 500 }}>
-                                {statusLabel}
-                              </span>
-                            ) : (
-                              <span style={{ fontWeight: 500, color: 'var(--color-text-dark)' }}>
-                                {g}{isLate && <sup style={{ color: 'var(--color-text-light)', fontSize: '10px' }}>L</sup>}
-                              </span>
+                            <span style={{ color: statusColor, fontSize: '12px', fontWeight: 600 }}>
+                              {statusLabel}
+                            </span>
+                            {g !== null && (
+                              <div style={{ marginTop: 2, fontSize: '11px', color: 'var(--color-text-light)' }}>
+                                {g} pts{isLate && <sup style={{ marginLeft: 2 }}>L</sup>}
+                              </div>
                             )}
                           </td>
                         );

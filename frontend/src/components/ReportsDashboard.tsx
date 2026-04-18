@@ -253,6 +253,30 @@ export function ReportsDashboard() {
     return list;
   }, [students, searchQuery, sortField, sortDir, studentStats]);
 
+  const statusesByStudent = useMemo(() => {
+    const now = Date.now();
+    const dueByAssignmentId = new Map(assignments.map((a) => [a.id, new Date(a.dueDate).getTime()]));
+
+    return students.reduce((acc, s) => {
+      const nextStatuses: Record<string, string> = {};
+
+      assignments.forEach((a) => {
+        const rawStatus = String(s.assignmentStatuses?.[a.id] ?? 'not_submitted').toLowerCase();
+        const dueAt = dueByAssignmentId.get(a.id);
+        const isPastDue = Number.isFinite(dueAt) ? (dueAt as number) < now : false;
+
+        if ((rawStatus === 'not_submitted' || rawStatus === '') && isPastDue) {
+          nextStatuses[a.id] = 'missing';
+        } else {
+          nextStatuses[a.id] = rawStatus;
+        }
+      });
+
+      acc[s.id] = nextStatuses;
+      return acc;
+    }, {} as Record<string, Record<string, string>>);
+  }, [students, assignments]);
+
   /* ── Export ── */
   const handleExport = useCallback(
     (_format: 'csv' | 'excel' | 'pdf' | 'canvas') => {
@@ -406,10 +430,7 @@ export function ReportsDashboard() {
                   acc[s.id] = { ...s.lateFlags };
                   return acc;
                 }, {} as Record<string, Record<string, boolean>>)}
-                statuses={students.reduce((acc, s) => {
-                  acc[s.id] = { ...s.assignmentStatuses };
-                  return acc;
-                }, {} as Record<string, Record<string, string>>)}
+                statuses={statusesByStudent}
                 onViewStudentReport={(studentId) => {
                   const s = students.find(st => st.id === studentId);
                   if (s) openStudentReport(s);

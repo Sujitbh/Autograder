@@ -1,9 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/utils/ThemeContext';
 import { codeRequiresStdin } from '@/utils/codeInputDetection';
+import {
+    buildResolvedWeightedCriteria,
+    formatPointValue,
+    toCriterionKey,
+    toWeightPercent,
+} from '@/lib/weightedRubricScoring';
 import { PageLayout } from './PageLayout';
 import { TopNav } from './TopNav';
 import { CodeEditor } from './CodeEditor';
@@ -346,10 +352,8 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         || 'python'
     ).toLowerCase();
 
-    const sectionWeightPercent = (weight?: number | null) => {
-        if (weight == null || Number.isNaN(weight)) return 100;
-        return weight <= 1.5 ? weight * 100 : weight;
-    };
+    const sectionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 100);
+    const criterionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 0);
 
     const rubricSections = normalizeTARubricSections(detail.rubrics ?? []);
     const rubrics = rubricSections.flatMap((section) =>
@@ -362,9 +366,23 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const inferredWeightedRubric = rubricSections.some(
         (section) =>
             Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 ||
-            section.criteria.some((criterion) => Math.abs((criterion.weight ?? 1) - 1) > 0.0001)
+            section.criteria.some((criterion) => Math.abs((criterionWeightPercent(criterion.weight) || 0) - 100) > 0.0001)
     );
     const isWeightedRubric = detail.assignment?.rubric_mode === 'weighted' || inferredWeightedRubric;
+    const resolvedWeightedCriteria = useMemo(() => {
+        if (!isWeightedRubric) return [];
+        return buildResolvedWeightedCriteria(rubricSections as any[]);
+    }, [isWeightedRubric, rubricSections]);
+    const weightedByKey = useMemo(
+        () => new Map(resolvedWeightedCriteria.map((row) => [row.key, row.effectiveWeightPercent])),
+        [resolvedWeightedCriteria],
+    );
+
+    const getCriterionEffectiveWeight = (section: any, criterion: any, sectionIdx: number, critIdx: number) => {
+        const key = toCriterionKey(section, criterion, sectionIdx, critIdx);
+        return weightedByKey.get(key) ?? 0;
+    };
+
     const getSectionFallbackPoints = (section: any) => {
         const assignmentMaxPoints = detail.assignment?.max_points ?? 0;
         if (assignmentMaxPoints <= 0) return null;
@@ -1017,7 +1035,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                     </span>
                                                 </div>
                                                 <div className="space-y-4">
-                                                    {rubricSections.map((section) => (
+                                                    {rubricSections.map((section, sectionIdx) => (
                                                         <div key={section.id} className="border-l-2 border-blue-500 pl-3">
                                                             <div className="flex items-center justify-between mb-2">
                                                                 <p style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
@@ -1031,12 +1049,13 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                             </div>
                                                             <div className="space-y-2">
                                                                 {(section.criteria || []).length > 0 ? (
-                                                                    (section.criteria || []).map((criterion) => {
+                                                                    (section.criteria || []).map((criterion, critIdx) => {
                                                                         const autoEval = autoGradeResult?.rubric_results?.evaluations?.find(
                                                                             (e) => e.rubric_id === criterion.id
                                                                         );
                                                                         const earned = autoEval ? autoEval.earned_points : null;
                                                                         const max = criterion.max_points || 0;
+                                                                        const effectiveWeight = getCriterionEffectiveWeight(section, criterion, sectionIdx, critIdx);
 
                                                                         return (
                                                                             <div
@@ -1049,7 +1068,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                                         {criterion.name}
                                                                                     </p>
                                                                                     <p style={{ fontSize: '10px', color: 'var(--color-text-light)', marginTop: '2px' }}>
-                                                                                        Weight: {((criterion.weight ?? 1) * 100).toFixed(0)}%
+                                                                                        Weight: {formatPointValue(effectiveWeight)}%
                                                                                     </p>
                                                                                     {criterion.description && (
                                                                                         <p style={{ fontSize: '10px', color: 'var(--color-text-mid)', marginTop: '2px' }}>

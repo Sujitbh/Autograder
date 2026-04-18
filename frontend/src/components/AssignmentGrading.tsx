@@ -316,7 +316,6 @@ export function AssignmentGrading() {
     const [showBulkGradeDialog, setShowBulkGradeDialog] = useState(false);
     const [pageSection, setPageSection] = useState<'overview' | 'submissions'>('overview');
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-    const isDraftAssignment = apiAssignment?.status === 'draft';
     const [showEditDialog, setShowEditDialog] = useState(false);
     const [editName, setEditName] = useState(meta?.name ?? '');
     const [editDescription, setEditDescription] = useState(meta?.description ?? '');
@@ -556,15 +555,7 @@ export function AssignmentGrading() {
                                 variant="outline"
                                 className="border-[var(--color-border)] bg-white h-10 px-4"
                                 onClick={() => {
-                                    if (isDraftAssignment) {
-                                        router.push(`/courses/${courseId}/assignment/new?draftId=${assignmentId}`);
-                                        return;
-                                    }
-                                    setEditName(meta.name);
-                                    setEditDescription(meta.description);
-                                    setEditDueDate(meta.dueDate);
-                                    setEditInstructions(meta.instructions);
-                                    setShowEditDialog(true);
+                                    router.push(`/courses/${courseId}/assignment/new?draftId=${assignmentId}`);
                                 }}
                             >
                                 <Edit className="w-4 h-4 mr-2" />

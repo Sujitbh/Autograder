@@ -13,6 +13,14 @@ import { OutputPanel } from './OutputPanel';
 import { useCodeExecution } from '@/hooks/useCodeExecution';
 import { submissionService } from '@/services/api';
 import {
+    buildResolvedWeightedCriteria,
+    calculateWeightedCriterionPoints,
+    calculateWeightedTotalPoints,
+    formatPointValue,
+    toCriterionKey,
+    toWeightPercent,
+} from '@/lib/weightedRubricScoring';
+import {
     ArrowLeft,
     CheckCircle2,
     XCircle,
@@ -169,38 +177,73 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
     // Helper: flatten rubric sections into flat array of criteria for scoring
     const flattenRubrics = (sections: any[]) => {
-        return sections.flatMap((section) => (section.criteria || [])
+        return sections.flatMap((section, sectionIdx) => (section.criteria || [])
             .filter((crit: any) => {
                 const w = crit?.weight;
                 return w == null || Number(w) > 0;
             })
-            .map((crit: any) => ({
-            ...crit,
-            section_name: section.name,
-            section_weight: section.weight ?? 1,
-        })));
+            .map((crit: any, critIdx: number) => ({
+                ...crit,
+                section_name: section.name,
+                section_weight: section.weight ?? 1,
+                section_index: sectionIdx,
+                criterion_index: critIdx,
+                criterion_key: toCriterionKey(section, crit, sectionIdx, critIdx),
+            })));
     };
 
-    const sectionWeightPercent = (weight?: number | null) => {
-        if (weight == null || Number.isNaN(weight)) return 100;
-        return weight <= 1.5 ? weight * 100 : weight;
-    };
-    const criterionWeightPercent = (weight?: number | null) => {
-        if (weight == null || Number.isNaN(weight)) return 100;
-        return weight <= 1.5 ? weight * 100 : weight;
-    };
+    const sectionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 100);
+    const criterionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 0);
     const hasPositiveCriterionWeight = (criterion: any) => {
         const w = criterion?.weight;
         return w == null || Number(w) > 0;
     };
 
+    const getCriterionRowKey = (section: any, criterion: any, sectionIdx: number, critIdx: number) =>
+        toCriterionKey(section, criterion, sectionIdx, critIdx);
+
     const rubricSections = detail?.rubrics ?? [];
-    const rubrics = flattenRubrics(rubricSections);
-    const inferredWeightedRubric = rubricSections.some((section: any) => 
-        Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 || 
-        (section.criteria || []).some((crit: any) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
+    const inferredWeightedRubric = rubricSections.some((section: any) =>
+        Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 ||
+        (section.criteria || []).some((crit: any) => Math.abs((criterionWeightPercent(crit.weight) || 0) - 100) > 0.0001)
     );
     const isWeightedRubric = detail?.assignment?.rubric_mode === 'weighted' || inferredWeightedRubric;
+    const resolvedWeightedCriteria = useMemo(() => {
+        if (!isWeightedRubric) return [];
+        return buildResolvedWeightedCriteria(rubricSections as any[]);
+    }, [isWeightedRubric, rubricSections]);
+    const weightedByKey = useMemo(() => {
+        const m = new Map<string, { effectiveWeightPercent: number; sectionWeightPercent: number }>();
+        resolvedWeightedCriteria.forEach((row) => {
+            m.set(row.key, {
+                effectiveWeightPercent: row.effectiveWeightPercent,
+                sectionWeightPercent: row.sectionWeightPercent,
+            });
+        });
+        return m;
+    }, [resolvedWeightedCriteria]);
+    const weightedMaxTotal = useMemo(
+        () => resolvedWeightedCriteria.reduce((sum, row) => sum + row.effectiveWeightPercent, 0),
+        [resolvedWeightedCriteria],
+    );
+    const rubrics = useMemo(
+        () => flattenRubrics(rubricSections).map((criterion: any) => ({
+            ...criterion,
+            effective_weight_percent: weightedByKey.get(criterion.criterion_key)?.effectiveWeightPercent ?? 0,
+        })),
+        [rubricSections, weightedByKey],
+    );
+
+    const getCriterionEffectiveWeight = (criterion: any, section: any, sectionIdx: number, critIdx: number) => {
+        const key = getCriterionRowKey(section, criterion, sectionIdx, critIdx);
+        return weightedByKey.get(key)?.effectiveWeightPercent ?? 0;
+    };
+
+    const rubricCriterionScaleMax = 5;
+    const getCriterionScaleMax = (criterion: any) => {
+        if (isWeightedRubric) return rubricCriterionScaleMax;
+        return Number(criterion?.max_points) || 0;
+    };
     const getSectionFallbackPoints = (section: any) => {
         const assignmentMaxPoints = detail?.assignment?.max_points ?? 0;
         if (assignmentMaxPoints <= 0) return null;
@@ -210,24 +253,13 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     };
     const unweightedMaxTotal = rubrics.reduce((s: number, r: any) => s + (r.max_points || 0), 0);
     const getWeightedScore = () => {
-        let weightedEarned = 0;
-        let totalWeight = 0;
-
-        rubrics.forEach((r: any, idx: number) => {
-            const maxPts = Number(r.max_points) || 0;
-            if (maxPts <= 0) return;
-            const entered = Number(rubricScores[idx]) || 0;
-            const ratio = Math.max(0, Math.min(entered / maxPts, 1));
-            const critWeight = criterionWeightPercent(r.weight);
-            const secWeight = sectionWeightPercent(r.section_weight);
-            const effectiveWeight = critWeight * (secWeight / 100);
-            weightedEarned += ratio * effectiveWeight;
-            totalWeight += effectiveWeight;
-        });
-
-        if (totalWeight <= 0) return 0;
-        const ratio = weightedEarned / totalWeight;
-        return ratio * resolvedMaxPoints;
+        if (weightedMaxTotal <= 0) return 0;
+        return calculateWeightedTotalPoints(
+            rubrics.map((r: any, idx: number) => ({
+                rating: Math.max(0, Math.min(Number(rubricScores[idx]) || 0, 5)),
+                effectiveWeightPercent: Number(r.effective_weight_percent) || 0,
+            })),
+        );
     };
     const getTotalScore = () => {
         if (!isWeightedRubric) {
@@ -235,23 +267,23 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         }
         return getWeightedScore();
     };
-    const getTotalMax = () => (isWeightedRubric ? resolvedMaxPoints : unweightedMaxTotal);
+    const getTotalMax = () => (isWeightedRubric ? weightedMaxTotal : unweightedMaxTotal);
     const resultPointsTotal = (detail?.results ?? []).reduce((s, r) => s + (r.points || 0), 0);
     const resolvedMaxPoints = detail?.assignment?.max_points || unweightedMaxTotal || detail?.max_score || resultPointsTotal || 100;
 
     const distributeScoreAcrossRubrics = useCallback((totalScore: number, flatRubrics: any[]) => {
         if (flatRubrics.length === 0) return [] as number[];
-        const rubricMaxTotal = flatRubrics.reduce((s: number, r: any) => s + (Number(r.max_points) || 0), 0);
+        const rubricMaxTotal = flatRubrics.reduce((s: number, r: any) => s + (getCriterionScaleMax(r) || 0), 0);
         const safeDenominator = isWeightedRubric
-            ? Math.max(1, Number(resolvedMaxPoints) || 1)
+            ? Math.max(1, Number(weightedMaxTotal) || 1)
             : Math.max(1, rubricMaxTotal);
 
         return flatRubrics.map((r: any) => {
-            const maxPoints = Number(r.max_points) || 0;
+            const maxPoints = getCriterionScaleMax(r);
             const scaled = (Math.max(0, Number(totalScore) || 0) / safeDenominator) * maxPoints;
             return Math.max(0, Math.min(Math.round(scaled), maxPoints));
         });
-    }, [isWeightedRubric, resolvedMaxPoints]);
+    }, [isWeightedRubric, weightedMaxTotal]);
 
     // Initialise form when detail loads
     useEffect(() => {
@@ -271,10 +303,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     }, [detail?.id, distributeScoreAcrossRubrics]);
 
     const updateRubricScore = (idx: number, val: string) => {
-        const maxPoints = Number(rubrics[idx]?.max_points ?? 0);
+        const maxPoints = getCriterionScaleMax(rubrics[idx]);
         const digitsOnly = String(val ?? '').replace(/[^\d]/g, '');
 
-        // For single-digit rubrics (most 0-5 style criteria), keep only latest typed digit
+        // For single-digit rubric scales (weighted 0-5 and similar), keep only latest typed digit
         // so typing a new number replaces the old one instead of appending (e.g., 2 -> 3).
         const normalized = maxPoints <= 9 ? digitsOnly.slice(-1) : digitsOnly;
         const parsed = normalized === '' ? 0 : Number(normalized);
@@ -399,8 +431,9 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
     const handleGrade = async (isDraft: boolean, moveToNext: boolean = false) => {
         const rawScore = getTotalScore();
-        const normalizedScore = Math.max(0, Math.min(Math.round(rawScore), resolvedMaxPoints));
-        const normalizedMax = Math.max(1, Math.round(resolvedMaxPoints));
+        const totalMaxForMode = getTotalMax();
+        const normalizedScore = Math.max(0, Math.min(Math.round(rawScore), Math.round(totalMaxForMode || 0)));
+        const normalizedMax = Math.max(1, Math.round(totalMaxForMode || 0));
         const feedbackToSave = feedback.trim() || 'Reviewed by instructor.';
         await gradeMutation.mutateAsync({ score: normalizedScore, max_score: normalizedMax, feedback: feedbackToSave });
 
@@ -417,8 +450,9 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                 router.push(`/courses/${courseId}/submissions/${nextSubmissionId}/grade`);
                 return;
             }
-            router.replace(`/courses/${courseId}/assignments/${detail?.assignment.id}/grading`);
-            router.refresh();
+            // Stay on this submission after finalizing grade; only explicit
+            // "Save & Next" should navigate away.
+            return;
         }
     };
 
@@ -1031,6 +1065,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                     const flatIdx = rubrics.findIndex((r: any) => 
                                                                         r.name === criterion.name && r.section_name === section.name
                                                                     );
+                                                                    const effectiveWeight = getCriterionEffectiveWeight(criterion, section, sectionIdx, critIdx);
                                                                     return (
                                                                         <div
                                                                             key={critIdx}
@@ -1045,11 +1080,11 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                                     <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{criterion.name}</p>
                                                                                     {criterion.description && <p style={{ fontSize: '11px', color: 'var(--color-text-mid)', marginTop: 2 }}>{criterion.description}</p>}
                                                                                     {isWeightedRubric && <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: 3 }}>
-                                                                                        Weight: {((criterion.weight ?? 1) * 100).toFixed(0)}%
+                                                                                        Weight: {formatPointValue(effectiveWeight)}%
                                                                                     </p>}
                                                                                 </div>
                                                                                 <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', flexShrink: 0 }}>
-                                                                                    {criterion.max_points} pts
+                                                                                    {isWeightedRubric ? '0-5' : `${criterion.max_points} pts`}
                                                                                 </span>
                                                                             </div>
                                                                         </div>
@@ -1335,6 +1370,9 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                     const flatIdx = rubrics.findIndex((r: any) => 
                                                                         r.name === criterion.name && r.section_name === section.name
                                                                     );
+                                                                    const effectiveWeight = getCriterionEffectiveWeight(criterion, section, sectionIdx, critIdx);
+                                                                    const enteredRating = flatIdx >= 0 ? (rubricScores[flatIdx] ?? 0) : 0;
+                                                                    const criterionPoints = calculateWeightedCriterionPoints(enteredRating, effectiveWeight);
                                                                     return (
                                                                         <div
                                                                             key={critIdx}
@@ -1348,11 +1386,16 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                                     <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{criterion.name}</p>
                                                                                     {criterion.description && <p style={{ fontSize: '11px', color: 'var(--color-text-mid)', marginTop: 2 }}>{criterion.description}</p>}
                                                                                     {isWeightedRubric && <p style={{ fontSize: '11px', color: 'var(--color-text-light)', marginTop: 3 }}>
-                                                                                        Weight: {criterionWeightPercent(criterion.weight).toFixed(0)}%
+                                                                                        Weight: {formatPointValue(effectiveWeight)}%
                                                                                     </p>}
                                                                                 </div>
                                                                                 <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', flexShrink: 0, marginLeft: 8 }}>
-                                                                                    {rubricScores[flatIdx] ?? 0} / {criterion.max_points}
+                                                                                    {enteredRating} / {getCriterionScaleMax(criterion)}
+                                                                                    {isWeightedRubric && (
+                                                                                        <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, color: 'var(--color-text-mid)' }}>
+                                                                                            ({formatPointValue(criterionPoints)} pts)
+                                                                                        </span>
+                                                                                    )}
                                                                                 </span>
                                                                             </div>
                                                                             <input type="text" inputMode="numeric" pattern="[0-9]*"
@@ -1374,7 +1417,9 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                 {/* Total Score */}
                                                 <div className="mt-4 px-4 py-3 rounded-lg flex items-center justify-between" style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}>
                                                     <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text-dark)', textTransform: 'uppercase', letterSpacing: '.4px' }}>Total</span>
-                                                    <span style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-primary)' }}>{Math.round(getTotalScore())} / {getTotalMax()}</span>
+                                                    <span style={{ fontSize: '22px', fontWeight: 800, color: 'var(--color-primary)' }}>
+                                                        {formatPointValue(getTotalScore())} / {formatPointValue(getTotalMax())}
+                                                    </span>
                                                 </div>
                                             </div>
                                         ) : (
