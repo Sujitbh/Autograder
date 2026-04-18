@@ -190,7 +190,8 @@ function FeatureCard({ feature, delay }: { feature: Feature; delay: number }) {
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-6px)';
-        e.currentTarget.style.boxShadow = '0 16px 40px rgba(123, 13, 13, 0.07), 0 4px 12px rgba(123, 13, 13, 0.04)';
+        e.currentTarget.style.boxShadow =
+          '0 16px 40px color-mix(in srgb, var(--landing-primary) 14%, transparent), 0 4px 12px color-mix(in srgb, var(--landing-primary) 8%, transparent)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
@@ -204,7 +205,7 @@ function FeatureCard({ feature, delay }: { feature: Feature; delay: number }) {
           height: 52,
           borderRadius: 14,
           background: 'linear-gradient(135deg, var(--landing-primary) 0%, var(--landing-primary-dark) 100%)',
-          boxShadow: '0 4px 12px rgba(123, 13, 13, 0.15)',
+          boxShadow: '0 4px 12px color-mix(in srgb, var(--landing-primary) 24%, transparent)',
         }}
       >
         <Icon size={24} color="#fff" strokeWidth={1.7} />

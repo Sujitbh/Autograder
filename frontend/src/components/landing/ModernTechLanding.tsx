@@ -104,27 +104,6 @@ const daySteps = [
   },
 ];
 
-const testimonials = [
-  {
-    initials: 'K.M.',
-    role: 'Faculty lead, upper-level systems course',
-    quote:
-      'Weekends used to disappear into manual runs of the same sanity checks. Now the boring part is handled and I still sign off on anything that matters.',
-  },
-  {
-    initials: 'R.T.',
-    role: 'Coordinator, first-year programming sequence',
-    quote:
-      'The hardest part with TAs was always calibration. Having a single queue and shared rubrics cut the “why is my grade different?” emails way down.',
-  },
-  {
-    initials: 'A.L.',
-    role: 'Instructor, algorithms',
-    quote:
-      'I was skeptical of anything that sounds like “auto grading.” Axiom is closer to a disciplined lab notebook for the course: everything is traceable.',
-  },
-];
-
 const faqItems = [
   {
     q: 'Does Axiom replace faculty judgment?',
@@ -143,19 +122,6 @@ const faqItems = [
     a: 'Like any campus system, you should keep a contingency syllabus statement. The team monitors availability; planned maintenance is communicated when possible.',
   },
 ];
-
-function Avatar({ initials }: { initials: string }) {
-  return (
-    <div
-      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-      style={{
-        background: 'linear-gradient(145deg, var(--landing-primary-light), var(--landing-primary))',
-      }}
-    >
-      {initials}
-    </div>
-  );
-}
 
 export default function ModernTechLanding() {
   const heroRef = useRef<HTMLElement>(null);
@@ -176,7 +142,7 @@ export default function ModernTechLanding() {
       <header
         className="sticky top-0 z-50 border-b backdrop-blur-md"
         style={{
-          backgroundColor: 'rgba(241, 245, 249, 0.92)',
+          backgroundColor: 'color-mix(in srgb, var(--landing-bg) 92%, transparent)',
           borderColor: 'var(--landing-border)',
         }}
       >
@@ -207,7 +173,6 @@ export default function ModernTechLanding() {
               ['#platform', 'Platform'],
               ['#day', 'Workflow'],
               ['#demo', 'Demo'],
-              ['#testimonials', 'Voices'],
               ['#trust', 'Trust'],
               ['#faq', 'FAQ'],
             ].map(([href, label]) => (
@@ -264,7 +229,7 @@ export default function ModernTechLanding() {
             className="pointer-events-none absolute inset-0 opacity-[0.5]"
             style={{
               backgroundImage:
-                'linear-gradient(rgba(12, 74, 110, 0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(12, 74, 110, 0.06) 1px, transparent 1px)',
+                'linear-gradient(color-mix(in srgb, var(--landing-primary) 12%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--landing-primary) 12%, transparent) 1px, transparent 1px)',
               backgroundSize: '48px 48px',
             }}
           />
@@ -319,7 +284,8 @@ export default function ModernTechLanding() {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl px-8 py-3.5 text-base font-semibold text-white no-underline shadow-lg transition-all hover:opacity-95 hover:shadow-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 sm:w-auto"
                 style={{
                   backgroundColor: 'var(--landing-primary)',
-                  boxShadow: '0 14px 40px rgba(12, 74, 110, 0.28)',
+                  boxShadow:
+                    '0 14px 40px color-mix(in srgb, var(--landing-primary) 36%, transparent)',
                   outlineColor: 'var(--landing-primary)',
                 }}
               >
@@ -668,93 +634,6 @@ export default function ModernTechLanding() {
         </section>
 
         <section
-          id="testimonials"
-          className="scroll-mt-24 border-t px-6 py-16 lg:px-8 lg:py-20"
-          style={{ borderColor: 'var(--landing-border)', backgroundColor: 'var(--landing-surface)' }}
-        >
-          <div className="mx-auto max-w-6xl">
-            <h2
-              className="mb-10 text-center text-2xl font-semibold sm:text-3xl"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--landing-ink)' }}
-            >
-              What colleagues are saying
-            </h2>
-            <p className="mx-auto mb-10 max-w-2xl text-center text-sm" style={{ color: 'var(--landing-muted)' }}>
-              Names withheld for privacy. Quotes reflect early feedback from CS instructors; obtain
-              formal endorsements before using in accreditation packets.
-            </p>
-            <div className="grid gap-8 md:grid-cols-3">
-              {testimonials.map((t) => (
-                <blockquote
-                  key={t.initials}
-                  className="flex flex-col rounded-2xl border p-6 shadow-sm"
-                  style={{
-                    borderColor: 'var(--landing-border)',
-                    backgroundColor: 'var(--landing-bg)',
-                  }}
-                >
-                  <div className="mb-4 flex items-center gap-3">
-                    <Avatar initials={t.initials} />
-                    <cite className="not-italic">
-                      <span className="block text-sm font-semibold" style={{ color: 'var(--landing-ink)' }}>
-                        {t.initials}
-                      </span>
-                      <span className="text-xs" style={{ color: 'var(--landing-muted)' }}>
-                        {t.role}
-                      </span>
-                    </cite>
-                  </div>
-                  <p className="flex-1 text-sm leading-relaxed" style={{ color: 'var(--landing-ink-soft)' }}>
-                    “{t.quote}”
-                  </p>
-                </blockquote>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section
-          id="team"
-          className="scroll-mt-24 border-t px-6 py-14 lg:px-8 lg:py-16"
-          style={{ borderColor: 'var(--landing-border)', backgroundColor: 'var(--landing-bg)' }}
-        >
-          <div className="mx-auto max-w-4xl text-center">
-            <h2
-              className="mb-4 text-2xl font-semibold sm:text-3xl"
-              style={{ fontFamily: 'var(--font-display)', color: 'var(--landing-ink)' }}
-            >
-              People behind the platform
-            </h2>
-            <p className="mb-10 text-base" style={{ color: 'var(--landing-muted)' }}>
-              Replace these placeholders with real photos and titles when your communications office
-              approves them.
-            </p>
-            <div className="flex flex-wrap justify-center gap-10">
-              {[
-                { initials: 'FS', label: 'Faculty steering' },
-                { initials: 'IT', label: 'Instructional technology' },
-                { initials: 'SD', label: 'Student developers' },
-              ].map((m) => (
-                <div key={m.label} className="flex w-36 flex-col items-center">
-                  <div
-                    className="mb-3 flex h-20 w-20 items-center justify-center rounded-full text-lg font-bold text-white"
-                    style={{
-                      background:
-                        'linear-gradient(160deg, var(--landing-primary-light), var(--landing-primary-dark))',
-                    }}
-                  >
-                    {m.initials}
-                  </div>
-                  <span className="text-sm font-medium" style={{ color: 'var(--landing-ink)' }}>
-                    {m.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section
           id="trust"
           className="scroll-mt-24 border-t px-6 py-16 lg:px-8 lg:py-20"
           style={{ borderColor: 'var(--landing-border)', backgroundColor: 'var(--landing-surface)' }}
@@ -888,7 +767,7 @@ export default function ModernTechLanding() {
         className="border-t"
         style={{
           borderColor: 'var(--landing-border)',
-          backgroundColor: 'var(--landing-ink)',
+          backgroundColor: 'var(--landing-contrast-bg)',
           color: 'rgba(255,255,255,0.72)',
         }}
       >

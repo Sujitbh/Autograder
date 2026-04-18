@@ -142,7 +142,10 @@ export default function LandingRoles() {
                 border: 'none',
                 backgroundColor: active === tab.key ? 'var(--landing-primary)' : 'transparent',
                 color: active === tab.key ? '#fff' : 'var(--landing-muted)',
-                boxShadow: active === tab.key ? '0 2px 8px rgba(123,13,13,0.2)' : 'none',
+                boxShadow:
+                  active === tab.key
+                    ? '0 2px 8px color-mix(in srgb, var(--landing-primary) 28%, transparent)'
+                    : 'none',
               }}
             >
               {tab.label}
@@ -157,7 +160,8 @@ export default function LandingRoles() {
             className="relative flex flex-col items-center justify-center p-12 overflow-hidden"
             style={{
               borderRadius: 22,
-              background: 'linear-gradient(160deg, #9E1515 0%, var(--landing-primary) 40%, var(--landing-primary-dark) 100%)',
+              background:
+                'linear-gradient(160deg, var(--landing-primary-light) 0%, var(--landing-primary) 40%, var(--landing-primary-dark) 100%)',
               minHeight: 380,
             }}
           >
@@ -233,7 +237,7 @@ export default function LandingRoles() {
                       width: 28,
                       height: 28,
                       borderRadius: '50%',
-                      backgroundColor: 'rgba(123,13,13,0.08)',
+                      backgroundColor: 'color-mix(in srgb, var(--landing-primary) 14%, transparent)',
                     }}
                   >
                     <CheckCircle2

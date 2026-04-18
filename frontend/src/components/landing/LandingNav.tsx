@@ -18,7 +18,9 @@ export default function LandingNav() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const bgColor = scrolled ? 'rgba(250, 248, 245, 0.95)' : 'rgba(26, 20, 16, 0.6)';
+  const bgColor = scrolled
+    ? 'color-mix(in srgb, var(--landing-bg) 94%, transparent)'
+    : 'color-mix(in srgb, var(--landing-contrast-bg) 65%, transparent)';
   const textColor = scrolled ? 'var(--landing-ink-soft)' : 'rgba(255,255,255,0.7)';
   const textHover = scrolled ? 'var(--landing-primary)' : '#fff';
   const logoColor = scrolled ? 'var(--landing-ink)' : '#fff';
@@ -32,7 +34,9 @@ export default function LandingNav() {
         WebkitBackdropFilter: 'blur(16px)',
         borderBottom: scrolled ? '1px solid var(--landing-border)' : '1px solid transparent',
         fontFamily: 'var(--font-body)',
-        boxShadow: scrolled ? '0 1px 12px rgba(123,13,13,0.05)' : 'none',
+        boxShadow: scrolled
+          ? '0 1px 12px color-mix(in srgb, var(--landing-primary) 14%, transparent)'
+          : 'none',
         transition: 'all 0.4s ease',
       }}
     >
@@ -80,16 +84,18 @@ export default function LandingNav() {
             fontWeight: 600,
             fontFamily: 'var(--font-body)',
             letterSpacing: '0.01em',
-            boxShadow: '0 2px 8px rgba(123,13,13,0.2)',
+            boxShadow: '0 2px 8px color-mix(in srgb, var(--landing-primary) 28%, transparent)',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = 'var(--landing-primary-light)';
-            e.currentTarget.style.boxShadow = '0 4px 16px rgba(123, 13, 13, 0.3)';
+            e.currentTarget.style.boxShadow =
+              '0 4px 16px color-mix(in srgb, var(--landing-primary) 34%, transparent)';
             e.currentTarget.style.transform = 'translateY(-1px)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'var(--landing-primary)';
-            e.currentTarget.style.boxShadow = '0 2px 8px rgba(123,13,13,0.2)';
+            e.currentTarget.style.boxShadow =
+              '0 2px 8px color-mix(in srgb, var(--landing-primary) 28%, transparent)';
             e.currentTarget.style.transform = 'translateY(0)';
           }}
         >

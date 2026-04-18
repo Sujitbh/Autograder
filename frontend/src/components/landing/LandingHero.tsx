@@ -33,7 +33,7 @@ export default function LandingHero() {
         fontFamily: 'var(--font-body)',
         paddingTop: 73,
         minHeight: '100vh',
-        background: 'linear-gradient(160deg, #1A1410 0%, #241A14 50%, #1A1410 100%)',
+        background: 'var(--landing-hero-bg)',
       }}
     >
       {/* Subtle grid overlay */}
@@ -109,17 +109,19 @@ export default function LandingHero() {
                 fontSize: 15,
                 fontWeight: 600,
                 fontFamily: 'var(--font-body)',
-                boxShadow: '0 4px 16px rgba(123,13,13,0.3)',
+                boxShadow: '0 4px 16px color-mix(in srgb, var(--landing-primary) 34%, transparent)',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = 'var(--landing-primary-light)';
                 e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 6px 24px rgba(123,13,13,0.4)';
+                e.currentTarget.style.boxShadow =
+                  '0 6px 24px color-mix(in srgb, var(--landing-primary) 42%, transparent)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'var(--landing-primary)';
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(123,13,13,0.3)';
+                e.currentTarget.style.boxShadow =
+                  '0 4px 16px color-mix(in srgb, var(--landing-primary) 34%, transparent)';
               }}
             >
               Get Started
@@ -241,7 +243,12 @@ function ProductMockup() {
           </span>
           <span
             className="ml-auto rounded-full px-2 py-0.5"
-            style={{ fontSize: 10, color: 'var(--landing-gold)', backgroundColor: 'rgba(196,154,60,0.1)', fontWeight: 600 }}
+            style={{
+              fontSize: 10,
+              color: 'var(--landing-gold)',
+              backgroundColor: 'color-mix(in srgb, var(--landing-gold) 16%, transparent)',
+              fontWeight: 600,
+            }}
           >
             Python
           </span>

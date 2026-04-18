@@ -320,17 +320,35 @@
 
 /* Axiom marketing landing only: navy primary, cool neutrals, precision accent */
 .axiom-landing {
-  --landing-primary: #0c4a6e;
-  --landing-primary-dark: #082f47;
-  --landing-primary-light: #155e8c;
-  --landing-bg: #f1f5f9;
+  --landing-primary: #7b0d0d;
+  --landing-primary-dark: #550808;
+  --landing-primary-light: #9e1515;
+  --landing-bg: #f8f3f2;
   --landing-surface: #ffffff;
-  --landing-ink: #0f172a;
-  --landing-ink-soft: #334155;
-  --landing-muted: #64748b;
-  --landing-border: #e2e8f0;
-  --landing-gold: #0369a1;
-  --landing-gold-light: #0ea5e9;
+  --landing-ink: #1f1414;
+  --landing-ink-soft: #4b2f2f;
+  --landing-muted: #7f6666;
+  --landing-border: #e8dada;
+  --landing-gold: #c49a3c;
+  --landing-gold-light: #e0b85d;
+  --landing-contrast-bg: #2a0f12;
+  --landing-hero-bg: linear-gradient(160deg, #2a0f12 0%, #3a161b 50%, #2a0f12 100%);
+}
+
+.dark .axiom-landing {
+  --landing-primary: #d26a6a;
+  --landing-primary-dark: #a33d3d;
+  --landing-primary-light: #e69a9a;
+  --landing-bg: #120b0d;
+  --landing-surface: #1c1215;
+  --landing-ink: #f7eaea;
+  --landing-ink-soft: #e5cfd4;
+  --landing-muted: #b89da4;
+  --landing-border: #3a2328;
+  --landing-gold: #e0bf78;
+  --landing-gold-light: #f0d79a;
+  --landing-contrast-bg: #0f0709;
+  --landing-hero-bg: linear-gradient(160deg, #0f0709 0%, #1b0d11 50%, #0f0709 100%);
 }
 
 @keyframes axiom-float-1 {

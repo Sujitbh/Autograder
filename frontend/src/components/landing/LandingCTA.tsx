@@ -30,7 +30,8 @@ export default function LandingCTA() {
       ref={ref}
       className="relative py-32 overflow-hidden"
       style={{
-        background: 'linear-gradient(160deg, #9E1515 0%, var(--landing-primary) 35%, var(--landing-primary-dark) 70%, #3D0606 100%)',
+        background:
+          'linear-gradient(160deg, var(--landing-primary-light) 0%, var(--landing-primary) 35%, var(--landing-primary-dark) 70%, var(--landing-primary-dark) 100%)',
         fontFamily: 'var(--font-body)',
       }}
     >
@@ -53,7 +54,7 @@ export default function LandingCTA() {
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          background: 'radial-gradient(circle, rgba(196,154,60,0.06) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, color-mix(in srgb, var(--landing-gold) 10%, transparent) 0%, transparent 70%)',
         }}
       />
 

@@ -37,7 +37,7 @@ export default function LandingHowItWorks() {
       id="how-it-works"
       ref={ref}
       className="py-32"
-      style={{ backgroundColor: 'var(--landing-ink)', fontFamily: 'var(--font-body)' }}
+      style={{ backgroundColor: 'var(--landing-contrast-bg)', fontFamily: 'var(--font-body)' }}
     >
       <div className="mx-auto px-8 text-center" style={{ maxWidth: 1200 }}>
         <span
@@ -83,7 +83,7 @@ export default function LandingHowItWorks() {
               left: '16%',
               right: '16%',
               height: 0,
-              borderTop: '2px dashed rgba(196,154,60,0.25)',
+              borderTop: '2px dashed color-mix(in srgb, var(--landing-gold) 32%, transparent)',
             }}
           />
 
@@ -96,11 +96,11 @@ export default function LandingHowItWorks() {
                   width: 88,
                   height: 88,
                   borderRadius: '50%',
-                  border: '2px solid rgba(196,154,60,0.5)',
-                  backgroundColor: 'var(--landing-ink)',
+                  border: '2px solid color-mix(in srgb, var(--landing-gold) 56%, transparent)',
+                  backgroundColor: 'var(--landing-contrast-bg)',
                   position: 'relative',
                   zIndex: 2,
-                  boxShadow: '0 0 24px rgba(196,154,60,0.08)',
+                  boxShadow: '0 0 24px color-mix(in srgb, var(--landing-gold) 16%, transparent)',
                 }}
               >
                 <span
@@ -122,7 +122,7 @@ export default function LandingHowItWorks() {
                   style={{
                     top: 38,
                     right: -8,
-                    color: 'rgba(196,154,60,0.3)',
+                    color: 'color-mix(in srgb, var(--landing-gold) 40%, transparent)',
                     fontSize: 18,
                     zIndex: 3,
                   }}

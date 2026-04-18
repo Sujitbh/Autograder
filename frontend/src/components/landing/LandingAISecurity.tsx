@@ -73,7 +73,8 @@ export default function LandingAISecurity() {
           className="relative mb-6 overflow-hidden"
           style={{
             borderRadius: 22,
-            background: 'linear-gradient(160deg, #9E1515 0%, var(--landing-primary) 40%, var(--landing-primary-dark) 100%)',
+            background:
+              'linear-gradient(160deg, var(--landing-primary-light) 0%, var(--landing-primary) 40%, var(--landing-primary-dark) 100%)',
           }}
         >
           <div
@@ -214,7 +215,8 @@ function SecurityCard({
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = 'translateY(-4px)';
-        e.currentTarget.style.boxShadow = '0 12px 32px rgba(123, 13, 13, 0.06)';
+        e.currentTarget.style.boxShadow =
+          '0 12px 32px color-mix(in srgb, var(--landing-primary) 14%, transparent)';
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.transform = 'translateY(0)';
@@ -227,7 +229,7 @@ function SecurityCard({
           width: 48,
           height: 48,
           borderRadius: 12,
-          backgroundColor: 'rgba(123,13,13,0.06)',
+          backgroundColor: 'color-mix(in srgb, var(--landing-primary) 10%, transparent)',
         }}
       >
         <Icon size={24} color="var(--landing-primary)" strokeWidth={1.7} />

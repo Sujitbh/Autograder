@@ -24,7 +24,7 @@ export default function LandingFooter() {
   return (
     <footer
       style={{
-        backgroundColor: 'var(--landing-ink)',
+        backgroundColor: 'var(--landing-contrast-bg)',
         fontFamily: 'var(--font-body)',
       }}
     >
