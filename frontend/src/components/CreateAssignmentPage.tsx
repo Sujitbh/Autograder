@@ -19,7 +19,7 @@ import { criterionWeightForAssignmentApi } from '@/lib/rubricApiWeights';
 import { courseService } from '@/services/api/courseService';
 import { assignmentService } from '@/services/api/assignmentService';
 import { testcaseService } from '@/services/api/testcaseService';
-import { courseDefaultApiToFormPartial } from '@/lib/courseDefaultRubric';
+import { courseDefaultApiToFormPartial, formRubricToCoursePutApi } from '@/lib/courseDefaultRubric';
 import { Loader2 } from 'lucide-react';
 import type { Assignment } from '@/types';
 
@@ -112,6 +112,27 @@ function assignmentToFormPartial(a: Assignment): Partial<AssignmentFormData> {
         autoFlagThreshold: 70,
         crossSectionComparison: false,
     };
+}
+
+function rubricToCourseDefaultPayload(data: AssignmentFormData) {
+    return formRubricToCoursePutApi({
+        rubric: (data.rubric ?? []).map((section) => ({
+            name: section.name,
+            description: section.description ?? '',
+            weight: section.weight ?? 0,
+            criteria: (section.criteria ?? []).map((criterion) => ({
+                name: criterion.name,
+                description: criterion.description ?? '',
+                maxPoints: Math.max(0, Math.round(criterion.maxPoints ?? 0)),
+                weight: criterion.weight ?? 0,
+                gradingMethod: criterion.gradingMethod,
+                defaultComments: criterion.defaultComments ?? undefined,
+            })),
+        })),
+        rubricMode: data.rubricMode,
+        rubricWeightKind: data.rubricMode === 'weighted' ? 'percent' : 'points',
+        maxPoints: data.maxPoints ?? 100,
+    });
 }
 
 /** Convert form data → API DTO */
@@ -361,6 +382,7 @@ export function CreateAssignmentPage() {
     const handlePublish = useCallback(
         (data: AssignmentFormData) => {
             const dto = toDto(data, cid);
+            const defaultRubricPayload = rubricToCourseDefaultPayload(data);
             if (draftId) {
                 void (async () => {
                     try {
@@ -415,6 +437,10 @@ export function CreateAssignmentPage() {
                         );
 
                         try {
+                            await courseService.putCourseDefaultRubric(cid, defaultRubricPayload);
+                        } catch { /* ignore default rubric sync failures */ }
+
+                        try {
                             localStorage.removeItem(`autograde_assignment_draft_${cid}`);
                             localStorage.removeItem(`autograde_assignment_draft_edit_${draftId}`);
                         } catch { /* ignore */ }
@@ -433,7 +459,10 @@ export function CreateAssignmentPage() {
             }
 
             createMutation.mutate(dto, {
-                onSuccess: () => {
+                onSuccess: async () => {
+                    try {
+                        await courseService.putCourseDefaultRubric(cid, defaultRubricPayload);
+                    } catch { /* ignore default rubric sync failures */ }
                     // Clear draft
                     try {
                         localStorage.removeItem(`autograde_assignment_draft_${cid}`);

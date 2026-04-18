@@ -9,6 +9,7 @@ import { Button } from './ui/button';
 import { CodeEditor } from './CodeEditor';
 import { OutputPanel } from './OutputPanel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { useAssignment } from '@/hooks/queries/useAssignments';
 import { useSubmissions } from '@/hooks/queries/useSubmissions';
 import { useCourses } from '@/hooks/queries/useCourses';
@@ -177,6 +178,8 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [reviewSubmissionId, setReviewSubmissionId] = useState<number | null>(null);
+  const [reviewSubmissionOpen, setReviewSubmissionOpen] = useState(false);
   const [hasDescriptionPdf, setHasDescriptionPdf] = useState(false);
   const [isOpeningDescriptionPdf, setIsOpeningDescriptionPdf] = useState(false);
 
@@ -275,6 +278,20 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
       sum + (section.criteria || []).reduce((sectionSum, crit) => sectionSum + (crit.maxPoints ?? 0), 0),
     0
   );
+  const inferredWeightedRubric = rubricSections.some((section) =>
+    Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 ||
+    (section.criteria || []).some((crit) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
+  );
+  const isWeightedRubric = assignment?.rubricMode === 'weighted' || inferredWeightedRubric;
+  const rubricCriterionScaleMax = 5;
+  const rubricPointsColumnLabel = isWeightedRubric ? 'Score (0-5)' : 'Points';
+  const getCriterionDisplayMaxPoints = (criterion: RubricCriterion) =>
+    isWeightedRubric ? rubricCriterionScaleMax : (criterion.maxPoints ?? 0);
+  const getCriterionAssignmentWeightPercent = (section: any, criterion: RubricCriterion) => {
+    const sectionPercent = sectionWeightPercent(section.weight);
+    const criterionPercent = criterionWeightPercent(criterion.weight);
+    return Math.round(((sectionPercent * criterionPercent) / 100) * 1000) / 1000;
+  };
   const getSectionFallbackPoints = (section: any) => {
     const assignmentMaxPoints = assignment?.maxPoints ?? 0;
     if (assignmentMaxPoints <= 0) return null;
@@ -282,11 +299,6 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     if (isWeightedRubric) return Math.round((assignmentMaxPoints * sectionWeightPercent(section.weight)) / 100);
     return null;
   };
-  const inferredWeightedRubric = rubricSections.some((section) =>
-    Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 ||
-    (section.criteria || []).some((crit) => Math.abs((crit.weight ?? 1) - 1) > 0.0001)
-  );
-  const isWeightedRubric = assignment?.rubricMode === 'weighted' || inferredWeightedRubric;
 
   // File upload handlers
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -396,14 +408,12 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
         );
       }
 
-      await submissionService.uploadFiles(assignmentId, filesToUpload);
+      const response = await submissionService.uploadFiles(assignmentId, filesToUpload);
       setSubmitSuccess(true);
       launchConfetti();
-      refetchSubmissions();
-      setTimeout(() => {
-        setSubmitSuccess(false);
-        router.push(`/student/courses/${courseId}`);
-      }, 3000);
+      await refetchSubmissions();
+      setReviewSubmissionId(response.submission_id);
+      setReviewSubmissionOpen(true);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Submission failed');
     } finally {
@@ -789,8 +799,19 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
             {/* Success/Error banners */}
             {submitSuccess && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: 13, background: isDark ? 'rgba(74,222,128,.12)' : 'rgba(22,163,74,.10)', color: isDark ? '#4ade80' : 'var(--color-success)', flexShrink: 0 }}>
-                <CheckCircle2 className="w-4 h-4" /> You have successfully submitted the assignment! Redirecting back to assignment page…
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 14px', fontSize: 13, background: isDark ? 'rgba(74,222,128,.12)' : 'rgba(22,163,74,.10)', color: isDark ? '#4ade80' : 'var(--color-success)', flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <CheckCircle2 className="w-4 h-4" /> Your submission was uploaded successfully.
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => reviewSubmissionId && setReviewSubmissionOpen(true)}
+                  disabled={reviewSubmissionId == null}
+                  className="h-8 px-3 text-xs"
+                >
+                  Review latest submission
+                </Button>
               </div>
             )}
             {submitError && (
@@ -913,9 +934,24 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                     {/* Submission Status */}
                     {latestSubmission && (
                       <div style={{ marginTop: 16 }}>
-                        <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: 8 }}>
-                          Submission Status
-                        </h3>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                          <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-dark)', margin: 0 }}>
+                            Submission Status
+                          </h3>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 px-3 text-xs"
+                            onClick={() => {
+                              const submissionIdNum = Number(latestSubmission.id);
+                              if (!Number.isFinite(submissionIdNum)) return;
+                              setReviewSubmissionId(submissionIdNum);
+                              setReviewSubmissionOpen(true);
+                            }}
+                          >
+                            View latest submission
+                          </Button>
+                        </div>
                         <div style={{
                           display: 'flex', alignItems: 'center', gap: 8,
                           padding: '8px 12px', borderRadius: 6, fontSize: 13, fontWeight: 500,
@@ -1009,6 +1045,11 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                               alignItems: 'center',
                             }}>
                               <span>{section.name}</span>
+                              {isWeightedRubric && (
+                                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-light)' }}>
+                                  Section {sectionWeightPercent(section.weight).toFixed(1)}%
+                                </span>
+                              )}
                             </div>
 
                             {(section.criteria || []).length > 0 ? (
@@ -1023,8 +1064,8 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                 <thead>
                                   <tr style={{ background: 'var(--color-surface-elevated)' }}>
                                     <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Criteria</th>
-                                    <th style={{ textAlign: 'center', width: 70, padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Points</th>
-                                    {isWeightedRubric && <th style={{ textAlign: 'center', width: 70, padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Weight</th>}
+                                    <th style={{ textAlign: 'center', width: 70, padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>{rubricPointsColumnLabel}</th>
+                                    {isWeightedRubric && <th style={{ textAlign: 'center', width: 110, padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Weight</th>}
                                     <th style={{ textAlign: 'left', padding: '8px 12px', color: 'var(--color-text-light)', fontWeight: 700, borderBottom: '1px solid var(--color-border)' }}>Description</th>
                                   </tr>
                                 </thead>
@@ -1032,8 +1073,20 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                   {(section.criteria || []).map((criterion, critIdx) => (
                                     <tr key={critIdx} style={{ borderTop: '1px solid var(--color-border)' }}>
                                       <td style={{ padding: '10px 12px', color: 'var(--color-text-dark)', fontWeight: 500 }}>{criterion.name}</td>
-                                      <td style={{ padding: '10px 12px', textAlign: 'center', color: isDark ? '#4ade80' : 'var(--color-success)', fontWeight: 700 }}>{criterion.maxPoints ?? 0}</td>
-                                      {isWeightedRubric && <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--color-text-dark)', fontWeight: 600 }}>{((criterion.weight ?? 1) * 100).toFixed(0)}%</td>}
+                                      <td style={{ padding: '10px 12px', textAlign: 'center', color: isDark ? '#4ade80' : 'var(--color-success)', fontWeight: 700 }}>{getCriterionDisplayMaxPoints(criterion)}</td>
+                                      {isWeightedRubric && (
+                                        <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--color-text-dark)', fontWeight: 600 }}>
+                                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
+                                            <span>{getCriterionAssignmentWeightPercent(section, criterion).toFixed(1)}%</span>
+                                            <span style={{ fontSize: 10, color: 'var(--color-text-light)' }}>
+                                              of assignment
+                                            </span>
+                                            <span style={{ fontSize: 10, color: 'var(--color-text-light)' }}>
+                                              {((criterion.weight ?? 1) * 100).toFixed(0)}% of section
+                                            </span>
+                                          </div>
+                                        </td>
+                                      )}
                                       <td style={{ padding: '10px 12px', color: 'var(--color-text-mid)', fontSize: 11 }}>{criterion.description || '—'}</td>
                                     </tr>
                                   ))}
@@ -1057,7 +1110,7 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                     No criteria were defined for this section.
                                   </p>
                                 )}
-                                {getSectionFallbackPoints(section) !== null && (
+                                {!isWeightedRubric && getSectionFallbackPoints(section) !== null && (
                                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8, fontSize: 12 }}>
                                     <span style={{ color: 'var(--color-text-light)', fontWeight: 600 }}>Points</span>
                                     <span style={{ color: isDark ? '#4ade80' : 'var(--color-success)', fontWeight: 700 }}>{getSectionFallbackPoints(section)}</span>
@@ -1069,20 +1122,34 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                         ))}
 
                         {/* Total points summary */}
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '10px 12px',
-                          borderRadius: 6,
-                          background: isDark ? 'rgba(74,222,128,.12)' : 'rgba(22,163,74,.10)',
-                          color: isDark ? '#4ade80' : 'var(--color-success)',
-                          fontWeight: 700,
-                          fontSize: 14,
-                        }}>
-                          <span>Total Points</span>
-                          <span>{rubricTotalPoints || assignment.maxPoints || 0}</span>
-                        </div>
+                        {isWeightedRubric ? (
+                          <div style={{
+                            padding: '10px 12px',
+                            borderRadius: 6,
+                            background: isDark ? 'rgba(74,222,128,.12)' : 'rgba(22,163,74,.10)',
+                            color: isDark ? '#4ade80' : 'var(--color-success)',
+                            fontWeight: 700,
+                            fontSize: 13,
+                            lineHeight: 1.5,
+                          }}>
+                            <span>Weighted rubrics are scored from 0 to 5 per criterion, then converted using the weight column.</span>
+                          </div>
+                        ) : (
+                          <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '10px 12px',
+                            borderRadius: 6,
+                            background: isDark ? 'rgba(74,222,128,.12)' : 'rgba(22,163,74,.10)',
+                            color: isDark ? '#4ade80' : 'var(--color-success)',
+                            fontWeight: 700,
+                            fontSize: 14,
+                          }}>
+                            <span>Total Points</span>
+                            <span>{rubricTotalPoints || assignment.maxPoints || 0}</span>
+                          </div>
+                        )}
                       </>
                     ) : (
                       <p style={{ fontSize: 13, color: 'var(--color-text-mid)' }}>
@@ -1406,6 +1473,13 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SubmissionDetailModal
+        open={reviewSubmissionOpen}
+        onClose={() => setReviewSubmissionOpen(false)}
+        submissionId={reviewSubmissionId}
+        assignmentName={assignment?.name}
+      />
     </PageLayout>
   );
 }
