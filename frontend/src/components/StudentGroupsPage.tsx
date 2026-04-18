@@ -5,9 +5,10 @@ import { useCourses } from '@/hooks/queries/useCourses';
 import { Users } from 'lucide-react';
 import { StudentLayout } from './StudentLayout';
 import api from '@/services/api/client';
+import { useAuth } from '@/utils/AuthContext';
 
 interface GroupMember {
-  id: number;
+  id: number | string;
   name: string;
   email: string;
   role: string | null;
@@ -26,14 +27,60 @@ interface StudentGroupsPageProps {
 }
 
 export function StudentGroupsPage({ courseId }: StudentGroupsPageProps) {
+  const { user } = useAuth();
   const { data: courses } = useCourses();
   const course = courses?.find((c) => c.id === courseId);
 
   const { data: groups = [], isLoading } = useQuery({
-    queryKey: ['studentGroups', courseId],
+    queryKey: ['studentGroups', courseId, user?.id],
     queryFn: async () => {
-      const { data } = await api.get<StudentGroup[]>(`/courses/${courseId}/my-groups`);
-      return data;
+      // Primary source: backend (persisted/shared across users).
+      try {
+        const { data } = await api.get<StudentGroup[]>(`/courses/${courseId}/my-groups`);
+        if (Array.isArray(data) && data.length > 0) {
+          return data;
+        }
+      } catch {
+        // Fall through to local fallback below.
+      }
+
+      // Fallback: faculty Groups page currently stores local draft groups in localStorage.
+      // This keeps student view aligned when groups are managed locally in the same environment.
+      if (typeof window === 'undefined' || !user?.id) return [];
+      const raw = localStorage.getItem(`autograde_groups_${courseId}`);
+      if (!raw) return [];
+
+      type LocalGroup = {
+        id?: string | number;
+        name?: string;
+        members?: Array<{ id?: string | number; name?: string; email?: string; role?: string | null }>;
+      };
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        return [];
+      }
+      if (!Array.isArray(parsed)) return [];
+
+      const me = String(user.id);
+      const localGroups: StudentGroup[] = (parsed as LocalGroup[])
+        .filter((g) => Array.isArray(g.members) && g.members.some((m) => String(m.id) === me))
+        .map((g, idx) => ({
+          id: Number(g.id) || idx + 1,
+          name: g.name ?? `Group ${idx + 1}`,
+          assignment_name: null,
+          is_reusable: false,
+          members: (g.members ?? []).map((m, mIdx) => ({
+            id: m.id ?? mIdx + 1,
+            name: m.name ?? 'Unknown Member',
+            email: m.email ?? '',
+            role: m.role ?? null,
+          })),
+        }));
+
+      return localGroups;
     },
   });
 

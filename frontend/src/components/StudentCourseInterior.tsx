@@ -2,10 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useQueries } from '@tanstack/react-query';
 import { useAssignments } from '@/hooks/queries/useAssignments';
 import { useCourses } from '@/hooks/queries/useCourses';
-import { submissionService } from '@/services/api';
 import { StudentLayout } from './StudentLayout';
 import { Input } from './ui/input';
 import {
@@ -22,131 +20,34 @@ interface StudentCourseInteriorProps {
   courseId: string;
 }
 
-type StudentStatus = 'not_submitted' | 'submitted' | 'grading' | 'graded';
-type SortField = 'name' | 'dueDate' | 'status' | 'score';
+type SortField = 'name' | 'dueDate';
 type SortOrder = 'asc' | 'desc';
-
-const STATUS_ORDER: Record<StudentStatus, number> = {
-  not_submitted: 0,
-  grading: 1,
-  submitted: 2,
-  graded: 3,
-};
-
-function getStudentStatus(
-  submissionStatus: string | null,
-): StudentStatus {
-  if (!submissionStatus) return 'not_submitted';
-  if (submissionStatus === 'graded') return 'graded';
-  if (submissionStatus === 'grading') return 'grading';
-  return 'submitted';
-}
-
-function getStatusBadge(status: StudentStatus) {
-  const cfg: Record<StudentStatus, { bg: string; text: string; border: string; label: string }> = {
-    not_submitted: { bg: '#F8F8F8', text: '#4F4F4F', border: '#E6E6E6', label: 'Not Submitted' },
-    submitted: { bg: '#EEF4FF', text: '#1A4D7A', border: '#D7E6FF', label: 'Submitted' },
-    grading: { bg: '#FFF8EC', text: '#8A5700', border: '#FFE4B5', label: 'In Review' },
-    graded: { bg: '#EAF7EA', text: '#256D2D', border: '#CBE8CF', label: 'Graded' },
-  };
-  const s = cfg[status];
-  return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: s.bg,
-        border: `1px solid ${s.border}`,
-        color: s.text,
-        fontSize: '11px',
-        fontWeight: 600,
-        textTransform: 'none',
-        padding: '5px 11px',
-        borderRadius: '999px',
-        lineHeight: '14px',
-        letterSpacing: '0',
-      }}
-    >
-      {s.label}
-    </span>
-  );
-}
 
 export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) {
   const router = useRouter();
   const { data: courses } = useCourses();
   const { data: assignments, isLoading, error: fetchError } = useAssignments(courseId);
-
-  const course = courses?.find((c) => c.id === courseId);
   const now = new Date();
 
-  const [activeTab, setActiveTab] = useState('all');
+  const course = courses?.find((c) => c.id === courseId);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('dueDate');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
 
-  const submissionQueries = useQueries({
-    queries: (assignments ?? []).map((a) => ({
-      queryKey: ['submissions', a.id],
-      queryFn: () => submissionService.getSubmissions(a.id),
-      enabled: !!a.id,
-    })),
-  });
-
-  const submissionMap = useMemo(() => {
-    const map: Record<string, { status: string; score: number | null; maxScore: number | null }> = {};
-    (assignments ?? []).forEach((a, idx) => {
-      const q = submissionQueries[idx];
-      if (q?.data && q.data.length > 0) {
-        const latest = q.data[0];
-        map[a.id] = {
-          status: latest.status,
-          score: latest.grade?.totalScore ?? null,
-          maxScore: latest.grade?.maxScore ?? null,
-        };
-      }
-    });
-    return map;
-  }, [assignments, submissionQueries]);
-
-  const tabCounts = useMemo(() => {
-    const all = assignments ?? [];
-    const allCount = all.length;
-    const notSubmitted = all.filter((a) => !submissionMap[a.id]).length;
-    const submitted = all.filter(
-      (a) => submissionMap[a.id] && submissionMap[a.id].status !== 'graded'
-    ).length;
-    const graded = all.filter((a) => submissionMap[a.id]?.status === 'graded').length;
-    return { all: allCount, notSubmitted, submitted, graded };
-  }, [assignments, submissionMap]);
-
-  const tabs = [
-    { id: 'all', label: 'All', count: tabCounts.all },
-    { id: 'not_submitted', label: 'To Do', count: tabCounts.notSubmitted },
-    { id: 'submitted', label: 'Submitted', count: tabCounts.submitted },
-    { id: 'graded', label: 'Graded', count: tabCounts.graded },
-  ];
-
   const filtered = useMemo(() => {
     return (assignments ?? []).filter((a) => {
-      const status = getStudentStatus(submissionMap[a.id]?.status ?? null);
-      if (activeTab === 'not_submitted' && status !== 'not_submitted') return false;
-      if (activeTab === 'submitted' && status !== 'submitted' && status !== 'grading') return false;
-      if (activeTab === 'graded' && status !== 'graded') return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         return a.name.toLowerCase().includes(q);
       }
       return true;
     });
-  }, [assignments, activeTab, searchQuery, submissionMap]);
+  }, [assignments, searchQuery]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
       let cmp = 0;
-      const aSub = submissionMap[a.id];
-      const bSub = submissionMap[b.id];
       switch (sortField) {
         case 'name':
           cmp = a.name.localeCompare(b.name);
@@ -154,17 +55,10 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
         case 'dueDate':
           cmp = (a.dueDate ? new Date(a.dueDate).getTime() : 0) - (b.dueDate ? new Date(b.dueDate).getTime() : 0);
           break;
-        case 'status':
-          cmp = (STATUS_ORDER[getStudentStatus(aSub?.status ?? null)] ?? 9) -
-            (STATUS_ORDER[getStudentStatus(bSub?.status ?? null)] ?? 9);
-          break;
-        case 'score':
-          cmp = (aSub?.score ?? -1) - (bSub?.score ?? -1);
-          break;
       }
       return sortOrder === 'asc' ? cmp : -cmp;
     });
-  }, [filtered, sortField, sortOrder, submissionMap]);
+  }, [filtered, sortField, sortOrder]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -243,50 +137,6 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 mb-5">
-            {tabs.map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className="transition-all relative flex items-center gap-2.5 rounded-full"
-                  style={{
-                    padding: '8px 14px',
-                    backgroundColor: isActive ? '#6B0000' : '#FFFFFF',
-                    border: isActive ? '1px solid #6B0000' : '1px solid #D3D6DB',
-                    color: isActive ? '#FFFFFF' : '#4B5563',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    lineHeight: 1,
-                    boxShadow: isActive ? '0 8px 16px rgba(107, 0, 0, 0.16)' : '0 1px 2px rgba(17, 24, 39, 0.05)',
-                  }}
-                >
-                  <span>{tab.label}</span>
-                  {tab.count > 0 && (
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        minWidth: '22px',
-                        height: '22px',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '12px',
-                        fontWeight: 700,
-                        borderRadius: '999px',
-                        backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : '#F3F4F6',
-                        color: isActive ? '#FFFFFF' : '#4B5563',
-                        padding: '0 6px',
-                      }}
-                    >
-                      {tab.count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
           {(assignments ?? []).length === 0 ? (
             <div className="text-center py-20 rounded-2xl" style={{ border: '1px dashed #D8D8D8', backgroundColor: '#FFFFFF' }}>
               <ClipboardX className="w-16 h-16 mx-auto mb-4" style={{ color: '#D9D9D9' }} />
@@ -301,17 +151,17 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
             <div className="text-center py-20 rounded-2xl" style={{ border: '1px dashed #D8D8D8', backgroundColor: '#FFFFFF' }}>
               <FilterX className="w-12 h-12 mx-auto mb-4" style={{ color: '#D9D9D9' }} />
               <p style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '8px' }}>
-                No {tabs.find((t) => t.id === activeTab)?.label} Assignments
+                No Matching Assignments
               </p>
               <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginBottom: '16px' }}>
-                Try selecting a different filter.
+                Try a different search term.
               </p>
               <button
-                onClick={() => { setActiveTab('all'); setSearchQuery(''); }}
+                onClick={() => setSearchQuery('')}
                 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}
                 className="hover:underline"
               >
-                Clear filters
+                Clear search
               </button>
             </div>
           ) : (
@@ -338,23 +188,29 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
                       </button>
                     </th>
                     <th className="text-left px-6 py-4">
-                      <button onClick={() => handleSort('score')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#374151', letterSpacing: '0', textTransform: 'none' }}>
-                        Score <SortIcon field="score" />
-                      </button>
-                    </th>
-                    <th className="text-left px-6 py-4">
-                      <button onClick={() => handleSort('status')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#374151', letterSpacing: '0', textTransform: 'none' }}>
-                        Status <SortIcon field="status" />
-                      </button>
+                      <span style={{ fontSize: '13px', fontWeight: 600, color: '#374151' }}>Status</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {sorted.map((assignment) => {
-                    const sub = submissionMap[assignment.id];
-                    const status = getStudentStatus(sub?.status ?? null);
                     const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : null;
-                    const isOverdue = dueDate && dueDate < now && status === 'not_submitted';
+                    const isPastDue = !!dueDate && dueDate < now;
+                    const isGroupAssignment = Boolean(assignment.isGroup);
+                    const baseRowBg = isGroupAssignment
+                      ? 'color-mix(in srgb, var(--color-primary) 3%, #FFFFFF)'
+                      : '';
+                    const hoverRowBg = isGroupAssignment
+                      ? 'color-mix(in srgb, var(--color-primary) 8%, #FFFFFF)'
+                      : '#FAFAFA';
+                    const assignmentStatus =
+                      assignment.isActive === false ? 'Closed' : isPastDue ? 'Past Due' : 'Open';
+                    const statusTone =
+                      assignmentStatus === 'Past Due'
+                        ? { bg: '#FEEDEE', text: '#8B0000', border: '#F6C6C8' }
+                        : assignmentStatus === 'Closed'
+                          ? { bg: '#F8F8F8', text: '#4F4F4F', border: '#E6E6E6' }
+                          : { bg: '#EAF7EA', text: '#256D2D', border: '#CBE8CF' };
 
                     return (
                       <tr
@@ -362,7 +218,13 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
                         className="border-b transition-colors"
                         style={{
                           borderColor: '#ECECEE',
-                          borderLeft: isOverdue ? '3px solid #8B0000' : '3px solid transparent',
+                          borderLeft: isGroupAssignment
+                            ? '3px solid color-mix(in srgb, var(--color-primary) 70%, transparent)'
+                            : '3px solid transparent',
+                          boxShadow: isGroupAssignment
+                            ? 'inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 16%, transparent)'
+                            : 'none',
+                          backgroundColor: baseRowBg,
                           cursor: 'pointer',
                         }}
                         tabIndex={0}
@@ -377,8 +239,8 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
                             router.push(`/student/courses/${courseId}/assignments/${assignment.id}`);
                           }
                         }}
-                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#FAFAFA')}
-                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
+                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = hoverRowBg)}
+                        onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = baseRowBg)}
                       >
                         <td className="px-8 py-5">
                           <span style={{ fontSize: '16px', fontWeight: 600, color: '#6B0000', letterSpacing: '-0.01em' }}>
@@ -387,40 +249,37 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
                         </td>
 
                         <td className="px-6 py-5">
-                          <div className="flex items-center gap-2">
-                            {isOverdue && (
-                              <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#8B0000' }} />
-                            )}
-                            <span
-                              style={{
-                                fontSize: '16px',
-                                color: isOverdue ? '#8B0000' : '#4B5563',
-                                fontWeight: isOverdue ? 500 : 400,
-                              }}
-                            >
-                              {dueDate
-                                ? dueDate.toLocaleDateString('en-US', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  year: 'numeric',
-                                })
-                                : '—'}
-                            </span>
-                          </div>
+                          <span
+                            style={{
+                              fontSize: '16px',
+                              color: '#4B5563',
+                              fontWeight: 400,
+                            }}
+                          >
+                            {dueDate
+                              ? dueDate.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })
+                              : '—'}
+                          </span>
                         </td>
 
                         <td className="px-6 py-5">
-                          {sub?.score != null ? (
-                            <span style={{ fontSize: '16px', fontWeight: 600, color: '#256D2D' }}>
-                              {sub.score} / {sub.maxScore ?? '?'}
-                            </span>
-                          ) : (
-                            <span style={{ fontSize: '16px', fontWeight: 400, color: '#9CA3AF' }}>—</span>
-                          )}
-                        </td>
-
-                        <td className="px-6 py-5">
-                          {getStatusBadge(status)}
+                          <span
+                            className="inline-flex items-center rounded-full px-2.5 py-1"
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              lineHeight: 1,
+                              backgroundColor: statusTone.bg,
+                              color: statusTone.text,
+                              border: `1px solid ${statusTone.border}`,
+                            }}
+                          >
+                            {assignmentStatus}
+                          </span>
                         </td>
                       </tr>
                     );

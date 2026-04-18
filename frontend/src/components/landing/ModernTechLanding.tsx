@@ -70,18 +70,24 @@ const pillars = [
     label: 'Built for real CS assignments',
     detail:
       'Executables, test harnesses, and the kinds of files students actually submit, not a generic file drop box.',
+    extra:
+      'Assignment specs stay practical and reproducible across semesters.',
   },
   {
     icon: Users,
     label: 'Roles that match how you teach',
     detail:
       'Faculty own outcomes. TAs work inside boundaries you set. Students get clarity on what is due and what they earned.',
+    extra:
+      'Permission boundaries reduce rework and keep grading decisions aligned.',
   },
   {
     icon: CheckCircle2,
     label: 'Anchored at ULM',
     detail:
       'Developed with the department in mind: availability, predictable behavior, and room to evolve with the curriculum.',
+    extra:
+      'Department-specific workflows can evolve without losing consistency.',
   },
 ];
 
@@ -188,13 +194,6 @@ export default function ModernTechLanding() {
           </nav>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
-              href="/login"
-              className="hidden px-3 py-2 text-sm font-medium no-underline transition-opacity hover:opacity-80 sm:inline"
-              style={{ color: 'var(--landing-ink-soft)' }}
-            >
-              Sign in
-            </Link>
-            <Link
               href="/signup"
               className="hidden rounded-lg border px-4 py-2 text-sm font-semibold no-underline transition-colors md:inline"
               style={{
@@ -223,10 +222,10 @@ export default function ModernTechLanding() {
       <main className="flex-1">
         <section
           ref={heroRef}
-          className="relative overflow-hidden px-6 pb-16 pt-14 lg:px-8 lg:pb-24 lg:pt-20"
+          className="relative overflow-hidden px-6 pb-10 pt-14 lg:px-8 lg:pb-14 lg:pt-20"
         >
           <div
-            className="pointer-events-none absolute inset-0 opacity-[0.5]"
+            className="pointer-events-none absolute inset-0 opacity-[0.38]"
             style={{
               backgroundImage:
                 'linear-gradient(color-mix(in srgb, var(--landing-primary) 12%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--landing-primary) 12%, transparent) 1px, transparent 1px)',
@@ -234,14 +233,14 @@ export default function ModernTechLanding() {
             }}
           />
           <motion.div
-            className="pointer-events-none absolute inset-0 hidden overflow-hidden md:block"
+            className="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block"
             style={{ y: parallaxY }}
             aria-hidden
           >
             <FloatingCodeBackground />
           </motion.div>
           <div
-            className="pointer-events-none absolute -right-20 top-10 h-72 w-72 rounded-full opacity-[0.14]"
+            className="pointer-events-none absolute -right-20 top-10 h-72 w-72 rounded-full opacity-[0.1]"
             style={{
               background: 'radial-gradient(circle, var(--landing-primary) 0%, transparent 70%)',
             }}
@@ -305,45 +304,7 @@ export default function ModernTechLanding() {
                 Register for access
               </Link>
             </div>
-            <p className="mt-6 text-sm" style={{ color: 'var(--landing-muted)' }}>
-              Returning user?{' '}
-              <Link
-                href="/login"
-                className="font-semibold no-underline"
-                style={{ color: 'var(--landing-primary)' }}
-              >
-                Sign in
-              </Link>
-            </p>
           </div>
-
-          <div className="relative mx-auto mt-16 grid max-w-5xl gap-6 sm:grid-cols-3">
-            {[
-              { value: '10,000+', label: 'Submissions processed per semester (target scale)' },
-              { value: '15+', label: 'CS faculty and instructional staff engaged' },
-              { value: '99.9%', label: 'Uptime goal for instructional weeks (planned maintenance excluded)' },
-            ].map((stat) => (
-              <div
-                key={stat.label}
-                className="rounded-2xl border px-6 py-5 text-center shadow-sm"
-                style={{
-                  borderColor: 'var(--landing-border)',
-                  backgroundColor: 'var(--landing-surface)',
-                }}
-              >
-                <p className="text-3xl font-bold tracking-tight" style={{ color: 'var(--landing-primary)' }}>
-                  {stat.value}
-                </p>
-                <p className="mt-2 text-sm leading-snug" style={{ color: 'var(--landing-muted)' }}>
-                  {stat.label}
-                </p>
-              </div>
-            ))}
-          </div>
-          <p className="mx-auto mt-4 max-w-3xl text-center text-xs" style={{ color: 'var(--landing-muted)' }}>
-            Figures shown describe design goals and early adoption. Replace with verified metrics from
-            your program office before external publication.
-          </p>
         </section>
 
         <section
@@ -357,7 +318,7 @@ export default function ModernTechLanding() {
               className="mb-4 text-2xl font-semibold sm:text-3xl"
               style={{ fontFamily: 'var(--font-display)', color: 'var(--landing-ink)' }}
             >
-              Built by faculty, for faculty
+              Built for faculty
             </h2>
             <p className="text-base leading-relaxed sm:text-lg" style={{ color: 'var(--landing-ink-soft)' }}>
               Axiom exists because instructors asked for a serious tool, not a toy. The point is to
@@ -388,7 +349,7 @@ export default function ModernTechLanding() {
               </h2>
             </div>
             <div className="grid gap-6 md:grid-cols-3">
-              {pillars.map(({ icon: Icon, label, detail }) => (
+              {pillars.map(({ icon: Icon, label, detail, extra }) => (
                 <div
                   key={label}
                   className="group rounded-2xl border p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
@@ -416,7 +377,7 @@ export default function ModernTechLanding() {
                     className="mt-3 max-h-0 overflow-hidden text-sm leading-relaxed opacity-0 transition-all duration-300 group-hover:max-h-28 group-hover:opacity-100"
                     style={{ color: 'var(--landing-gold)' }}
                   >
-                    Less context switching, clearer handoffs between you and your TAs.
+                    {extra}
                   </p>
                 </div>
               ))}
@@ -455,7 +416,8 @@ export default function ModernTechLanding() {
                   style={{
                     borderColor: 'var(--landing-border)',
                     backgroundColor: 'var(--landing-bg)',
-                    boxShadow: '0 2px 12px rgba(15, 23, 42, 0.04)',
+                    boxShadow:
+                      '0 2px 12px color-mix(in srgb, var(--landing-ink) 8%, transparent)',
                   }}
                 >
                   <div
@@ -715,9 +677,22 @@ export default function ModernTechLanding() {
             >
               Frequently asked questions
             </h2>
-            <Accordion type="single" collapsible className="w-full rounded-xl border bg-white px-4" style={{ borderColor: 'var(--landing-border)' }}>
+            <Accordion
+              type="single"
+              collapsible
+              className="w-full rounded-xl border px-4"
+              style={{
+                borderColor: 'var(--landing-border)',
+                backgroundColor: 'var(--landing-surface)',
+              }}
+            >
               {faqItems.map((item, i) => (
-                <AccordionItem key={item.q} value={`item-${i}`} className="border-slate-200">
+                <AccordionItem
+                  key={item.q}
+                  value={`item-${i}`}
+                  className="border-b"
+                  style={{ borderColor: 'var(--landing-border)' }}
+                >
                   <AccordionTrigger className="text-left text-base hover:no-underline" style={{ color: 'var(--landing-ink)' }}>
                     {item.q}
                   </AccordionTrigger>
@@ -741,7 +716,7 @@ export default function ModernTechLanding() {
               Ready to reclaim your grading time?
             </h2>
             <p className="max-w-xl text-base opacity-90">
-              Sign in if you already have an account, or register to get started with the department
+              Access Axiom if you already have an account, or register to get started with the department
               workflow.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -750,7 +725,7 @@ export default function ModernTechLanding() {
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-8 py-3.5 text-base font-semibold no-underline transition-opacity hover:opacity-95"
                 style={{ color: 'var(--landing-primary-dark)' }}
               >
-                Sign in
+                Access Axiom
               </Link>
               <Link
                 href="/signup"
@@ -784,7 +759,7 @@ export default function ModernTechLanding() {
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href="/login" className="text-white/75 no-underline hover:text-white">
-                  Sign in
+                  Access Axiom
                 </Link>
               </li>
               <li>
