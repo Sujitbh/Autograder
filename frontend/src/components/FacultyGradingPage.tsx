@@ -38,11 +38,20 @@ import {
     Zap,
     ScanSearch,
     Search,
+    Plus,
+    Upload,
 } from 'lucide-react';
 
 interface FacultyGradingPageProps {
     courseId: string;
     submissionId: string;
+}
+
+interface EditorReviewFile {
+    id: string;
+    name: string;
+    content: string;
+    savedContent: string;
 }
 
 const LANGUAGE_EXTENSION_MAP: Record<string, string> = {
@@ -129,10 +138,11 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const { execute, isRunning: isExecutingCode, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
 
     const [activeFileIndex, setActiveFileIndex] = useState(0);
+    const [editorFiles, setEditorFiles] = useState<EditorReviewFile[]>([]);
     const [rubricScores, setRubricScores] = useState<number[]>([]);
     const [feedback, setFeedback] = useState('');
     const [expandedTests, setExpandedTests] = useState<Set<number>>(new Set());
-    const [showExplorer, setShowExplorer] = useState(true);
+    const [showRosterPanel, setShowRosterPanel] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
     const [infoPanelWidth, setInfoPanelWidth] = useState(400);
     const [outputOpen, setOutputOpen] = useState(false);
@@ -153,6 +163,26 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         setPlagiarismScanOverride(null);
         setCompareOtherSubmissionId(null);
     }, [submissionId]);
+
+    useEffect(() => {
+        if (!detail) return;
+        const seededFiles = (detail.files ?? []).map((file: any, idx: number) => ({
+            id: file?.id != null ? `submission-${file.id}` : `submission-${idx}`,
+            name: file?.filename ?? `file-${idx + 1}${LANGUAGE_EXTENSION_MAP[(detail.assignment.language || 'python').toLowerCase()] ?? '.txt'}`,
+            content: file?.content ?? '',
+            savedContent: file?.content ?? '',
+        }));
+        if (seededFiles.length === 0) {
+            seededFiles.push({
+                id: 'submission-empty',
+                name: `solution${LANGUAGE_EXTENSION_MAP[(detail.assignment.language || 'python').toLowerCase()] ?? '.txt'}`,
+                content: '',
+                savedContent: '',
+            });
+        }
+        setEditorFiles(seededFiles);
+        setActiveFileIndex(0);
+    }, [detail?.id, detail?.assignment?.language]);
 
     const plagiarismScanMutation = useMutation({
         mutationFn: () => submissionService.getPlagiarismScan(submissionId),
@@ -472,7 +502,6 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const handleRunCode = async () => {
         if (!detail) return;
         const lang = (detail.assignment.language || 'python').toLowerCase();
-        const code = detail.files[activeFileIndex]?.content ?? '';
         setOutputOpen(true);
         if (codeUsesInput(code, lang)) {
             if (!showInlineInput) {
@@ -492,11 +521,75 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const handleRunWithStdin = async () => {
         if (!detail) return;
         const lang = (detail.assignment.language || 'python').toLowerCase();
-        const code = detail.files[activeFileIndex]?.content ?? '';
         setOutputOpen(true);
         setShowInlineInput(true);
         await execute(code, lang, stdinValue);
     };
+
+    const setCode = (value: string) => {
+        setEditorFiles((prev) => prev.map((file, idx) => (idx === activeFileIndex ? { ...file, content: value } : file)));
+    };
+
+    const handleAddFile = () => {
+        const extension = LANGUAGE_EXTENSION_MAP[language] ?? '.txt';
+        const suggestedName = `scratch-${editorFiles.length + 1}${extension}`;
+        const inputName = window.prompt('Enter new file name', suggestedName);
+        if (!inputName) return;
+        const nextName = inputName.trim();
+        if (!nextName) return;
+        const existing = editorFiles.findIndex((file) => file.name === nextName);
+        if (existing >= 0) {
+            setActiveFileIndex(existing);
+            return;
+        }
+        setEditorFiles((prev) => [
+            ...prev,
+            {
+                id: `local-${Date.now()}-${prev.length}`,
+                name: nextName,
+                content: '',
+                savedContent: '',
+            },
+        ]);
+        setActiveFileIndex(editorFiles.length);
+    };
+
+    const handleUploadSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files) return;
+        const files = Array.from(e.target.files);
+        files.forEach((file) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const content = (ev.target?.result as string) ?? '';
+                setEditorFiles((prev) => {
+                    const existing = prev.findIndex((entry) => entry.name === file.name);
+                    if (existing >= 0) {
+                        const next = [...prev];
+                        next[existing] = {
+                            ...next[existing],
+                            content,
+                            savedContent: content,
+                        };
+                        setActiveFileIndex(existing);
+                        return next;
+                    }
+                    const next = [
+                        ...prev,
+                        {
+                            id: `upload-${Date.now()}-${prev.length}`,
+                            name: file.name,
+                            content,
+                            savedContent: content,
+                        },
+                    ];
+                    setActiveFileIndex(next.length - 1);
+                    return next;
+                });
+            };
+            reader.readAsText(file);
+        });
+        e.target.value = '';
+    }, []);
 
     const breadcrumbs = [
         { label: 'Assignments', href: `/courses/${courseId}/assignments/${detail?.assignment?.id}/grading` },
@@ -533,7 +626,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     }
 
     const language = (detail.assignment.language || 'python').toLowerCase();
-    const activeFile = detail.files[activeFileIndex];
+    const activeFile = editorFiles[activeFileIndex];
     const code = activeFile?.content || '';
     const displayTests = (() => {
         const latestResults = liveTestResults ?? (detail.results.length > 0
@@ -584,142 +677,107 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
             <div className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
                 <div className="flex flex-1 overflow-hidden relative">
 
-                    {/* ── LEFT: File Explorer ── */}
-                    {showExplorer && (
-                        <div className="flex shrink-0 overflow-hidden" style={{ borderRight: '1px solid var(--color-border)' }}>
-                            <div
-                                className="flex flex-col overflow-hidden"
-                                style={{ width: 220, minWidth: 220, background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)' }}
-                            >
-                                <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
-                                    Students
+                    {/* ── LEFT: Student Roster ── */}
+                    {showRosterPanel && (
+                        <div
+                            className="flex flex-col shrink-0 overflow-hidden"
+                            style={{ width: 220, minWidth: 220, background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)' }}
+                        >
+                            <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
+                                Students
+                            </div>
+                            <div style={{ padding: '0 10px 10px', borderBottom: '1px solid var(--color-border)' }}>
+                                <div style={{ fontSize: 10, color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
+                                    Roster ({studentLatestSubmissions.length})
                                 </div>
-                                <div style={{ padding: '0 10px 10px', borderBottom: '1px solid var(--color-border)' }}>
-                                    <div style={{ fontSize: 10, color: 'var(--color-text-light)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
-                                        Roster ({studentLatestSubmissions.length})
-                                    </div>
-                                    <div style={{ position: 'relative', marginBottom: 8 }}>
-                                        <Search style={{ width: 13, height: 13, position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
-                                        <input
-                                            type="text"
-                                            value={studentSearch}
-                                            onChange={(e) => setStudentSearch(e.target.value)}
-                                            placeholder="Find student..."
-                                            style={{
-                                                width: '100%',
-                                                padding: '6px 8px 6px 28px',
-                                                borderRadius: 6,
-                                                border: '1px solid var(--color-border)',
-                                                fontSize: 12,
-                                                outline: 'none',
-                                                background: 'var(--color-surface-elevated)',
-                                                color: 'var(--color-text-dark)',
-                                            }}
-                                        />
-                                    </div>
-                                    <div style={{ maxHeight: 520, overflowY: 'auto', paddingRight: 2 }}>
-                                        {visibleStudentRows.length === 0 ? (
-                                            <p style={{ fontSize: 11, color: 'var(--color-text-light)', padding: '4px 2px' }}>No student found.</p>
-                                        ) : (
-                                            visibleStudentRows.map((s: any) => {
-                                                const isCurrent = String(s.id) === String(submissionId);
-                                                const isGraded = s.status === 'graded';
-                                                return (
-                                                    <button
-                                                        key={s.id}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            if (!isCurrent) {
-                                                                router.push(`/courses/${courseId}/submissions/${s.id}/grade`);
-                                                            }
-                                                        }}
-                                                        style={{
-                                                            width: '100%',
-                                                            display: 'flex',
-                                                            alignItems: 'center',
-                                                            justifyContent: 'space-between',
-                                                            gap: 8,
-                                                            padding: '7px 8px',
-                                                            borderRadius: 7,
-                                                            border: isCurrent ? '1px solid var(--color-primary)' : '1px solid transparent',
-                                                            background: isCurrent ? 'var(--color-primary-bg)' : 'transparent',
-                                                            cursor: isCurrent ? 'default' : 'pointer',
-                                                            marginBottom: 2,
-                                                            textAlign: 'left',
-                                                        }}
-                                                        onMouseEnter={(e) => {
-                                                            if (!isCurrent) e.currentTarget.style.background = 'var(--color-surface-elevated)';
-                                                        }}
-                                                        onMouseLeave={(e) => {
-                                                            if (!isCurrent) e.currentTarget.style.background = 'transparent';
-                                                        }}
-                                                    >
-                                                        <div style={{ minWidth: 0 }}>
-                                                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-dark)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                                {s.studentName || `Student ${s.studentId ?? ''}`}
-                                                            </div>
-                                                            <div style={{ fontSize: 10.5, color: 'var(--color-text-light)' }}>
-                                                                {isGraded
-                                                                    ? `Graded${s.grade ? ` · ${s.grade.totalScore}/${s.grade.maxScore}` : ''}`
-                                                                    : 'Needs grading'}
-                                                            </div>
+                                <div style={{ position: 'relative', marginBottom: 8 }}>
+                                    <Search style={{ width: 13, height: 13, position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-light)' }} />
+                                    <input
+                                        type="text"
+                                        value={studentSearch}
+                                        onChange={(e) => setStudentSearch(e.target.value)}
+                                        placeholder="Find student..."
+                                        style={{
+                                            width: '100%',
+                                            padding: '6px 8px 6px 28px',
+                                            borderRadius: 6,
+                                            border: '1px solid var(--color-border)',
+                                            fontSize: 12,
+                                            outline: 'none',
+                                            background: 'var(--color-surface-elevated)',
+                                            color: 'var(--color-text-dark)',
+                                        }}
+                                    />
+                                </div>
+                                <div style={{ maxHeight: 520, overflowY: 'auto', paddingRight: 2 }}>
+                                    {visibleStudentRows.length === 0 ? (
+                                        <p style={{ fontSize: 11, color: 'var(--color-text-light)', padding: '4px 2px' }}>No student found.</p>
+                                    ) : (
+                                        visibleStudentRows.map((s: any) => {
+                                            const isCurrent = String(s.id) === String(submissionId);
+                                            const isGraded = s.status === 'graded';
+                                            return (
+                                                <button
+                                                    key={s.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        if (!isCurrent) {
+                                                            router.push(`/courses/${courseId}/submissions/${s.id}/grade`);
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        width: '100%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'space-between',
+                                                        gap: 8,
+                                                        padding: '7px 8px',
+                                                        borderRadius: 7,
+                                                        border: isCurrent ? '1px solid var(--color-primary)' : '1px solid transparent',
+                                                        background: isCurrent ? 'var(--color-primary-bg)' : 'transparent',
+                                                        cursor: isCurrent ? 'default' : 'pointer',
+                                                        marginBottom: 2,
+                                                        textAlign: 'left',
+                                                    }}
+                                                    onMouseEnter={(e) => {
+                                                        if (!isCurrent) e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        if (!isCurrent) e.currentTarget.style.background = 'transparent';
+                                                    }}
+                                                >
+                                                    <div style={{ minWidth: 0 }}>
+                                                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-dark)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            {s.studentName || `Student ${s.studentId ?? ''}`}
                                                         </div>
-                                                        <span
-                                                            style={{
-                                                                width: 7,
-                                                                height: 7,
-                                                                borderRadius: '50%',
-                                                                flexShrink: 0,
-                                                                background: isGraded ? '#16a34a' : '#f59e0b',
-                                                            }}
-                                                        />
-                                                    </button>
-                                                );
-                                            })
-                                        )}
-                                    </div>
-                                </div>
-                                <div style={{ padding: '8px 10px', borderTop: '1px solid var(--color-border)', marginTop: 'auto' }}>
-                                    <button onClick={() => router.push(`/courses/${courseId}/assignments/${detail.assignment.id}/grading`)}
-                                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--color-text-mid)', background: 'transparent', border: 'none', cursor: 'pointer', width: '100%', transition: 'background .15s' }}
-                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-elevated)'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                        <ArrowLeft style={{ width: 15, height: 15 }} /> Back to Grading
-                                    </button>
+                                                        <div style={{ fontSize: 10.5, color: 'var(--color-text-light)' }}>
+                                                            {isGraded
+                                                                ? `Graded${s.grade ? ` · ${s.grade.totalScore}/${s.grade.maxScore}` : ''}`
+                                                                : 'Needs grading'}
+                                                        </div>
+                                                    </div>
+                                                    <span
+                                                        style={{
+                                                            width: 7,
+                                                            height: 7,
+                                                            borderRadius: '50%',
+                                                            flexShrink: 0,
+                                                            background: isGraded ? '#16a34a' : '#f59e0b',
+                                                        }}
+                                                    />
+                                                </button>
+                                            );
+                                        })
+                                    )}
                                 </div>
                             </div>
-
-                            <div
-                                className="flex flex-col overflow-hidden"
-                                style={{ width: 180, minWidth: 180, background: 'var(--color-surface)' }}
-                            >
-                                <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
-                                    Explorer
-                                </div>
-                                <div style={{ padding: '8px 14px 6px', fontSize: 10, fontWeight: 700, letterSpacing: '.06em', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
-                                    Files
-                                </div>
-                                <div className="flex-1 overflow-y-auto" style={{ padding: '4px 0' }}>
-                                    {detail.files.map((file, idx) => {
-                                        const isActive = idx === activeFileIndex;
-                                        return (
-                                            <div key={file.id} onClick={() => setActiveFileIndex(idx)}
-                                                style={{
-                                                    display: 'flex', alignItems: 'center', padding: '5px 14px', cursor: 'pointer',
-                                                    fontSize: 13, color: isActive ? 'var(--color-text-dark)' : 'var(--color-text-mid)',
-                                                    borderLeft: isActive ? '3px solid var(--color-primary)' : '3px solid transparent',
-                                                    background: isActive ? 'var(--color-surface-elevated)' : 'transparent',
-                                                    gap: 6, transition: 'background .15s',
-                                                }}
-                                                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
-                                                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
-                                            >
-                                                <span style={{ fontSize: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', width: 16, height: 16 }}>{getFileIcon(file.filename)}</span>
-                                                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{file.filename}</span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                            <div style={{ padding: '8px 10px', borderTop: '1px solid var(--color-border)', marginTop: 'auto' }}>
+                                <button onClick={() => router.push(`/courses/${courseId}/assignments/${detail.assignment.id}/grading`)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--color-text-mid)', background: 'transparent', border: 'none', cursor: 'pointer', width: '100%', transition: 'background .15s' }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-elevated)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                    <ArrowLeft style={{ width: 15, height: 15 }} /> Back to Grading
+                                </button>
                             </div>
                         </div>
                     )}
@@ -727,17 +785,126 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                     {/* ── CENTER: Editor ── */}
                     <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
                         {/* Editor Topbar */}
-                        <div style={{ height: 42, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 8, flexShrink: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden' }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-dark)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>
-                                {activeFile?.filename ?? 'No file open'}
-                            </span>
-                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#3b1a1a' : '#fef3c7', color: isDark ? '#fca5a5' : '#92400e', display: 'inline-flex', alignItems: 'center' }}>
-                                {language.charAt(0).toUpperCase() + language.slice(1)}
-                            </span>
-                            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '4px 10px', borderRadius: 10, background: isDark ? '#1f2937' : '#e5e7eb', color: isDark ? '#d1d5db' : '#374151', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap', lineHeight: 1, minWidth: 68, flexShrink: 0 }}>
-                                View Only
-                            </span>
-                            <div style={{ flex: 1 }} />
+                        <div style={{ minHeight: 44, background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', padding: '0 12px', gap: 8, flexShrink: 0, flexWrap: 'nowrap', overflowX: 'auto', overflowY: 'hidden' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, overflowX: 'auto', padding: '6px 0' }}>
+                                    {editorFiles.map((file, idx) => {
+                                        const isActive = idx === activeFileIndex;
+                                        const isModified = file.content !== file.savedContent;
+                                        return (
+                                            <button
+                                                key={file.id}
+                                                type="button"
+                                                onClick={() => setActiveFileIndex(idx)}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 6,
+                                                    padding: '5px 10px',
+                                                    borderRadius: 8,
+                                                    border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                                                    background: isActive ? 'var(--color-primary)' : 'var(--color-surface-elevated)',
+                                                    color: isActive ? '#fff' : 'var(--color-text-mid)',
+                                                    fontSize: 12,
+                                                    fontWeight: 600,
+                                                    whiteSpace: 'nowrap',
+                                                    cursor: isActive ? 'default' : 'pointer',
+                                                    transition: 'all .15s',
+                                                    maxWidth: 260,
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    if (!isActive) {
+                                                        e.currentTarget.style.background = 'var(--color-primary-bg)';
+                                                        e.currentTarget.style.color = 'var(--color-text-dark)';
+                                                    }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    if (!isActive) {
+                                                        e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                                                        e.currentTarget.style.color = 'var(--color-text-mid)';
+                                                    }
+                                                }}
+                                            >
+                                                <span style={{ fontSize: 13, flexShrink: 0, display: 'inline-flex', alignItems: 'center', width: 14, height: 14 }}>
+                                                    {getFileIcon(file.name)}
+                                                </span>
+                                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</span>
+                                                {isModified && (
+                                                    <span style={{ color: isActive ? '#fff' : 'var(--color-primary)', fontSize: 12, lineHeight: 1, flexShrink: 0 }}>
+                                                        •
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleAddFile}
+                                    title="Add new file"
+                                    style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: 6,
+                                        border: '1px solid var(--color-border)',
+                                        background: 'var(--color-surface-elevated)',
+                                        color: 'var(--color-text-mid)',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        flexShrink: 0,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'var(--color-primary-bg)';
+                                        e.currentTarget.style.color = 'var(--color-primary)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                                        e.currentTarget.style.color = 'var(--color-text-mid)';
+                                    }}
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => document.getElementById('faculty-upload-input-topbar')?.click()}
+                                    title="Upload files"
+                                    style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: 6,
+                                        border: '1px solid var(--color-border)',
+                                        background: 'var(--color-surface-elevated)',
+                                        color: 'var(--color-text-mid)',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        flexShrink: 0,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'var(--color-primary-bg)';
+                                        e.currentTarget.style.color = 'var(--color-primary)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                                        e.currentTarget.style.color = 'var(--color-text-mid)';
+                                    }}
+                                >
+                                    <Upload className="w-4 h-4" />
+                                </button>
+                                <input
+                                    id="faculty-upload-input-topbar"
+                                    type="file"
+                                    multiple
+                                    className="hidden"
+                                    onChange={handleUploadSelect}
+                                />
+                                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const, letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10, background: isDark ? '#3b1a1a' : '#fef3c7', color: isDark ? '#fca5a5' : '#92400e', display: 'inline-flex', alignItems: 'center' }}>
+                                    {language.charAt(0).toUpperCase() + language.slice(1)}
+                                </span>
+                            </div>
                             {/* Run Code */}
                             <button onClick={handleRunCode} disabled={isExecutingCode || autoGradeMutation.isPending}
                                 style={{ padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: '#16a34a', color: '#fff', letterSpacing: '.3px', transition: 'background .15s', opacity: isExecutingCode ? 0.7 : 1, cursor: isExecutingCode ? 'not-allowed' : 'pointer', border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap', lineHeight: 1.1 }}
@@ -772,7 +939,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                             {/* Layout toggles */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 {[
-                                    { label: 'Explorer', active: showExplorer, toggle: () => setShowExplorer(v => !v), icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.2} width={16} height={16}><rect x="1" y="1" width="4.5" height="14" rx="1" fill="currentColor" opacity=".35" /><rect x="1" y="1" width="14" height="14" rx="1.5" /></svg> },
+                                    { label: 'Roster', active: showRosterPanel, toggle: () => setShowRosterPanel(v => !v), icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.2} width={16} height={16}><rect x="1" y="1" width="4.5" height="14" rx="1" fill="currentColor" opacity=".35" /><rect x="1" y="1" width="14" height="14" rx="1.5" /></svg> },
                                     { label: 'Output', active: outputOpen, toggle: () => setOutputOpen(v => !v), icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.2} width={16} height={16}><rect x="1" y="9.5" width="14" height="5.5" rx="1" fill="currentColor" opacity=".35" /><rect x="1" y="1" width="14" height="14" rx="1.5" /></svg> },
                                     { label: 'Panel', active: showInfoPanel, toggle: () => setShowInfoPanel(v => !v), icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.2} width={16} height={16}><rect x="10.5" y="1" width="4.5" height="14" rx="1" fill="currentColor" opacity=".35" /><rect x="1" y="1" width="14" height="14" rx="1.5" /></svg> },
                                 ].map(btn => (
@@ -789,7 +956,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                         {/* Code Editor */}
                         <div className="flex-1 overflow-hidden relative" style={{ background: 'var(--color-surface)' }}>
                             {activeFile ? (
-                                <CodeEditor language={language} value={code} onChange={() => { }} readOnly />
+                                <CodeEditor language={language} value={code} onChange={setCode} />
                             ) : (
                                 <div className="flex items-center justify-center h-full">
                                     <p style={{ color: 'var(--color-text-mid)', fontSize: '14px' }}>No file content available</p>

@@ -520,30 +520,30 @@ export function AssignmentGrading() {
                                     fontWeight: 700,
                                     letterSpacing: '-0.015em',
                                     lineHeight: '38px',
-                                    color: '#111827',
+                                    color: 'var(--color-text-dark)',
                                 }}
                             >
                                 {meta.name}
                             </h1>
                             <div className="flex items-center gap-3 mt-3 flex-wrap">
-                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#4B5563', backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', padding: '6px 12px', borderRadius: '10px' }}>
+                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-mid)', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '10px' }}>
                                     <Calendar className="w-4 h-4" />
                                     Due: {new Date(meta.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                 </span>
-                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#4B5563', backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', padding: '6px 12px', borderRadius: '10px' }}>
+                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-mid)', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '10px' }}>
                                     <Code className="w-4 h-4" />
                                     {meta.language}
                                 </span>
-                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#4B5563', backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', padding: '6px 12px', borderRadius: '10px' }}>
+                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-mid)', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '10px' }}>
                                     <Users className="w-4 h-4" />
                                     {rosterStudents.length} Students
                                 </span>
-                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: '#4B5563', backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', padding: '6px 12px', borderRadius: '10px' }}>
+                                <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-mid)', backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '10px' }}>
                                     <Star className="w-4 h-4" />
                                     {meta.totalPoints} Points
                                 </span>
                                 {meta.isGroupAssignment && (
-                                    <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#6B0000', backgroundColor: '#FFF7ED', border: '1px solid #F3D5B5', padding: '6px 12px', borderRadius: '10px' }}>
+                                    <span className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 600, color: '#6B0000', backgroundColor: 'var(--color-warning-bg)', border: '1px solid var(--color-border)', padding: '6px 12px', borderRadius: '10px' }}>
                                         <UserCheck className="w-4 h-4" />
                                         Group Assignment
                                     </span>
@@ -553,7 +553,7 @@ export function AssignmentGrading() {
                         <div className="flex items-center gap-2 flex-wrap">
                             <Button
                                 variant="outline"
-                                className="border-[var(--color-border)] bg-white h-10 px-4"
+                                className="border-[var(--color-border)] bg-[var(--color-surface)] h-10 px-4"
                                 onClick={() => {
                                     router.push(`/courses/${courseId}/assignment/new?draftId=${assignmentId}`);
                                 }}
@@ -563,7 +563,7 @@ export function AssignmentGrading() {
                             </Button>
                             <Button
                                 variant="outline"
-                                className="border-red-200 text-red-700 hover:bg-red-50 bg-white h-10 px-4"
+                                className="border-red-200 text-red-700 hover:bg-red-50 bg-[var(--color-surface)] h-10 px-4"
                                 onClick={() => setShowDeleteDialog(true)}
                             >
                                 <Trash2 className="w-4 h-4 mr-2" />
@@ -571,7 +571,7 @@ export function AssignmentGrading() {
                             </Button>
                             <Button
                                 variant="outline"
-                                className="border-[var(--color-border)] bg-white h-10 px-4"
+                                className="border-[var(--color-border)] bg-[var(--color-surface)] h-10 px-4"
                                 onClick={handleDownloadZip}
                                 disabled={isDownloadingZip}
                             >
@@ -596,12 +596,12 @@ export function AssignmentGrading() {
                                     style={{
                                         fontSize: '13px',
                                         fontWeight: active ? 600 : 400,
-                                        color: active ? '#6B0000' : '#595959',
-                                        backgroundColor: active ? '#F9F1F1' : 'transparent',
-                                        border: active ? '1px solid #E7D4D4' : '1px solid transparent',
+                                        color: active ? '#6B0000' : 'var(--color-text-mid)',
+                                        backgroundColor: active ? 'var(--color-primary-bg)' : 'transparent',
+                                        border: active ? '1px solid var(--color-border)' : '1px solid transparent',
                                     }}
                                     onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = '#6B0000'; }}
-                                    onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = '#595959'; }}
+                                    onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = 'var(--color-text-mid)'; }}
                                 >
                                     <sec.icon className="w-4 h-4" />
                                     {sec.label}
@@ -614,21 +614,21 @@ export function AssignmentGrading() {
                     {pageSection === 'overview' && (
                             <div className="space-y-5">
                                 {/* Description Card */}
-                                <div className="rounded-xl p-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
+                                <div className="rounded-xl p-6" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
                                 <h2 className="flex items-center gap-2 mb-4" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                                     <BookOpen className="w-5 h-5" style={{ color: '#6B0000' }} />
                                     Description
                                 </h2>
-                                <p style={{ fontSize: '14px', color: '#595959', lineHeight: '1.7' }}>{meta.description}</p>
+                                <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', lineHeight: '1.7' }}>{meta.description}</p>
                             </div>
 
                                 {/* Instructions Card */}
-                                <div className="rounded-xl p-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
+                                <div className="rounded-xl p-6" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
                                 <h2 className="flex items-center gap-2 mb-4" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                                     <FileText className="w-5 h-5" style={{ color: '#6B0000' }} />
                                     Instructions
                                 </h2>
-                                <div style={{ fontSize: '14px', color: '#595959', lineHeight: '1.8' }}>
+                                <div style={{ fontSize: '14px', color: 'var(--color-text-mid)', lineHeight: '1.8' }}>
                                     {meta.instructions.split('\n').map((line, i) => (
                                         <p key={i} className="mb-1">{line}</p>
                                     ))}
@@ -638,29 +638,29 @@ export function AssignmentGrading() {
                             {/* Settings + Class Stats Cards */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Class Statistics */}
-                                <div className="rounded-xl p-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
+                                <div className="rounded-xl p-6" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
                                     <h2 className="flex items-center gap-2 mb-4" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                                         <BarChart3 className="w-5 h-5" style={{ color: '#6B0000' }} />
                                         Class Statistics
                                     </h2>
                                     {classStats.gradedCount === 0 ? (
-                                        <p style={{ fontSize: '14px', color: '#595959' }}>No graded submissions yet.</p>
+                                        <p style={{ fontSize: '14px', color: 'var(--color-text-mid)' }}>No graded submissions yet.</p>
                                     ) : (
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                                <span style={{ fontSize: '14px', color: '#2D2D2D' }}>Mean</span>
+                                                <span style={{ fontSize: '14px', color: 'var(--color-text-dark)' }}>Mean</span>
                                                 <span style={{ fontSize: '14px', fontWeight: 700, color: '#6B0000' }}>
                                                     {classStats.meanPoints}/{meta.totalPoints} pts
                                                 </span>
                                             </div>
                                             <div className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                                                <span style={{ fontSize: '14px', color: '#2D2D2D' }}>Median</span>
+                                                <span style={{ fontSize: '14px', color: 'var(--color-text-dark)' }}>Median</span>
                                                 <span style={{ fontSize: '14px', fontWeight: 700, color: '#6B0000' }}>
                                                     {classStats.medianPoints}/{meta.totalPoints} pts
                                                 </span>
                                             </div>
                                             <div className="flex items-center justify-between pt-3" style={{ borderTop: '2px solid var(--color-border)' }}>
-                                                <span style={{ fontSize: '15px', fontWeight: 700, color: '#2D2D2D' }}>Graded Students</span>
+                                                <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-text-dark)' }}>Graded Students</span>
                                                 <span style={{ fontSize: '15px', fontWeight: 700, color: '#6B0000' }}>{classStats.gradedCount}</span>
                                             </div>
                                         </div>
@@ -668,7 +668,7 @@ export function AssignmentGrading() {
                                 </div>
 
                                 {/* Assignment Settings */}
-                                <div className="rounded-xl p-6" style={{ backgroundColor: '#FFFFFF', border: '1px solid #E5E7EB', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
+                                <div className="rounded-xl p-6" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: '0 4px 12px rgba(15, 23, 42, 0.04)' }}>
                                     <h2 className="flex items-center gap-2 mb-4" style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                                         <Settings2 className="w-5 h-5" style={{ color: '#6B0000' }} />
                                         Settings
@@ -687,7 +687,7 @@ export function AssignmentGrading() {
                                                 <item.icon className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#8A8A8A' }} />
                                                 <div>
                                                     <p style={{ fontSize: '12px', fontWeight: 500, color: '#8A8A8A', marginBottom: '2px' }}>{item.label}</p>
-                                                    <p style={{ fontSize: '14px', color: '#2D2D2D' }}>{item.value}</p>
+                                                    <p style={{ fontSize: '14px', color: 'var(--color-text-dark)' }}>{item.value}</p>
                                                 </div>
                                             </div>
                                         ))}
@@ -703,7 +703,7 @@ export function AssignmentGrading() {
                             {/* Top bar: Grade All + filter tabs */}
                             <div
                                 className="flex items-center justify-between mb-5 flex-wrap gap-3 rounded-xl p-3"
-                                style={{ backgroundColor: '#FCFCFC', border: '1px solid var(--color-border)' }}
+                                style={{ backgroundColor: 'var(--color-surface-elevated)', border: '1px solid var(--color-border)' }}
                             >
                                 <div className="flex items-center gap-2 flex-wrap">
                                     {tabs.map(tab => {
@@ -718,12 +718,12 @@ export function AssignmentGrading() {
                                                     borderRadius: '10px',
                                                     fontSize: '12px',
                                                     fontWeight: active ? 600 : 400,
-                                                    backgroundColor: active ? '#F2E4E4' : '#FFFFFF',
-                                                    color: active ? '#6B0000' : '#595959',
-                                                    border: active ? '1px solid #DABBBB' : '1px solid #E5E5E5',
+                                                    backgroundColor: active ? 'var(--color-primary-bg)' : 'var(--color-surface)',
+                                                    color: active ? '#6B0000' : 'var(--color-text-mid)',
+                                                    border: active ? '1px solid var(--color-border)' : '1px solid var(--color-border)',
                                                 }}
-                                                onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = '#F8F8F8'; }}
-                                                onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = '#FFFFFF'; }}
+                                                onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)'; }}
+                                                onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'var(--color-surface)'; }}
                                             >
                                                 {tab.label}
                                                 {tab.count > 0 && (
@@ -732,7 +732,7 @@ export function AssignmentGrading() {
                                                             marginLeft: '6px',
                                                             fontSize: '11px',
                                                             fontWeight: 600,
-                                                            color: active ? '#6B0000' : '#7A7A7A',
+                                                            color: active ? '#6B0000' : 'var(--color-text-light)',
                                                         }}
                                                     >
                                                         {tab.count}
@@ -744,7 +744,7 @@ export function AssignmentGrading() {
                                 </div>
                                 <Button
                                     variant="outline"
-                                    className="border-[var(--color-border)] h-9 bg-white"
+                                    className="border-[var(--color-border)] h-9 bg-[var(--color-surface)]"
                                     onClick={() => router.push(`/courses/${courseId}/assignments/${assignmentId}/performance`)}
                                 >
                                     <BarChart3 className="w-4 h-4 mr-2" />
@@ -768,7 +768,7 @@ export function AssignmentGrading() {
                                         placeholder="Search students by name or ID..."
                                         value={searchQuery}
                                         onChange={e => setSearchQuery(e.target.value)}
-                                        className="pl-10 border-[var(--color-border)] bg-white h-11 rounded-lg"
+                                        className="pl-10 border-[var(--color-border)] bg-[var(--color-surface)] h-11 rounded-lg"
                                     />
                                 </div>
                             </div>
@@ -801,7 +801,7 @@ export function AssignmentGrading() {
                             ) : (
                                 <div className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', boxShadow: '0 6px 18px rgba(10,10,10,0.05)' }}>
                                     <table className="w-full">
-                                        <thead style={{ backgroundColor: '#FAFAFA', borderBottom: '1px solid var(--color-border)' }}>
+                                        <thead style={{ backgroundColor: 'var(--color-surface-elevated)', borderBottom: '1px solid var(--color-border)' }}>
                                             <tr>
                                                 <th className="text-left px-6 py-4">
                                                     <button onClick={() => handleSort('studentName')} className="flex items-center gap-1.5" style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
@@ -834,12 +834,12 @@ export function AssignmentGrading() {
                                                         style={{
                                                             borderColor: 'var(--color-border)',
                                                             borderLeft: rowFlagged ? '4px solid #FF6B00' : '4px solid transparent',
-                                                            backgroundColor: rowFlagged ? '#FFF9F5' : undefined,
+                                                            backgroundColor: rowFlagged ? 'var(--color-warning-bg)' : undefined,
                                                             cursor: sub.status !== 'not-submitted' ? 'pointer' : 'default',
                                                             opacity: sub.status === 'graded' ? 0.85 : 1,
                                                         }}
-                                                        onMouseEnter={(e) => { if (sub.status !== 'not-submitted') e.currentTarget.style.backgroundColor = rowFlagged ? '#FFF0E6' : '#FAF7F7'; }}
-                                                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = rowFlagged ? '#FFF9F5' : ''; }}
+                                                        onMouseEnter={(e) => { if (sub.status !== 'not-submitted') e.currentTarget.style.backgroundColor = rowFlagged ? 'var(--color-warning-bg)' : 'var(--color-surface-elevated)'; }}
+                                                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = rowFlagged ? 'var(--color-warning-bg)' : ''; }}
                                                         onClick={() => {
                                                             if (sub.status === 'not-submitted') return;
                                                             router.push(`/courses/${courseId}/submissions/${sub.id}/grade`);
@@ -855,7 +855,7 @@ export function AssignmentGrading() {
                                                                 <div>
                                                                     <div className="flex items-center gap-2">
                                                                         {rowFlagged && <AlertTriangle className="w-4 h-4 flex-shrink-0" style={{ color: '#FF6B00' }} />}
-                                                                        <span style={{ fontSize: '14px', fontWeight: 600, color: '#2D2D2D' }}>{displayStudentName}</span>
+                                                                        <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{displayStudentName}</span>
                                                                     </div>
                                                                     {meta.isGroupAssignment && (
                                                                         <span style={{ fontSize: '11px', color: '#6B0000', fontWeight: 500 }}>
@@ -865,11 +865,11 @@ export function AssignmentGrading() {
                                                                 </div>
                                                             </div>
                                                         </td>
-                                                        <td className="px-5 py-4 hidden md:table-cell" style={{ fontSize: '13px', color: '#595959' }}>{sub.studentId}</td>
+                                                        <td className="px-5 py-4 hidden md:table-cell" style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>{sub.studentId}</td>
                                                         <td className="px-5 py-4">
                                                             {sub.submittedAt ? (
                                                                 <div className="flex items-center gap-2">
-                                                                    <span style={{ fontSize: '13px', color: sub.late ? '#8B0000' : '#595959' }}>
+                                                                    <span style={{ fontSize: '13px', color: sub.late ? '#8B0000' : 'var(--color-text-mid)' }}>
                                                                         {new Date(sub.submittedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}{' '}
                                                                         {new Date(sub.submittedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                                                                     </span>
@@ -954,7 +954,7 @@ export function AssignmentGrading() {
                             Delete Assignment
                         </DialogTitle>
                         <DialogDescription style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '8px' }}>
-                            Are you sure you want to delete <strong style={{ color: '#2D2D2D' }}>{meta.name}</strong>? This will permanently remove the assignment and all {counts.all} student submissions.
+                            Are you sure you want to delete <strong style={{ color: 'var(--color-text-dark)' }}>{meta.name}</strong>? This will permanently remove the assignment and all {counts.all} student submissions.
                         </DialogDescription>
                     </DialogHeader>
                     <div className="mt-3 p-3 rounded-lg flex items-start gap-2" style={{ backgroundColor: '#FEF2F2' }}>
@@ -989,34 +989,34 @@ export function AssignmentGrading() {
                     </DialogHeader>
                     <div className="space-y-5 mt-4">
                         <div>
-                            <label style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D', display: 'block', marginBottom: '6px' }}>Assignment Name</label>
+                            <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)', display: 'block', marginBottom: '6px' }}>Assignment Name</label>
                             <Input value={editName} onChange={e => setEditName(e.target.value)} className="border-[var(--color-border)]" />
                         </div>
                         <div>
-                            <label style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D', display: 'block', marginBottom: '6px' }}>Description</label>
+                            <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)', display: 'block', marginBottom: '6px' }}>Description</label>
                             <Textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} className="border-[var(--color-border)] min-h-[100px]" />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D', display: 'block', marginBottom: '6px' }}>Due Date</label>
+                                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)', display: 'block', marginBottom: '6px' }}>Due Date</label>
                                 <Input type="date" value={editDueDate} onChange={e => setEditDueDate(e.target.value)} className="border-[var(--color-border)]" />
                             </div>
                             <div>
-                                <label style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D', display: 'block', marginBottom: '6px' }}>Total Points</label>
+                                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)', display: 'block', marginBottom: '6px' }}>Total Points</label>
                                 <Input type="number" value={meta.totalPoints} readOnly className="border-[var(--color-border)] bg-gray-50" />
                             </div>
                         </div>
                         <div>
-                            <label style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D', display: 'block', marginBottom: '6px' }}>Instructions</label>
+                            <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)', display: 'block', marginBottom: '6px' }}>Instructions</label>
                             <Textarea value={editInstructions} onChange={e => setEditInstructions(e.target.value)} className="border-[var(--color-border)] min-h-[120px]" />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D', display: 'block', marginBottom: '6px' }}>Allowed Attempts</label>
+                                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)', display: 'block', marginBottom: '6px' }}>Allowed Attempts</label>
                                 <Input type="number" value={meta.allowedAttempts} readOnly className="border-[var(--color-border)] bg-gray-50" />
                             </div>
                             <div>
-                                <label style={{ fontSize: '13px', fontWeight: 600, color: '#2D2D2D', display: 'block', marginBottom: '6px' }}>Language</label>
+                                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text-dark)', display: 'block', marginBottom: '6px' }}>Language</label>
                                 <Input value={meta.language} readOnly className="border-[var(--color-border)] bg-gray-50" />
                             </div>
                         </div>
@@ -1039,14 +1039,14 @@ export function AssignmentGrading() {
                             Apply Grade to Group Members
                         </DialogTitle>
                         <DialogDescription style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '8px' }}>
-                            Apply the same grade from <strong style={{ color: '#2D2D2D' }}>{applyGroupStudent?.studentName}</strong> to all other members of the group.
+                            Apply the same grade from <strong style={{ color: 'var(--color-text-dark)' }}>{applyGroupStudent?.studentName}</strong> to all other members of the group.
                         </DialogDescription>
                     </DialogHeader>
 
                     {/* Grade to apply */}
                     <div className="mt-3 p-4 rounded-lg" style={{ backgroundColor: '#F5EDED' }}>
                         <div className="flex items-center justify-between">
-                            <span style={{ fontSize: '14px', fontWeight: 500, color: '#2D2D2D' }}>Grade to Apply</span>
+                            <span style={{ fontSize: '14px', fontWeight: 500, color: 'var(--color-text-dark)' }}>Grade to Apply</span>
                             <span style={{ fontSize: '22px', fontWeight: 700, color: '#6B0000' }}>
                                 {applyGroupGrade ?? '—'} / {meta.totalPoints}
                             </span>

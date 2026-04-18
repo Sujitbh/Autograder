@@ -425,7 +425,7 @@ export function SettingsPage() {
                             )}
 
                             {activeSection === 'rubric' && (
-                                <div className="bg-white rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
+                                <div className="bg-[var(--color-surface)] rounded-lg p-6" style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
                                     <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--color-text-dark)', marginBottom: '12px' }}>
                                         Default assignment rubric
                                     </h2>

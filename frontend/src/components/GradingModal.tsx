@@ -196,7 +196,7 @@ export function GradingModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>
       <div
-        className="bg-white rounded-2xl overflow-hidden flex flex-col"
+        className="bg-[var(--color-surface)] rounded-2xl overflow-hidden flex flex-col"
         style={{
           width: '90vw',
           height: '90vh',

@@ -175,7 +175,6 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const [outputPanelHeight, setOutputPanelHeight] = useState(280);
 
   // Panel visibility
-  const showExplorer = false;
   const [showInfoPanel, setShowInfoPanel] = useState(true);
   const [infoPanelWidth, setInfoPanelWidth] = useState(360);
 
@@ -514,106 +513,6 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
       <div className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
         <div className="flex flex-1 overflow-hidden relative">
-
-          {/* ── LEFT: Explorer ── */}
-          {showExplorer && (
-            <div
-              className="flex flex-col shrink-0 overflow-hidden"
-              style={{
-                width: 220, minWidth: 220,
-                background: 'var(--color-surface)',
-                borderRight: '1px solid var(--color-border)',
-                transition: 'margin-left .25s ease, opacity .25s ease',
-              }}
-            >
-              <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
-                Explorer
-              </div>
-              <div className="flex-1 overflow-y-auto" style={{ padding: '4px 0' }}>
-                {editorFiles.map((f, idx) => {
-                  const isActive = idx === activeFileIdx;
-                  const isModified = f.content !== f.savedContent;
-                  return (
-                    <div
-                      key={f.name}
-                      onClick={() => setActiveFileIdx(idx)}
-                      className="group"
-                      style={{
-                        display: 'flex', alignItems: 'center',
-                        padding: '5px 14px', cursor: 'pointer',
-                        fontSize: 13, color: isActive ? 'var(--color-text-dark)' : 'var(--color-text-mid)',
-                        borderLeft: isActive ? '3px solid var(--color-primary)' : '3px solid transparent',
-                        background: isActive ? 'var(--color-surface-elevated)' : 'transparent',
-                        gap: 6, transition: 'background .15s',
-                      }}
-                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
-                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = isActive ? 'var(--color-surface-elevated)' : 'transparent'; }}
-                    >
-                      <span style={{ fontSize: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', width: 16, height: 16 }}>{getFileIcon(f.name)}</span>
-                      <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{f.name}</span>
-                      {isModified && <span style={{ color: 'var(--color-primary)', fontSize: 16, lineHeight: '1', marginRight: 2, flexShrink: 0 }}>●</span>}
-                      {editorFiles.length > 1 && (
-                        <button
-                          onClick={(e) => closeEditorFile(idx, e)}
-                          className="opacity-0 group-hover:opacity-100"
-                          style={{ fontSize: 14, color: 'var(--color-text-light)', padding: '2px 4px', borderRadius: 3, transition: 'opacity .15s, background .15s', flexShrink: 0, background: 'transparent', border: 'none', cursor: 'pointer' }}
-                          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-elevated)'; e.currentTarget.style.color = 'var(--color-error)'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-text-light)'; }}
-                        >
-                          ×
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column' as const, gap: 4, borderTop: '1px solid var(--color-border)' }}>
-                <button
-                  onClick={() => setNewFileDialogOpen(true)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--color-text-mid)', transition: 'background .15s', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-elevated)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  <span style={{ fontSize: 15 }}>＋</span> New File
-                </button>
-                <button
-                  onClick={() => document.getElementById('upload-input-explorer')?.click()}
-                  style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--color-text-mid)', transition: 'background .15s', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-elevated)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                  <span style={{ fontSize: 15 }}>⬆</span> Upload Files
-                </button>
-                <input
-                  type="file"
-                  id="upload-input-explorer"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    if (!e.target.files) return;
-                    Array.from(e.target.files).forEach(file => {
-                      const reader = new FileReader();
-                      reader.onload = (ev) => {
-                        const content = ev.target?.result as string ?? '';
-                        setEditorFiles(prev => {
-                          const existing = prev.findIndex(ef => ef.name === file.name);
-                          if (existing >= 0) {
-                            const updated = [...prev];
-                            updated[existing] = { name: file.name, content, savedContent: content };
-                            return updated;
-                          }
-                          return [...prev, { name: file.name, content, savedContent: content }];
-                        });
-                        setActiveFileIdx(editorFiles.length);
-                      };
-                      reader.readAsText(file);
-                    });
-                    e.target.value = '';
-                  }}
-                />
-              </div>
-            </div>
-          )}
 
           {/* ── CENTER: Editor ── */}
           <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">

@@ -479,7 +479,7 @@ export function GroupsPage() {
                                 return (
                                     <div
                                         key={group.id}
-                                        className={`bg-white rounded-xl overflow-hidden transition-all hover:shadow-md h-fit ${isExpanded ? 'md:col-span-2' : ''}`}
+                                        className={`bg-[var(--color-surface)] rounded-xl overflow-hidden transition-all hover:shadow-md h-fit ${isExpanded ? 'md:col-span-2' : ''}`}
                                         style={{ boxShadow: isExpanded ? '0 8px 20px rgba(15,23,42,0.07)' : '0 1px 3px rgba(0,0,0,0.08)', border: '1px solid var(--color-border)' }}
                                     >
                                         {/* Header */}
@@ -657,7 +657,7 @@ export function GroupsPage() {
                         </div>
                     ) : (
                         /* ──────── List View ──────── */
-                        <div className="bg-white rounded-xl overflow-hidden" style={{ boxShadow: 'var(--shadow-card)', border: '1px solid var(--color-border)' }}>
+                        <div className="bg-[var(--color-surface)] rounded-xl overflow-hidden" style={{ boxShadow: 'var(--shadow-card)', border: '1px solid var(--color-border)' }}>
                             <table className="w-full">
                                 <thead style={{ backgroundColor: 'var(--color-primary-bg)', borderBottom: '1px solid var(--color-border)' }}>
                                     <tr>

@@ -669,12 +669,12 @@ export function CourseInterior() {
                                 {visibilityUpdatingId === assignment.id ? (
                                   <Loader2 className="w-4.5 h-4.5 animate-spin text-[var(--color-text-mid)]" />
                                 ) : (
-                                  <CheckCircle2
-                                    className="w-4.5 h-4.5"
-                                    style={assignment.isVisibleToStudents
-                                      ? { color: '#FFFFFF', fill: '#2D6A2D', stroke: '#FFFFFF' }
-                                      : { color: '#B0B0B0', fill: '#FFFFFF', stroke: '#B0B0B0' }}
-                                  />
+                                    <CheckCircle2
+                                      className="w-4.5 h-4.5"
+                                      style={assignment.isVisibleToStudents
+                                      ? { color: 'var(--color-surface)', fill: '#2D6A2D', stroke: 'var(--color-surface)' }
+                                      : { color: '#B0B0B0', fill: 'var(--color-surface)', stroke: '#B0B0B0' }}
+                                    />
                                 )}
                               </button>
                               <button

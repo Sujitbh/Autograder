@@ -40,11 +40,20 @@ import {
     FileText,
     Play,
     Zap,
+    Plus,
+    Upload,
 } from 'lucide-react';
 
 interface TAGradingPageProps {
     courseId: string;
     submissionId: string;
+}
+
+interface EditorReviewFile {
+    id: string;
+    name: string;
+    content: string;
+    savedContent: string;
 }
 
 const LANGUAGE_EXTENSION_MAP: Record<string, string> = {
@@ -166,13 +175,13 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const { execute, isRunning: isExecutingCode, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
 
     const [activeFileIndex, setActiveFileIndex] = useState(0);
+    const [editorFiles, setEditorFiles] = useState<EditorReviewFile[]>([]);
     const [score, setScore] = useState<string>('');
     const [maxScore, setMaxScore] = useState<string>('');
     const [feedback, setFeedback] = useState('');
     const [expandedTests, setExpandedTests] = useState<Set<number>>(new Set());
 
     // UI Layout state
-    const [showExplorer, setShowExplorer] = useState(true);
     const [showInfoPanel, setShowInfoPanel] = useState(true);
     const [infoPanelWidth, setInfoPanelWidth] = useState(360);
     const [outputOpen, setOutputOpen] = useState(false);
@@ -224,6 +233,30 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
             setFeedback(detail.feedback || '');
         }
     }, [detail]);
+
+    useEffect(() => {
+        if (!detail) return;
+        const defaultLanguage = (
+            detail.assignment.allowed_languages?.split(',')[0]
+            || 'python'
+        ).toLowerCase();
+        const seededFiles = (detail.files ?? []).map((file: any, idx: number) => ({
+            id: file?.id != null ? `submission-${file.id}` : `submission-${idx}`,
+            name: file?.filename ?? `file-${idx + 1}${LANGUAGE_EXTENSION_MAP[defaultLanguage] ?? '.txt'}`,
+            content: file?.content ?? '',
+            savedContent: file?.content ?? '',
+        }));
+        if (seededFiles.length === 0) {
+            seededFiles.push({
+                id: 'submission-empty',
+                name: `solution${LANGUAGE_EXTENSION_MAP[defaultLanguage] ?? '.txt'}`,
+                content: '',
+                savedContent: '',
+            });
+        }
+        setEditorFiles(seededFiles);
+        setActiveFileIndex(0);
+    }, [detail?.id, detail?.assignment?.allowed_languages]);
 
     const toggleTest = (testId: number) => {
         setExpandedTests((prev) => {
@@ -390,7 +423,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         if (isWeightedRubric) return Math.round((assignmentMaxPoints * sectionWeightPercent(section.weight)) / 100);
         return null;
     };
-    const activeFile = detail.files[activeFileIndex];
+    const activeFile = editorFiles[activeFileIndex];
     const code = activeFile?.content || '';
 
     const handleRunCode = async () => {
@@ -418,6 +451,71 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         await execute(code, language, stdinValue);
     };
 
+    const setCode = (value: string) => {
+        setEditorFiles((prev) => prev.map((file, idx) => (idx === activeFileIndex ? { ...file, content: value } : file)));
+    };
+
+    const handleAddFile = () => {
+        const extension = LANGUAGE_EXTENSION_MAP[language] ?? '.txt';
+        const suggestedName = `scratch-${editorFiles.length + 1}${extension}`;
+        const inputName = window.prompt('Enter new file name', suggestedName);
+        if (!inputName) return;
+        const nextName = inputName.trim();
+        if (!nextName) return;
+        const existing = editorFiles.findIndex((file) => file.name === nextName);
+        if (existing >= 0) {
+            setActiveFileIndex(existing);
+            return;
+        }
+        setEditorFiles((prev) => [
+            ...prev,
+            {
+                id: `local-${Date.now()}-${prev.length}`,
+                name: nextName,
+                content: '',
+                savedContent: '',
+            },
+        ]);
+        setActiveFileIndex(editorFiles.length);
+    };
+
+    const handleUploadSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files) return;
+        const files = Array.from(e.target.files);
+        files.forEach((file) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const content = (ev.target?.result as string) ?? '';
+                setEditorFiles((prev) => {
+                    const existing = prev.findIndex((entry) => entry.name === file.name);
+                    if (existing >= 0) {
+                        const next = [...prev];
+                        next[existing] = {
+                            ...next[existing],
+                            content,
+                            savedContent: content,
+                        };
+                        setActiveFileIndex(existing);
+                        return next;
+                    }
+                    const next = [
+                        ...prev,
+                        {
+                            id: `upload-${Date.now()}-${prev.length}`,
+                            name: file.name,
+                            content,
+                            savedContent: content,
+                        },
+                    ];
+                    setActiveFileIndex(next.length - 1);
+                    return next;
+                });
+            };
+            reader.readAsText(file);
+        });
+        e.target.value = '';
+    }, []);
+
     return (
         <PageLayout>
             <TopNav breadcrumbs={[{ label: 'TA Dashboard', href: '/ta' }, ...breadcrumbs]} />
@@ -425,80 +523,167 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
             <div className="flex flex-col" style={{ height: 'calc(100vh - 64px)' }}>
                 <div className="flex flex-1 overflow-hidden relative">
 
-                    {/* ── LEFT: Explorer ── */}
-                    {showExplorer && (
-                        <div
-                            className="flex flex-col shrink-0 overflow-hidden"
-                            style={{
-                                width: 220, minWidth: 220,
-                                background: 'var(--color-surface)',
-                                borderRight: '1px solid var(--color-border)',
-                                transition: 'margin-left .25s ease, opacity .25s ease',
-                            }}
-                        >
-                            <div style={{ padding: '12px 14px 8px', fontSize: 11, fontWeight: 700, letterSpacing: '1.2px', color: 'var(--color-text-light)', textTransform: 'uppercase' as const }}>
-                                Explorer
-                            </div>
-                            <div className="flex-1 overflow-y-auto" style={{ padding: '4px 0' }}>
-                                {detail.files.map((file, idx) => {
-                                    const isActive = idx === activeFileIndex;
-                                    return (
-                                        <div
-                                            key={file.id}
-                                            onClick={() => setActiveFileIndex(idx)}
-                                            className="group"
-                                            style={{
-                                                display: 'flex', alignItems: 'center',
-                                                padding: '5px 14px', cursor: 'pointer',
-                                                fontSize: 13, color: isActive ? 'var(--color-text-dark)' : 'var(--color-text-mid)',
-                                                borderLeft: isActive ? '3px solid var(--color-primary)' : '3px solid transparent',
-                                                background: isActive ? 'var(--color-surface-elevated)' : 'transparent',
-                                                gap: 6, transition: 'background .15s',
-                                            }}
-                                            onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--color-surface-elevated)'; }}
-                                            onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = isActive ? 'var(--color-surface-elevated)' : 'transparent'; }}
-                                        >
-                                            <span style={{ fontSize: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', width: 16, height: 16 }}>{getFileIcon(file.filename)}</span>
-                                            <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{file.filename}</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column' as const, gap: 4, borderTop: '1px solid var(--color-border)' }}>
-                                <button
-                                    onClick={() => router.push(`/ta/courses/${courseId}/submissions`)}
-                                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, color: 'var(--color-text-mid)', transition: 'background .15s', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--color-surface-elevated)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                                >
-                                    <ArrowLeft style={{ width: 15, height: 15 }} /> Back to Submissions
-                                </button>
-                                {/* Removed New File / Upload Files for TA/Faculty */}
-                            </div>
-                        </div>
-                    )}
-
                     {/* ── CENTER: Editor ── */}
                     <div className="flex flex-col flex-1 min-w-0 overflow-hidden relative">
                         {/* Editor Topbar */}
                         <div style={{
-                            height: 38, background: 'var(--color-surface)',
+                            minHeight: 44, background: 'var(--color-surface)',
                             borderBottom: '1px solid var(--color-border)',
                             display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, flexShrink: 0,
                         }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-dark)' }}>
-                                {activeFile?.filename ?? 'No file open'}
-                            </span>
-                            <span style={{
-                                fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const,
-                                letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10,
-                                background: isDark ? '#3b1a1a' : 'var(--color-warning-bg)',
-                                color: isDark ? '#fca5a5' : 'var(--color-warning)',
-                                display: 'inline-flex', alignItems: 'center', gap: 4,
-                            }}>
-                                {language.charAt(0).toUpperCase() + language.slice(1)}
-                            </span>
-                            <div style={{ flex: 1 }} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                                <button
+                                    type="button"
+                                    onClick={() => router.push(`/ta/courses/${courseId}/submissions`)}
+                                    style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: 6,
+                                        padding: '5px 10px',
+                                        borderRadius: 8,
+                                        border: '1px solid var(--color-border)',
+                                        background: 'var(--color-surface-elevated)',
+                                        color: 'var(--color-text-mid)',
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        flexShrink: 0,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'var(--color-primary-bg)';
+                                        e.currentTarget.style.color = 'var(--color-primary)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                                        e.currentTarget.style.color = 'var(--color-text-mid)';
+                                    }}
+                                >
+                                    <ArrowLeft className="w-3.5 h-3.5" /> Back
+                                </button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0, overflowX: 'auto', padding: '6px 0' }}>
+                                    {editorFiles.map((file, idx) => {
+                                        const isActive = idx === activeFileIndex;
+                                        const isModified = file.content !== file.savedContent;
+                                        return (
+                                            <button
+                                                key={file.id}
+                                                type="button"
+                                                onClick={() => setActiveFileIndex(idx)}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 6,
+                                                    padding: '5px 10px',
+                                                    borderRadius: 8,
+                                                    border: isActive ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                                                    background: isActive ? 'var(--color-primary)' : 'var(--color-surface-elevated)',
+                                                    color: isActive ? '#fff' : 'var(--color-text-mid)',
+                                                    fontSize: 12,
+                                                    fontWeight: 600,
+                                                    whiteSpace: 'nowrap',
+                                                    cursor: isActive ? 'default' : 'pointer',
+                                                    transition: 'all .15s',
+                                                    maxWidth: 260,
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                    if (!isActive) {
+                                                        e.currentTarget.style.background = 'var(--color-primary-bg)';
+                                                        e.currentTarget.style.color = 'var(--color-text-dark)';
+                                                    }
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                    if (!isActive) {
+                                                        e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                                                        e.currentTarget.style.color = 'var(--color-text-mid)';
+                                                    }
+                                                }}
+                                            >
+                                                <span style={{ fontSize: 13, flexShrink: 0, display: 'inline-flex', alignItems: 'center', width: 14, height: 14 }}>
+                                                    {getFileIcon(file.name)}
+                                                </span>
+                                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</span>
+                                                {isModified && (
+                                                    <span style={{ color: isActive ? '#fff' : 'var(--color-primary)', fontSize: 12, lineHeight: 1, flexShrink: 0 }}>
+                                                        •
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleAddFile}
+                                    title="Add new file"
+                                    style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: 6,
+                                        border: '1px solid var(--color-border)',
+                                        background: 'var(--color-surface-elevated)',
+                                        color: 'var(--color-text-mid)',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        flexShrink: 0,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'var(--color-primary-bg)';
+                                        e.currentTarget.style.color = 'var(--color-primary)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                                        e.currentTarget.style.color = 'var(--color-text-mid)';
+                                    }}
+                                >
+                                    <Plus className="w-4 h-4" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => document.getElementById('ta-upload-input-topbar')?.click()}
+                                    title="Upload files"
+                                    style={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: 6,
+                                        border: '1px solid var(--color-border)',
+                                        background: 'var(--color-surface-elevated)',
+                                        color: 'var(--color-text-mid)',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        flexShrink: 0,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background = 'var(--color-primary-bg)';
+                                        e.currentTarget.style.color = 'var(--color-primary)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = 'var(--color-surface-elevated)';
+                                        e.currentTarget.style.color = 'var(--color-text-mid)';
+                                    }}
+                                >
+                                    <Upload className="w-4 h-4" />
+                                </button>
+                                <input
+                                    id="ta-upload-input-topbar"
+                                    type="file"
+                                    multiple
+                                    className="hidden"
+                                    onChange={handleUploadSelect}
+                                />
+                                <span style={{
+                                    fontSize: 10, fontWeight: 700, textTransform: 'uppercase' as const,
+                                    letterSpacing: '.6px', padding: '2px 8px', borderRadius: 10,
+                                    background: isDark ? '#3b1a1a' : 'var(--color-warning-bg)',
+                                    color: isDark ? '#fca5a5' : 'var(--color-warning)',
+                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                }}>
+                                    {language.charAt(0).toUpperCase() + language.slice(1)}
+                                </span>
+                            </div>
 
                             {/* Ad-hoc Run button (similar to student) */}
                             <button
@@ -562,23 +747,6 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                             {/* Layout toggles */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                 <button
-                                    onClick={() => setShowExplorer(v => !v)}
-                                    title="Toggle Explorer"
-                                    style={{
-                                        background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-                                        borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        color: showExplorer ? 'var(--color-text-dark)' : 'var(--color-text-light)',
-                                        transition: 'background .12s, color .12s',
-                                    }}
-                                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-surface-elevated)'; e.currentTarget.style.color = 'var(--color-text-dark)'; }}
-                                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = showExplorer ? 'var(--color-text-dark)' : 'var(--color-text-light)'; }}
-                                >
-                                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.2} width={16} height={16}>
-                                        <rect x="1" y="1" width="4.5" height="14" rx="1" fill="currentColor" opacity=".35" />
-                                        <rect x="1" y="1" width="14" height="14" rx="1.5" />
-                                    </svg>
-                                </button>
-                                <button
                                     onClick={() => setOutputOpen(v => !v)}
                                     title="Toggle Output Panel"
                                     style={{
@@ -621,7 +789,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                 <CodeEditor
                                     language={language}
                                     value={code}
-                                    onChange={() => { }} // Read-only for TAs
+                                    onChange={setCode}
                                 />
                             ) : (
                                 <div className="flex items-center justify-center h-full">
