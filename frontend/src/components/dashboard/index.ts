@@ -9,6 +9,13 @@ export type { StudentCourseLike, FacultyCourseLike } from './CourseTile';
 export { EmptyState } from './EmptyState';
 export type { EmptyStateVariant } from './EmptyState';
 export { DashboardSkeleton } from './DashboardSkeleton';
+export {
+    WeekAhead,
+    facultyWeekItems,
+    facultyWeekItemsFromActivity,
+    studentWeekItems,
+} from './WeekAhead';
+export type { WeekAheadItem } from './WeekAhead';
 export { CoursePill, SectionCard, GhostButton, Sparkline, DeltaChip } from './primitives';
 export {
     timeOfDayGreeting,

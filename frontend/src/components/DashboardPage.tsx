@@ -24,6 +24,10 @@ import {
     SectionCard,
     GhostButton,
     DashboardSkeleton,
+    WeekAhead,
+    facultyWeekItems,
+    facultyWeekItemsFromActivity,
+    studentWeekItems,
     timeOfDayGreeting,
     eyebrowLine,
     studentSummary,
@@ -124,7 +128,7 @@ function StudentDashboardBody({ data }: { data: StudentDashboardFeed }) {
                   ≥1280 → 5/4/3 triptych */}
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
                 <div
-                    className="dash-enter lg:col-span-8 xl:col-span-5"
+                    className="dash-enter flex flex-col gap-5 lg:col-span-8 xl:col-span-5"
                     style={stagger(2)}
                 >
                     <SectionCard
@@ -140,6 +144,13 @@ function StudentDashboardBody({ data }: { data: StudentDashboardFeed }) {
                         }
                     >
                         <StudentTodoList todos={data.todos} />
+                    </SectionCard>
+
+                    <SectionCard id="week-ahead" title="This Week">
+                        <WeekAhead
+                            items={studentWeekItems(data.todos)}
+                            emptyHint="No assignments are due in the next 7 days."
+                        />
                     </SectionCard>
                 </div>
 
@@ -245,7 +256,7 @@ function FacultyDashboardBody({ data }: { data: FacultyDashboardFeed }) {
 
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
                 <div
-                    className="dash-enter lg:col-span-8 xl:col-span-5"
+                    className="dash-enter flex flex-col gap-5 lg:col-span-8 xl:col-span-5"
                     style={stagger(2)}
                 >
                     <SectionCard
@@ -261,6 +272,19 @@ function FacultyDashboardBody({ data }: { data: FacultyDashboardFeed }) {
                         }
                     >
                         <FacultyTodoList todos={data.todos} />
+                    </SectionCard>
+
+                    <SectionCard
+                        id="week-ahead"
+                        title="This Week"
+                    >
+                        <WeekAhead
+                            items={[
+                                ...facultyWeekItems(data.todos),
+                                ...facultyWeekItemsFromActivity(data.activity),
+                            ]}
+                            emptyHint="No student deadlines coming up in the next 7 days."
+                        />
                     </SectionCard>
                 </div>
 
