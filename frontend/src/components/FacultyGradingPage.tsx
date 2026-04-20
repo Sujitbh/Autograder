@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import type { AxiosError } from 'axios';
@@ -157,6 +157,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
     const [activeFileIndex, setActiveFileIndex] = useState(0);
     const [editorFiles, setEditorFiles] = useState<EditorReviewFile[]>([]);
+    const editorFilesRef = useRef<EditorReviewFile[]>([]);
     const [rubricScores, setRubricScores] = useState<number[]>([]);
     const [feedback, setFeedback] = useState('');
     const [expandedTests, setExpandedTests] = useState<Set<number>>(new Set());
@@ -201,6 +202,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         setEditorFiles(seededFiles);
         setActiveFileIndex(0);
     }, [detail?.id, detail?.assignment?.language]);
+
+    useEffect(() => {
+        editorFilesRef.current = editorFiles;
+    }, [editorFiles]);
 
     const plagiarismScanMutation = useMutation({
         mutationFn: () => submissionService.getPlagiarismScan(submissionId),
@@ -524,6 +529,38 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         }
     };
 
+    const saveEditorFilesNow = useCallback((): EditorReviewFile[] => {
+        const currentFiles = editorFilesRef.current;
+        if (currentFiles.length === 0) return [];
+
+        const savedSnapshot = currentFiles.map((file) => ({ ...file, savedContent: file.content }));
+        editorFilesRef.current = savedSnapshot;
+        setEditorFiles(savedSnapshot);
+        return savedSnapshot;
+    }, []);
+
+    const buildExecutionScope = useCallback((filesSnapshot?: EditorReviewFile[]) => {
+        const scopedFiles = filesSnapshot ?? editorFilesRef.current;
+        const languageForExtension = (detail?.assignment?.language || 'python').toLowerCase();
+        const defaultFileName = `solution${LANGUAGE_EXTENSION_MAP[languageForExtension] ?? '.txt'}`;
+        const entryFile = scopedFiles[activeFileIndex]?.name ?? defaultFileName;
+        return {
+            assignmentId: detail?.assignment?.id,
+            entryFilename: entryFile,
+            files: scopedFiles.map((file) => ({ name: file.name, content: file.content })),
+        };
+    }, [activeFileIndex, detail?.assignment?.id, detail?.assignment?.language]);
+
+    const resolveExecutionCode = useCallback((filesSnapshot: EditorReviewFile[], entryFilename?: string) => {
+        if (filesSnapshot.length === 0) {
+            return editorFilesRef.current[activeFileIndex]?.content ?? '';
+        }
+        const entryFile = entryFilename
+            ? filesSnapshot.find((file) => file.name === entryFilename)
+            : undefined;
+        return entryFile?.content ?? filesSnapshot[activeFileIndex]?.content ?? '';
+    }, [activeFileIndex]);
+
     const handleGrade = async (isDraft: boolean, moveToNext: boolean = false) => {
         const rawScore = getTotalScore();
         const totalMaxForMode = getTotalMax();
@@ -604,16 +641,19 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         if (!detail) return;
         const lang = (detail.assignment.language || 'python').toLowerCase();
         setOutputOpen(true);
-        if (codeUsesInput(code, lang)) {
+        const savedSnapshot = saveEditorFilesNow();
+        const executionScope = buildExecutionScope(savedSnapshot);
+        const executionCode = resolveExecutionCode(savedSnapshot, executionScope.entryFilename);
+        if (codeUsesInput(executionCode, lang)) {
             if (!showInlineInput) {
                 setShowInlineInput(true);
                 return;
             }
-            await execute(code, lang, stdinValue);
+            await execute(executionCode, lang, stdinValue, executionScope);
             return;
         }
         setShowInlineInput(false);
-        await execute(code, lang);
+        await execute(executionCode, lang, '', executionScope);
     };
     const handleCompileCode = async () => {
         if (!detail) return;
@@ -621,7 +661,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         if (lang !== 'python' && lang !== 'java') return;
         setOutputOpen(true);
         setShowInlineInput(false);
-        await compile(code, lang);
+        const savedSnapshot = saveEditorFilesNow();
+        const executionScope = buildExecutionScope(savedSnapshot);
+        const executionCode = resolveExecutionCode(savedSnapshot, executionScope.entryFilename);
+        await compile(executionCode, lang, executionScope);
     };
     const handleOpenInlineInput = () => {
         setOutputOpen(true);
@@ -632,11 +675,18 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         const lang = (detail.assignment.language || 'python').toLowerCase();
         setOutputOpen(true);
         setShowInlineInput(true);
-        await execute(code, lang, stdinValue);
+        const savedSnapshot = saveEditorFilesNow();
+        const executionScope = buildExecutionScope(savedSnapshot);
+        const executionCode = resolveExecutionCode(savedSnapshot, executionScope.entryFilename);
+        await execute(executionCode, lang, stdinValue, executionScope);
     };
 
     const setCode = (value: string) => {
-        setEditorFiles((prev) => prev.map((file, idx) => (idx === activeFileIndex ? { ...file, content: value } : file)));
+        setEditorFiles((prev) => {
+            const next = prev.map((file, idx) => (idx === activeFileIndex ? { ...file, content: value } : file));
+            editorFilesRef.current = next;
+            return next;
+        });
     };
 
     const handleAddFile = () => {

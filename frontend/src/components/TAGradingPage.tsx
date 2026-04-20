@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/utils/ThemeContext';
 import { codeRequiresStdin } from '@/utils/codeInputDetection';
@@ -175,6 +175,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
 
     const [activeFileIndex, setActiveFileIndex] = useState(0);
     const [editorFiles, setEditorFiles] = useState<EditorReviewFile[]>([]);
+    const editorFilesRef = useRef<EditorReviewFile[]>([]);
     const [score, setScore] = useState<string>('');
     const [maxScore, setMaxScore] = useState<string>('');
     const [feedback, setFeedback] = useState('');
@@ -256,6 +257,10 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         setEditorFiles(seededFiles);
         setActiveFileIndex(0);
     }, [detail?.id, detail?.assignment?.allowed_languages]);
+
+    useEffect(() => {
+        editorFilesRef.current = editorFiles;
+    }, [editorFiles]);
 
     const toggleTest = (testId: number) => {
         setExpandedTests((prev) => {
@@ -423,25 +428,62 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const activeFile = editorFiles[activeFileIndex];
     const code = activeFile?.content || '';
 
+    const saveEditorFilesNow = useCallback((): EditorReviewFile[] => {
+        const currentFiles = editorFilesRef.current;
+        if (currentFiles.length === 0) return [];
+
+        const savedSnapshot = currentFiles.map((file) => ({ ...file, savedContent: file.content }));
+        editorFilesRef.current = savedSnapshot;
+        setEditorFiles(savedSnapshot);
+        return savedSnapshot;
+    }, []);
+
+    const buildExecutionScope = useCallback((filesSnapshot?: EditorReviewFile[]) => {
+        const scopedFiles = filesSnapshot ?? editorFilesRef.current;
+        const defaultFileName = `solution${LANGUAGE_EXTENSION_MAP[language] ?? '.txt'}`;
+        const entryFile = scopedFiles[activeFileIndex]?.name ?? defaultFileName;
+        return {
+            assignmentId: detail?.assignment?.id,
+            entryFilename: entryFile,
+            files: scopedFiles.map((file) => ({ name: file.name, content: file.content })),
+        };
+    }, [activeFileIndex, detail?.assignment?.id, language]);
+
+    const resolveExecutionCode = useCallback((filesSnapshot: EditorReviewFile[], entryFilename?: string) => {
+        if (filesSnapshot.length === 0) {
+            return editorFilesRef.current[activeFileIndex]?.content ?? '';
+        }
+        const entryFile = entryFilename
+            ? filesSnapshot.find((file) => file.name === entryFilename)
+            : undefined;
+        return entryFile?.content ?? filesSnapshot[activeFileIndex]?.content ?? '';
+    }, [activeFileIndex]);
+
     const handleRunCode = async () => {
         setOutputOpen(true);
-        if (codeRequiresStdin(code, language)) {
+        const savedSnapshot = saveEditorFilesNow();
+        const executionScope = buildExecutionScope(savedSnapshot);
+        const executionCode = resolveExecutionCode(savedSnapshot, executionScope.entryFilename);
+        if (codeRequiresStdin(executionCode, language)) {
             if (!showInlineInput) {
                 setShowInlineInput(true);
                 return;
             }
-            await execute(code, language, stdinValue);
+            await execute(executionCode, language, stdinValue, executionScope);
             return;
         }
         setShowInlineInput(false);
-        await execute(code, language);
+        await execute(executionCode, language, '', executionScope);
     };
 
     const handleCompileCode = async () => {
         if (!supportsCompileCheck) return;
         setOutputOpen(true);
         setShowInlineInput(false);
-        await compile(code, language);
+        const savedSnapshot = saveEditorFilesNow();
+        const executionScope = buildExecutionScope(savedSnapshot);
+        const executionCode = resolveExecutionCode(savedSnapshot, executionScope.entryFilename);
+        await compile(executionCode, language, executionScope);
     };
 
     const handleOpenInlineInput = () => {
@@ -452,11 +494,18 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const handleRunWithStdin = async () => {
         setOutputOpen(true);
         setShowInlineInput(true);
-        await execute(code, language, stdinValue);
+        const savedSnapshot = saveEditorFilesNow();
+        const executionScope = buildExecutionScope(savedSnapshot);
+        const executionCode = resolveExecutionCode(savedSnapshot, executionScope.entryFilename);
+        await execute(executionCode, language, stdinValue, executionScope);
     };
 
     const setCode = (value: string) => {
-        setEditorFiles((prev) => prev.map((file, idx) => (idx === activeFileIndex ? { ...file, content: value } : file)));
+        setEditorFiles((prev) => {
+            const next = prev.map((file, idx) => (idx === activeFileIndex ? { ...file, content: value } : file));
+            editorFilesRef.current = next;
+            return next;
+        });
     };
 
     const handleAddFile = () => {
