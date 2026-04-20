@@ -39,7 +39,7 @@ export function useSubmitCode() {
     });
 }
 
-export function useGradeSubmission() {
+export function useGradeSubmission(p0: { status: string; }) {
     const qc = useQueryClient();
 
     return useMutation({

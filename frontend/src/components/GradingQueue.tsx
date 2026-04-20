@@ -1,4 +1,4 @@
-import { Fragment, useState, useMemo } from 'react';
+import { useMemo, useState, Fragment } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { Search, Filter, CheckCircle2, Clock, AlertTriangle, ChevronDown, ChevronRight, ArrowUpDown, BarChart3, Loader2, RotateCcw } from 'lucide-react';
 import { TopNav } from './TopNav';
@@ -15,7 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from './ui/select';
-import { useAssignments } from '@/hooks/queries';
+import { useAssignments, useGradeSubmission } from '@/hooks/queries';
 import { submissionService } from '@/services/api';
 import type { Submission as ApiSubmission, Assignment, RubricCriterion, TestCaseResult } from '@/types';
 import { normalizeRubricToCriteria } from '@/utils/rubric';
@@ -271,8 +271,17 @@ export function GradingQueue() {
         }
     };
 
-    const handleSaveDraft = (_data: GradingPayload) => {
+    const handleSaveDraft = async (_data: GradingPayload) => {
         // TODO: call gradeSubmission API with draft status
+        try {
+            await useGradeSubmission({
+                ..._data,
+                status: 'draft',
+            });
+            console.log('Draft saved successfully');
+        } catch (error) {
+            console.error('Failed to save draft: ', error);
+        }
     };
 
     const handleSubmitGrade = (_data: GradingPayload) => {
