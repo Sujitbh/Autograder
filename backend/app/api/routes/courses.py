@@ -1012,10 +1012,22 @@ def get_course_grades(
     # Collect grades
     assignment_grades = []
     graded_scores = []
-    
+    now_utc = datetime.now(UTC)
+
     for assignment in assignments:
         sub = latest_submissions.get(assignment.id)
         status = _submission_status_for_gradebook(assignment, sub)
+        # Normalize due_date to aware UTC for a safe comparison; store ISO in payload.
+        due_dt = assignment.due_date
+        due_iso: Optional[str] = None
+        is_overdue = False
+        if due_dt is not None:
+            if due_dt.tzinfo is None:
+                due_dt = due_dt.replace(tzinfo=UTC)
+            due_iso = due_dt.isoformat()
+            # Overdue only matters if the student hasn't submitted yet.
+            is_overdue = due_dt < now_utc and (sub is None or not getattr(sub, "submitted_at", None))
+
         if sub and sub.status == "graded" and sub.score is not None and sub.max_score is not None and sub.max_score > 0:
             percentage = (sub.score / sub.max_score) * 100
             graded_scores.append(percentage)
@@ -1029,6 +1041,8 @@ def get_course_grades(
                 "status": status,
                 "feedback": sub.feedback,
                 "graded_at": sub.graded_at.isoformat() if sub.graded_at else None,
+                "due_date": due_iso,
+                "is_overdue": False,
             })
         else:
             assignment_grades.append({
@@ -1041,6 +1055,8 @@ def get_course_grades(
                 "status": status,
                 "feedback": sub.feedback if sub is not None else None,
                 "graded_at": sub.graded_at.isoformat() if sub and sub.graded_at else None,
+                "due_date": due_iso,
+                "is_overdue": is_overdue,
             })
     
     average_score = None

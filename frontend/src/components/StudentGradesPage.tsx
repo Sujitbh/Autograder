@@ -4,303 +4,303 @@ import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useCourses } from '@/hooks/queries/useCourses';
-import { TrendingUp, Search, ChevronDown } from 'lucide-react';
 import { StudentLayout } from './StudentLayout';
 import api from '@/services/api/client';
+import {
+    GradesSummaryCard,
+    GradesControls,
+    GradeRow,
+    GradesEmptyState,
+    statusOf,
+    type GradesPayload,
+    type GradeFilter,
+    type GradeSort,
+} from './grades';
 
 interface StudentGradesPageProps {
-  courseId: string;
+    courseId: string;
 }
 
-type GradeFilter = 'all' | 'graded' | 'pending' | 'not_submitted';
-type GradeSort = 'name_asc' | 'name_desc' | 'score_desc' | 'score_asc' | 'status';
-
-function getStatusLabel(assignment: any): 'Graded' | 'Pending Grade' | 'Not Submitted' {
-  if (assignment.percentage !== null) return 'Graded';
-  if (assignment.submitted) return 'Pending Grade';
-  return 'Not Submitted';
-}
-
-function getScoreColor(percentage: number | null) {
-  if (percentage === null) return 'var(--color-text-mid)';
-  if (percentage >= 85) return 'var(--color-success)';
-  if (percentage >= 70) return 'var(--color-info)';
-  if (percentage >= 50) return 'var(--color-warning)';
-  return 'var(--color-error)';
-}
-
-function getStatusTone(status: 'Graded' | 'Pending Grade' | 'Not Submitted') {
-  if (status === 'Graded') {
-    return { bg: 'rgba(22,163,74,0.10)', border: 'rgba(22,163,74,0.22)', text: 'var(--color-success)' };
-  }
-  if (status === 'Pending Grade') {
-    return { bg: 'rgba(217,119,6,0.10)', border: 'rgba(217,119,6,0.22)', text: 'var(--color-warning)' };
-  }
-  return { bg: 'rgba(107,114,128,0.08)', border: 'rgba(107,114,128,0.20)', text: 'var(--color-text-mid)' };
+function GradesSkeleton() {
+    return (
+        <div className="dash-root">
+            <div
+                className="h-[196px] w-full rounded-[16px]"
+                style={{
+                    background: 'var(--dash-surface-2)',
+                    boxShadow: 'inset 0 0 0 1px var(--dash-ring-subtle)',
+                }}
+            >
+                <div className="dash-skeleton h-full w-full rounded-[16px]" />
+            </div>
+            <div className="mt-5 h-[44px] w-full rounded-[10px]">
+                <div className="dash-skeleton h-full w-full rounded-[10px]" />
+            </div>
+            <div className="mt-4 flex flex-col gap-3">
+                {[0, 1, 2, 3].map((i) => (
+                    <div
+                        key={i}
+                        className="h-[86px] w-full rounded-[14px]"
+                        style={{
+                            background: 'var(--dash-surface-2)',
+                            boxShadow: 'inset 0 0 0 1px var(--dash-ring-subtle)',
+                        }}
+                    >
+                        <div className="dash-skeleton h-full w-full rounded-[14px]" />
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
 }
 
 export function StudentGradesPage({ courseId }: StudentGradesPageProps) {
-  const router = useRouter();
-  const { data: courses } = useCourses();
-  const course = courses?.find((c) => c.id === courseId);
+    const router = useRouter();
+    const { data: courses } = useCourses();
+    const course = courses?.find((c) => c.id === courseId);
 
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<GradeFilter>('all');
-  const [sortBy, setSortBy] = useState<GradeSort>('score_desc');
+    const [query, setQuery] = useState('');
+    const [filter, setFilter] = useState<GradeFilter>('all');
+    const [sortBy, setSortBy] = useState<GradeSort>('due_asc');
 
-  const { data: gradesData, isLoading } = useQuery({
-    queryKey: ['courseGrades', courseId],
-    queryFn: async () => {
-      const { data } = await api.get(`/courses/${courseId}/grades`);
-      return data;
-    },
-  });
-
-  const assignments = gradesData?.assignments ?? [];
-
-  const counts = useMemo(() => {
-    const graded = assignments.filter((a: any) => a.percentage !== null).length;
-    const pending = assignments.filter((a: any) => a.percentage === null && a.submitted).length;
-    const notSubmitted = assignments.filter((a: any) => !a.submitted).length;
-    return {
-      all: assignments.length,
-      graded,
-      pending,
-      notSubmitted,
-    };
-  }, [assignments]);
-
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filtered = assignments.filter((a: any) => {
-      const status = getStatusLabel(a);
-      const matchesQuery = !q || String(a.assignment_name ?? '').toLowerCase().includes(q);
-      const matchesFilter =
-        filter === 'all' ||
-        (filter === 'graded' && status === 'Graded') ||
-        (filter === 'pending' && status === 'Pending Grade') ||
-        (filter === 'not_submitted' && status === 'Not Submitted');
-      return matchesQuery && matchesFilter;
+    const { data, isLoading, isError, refetch } = useQuery<GradesPayload>({
+        queryKey: ['courseGrades', courseId],
+        queryFn: async () => {
+            const { data } = await api.get(`/courses/${courseId}/grades`);
+            return data as GradesPayload;
+        },
     });
 
-    const statusOrder: Record<string, number> = {
-      'Graded': 0,
-      'Pending Grade': 1,
-      'Not Submitted': 2,
-    };
+    const assignments = data?.assignments ?? [];
 
-    return [...filtered].sort((a: any, b: any) => {
-      const scoreA = a.percentage ?? -1;
-      const scoreB = b.percentage ?? -1;
-      const nameA = String(a.assignment_name ?? '');
-      const nameB = String(b.assignment_name ?? '');
-      const statusA = getStatusLabel(a);
-      const statusB = getStatusLabel(b);
+    const counts = useMemo(() => {
+        let graded = 0;
+        let pending = 0;
+        let notSubmitted = 0;
+        let overdue = 0;
+        for (const a of assignments) {
+            const s = statusOf(a);
+            if (s === 'Graded') graded++;
+            else if (s === 'Pending Grade') pending++;
+            else {
+                notSubmitted++;
+                if (a.is_overdue) overdue++;
+            }
+        }
+        return {
+            all: assignments.length,
+            graded,
+            pending,
+            notSubmitted,
+            overdue,
+        };
+    }, [assignments]);
 
-      switch (sortBy) {
-        case 'name_asc':
-          return nameA.localeCompare(nameB);
-        case 'name_desc':
-          return nameB.localeCompare(nameA);
-        case 'score_asc':
-          return scoreA - scoreB;
-        case 'score_desc':
-          return scoreB - scoreA;
-        case 'status':
-          return (statusOrder[statusA] ?? 9) - (statusOrder[statusB] ?? 9);
-        default:
-          return 0;
-      }
-    });
-  }, [assignments, filter, query, sortBy]);
+    const rows = useMemo(() => {
+        const q = query.trim().toLowerCase();
+        const filtered = assignments.filter((a) => {
+            const status = statusOf(a);
+            const matchesQuery =
+                !q || String(a.assignment_name ?? '').toLowerCase().includes(q);
+            const matchesFilter =
+                filter === 'all' ||
+                (filter === 'graded' && status === 'Graded') ||
+                (filter === 'pending' && status === 'Pending Grade') ||
+                (filter === 'not_submitted' && status === 'Not Submitted');
+            return matchesQuery && matchesFilter;
+        });
 
-  return (
-    <StudentLayout
-      activeItem="grades"
-      courseId={courseId}
-      breadcrumbs={[
+        const statusOrder: Record<string, number> = {
+            'Not Submitted': 0,
+            'Pending Grade': 1,
+            Graded: 2,
+        };
+
+        return [...filtered].sort((a, b) => {
+            const scoreA = a.percentage ?? -1;
+            const scoreB = b.percentage ?? -1;
+            const nameA = String(a.assignment_name ?? '');
+            const nameB = String(b.assignment_name ?? '');
+            const statusA = statusOf(a);
+            const statusB = statusOf(b);
+
+            switch (sortBy) {
+                case 'due_asc': {
+                    // Overdue first, then nearest due (missing dates last).
+                    const overdueA = a.is_overdue ? 0 : 1;
+                    const overdueB = b.is_overdue ? 0 : 1;
+                    if (overdueA !== overdueB) return overdueA - overdueB;
+                    const tA = a.due_date
+                        ? new Date(a.due_date).getTime()
+                        : Number.POSITIVE_INFINITY;
+                    const tB = b.due_date
+                        ? new Date(b.due_date).getTime()
+                        : Number.POSITIVE_INFINITY;
+                    if (tA !== tB) return tA - tB;
+                    return nameA.localeCompare(nameB);
+                }
+                case 'name_asc':
+                    return nameA.localeCompare(nameB);
+                case 'name_desc':
+                    return nameB.localeCompare(nameA);
+                case 'score_asc':
+                    return scoreA - scoreB;
+                case 'score_desc':
+                    return scoreB - scoreA;
+                case 'status':
+                    return (statusOrder[statusA] ?? 9) - (statusOrder[statusB] ?? 9);
+                default:
+                    return 0;
+            }
+        });
+    }, [assignments, filter, query, sortBy]);
+
+    const openAssignment = (id: number) =>
+        router.push(`/student/courses/${courseId}/assignments/${id}`);
+
+    const breadcrumbs = [
         { label: course?.name ?? 'Course', href: `/student/courses/${courseId}` },
         { label: 'Grades' },
-      ]}
-    >
-      <div className="w-full max-w-none">
-        <div className="mb-5">
-          <h2 className="text-[36px] leading-tight font-semibold" style={{ color: 'var(--color-text-dark)', letterSpacing: '-0.02em' }}>My Grades</h2>
-          <p className="text-base mt-1" style={{ color: 'var(--color-text-mid)' }}>
-            Your performance in {course?.name ?? 'this course'}
-          </p>
-          <div className="mt-3" style={{ width: 86, height: 3, borderRadius: 999, background: 'linear-gradient(90deg, var(--color-primary), rgba(107,0,0,0.25))' }} />
-        </div>
+    ];
 
-        {isLoading ? (
-          <div className="text-center py-20">
-            <div className="animate-spin h-8 w-8 border-4 border-t-transparent rounded-full mx-auto" style={{ borderColor: 'var(--color-primary)', borderTopColor: 'transparent' }} />
-            <p className="mt-4" style={{ color: 'var(--color-text-mid)' }}>Loading grades...</p>
-          </div>
-        ) : gradesData ? (
-          <>
-            <div
-              className="mb-5 pb-4 flex flex-wrap items-center gap-2"
-              style={{ borderBottom: '1px solid var(--color-border)' }}
-            >
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: 'var(--color-surface)' }}>
-                <TrendingUp className="w-4 h-4" style={{ color: 'var(--color-text-mid)' }} />
-                <span style={{ color: 'var(--color-text-mid)', fontSize: '14px' }}>Average:</span>
-                <strong style={{ color: 'var(--color-text-dark)', fontSize: '16px' }}>
-                  {gradesData.averageScore !== null ? `${gradesData.averageScore}%` : 'No grades yet'}
-                </strong>
-              </div>
-              <div className="px-3 py-1.5 rounded-full" style={{ background: 'var(--color-surface)' }}>
-                <span style={{ color: 'var(--color-text-mid)', fontSize: '14px' }}>
-                Graded <strong style={{ color: 'var(--color-text-dark)' }}>{gradesData.graded_count}</strong> of <strong style={{ color: 'var(--color-text-dark)' }}>{gradesData.total_count}</strong>
-                </span>
-              </div>
-              <div className="px-3 py-1.5 rounded-full" style={{ background: 'var(--color-surface)' }}>
-                <span style={{ color: 'var(--color-text-mid)', fontSize: '14px' }}>
-                Pending <strong style={{ color: 'var(--color-text-dark)' }}>{counts.pending}</strong>
-                </span>
-              </div>
-            </div>
-
-            <div className="mb-4 flex flex-wrap items-center gap-3">
-              <div className="relative min-w-[280px] flex-1 max-w-[560px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--color-text-light)' }} />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search assignment name..."
-                  className="w-full pl-9 pr-3 py-2.5 rounded-lg border text-sm outline-none transition"
-                  style={{
-                    backgroundColor: 'var(--color-surface)',
-                    borderColor: 'var(--color-border)',
-                    color: 'var(--color-text-dark)',
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center gap-2 flex-wrap">
-                {[
-                  { id: 'all', label: 'All', count: counts.all },
-                  { id: 'graded', label: 'Graded', count: counts.graded },
-                  { id: 'pending', label: 'Pending', count: counts.pending },
-                  { id: 'not_submitted', label: 'Not Submitted', count: counts.notSubmitted },
-                ].map((f) => {
-                  const active = filter === f.id;
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => setFilter(f.id as GradeFilter)}
-                      className="px-3 py-1.5 rounded-full text-sm transition"
-                      style={{
-                        backgroundColor: active ? 'var(--color-primary)' : 'var(--color-surface)',
-                        color: active ? '#FFFFFF' : 'var(--color-text-mid)',
-                        border: `1px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        fontWeight: 500,
-                      }}
+    return (
+        <StudentLayout activeItem="grades" courseId={courseId} breadcrumbs={breadcrumbs}>
+            <div className="dash-root w-full max-w-none pb-8">
+                {/* Header */}
+                <div className="dash-enter mb-6">
+                    <h1
+                        className="text-[30px] font-semibold leading-[34px] tracking-[-0.02em] md:text-[34px] md:leading-[38px]"
+                        style={{ color: 'var(--dash-ink-1)' }}
                     >
-                      {f.label} <span style={{ opacity: 0.85 }}>{f.count}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="relative ml-auto min-w-[190px]">
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as GradeSort)}
-                  className="w-full appearance-none rounded-lg border pl-3 pr-8 py-2.5 text-sm outline-none"
-                  style={{
-                    backgroundColor: 'var(--color-surface)',
-                    borderColor: 'var(--color-border)',
-                    color: 'var(--color-text-dark)',
-                  }}
-                >
-                  <option value="score_desc">Sort: Highest score</option>
-                  <option value="score_asc">Sort: Lowest score</option>
-                  <option value="name_asc">Sort: Name A-Z</option>
-                  <option value="name_desc">Sort: Name Z-A</option>
-                  <option value="status">Sort: Status</option>
-                </select>
-                <ChevronDown className="w-4 h-4 pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-light)' }} />
-              </div>
-            </div>
-
-            {rows.length > 0 ? (
-              <div>
-                <div
-                  className="grid px-3 py-2 text-xs"
-                  style={{
-                    gridTemplateColumns: 'minmax(260px, 1.6fr) minmax(180px, 1fr) minmax(140px, .8fr)',
-                    color: 'var(--color-text-light)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '.05em',
-                  }}
-                >
-                  <span>Assignment</span>
-                  <span>Status</span>
-                  <span className="text-right">Score</span>
+                        My Grades
+                    </h1>
+                    <p
+                        className="mt-1 text-[14px] leading-[20px]"
+                        style={{ color: 'var(--dash-ink-3)' }}
+                    >
+                        Your performance in{' '}
+                        <span style={{ color: 'var(--dash-ink-2)', fontWeight: 500 }}>
+                            {course?.name ?? 'this course'}
+                        </span>
+                        .
+                    </p>
                 </div>
 
-                {rows.map((ag: any, idx: number) => {
-                  const status = getStatusLabel(ag);
-                  const scoreColor = getScoreColor(ag.percentage);
-                  const tone = getStatusTone(status);
-                  return (
-                    <button
-                      key={ag.assignment_id}
-                      onClick={() => router.push(`/student/courses/${courseId}/assignments/${ag.assignment_id}`)}
-                      className="w-full grid items-center px-3 py-3.5 text-left transition-colors"
-                      style={{
-                        gridTemplateColumns: 'minmax(260px, 1.6fr) minmax(180px, 1fr) minmax(140px, .8fr)',
-                        borderTop: '1px solid var(--color-border)',
-                        backgroundColor: idx % 2 === 0 ? 'transparent' : 'rgba(148,163,184,0.03)',
-                      }}
-                      onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)')}
-                      onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = idx % 2 === 0 ? 'transparent' : 'rgba(148,163,184,0.03)')}
+                {isLoading ? (
+                    <GradesSkeleton />
+                ) : isError ? (
+                    <div
+                        className="rounded-[16px] p-6 text-center"
+                        style={{
+                            background: 'var(--dash-danger-tint)',
+                            boxShadow:
+                                'inset 0 0 0 1px color-mix(in srgb, var(--dash-danger-ink) 22%, transparent)',
+                            color: 'var(--dash-danger-ink)',
+                        }}
                     >
-                      <span className="text-[17px] font-medium" style={{ color: 'var(--color-text-dark)' }}>
-                        {ag.assignment_name}
-                      </span>
-                      <span>
-                        <span
-                          className="inline-flex items-center px-2.5 py-1 rounded-full text-[13px]"
-                          style={{
-                            backgroundColor: tone.bg,
-                            border: `1px solid ${tone.border}`,
-                            color: tone.text,
-                            fontWeight: 500,
-                          }}
+                        <p className="text-[15px] font-semibold">
+                            We couldn't load your grades.
+                        </p>
+                        <p className="mt-1 text-[13px]" style={{ color: 'var(--dash-ink-3)' }}>
+                            Check your connection and try again.
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => refetch()}
+                            className="mt-4 inline-flex h-[34px] items-center rounded-full px-4 text-[12.5px] font-semibold"
+                            style={{
+                                background: 'var(--dash-surface-2)',
+                                color: 'var(--dash-ink-1)',
+                                boxShadow: 'inset 0 0 0 1px var(--dash-ring-strong)',
+                            }}
                         >
-                          {status === 'Pending Grade' ? 'Submitted · Pending' : status}
-                        </span>
-                      </span>
-                      <span className="text-right" style={{ color: scoreColor, fontSize: '16px', fontWeight: 600 }}>
-                        {ag.percentage !== null ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                            <span>{`${ag.score}/${ag.max_score}`}</span>
-                            <span style={{ fontSize: 13, color: 'var(--color-text-mid)', fontWeight: 500 }}>{`(${ag.percentage}%)`}</span>
-                          </span>
-                        ) : '—'}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="py-16 text-center" style={{ color: 'var(--color-text-mid)' }}>
-                No assignments match your current search/filter.
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-center py-20">
-            <TrendingUp className="w-12 h-12 mx-auto mb-4" style={{ color: 'var(--color-text-light)' }} />
-            <p className="font-semibold text-lg" style={{ color: 'var(--color-text-dark)' }}>No grades yet</p>
-            <p className="text-sm mt-2" style={{ color: 'var(--color-text-mid)' }}>Grades will appear here once your assignments are graded.</p>
-          </div>
-        )}
-      </div>
-    </StudentLayout>
-  );
+                            Retry
+                        </button>
+                    </div>
+                ) : data && data.total_count === 0 ? (
+                    <GradesEmptyState
+                        variant="no-assignments"
+                        title="No assignments yet."
+                        hint="When your instructor posts assignments, you'll see your grades and feedback here."
+                    />
+                ) : data ? (
+                    <>
+                        <div className="dash-enter" style={{ animationDelay: '40ms' }}>
+                            <GradesSummaryCard
+                                average={data.averageScore}
+                                gradedCount={data.graded_count}
+                                totalCount={data.total_count}
+                                pendingCount={counts.pending}
+                                notSubmittedCount={counts.notSubmitted}
+                                overdueCount={counts.overdue}
+                                assignments={assignments}
+                                onOpenAssignment={openAssignment}
+                            />
+                        </div>
+
+                        <div
+                            className="dash-enter mt-6"
+                            style={{ animationDelay: '80ms' }}
+                        >
+                            <GradesControls
+                                query={query}
+                                onQueryChange={setQuery}
+                                filter={filter}
+                                onFilterChange={setFilter}
+                                sort={sortBy}
+                                onSortChange={setSortBy}
+                                counts={counts}
+                                overdueCount={counts.overdue}
+                            />
+                        </div>
+
+                        <div className="mt-5 flex flex-col gap-3">
+                            {rows.length === 0 ? (
+                                <div
+                                    className="dash-enter"
+                                    style={{ animationDelay: '120ms' }}
+                                >
+                                    <GradesEmptyState
+                                        variant={query ? 'no-results' : 'filter-empty'}
+                                        title={
+                                            query
+                                                ? `No assignments match "${query}".`
+                                                : 'Nothing matches this filter.'
+                                        }
+                                        hint={
+                                            query
+                                                ? 'Try a shorter search term or clear it.'
+                                                : 'Try a different filter, or switch back to All.'
+                                        }
+                                        action={{
+                                            label: query ? 'Clear search' : 'Show all',
+                                            onClick: () => {
+                                                setQuery('');
+                                                setFilter('all');
+                                            },
+                                        }}
+                                    />
+                                </div>
+                            ) : (
+                                rows.map((a, i) => (
+                                    <div
+                                        key={a.assignment_id}
+                                        className="dash-enter"
+                                        style={{
+                                            animationDelay: `${Math.min(120 + i * 28, 320)}ms`,
+                                        }}
+                                    >
+                                        <GradeRow
+                                            assignment={a}
+                                            onOpen={openAssignment}
+                                        />
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </>
+                ) : null}
+            </div>
+        </StudentLayout>
+    );
 }
