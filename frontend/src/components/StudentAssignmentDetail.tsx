@@ -165,11 +165,16 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const defaultFileName = DEFAULT_FILE_NAME_BY_LANGUAGE[language]
     ?? `solution${LANGUAGE_EXTENSION_MAP[language] ?? '.txt'}`;
   const [editorFiles, setEditorFiles] = useState<EditorFile[]>([]);
+  const editorFilesRef = useRef<EditorFile[]>([]);
   const [activeFileIdx, setActiveFileIdx] = useState(0);
   const activeFile = editorFiles[activeFileIdx] ?? null;
   const code = activeFile?.content ?? '';
   const setCode = (val: string) => {
-    setEditorFiles(prev => prev.map((f, i) => i === activeFileIdx ? { ...f, content: val } : f));
+    setEditorFiles((prev) => {
+      const next = prev.map((f, i) => (i === activeFileIdx ? { ...f, content: val } : f));
+      editorFilesRef.current = next;
+      return next;
+    });
   };
   const [mode, setMode] = useState<'editor' | 'upload'>('editor');
   const [infoTab, setInfoTab] = useState<'desc' | 'rubric' | 'tests' | 'submit'>('desc');
@@ -209,6 +214,10 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
+  useEffect(() => {
+    editorFilesRef.current = editorFiles;
+  }, [editorFiles]);
+
   // Load saved code on mount
   useEffect(() => {
     const savedJson = localStorage.getItem(autoSaveKey);
@@ -242,6 +251,18 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
   }, [editorFiles, autoSaveKey]);
+
+  const saveEditorFilesNow = useCallback((): EditorFile[] => {
+    const currentFiles = editorFilesRef.current;
+    if (currentFiles.length === 0) return [];
+
+    const savedSnapshot = currentFiles.map((file) => ({ ...file, savedContent: file.content }));
+    editorFilesRef.current = savedSnapshot;
+    setEditorFiles(savedSnapshot);
+    localStorage.setItem(autoSaveKey, JSON.stringify(savedSnapshot));
+    setLastSaved(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    return savedSnapshot;
+  }, [autoSaveKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -356,26 +377,41 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     }
   }, []);
 
-  const buildExecutionScope = () => ({
-    assignmentId: assignmentId,
-    entryFilename: activeFile?.name ?? defaultFileName,
-    files: editorFiles.map(file => ({ name: file.name, content: file.content })),
-  });
+  const buildExecutionScope = (filesSnapshot?: EditorFile[]) => {
+    const scopedFiles = filesSnapshot ?? editorFilesRef.current;
+    const entryFile = scopedFiles[activeFileIdx]?.name ?? activeFile?.name ?? defaultFileName;
+    return {
+      assignmentId: assignmentId,
+      entryFilename: entryFile,
+      files: scopedFiles.map((file) => ({ name: file.name, content: file.content })),
+    };
+  };
+
+  const resolveExecutionCode = (filesSnapshot: EditorFile[], entryFilename?: string) => {
+    if (filesSnapshot.length === 0) return code;
+    const entryFile = entryFilename
+      ? filesSnapshot.find((file) => file.name === entryFilename)
+      : undefined;
+    return entryFile?.content ?? filesSnapshot[activeFileIdx]?.content ?? code;
+  };
 
   // Run code
   const handleRunCode = async () => {
     setOutputOpen(true);
-    if (codeRequiresStdin(code, language)) {
+    const savedSnapshot = saveEditorFilesNow();
+    const executionScope = buildExecutionScope(savedSnapshot);
+    const executionCode = resolveExecutionCode(savedSnapshot, executionScope.entryFilename);
+    if (codeRequiresStdin(executionCode, language)) {
       if (!showInlineInput) {
         setShowInlineInput(true);
         return; // open input area on first click; user types then clicks Run inside
       }
       // input area already open — run with whatever is currently in stdinValue
-      await execute(code, language, stdinValue, buildExecutionScope());
+      await execute(executionCode, language, stdinValue, executionScope);
       return;
     }
     setShowInlineInput(false);
-    await execute(code, language, '', buildExecutionScope());
+    await execute(executionCode, language, '', executionScope);
   };
 
   const supportsCompileCheck = language === 'python' || language === 'java';
@@ -385,7 +421,10 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
     if (!supportsCompileCheck) return;
     setOutputOpen(true);
     setShowInlineInput(false);
-    await compile(code, language, buildExecutionScope());
+    const savedSnapshot = saveEditorFilesNow();
+    const executionScope = buildExecutionScope(savedSnapshot);
+    const executionCode = resolveExecutionCode(savedSnapshot, executionScope.entryFilename);
+    await compile(executionCode, language, executionScope);
   };
 
   const handleOpenInlineInput = () => {
@@ -397,14 +436,20 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   const handleRunWithStdin = async () => {
     setOutputOpen(true);
     setShowInlineInput(true);
-    await execute(code, language, stdinValue, buildExecutionScope());
+    const savedSnapshot = saveEditorFilesNow();
+    const executionScope = buildExecutionScope(savedSnapshot);
+    const executionCode = resolveExecutionCode(savedSnapshot, executionScope.entryFilename);
+    await execute(executionCode, language, stdinValue, executionScope);
   };
 
   // Run public tests
   const handleRunTests = async () => {
     if (!testCases || testCases.length === 0) return;
     setInfoTab('tests');
-    await runTests(code, language, testCases);
+    const savedSnapshot = saveEditorFilesNow();
+    const executionScope = buildExecutionScope(savedSnapshot);
+    const executionCode = resolveExecutionCode(savedSnapshot, executionScope.entryFilename);
+    await runTests(executionCode, language, testCases, executionScope);
   };
 
   // Reset to starter code

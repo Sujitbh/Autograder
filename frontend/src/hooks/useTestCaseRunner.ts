@@ -1,9 +1,15 @@
 import { useState, useCallback } from 'react';
-import { codeExecutionApiService, type ExecuteCodeResponse } from '@/services/api/codeExecutionApiService';
+import { codeExecutionApiService, type ExecuteCodeFile, type ExecuteCodeResponse } from '@/services/api/codeExecutionApiService';
 import type { BackendTestCase } from '@/services/api/testcaseService';
 import type { TestCaseRunResult } from '@/components/TestResultsPanel';
 import { runClientJavaScript } from '@/utils/clientExecution';
 import { outputsMatch } from '@/utils/outputMatching';
+
+interface TestExecutionScopeOptions {
+  assignmentId?: string | number;
+  entryFilename?: string;
+  files?: ExecuteCodeFile[];
+}
 
 export function useTestCaseRunner() {
   const [isRunning, setIsRunning] = useState(false);
@@ -14,6 +20,7 @@ export function useTestCaseRunner() {
     code: string,
     language: string,
     testCases: BackendTestCase[],
+    scope?: TestExecutionScopeOptions,
   ) => {
     setIsRunning(true);
     setResults([]);
@@ -30,10 +37,14 @@ export function useTestCaseRunner() {
         if (language === 'javascript') {
           execResult = await runClientJavaScript(code, tc.input_data ?? '');
         } else {
+          const resolvedAssignmentId = scope?.assignmentId != null ? Number(scope.assignmentId) : undefined;
           execResult = await codeExecutionApiService.execute({
             code,
             language,
             stdin_input: tc.input_data ?? '',
+            assignment_id: Number.isFinite(resolvedAssignmentId) ? resolvedAssignmentId : undefined,
+            entry_filename: scope?.entryFilename,
+            files: scope?.files,
           });
         }
 
