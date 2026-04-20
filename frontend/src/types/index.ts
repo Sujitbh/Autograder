@@ -155,6 +155,8 @@ export interface RubricCriterion {
     maxPoints: number;
     weight?: number;
     gradingMethod: GradingMethod;
+    /** Default instructor comments keyed by grade level (e.g. "0".."5"). */
+    defaultComments?: Record<string, string> | null;
 }
 
 export interface RubricSection {

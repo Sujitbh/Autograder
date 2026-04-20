@@ -127,7 +127,12 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         .join(' | ');
 
     const gradeMutation = useMutation({
-        mutationFn: (payload: { score: number; max_score: number; feedback?: string }) =>
+        mutationFn: (payload: {
+            score: number;
+            max_score: number;
+            feedback?: string;
+            criterion_scores?: Array<{ criterion_id: number; grade: number }>;
+        }) =>
             submissionService.overrideSubmissionScore(submissionId, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['faculty-submission-detail', submissionId] });
@@ -472,7 +477,29 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         const normalizedScore = Math.max(0, Math.min(Math.round(rawScore), Math.round(totalMaxForMode || 0)));
         const normalizedMax = Math.max(1, Math.round(totalMaxForMode || 0));
         const feedbackToSave = feedback.trim() || 'Reviewed by instructor.';
-        await gradeMutation.mutateAsync({ score: normalizedScore, max_score: normalizedMax, feedback: feedbackToSave });
+
+        // Snapshot per-criterion grades (0-5) so students can see their rating
+        // and the matching auto-feedback on each row of the rubric.
+        const criterionScores = isWeightedRubric
+            ? rubrics
+                  .map((r: any, idx: number) => {
+                      const criterionId = Number(r?.id);
+                      if (!Number.isFinite(criterionId) || criterionId <= 0) return null;
+                      const grade = Math.max(
+                          0,
+                          Math.min(5, Math.round(Number(rubricScores[idx]) || 0)),
+                      );
+                      return { criterion_id: criterionId, grade };
+                  })
+                  .filter((item): item is { criterion_id: number; grade: number } => item !== null)
+            : undefined;
+
+        await gradeMutation.mutateAsync({
+            score: normalizedScore,
+            max_score: normalizedMax,
+            feedback: feedbackToSave,
+            criterion_scores: criterionScores,
+        });
 
         // Keep assignment list and gradebook views in sync immediately after manual grading.
         await Promise.all([

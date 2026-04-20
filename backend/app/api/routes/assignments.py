@@ -348,27 +348,28 @@ def replace_assignment_rubric(
     if payload.rubricMode is not None:
         assignment.rubric_mode = payload.rubricMode
 
-    for sec in list(assignment.rubric_sections):
-        db.delete(sec)
+    # Clear existing rubric via the relationship so the delete-orphan cascade
+    # removes the old rows AND the in-memory collection stays in sync. Calling
+    # db.delete() on each section while leaving them in the collection causes
+    # SQLAlchemy to later cascade over deleted (transient) instances.
+    assignment.rubric_sections.clear()
     db.flush()
 
     for section_idx, rs in enumerate(payload.rubric):
         section = RubricSection(
-            assignment_id=assignment.id,
             name=rs.name,
             description=rs.description,
             weight=float(rs.weight) if rs.weight is not None else 100.0,
             order=section_idx,
         )
-        db.add(section)
+        assignment.rubric_sections.append(section)
         db.flush()
 
         sec_w = float(section.weight)
         for crit_idx, rc in enumerate(rs.criteria or []):
             dc = json.dumps(rc.defaultComments) if rc.defaultComments else None
-            db.add(
+            section.criteria.append(
                 RubricCriterion(
-                    section_id=section.id,
                     name=rc.name,
                     description=rc.description,
                     max_points=rc.maxPoints or 5,
@@ -379,7 +380,6 @@ def replace_assignment_rubric(
                 )
             )
 
-    db.add(assignment)
     db.commit()
     db.refresh(assignment)
     return (

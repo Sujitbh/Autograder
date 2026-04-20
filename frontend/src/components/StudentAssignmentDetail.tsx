@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '@/utils/ThemeContext';
 import { PageLayout } from './PageLayout';
@@ -260,6 +261,29 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
 
   const course = courses?.find((c) => c.id === courseId);
   const latestSubmission = submissions && submissions.length > 0 ? submissions[0] : null;
+
+  // Pull per-criterion grades (0-5) that the instructor/TA saved during grading
+  // so the student can see what they got on each rubric row and the matching
+  // automated feedback (default comments) from the weighted rubric.
+  const latestSubmissionIdNum = latestSubmission ? Number(latestSubmission.id) : null;
+  const hasGradeForLatest = !!latestSubmission?.grade;
+  const { data: criterionScoreRows } = useQuery({
+    queryKey: ['submission-criterion-scores', latestSubmissionIdNum],
+    queryFn: () => submissionService.getSubmissionCriterionScores(latestSubmissionIdNum!),
+    enabled:
+      latestSubmissionIdNum != null &&
+      Number.isFinite(latestSubmissionIdNum) &&
+      latestSubmissionIdNum > 0 &&
+      hasGradeForLatest,
+  });
+  const criterionScoreByCriterionId = useMemo(() => {
+    const m = new Map<string, { grade: number; feedback: string | null }>();
+    (criterionScoreRows ?? []).forEach((row) => {
+      m.set(String(row.criterion_id), { grade: row.grade, feedback: row.feedback });
+    });
+    return m;
+  }, [criterionScoreRows]);
+
   const sectionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 100);
   const criterionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 0);
   const rubricFromAssignment = normalizeRubricToSections(assignment?.rubric);
@@ -1173,23 +1197,40 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {(section.criteria || []).map((criterion, critIdx) => (
-                                    <tr key={critIdx} style={{ borderTop: '1px solid var(--color-border)' }}>
-                                      <td style={{ padding: '10px 12px', color: 'var(--color-text-dark)', fontWeight: 500 }}>{criterion.name}</td>
-                                      <td style={{ padding: '10px 12px', textAlign: 'center', color: isDark ? '#4ade80' : 'var(--color-success)', fontWeight: 700 }}>{getCriterionDisplayMaxPoints(criterion)}</td>
-                                      {isWeightedRubric && (
-                                        <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--color-text-dark)', fontWeight: 600 }}>
-                                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
-                                            <span>{formatPointValue(getCriterionAssignmentWeightPercent(section, criterion, sectionIdx, critIdx))}%</span>
-                                            <span style={{ fontSize: 10, color: 'var(--color-text-light)' }}>
-                                              of assignment
-                                            </span>
-                                          </div>
-                                        </td>
-                                      )}
-                                      <td style={{ padding: '10px 12px', color: 'var(--color-text-mid)', fontSize: 11 }}>{criterion.description || '—'}</td>
-                                    </tr>
-                                  ))}
+                                  {(section.criteria || []).map((criterion, critIdx) => {
+                                    const maxPointsForCriterion = getCriterionDisplayMaxPoints(criterion);
+                                    const savedScore = criterionScoreByCriterionId.get(String(criterion.id));
+                                    const hasSavedGrade = savedScore != null && hasGradeForLatest;
+                                    const displayedScore = hasSavedGrade
+                                      ? `${savedScore!.grade} / ${maxPointsForCriterion}`
+                                      : String(maxPointsForCriterion);
+                                    const autoFeedback = hasSavedGrade
+                                      ? (savedScore!.feedback && savedScore!.feedback.trim().length > 0
+                                          ? savedScore!.feedback
+                                          : criterion.defaultComments?.[String(savedScore!.grade)] ?? '')
+                                      : '';
+                                    const descriptionText =
+                                      (autoFeedback && autoFeedback.trim().length > 0)
+                                        ? autoFeedback
+                                        : (criterion.description || '—');
+                                    return (
+                                      <tr key={critIdx} style={{ borderTop: '1px solid var(--color-border)' }}>
+                                        <td style={{ padding: '10px 12px', color: 'var(--color-text-dark)', fontWeight: 500 }}>{criterion.name}</td>
+                                        <td style={{ padding: '10px 12px', textAlign: 'center', color: isDark ? '#4ade80' : 'var(--color-success)', fontWeight: 700 }}>{displayedScore}</td>
+                                        {isWeightedRubric && (
+                                          <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--color-text-dark)', fontWeight: 600 }}>
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
+                                              <span>{formatPointValue(getCriterionAssignmentWeightPercent(section, criterion, sectionIdx, critIdx))}%</span>
+                                              <span style={{ fontSize: 10, color: 'var(--color-text-light)' }}>
+                                                of assignment
+                                              </span>
+                                            </div>
+                                          </td>
+                                        )}
+                                        <td style={{ padding: '10px 12px', color: 'var(--color-text-mid)', fontSize: 11, whiteSpace: 'pre-wrap' }}>{descriptionText}</td>
+                                      </tr>
+                                    );
+                                  })}
                                 </tbody>
                               </table>
                             ) : (

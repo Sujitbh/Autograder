@@ -58,6 +58,10 @@ function normalizeCriterion(
         maxPoints: toFiniteNumber(value.maxPoints, 0),
         weight: toFiniteNumber(value.weight, 1),
         gradingMethod,
+        defaultComments:
+            value.defaultComments && typeof value.defaultComments === 'object'
+                ? value.defaultComments
+                : null,
     };
 }
 

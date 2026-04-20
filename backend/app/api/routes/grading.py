@@ -16,6 +16,8 @@ from app.models.rubric import Rubric
 from app.models.enrollment import Enrollment
 from app.models.ta_permission import TAPermission
 from app.models.submission_rubric_score import SubmissionRubricScore
+from app.models.submission_rubric_criterion_score import SubmissionRubricCriterionScore
+from app.models.rubric_section import RubricCriterion
 from app.models.testcase import TestCase
 from app.models.submission_result import SubmissionResult
 from app.services.grading_service import GradingService
@@ -57,11 +59,20 @@ class GradeSubmissionRequest(BaseModel):
     apply_rubric: bool = True
 
 
+class CriterionScoreInline(BaseModel):
+    """Per-criterion grade (0-5) awarded by instructor/TA for a weighted rubric."""
+    criterion_id: int
+    grade: int
+    feedback: Optional[str] = None
+
+
 class ManualScoreUpdateRequest(BaseModel):
     score: int
     max_score: Optional[int] = None
     feedback: Optional[str] = None
     rubric_breakdown: Optional[list[dict]] = None
+    # Per-criterion 0–5 ratings + auto feedback snapshot for weighted rubrics.
+    criterion_scores: Optional[list[CriterionScoreInline]] = None
 
 
 def _enforce_ta_can_grade(db: Session, user: User, course_id: int) -> None:
@@ -82,6 +93,50 @@ def _enforce_ta_can_grade(db: Session, user: User, course_id: int) -> None:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Permission denied: cannot grade submissions",
         )
+
+
+def _persist_manual_criterion_scores(
+    db: Session,
+    submission_id: int,
+    criterion_scores: Optional[list[CriterionScoreInline]],
+    grader_id: int,
+) -> None:
+    """Persist per-criterion 0-5 grades + captured auto-feedback for a weighted rubric."""
+    if criterion_scores is None:
+        return
+
+    db.query(SubmissionRubricCriterionScore).filter(
+        SubmissionRubricCriterionScore.submission_id == submission_id
+    ).delete()
+
+    for item in criterion_scores:
+        criterion = (
+            db.query(RubricCriterion)
+            .filter(RubricCriterion.id == item.criterion_id)
+            .first()
+        )
+        if not criterion:
+            continue
+
+        grade = max(0, min(int(item.grade or 0), 5))
+        percent_weight = float(criterion.weight or 0)
+        # Award points = (grade / 5) * weight%. Totals are still stored on
+        # submission.score; this table is just a breakdown for display.
+        points_awarded = round((grade / 5.0) * percent_weight, 4) if percent_weight > 0 else 0.0
+
+        db.add(
+            SubmissionRubricCriterionScore(
+                submission_id=submission_id,
+                criterion_id=criterion.id,
+                grader_id=grader_id,
+                grade=grade,
+                percent_weight=percent_weight,
+                points_awarded=points_awarded,
+                feedback=item.feedback,
+            )
+        )
+
+    db.flush()
 
 
 def _persist_manual_rubric_breakdown(
@@ -500,6 +555,13 @@ def manual_score_submission(
         db=db,
         submission_id=submission.id,
         rubric_breakdown=payload.rubric_breakdown,
+        grader_id=user.id,
+    )
+
+    _persist_manual_criterion_scores(
+        db=db,
+        submission_id=submission.id,
+        criterion_scores=payload.criterion_scores,
         grader_id=user.id,
     )
 

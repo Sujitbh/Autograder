@@ -347,12 +347,38 @@ export const submissionService = {
   /** Manual score entry/override by instructor/TA. */
   async overrideSubmissionScore(
     submissionId: string,
-    payload: { score: number; max_score?: number; feedback?: string }
+    payload: {
+      score: number;
+      max_score?: number;
+      feedback?: string;
+      /** Optional per-criterion 0-5 grades for weighted rubrics. */
+      criterion_scores?: Array<{
+        criterion_id: number;
+        grade: number;
+        feedback?: string | null;
+      }>;
+    }
   ): Promise<BackendGradingResults> {
     const { data } = await api.patch<BackendGradingResults>(
       `/grading/submissions/${submissionId}/score`,
       payload
     );
+    return data;
+  },
+
+  /** Fetch per-criterion scores (grade + feedback) that were saved for a submission. */
+  async getSubmissionCriterionScores(
+    submissionId: string | number,
+  ): Promise<Array<{
+    id: number;
+    submission_id: number;
+    criterion_id: number;
+    grade: number;
+    percent_weight: number;
+    points_awarded: number;
+    feedback: string | null;
+  }>> {
+    const { data } = await api.get(`/rubric-criterion-scores/submission/${submissionId}`);
     return data;
   },
 

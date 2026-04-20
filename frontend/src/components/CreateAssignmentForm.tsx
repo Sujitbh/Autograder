@@ -113,20 +113,30 @@ function toCriterionWeightPercent(weight?: number | string | null): number {
     return numeric;
 }
 
-/** Split `targetTotal` percent across positive `parts` proportionally; fix rounding drift on the last part. */
+/** Split `targetTotal` across positive `parts` proportionally using whole numbers; any leftover
+ * (from rounding) goes to the criteria with the largest fractional remainders so the total still
+ * equals `targetTotal`. */
 function distributePercentAcrossParts(parts: number[], targetTotal: number): number[] {
     const n = parts.length;
     if (n === 0) return [];
+    const target = Math.round(targetTotal);
     const sum = parts.reduce((a, b) => a + b, 0);
     if (sum <= 0) {
-        const each = Math.round((targetTotal / n) * 1000) / 1000;
-        return parts.map(() => each);
+        const base = Math.floor(target / n);
+        const leftover = target - base * n;
+        return parts.map((_, i) => base + (i < leftover ? 1 : 0));
     }
-    const scaled = parts.map((p) => (p / sum) * targetTotal);
-    const rounded = scaled.map((x) => Math.max(0, Math.round(x * 1000) / 1000));
-    let drift = Math.round((targetTotal - rounded.reduce((a, b) => a + b, 0)) * 1000) / 1000;
-    rounded[n - 1] = Math.max(0, Math.round((rounded[n - 1] + drift) * 1000) / 1000);
-    return rounded;
+    const scaled = parts.map((p) => (p / sum) * target);
+    const floored = scaled.map((x) => Math.max(0, Math.floor(x)));
+    let remainder = target - floored.reduce((a, b) => a + b, 0);
+    const fractional = scaled
+        .map((x, i) => ({ i, frac: x - Math.floor(x) }))
+        .sort((a, b) => b.frac - a.frac);
+    for (let k = 0; k < fractional.length && remainder > 0; k++) {
+        floored[fractional[k].i] += 1;
+        remainder -= 1;
+    }
+    return floored;
 }
 
 function distributePointsAcrossCriteria(
@@ -166,11 +176,6 @@ function normalizeCriterionWeightsForSection(criteria: RubricCriterion[], sectio
     const n = criteria.length;
     if (n === 0) return [];
     const parts = criteria.map((c) => (c.weight != null ? toCriterionWeightPercent(c.weight) : 0));
-    const sum = parts.reduce((a, b) => a + b, 0);
-    if (sum <= 0) {
-        const each = Math.round((sectionWeightPercent / n) * 1000) / 1000;
-        return parts.map(() => each);
-    }
     return distributePercentAcrossParts(parts, sectionWeightPercent);
 }
 
@@ -179,13 +184,7 @@ function criterionWeightsFromMaxPoints(
     totalPercent: number
 ): number[] {
     const pts = criteria.map((c) => Math.max(0, c.maxPoints));
-    const sumPts = pts.reduce((a, b) => a + b, 0);
-    const n = criteria.length;
-    if (n === 0) return [];
-    if (sumPts <= 0) {
-        const each = Math.round((totalPercent / n) * 1000) / 1000;
-        return pts.map(() => each);
-    }
+    if (criteria.length === 0) return [];
     return distributePercentAcrossParts(pts, totalPercent);
 }
 

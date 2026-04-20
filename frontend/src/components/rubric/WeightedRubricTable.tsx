@@ -425,11 +425,12 @@ export default function WeightedRubricTable({
                                                             type="number"
                                                             min={0}
                                                             max={100}
+                                                            step={1}
                                                             value={criterion.weight}
                                                             onChange={(e) =>
                                                                 updateCriterion(si, ci, {
                                                                     weight: clamp(
-                                                                        Number(e.target.value) || 0,
+                                                                        Math.round(Number(e.target.value) || 0),
                                                                         0,
                                                                         100,
                                                                     ),
@@ -583,7 +584,7 @@ export default function WeightedRubricTable({
                                         : ''
                                 }`}
                             >
-                                {Math.round(totalWeight * 100) / 100}
+                                {Math.round(totalWeight)}
                             </td>
                             {(isGrading || isPreview) && (
                                 <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-center text-sm">
