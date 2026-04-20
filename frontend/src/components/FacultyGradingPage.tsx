@@ -131,11 +131,16 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
             score: number;
             max_score: number;
             feedback?: string;
-            criterion_scores?: Array<{ criterion_id: number; grade: number }>;
+            criterion_scores?: Array<{
+                criterion_id: number;
+                grade?: number;
+                points_awarded?: number;
+            }>;
         }) =>
             submissionService.overrideSubmissionScore(submissionId, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['faculty-submission-detail', submissionId] });
+            queryClient.invalidateQueries({ queryKey: ['faculty-grading-criterion-scores', submissionId] });
         },
     });
 
@@ -327,6 +332,25 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         });
     }, [isWeightedRubric, weightedMaxTotal]);
 
+    // Pull saved per-criterion grades so reopening a graded submission shows
+    // exactly what the instructor entered, not a synthetic redistribution of
+    // the total score.
+    const { data: savedCriterionScores } = useQuery({
+        queryKey: ['faculty-grading-criterion-scores', submissionId],
+        queryFn: () => submissionService.getSubmissionCriterionScores(submissionId),
+        enabled: !!submissionId,
+    });
+    const savedCriterionScoreById = useMemo(() => {
+        const m = new Map<number, { grade: number; points_awarded: number }>();
+        (savedCriterionScores ?? []).forEach((row) => {
+            m.set(row.criterion_id, {
+                grade: row.grade,
+                points_awarded: row.points_awarded,
+            });
+        });
+        return m;
+    }, [savedCriterionScores]);
+
     // Initialise form when detail loads
     useEffect(() => {
         if (!detail) return;
@@ -334,25 +358,53 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         const rubricSections = detail.rubrics ?? [];
         const flatRubrics = flattenRubrics(rubricSections);
 
-        if (flatRubrics.length > 0) {
-            // If already graded, distribute score proportionally across criteria
-            if (detail.score != null && flatRubrics.length > 0) {
-                setRubricScores(distributeScoreAcrossRubrics(detail.score, flatRubrics));
-            } else {
-                setRubricScores(flatRubrics.map(() => 0));
-            }
+        if (flatRubrics.length === 0) return;
+
+        // If we have per-criterion rows from the backend, seed from them so
+        // the instructor sees exactly the grades they entered before.
+        const hasSavedRows = savedCriterionScoreById.size > 0;
+        if (hasSavedRows) {
+            setRubricScores(
+                flatRubrics.map((r: any) => {
+                    const saved = savedCriterionScoreById.get(Number(r?.id));
+                    if (!saved) return 0;
+                    return isWeightedRubric ? saved.grade : saved.points_awarded;
+                }),
+            );
+            return;
         }
-    }, [detail?.id, distributeScoreAcrossRubrics]);
+
+        // Fallback: distribute total proportionally (legacy grades saved before
+        // we captured per-criterion data).
+        if (detail.score != null) {
+            setRubricScores(distributeScoreAcrossRubrics(detail.score, flatRubrics));
+        } else {
+            setRubricScores(flatRubrics.map(() => 0));
+        }
+    }, [detail?.id, distributeScoreAcrossRubrics, savedCriterionScoreById, isWeightedRubric]);
 
     const updateRubricScore = (idx: number, val: string) => {
         const maxPoints = getCriterionScaleMax(rubrics[idx]);
-        const digitsOnly = String(val ?? '').replace(/[^\d]/g, '');
 
-        // For single-digit rubric scales (weighted 0-5 and similar), keep only latest typed digit
-        // so typing a new number replaces the old one instead of appending (e.g., 2 -> 3).
-        const normalized = maxPoints <= 9 ? digitsOnly.slice(-1) : digitsOnly;
-        const parsed = normalized === '' ? 0 : Number(normalized);
-        const num = Math.max(0, Math.min(Number.isFinite(parsed) ? parsed : 0, maxPoints));
+        let num: number;
+        if (isWeightedRubric) {
+            // Weighted rubric always uses the 0–5 tier. Keep only the latest
+            // typed digit so typing a new number replaces the old one rather
+            // than appending (e.g. "2" → "3", not "23").
+            const digitsOnly = String(val ?? '').replace(/[^\d]/g, '');
+            const normalized = maxPoints <= 9 ? digitsOnly.slice(-1) : digitsOnly;
+            const parsed = normalized === '' ? 0 : Number(normalized);
+            num = Math.max(0, Math.min(Number.isFinite(parsed) ? parsed : 0, maxPoints));
+        } else {
+            // Unweighted rubrics accept decimals (e.g. 4.5 / 5).
+            const cleaned = String(val ?? '').replace(/[^0-9.]/g, '');
+            const firstDot = cleaned.indexOf('.');
+            const normalized = firstDot === -1
+                ? cleaned
+                : cleaned.slice(0, firstDot + 1) + cleaned.slice(firstDot + 1).replace(/\./g, '');
+            const parsed = normalized === '' || normalized === '.' ? 0 : Number(normalized);
+            num = Math.max(0, Math.min(Number.isFinite(parsed) ? parsed : 0, maxPoints));
+        }
 
         setRubricScores(prev => {
             const next = [...prev];
@@ -478,20 +530,33 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         const normalizedMax = Math.max(1, Math.round(totalMaxForMode || 0));
         const feedbackToSave = feedback.trim() || 'Reviewed by instructor.';
 
-        // Snapshot per-criterion grades (0-5) so students can see their rating
-        // and the matching auto-feedback on each row of the rubric.
-        const criterionScores = isWeightedRubric
+        // Snapshot per-criterion grades so students can see their rating and
+        // the matching auto-feedback on each row of the rubric. Weighted
+        // rubrics send the 0–5 tier (`grade`); unweighted rubrics send the
+        // actual awarded points (`points_awarded`).
+        type CriterionScorePayload = {
+            criterion_id: number;
+            grade?: number;
+            points_awarded?: number;
+        };
+        const criterionScores: CriterionScorePayload[] | undefined = rubrics.length
             ? rubrics
-                  .map((r: any, idx: number) => {
-                      const criterionId = Number(r?.id);
-                      if (!Number.isFinite(criterionId) || criterionId <= 0) return null;
-                      const grade = Math.max(
-                          0,
-                          Math.min(5, Math.round(Number(rubricScores[idx]) || 0)),
-                      );
-                      return { criterion_id: criterionId, grade };
-                  })
-                  .filter((item): item is { criterion_id: number; grade: number } => item !== null)
+                .map((r: any, idx: number): CriterionScorePayload | null => {
+                    const criterionId = Number(r?.id);
+                    if (!Number.isFinite(criterionId) || criterionId <= 0) return null;
+                    if (isWeightedRubric) {
+                        const grade = Math.max(
+                            0,
+                            Math.min(5, Math.round(Number(rubricScores[idx]) || 0)),
+                        );
+                        return { criterion_id: criterionId, grade };
+                    }
+                    const maxPoints = getCriterionScaleMax(r);
+                    const raw = Number(rubricScores[idx]);
+                    const clamped = Math.max(0, Math.min(Number.isFinite(raw) ? raw : 0, maxPoints));
+                    return { criterion_id: criterionId, points_awarded: clamped };
+                })
+                .filter((item): item is CriterionScorePayload => item !== null)
             : undefined;
 
         await gradeMutation.mutateAsync({
@@ -1590,7 +1655,9 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                                     </p>}
                                                                                 </div>
                                                                                 <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-primary)', flexShrink: 0, marginLeft: 8 }}>
-                                                                                    {enteredRating} / {getCriterionScaleMax(criterion)}
+                                                                                    {isWeightedRubric
+                                                                                        ? `${enteredRating} / ${getCriterionScaleMax(criterion)}`
+                                                                                        : `${formatPointValue(Number(enteredRating) || 0)} / ${formatPointValue(getCriterionScaleMax(criterion))}`}
                                                                                     {isWeightedRubric && (
                                                                                         <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 600, color: 'var(--color-text-mid)' }}>
                                                                                             ({formatPointValue(criterionPoints)} pts)
@@ -1598,12 +1665,24 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                                     )}
                                                                                 </span>
                                                                             </div>
-                                                                            <input type="text" inputMode="numeric" pattern="[0-9]*"
-                                                                                value={rubricScores[flatIdx] ?? 0}
-                                                                                onChange={e => flatIdx >= 0 && updateRubricScore(flatIdx, e.target.value)}
-                                                                                onFocus={(e) => e.currentTarget.select()}
-                                                                                className="w-full px-3 py-1.5 rounded-md focus:outline-none transition-shadow"
-                                                                                style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-dark)' }} />
+                                                                            {isWeightedRubric ? (
+                                                                                <input type="text" inputMode="numeric" pattern="[0-9]*"
+                                                                                    value={rubricScores[flatIdx] ?? 0}
+                                                                                    onChange={e => flatIdx >= 0 && updateRubricScore(flatIdx, e.target.value)}
+                                                                                    onFocus={(e) => e.currentTarget.select()}
+                                                                                    className="w-full px-3 py-1.5 rounded-md focus:outline-none transition-shadow"
+                                                                                    style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-dark)' }} />
+                                                                            ) : (
+                                                                                <input type="number" inputMode="decimal"
+                                                                                    min={0}
+                                                                                    max={getCriterionScaleMax(criterion)}
+                                                                                    step={0.25}
+                                                                                    value={rubricScores[flatIdx] ?? 0}
+                                                                                    onChange={e => flatIdx >= 0 && updateRubricScore(flatIdx, e.target.value)}
+                                                                                    onFocus={(e) => e.currentTarget.select()}
+                                                                                    className="w-full px-3 py-1.5 rounded-md focus:outline-none transition-shadow"
+                                                                                    style={{ backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)', fontSize: '14px', color: 'var(--color-text-dark)' }} />
+                                                                            )}
                                                                         </div>
                                                                     );
                                                                 })}

@@ -9,10 +9,10 @@ import { useAuth } from '@/utils/AuthContext';
 
 function dashboardForRole(role: string): string {
   switch (role) {
-    case 'student': return '/student';
     case 'admin': return '/admin';
+    case 'student':
     case 'faculty':
-    default: return '/courses';
+    default: return '/dashboard';
   }
 }
 

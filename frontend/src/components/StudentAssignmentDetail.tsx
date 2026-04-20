@@ -277,9 +277,13 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
       hasGradeForLatest,
   });
   const criterionScoreByCriterionId = useMemo(() => {
-    const m = new Map<string, { grade: number; feedback: string | null }>();
+    const m = new Map<string, { grade: number; points_awarded: number; feedback: string | null }>();
     (criterionScoreRows ?? []).forEach((row) => {
-      m.set(String(row.criterion_id), { grade: row.grade, feedback: row.feedback });
+      m.set(String(row.criterion_id), {
+        grade: row.grade,
+        points_awarded: row.points_awarded,
+        feedback: row.feedback,
+      });
     });
     return m;
   }, [criterionScoreRows]);
@@ -1156,7 +1160,24 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                     {rubricSections.length > 0 ? (
                       <>
                         {/* Rubric sections */}
-                        {rubricSections.map((section, sectionIdx) => (
+                        {rubricSections.map((section, sectionIdx) => {
+                          // Pre-compute section-level subtotal for unweighted rubrics so the
+                          // student sees "Section earned: X / Y" in the header.
+                          let sectionEarned = 0;
+                          let sectionMax = 0;
+                          if (!isWeightedRubric) {
+                            (section.criteria || []).forEach((crit) => {
+                              const max = getCriterionDisplayMaxPoints(crit);
+                              sectionMax += max;
+                              const saved = criterionScoreByCriterionId.get(String((crit as any).id));
+                              if (saved && hasGradeForLatest) {
+                                sectionEarned += Number(saved.points_awarded) || 0;
+                              }
+                            });
+                          }
+                          const hasSectionEarned = !isWeightedRubric && hasGradeForLatest && sectionMax > 0;
+
+                          return (
                           <div key={sectionIdx} style={{ marginBottom: 16 }}>
                             {/* Section header */}
                             <div style={{
@@ -1172,11 +1193,15 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                               alignItems: 'center',
                             }}>
                               <span>{section.name}</span>
-                              {isWeightedRubric && (
+                              {isWeightedRubric ? (
                                 <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-light)' }}>
                                   Section {sectionWeightPercent(section.weight).toFixed(1)}%
                                 </span>
-                              )}
+                              ) : hasSectionEarned ? (
+                                <span style={{ fontSize: 11, fontWeight: 700, color: isDark ? '#4ade80' : 'var(--color-success)' }}>
+                                  Section earned: {formatPointValue(sectionEarned)} / {formatPointValue(sectionMax)}
+                                </span>
+                              ) : null}
                             </div>
 
                             {(section.criteria || []).length > 0 ? (
@@ -1201,22 +1226,70 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                     const maxPointsForCriterion = getCriterionDisplayMaxPoints(criterion);
                                     const savedScore = criterionScoreByCriterionId.get(String(criterion.id));
                                     const hasSavedGrade = savedScore != null && hasGradeForLatest;
-                                    const displayedScore = hasSavedGrade
-                                      ? `${savedScore!.grade} / ${maxPointsForCriterion}`
-                                      : String(maxPointsForCriterion);
+
+                                    // Derive what to show + which tier drives auto-feedback.
+                                    // Weighted rubric: show `grade / 5` and look up feedback by grade.
+                                    // Unweighted rubric: show `points / max` and derive a 0–5 tier
+                                    // from the ratio so the same defaultComments mechanism works.
+                                    let displayedScore: string;
+                                    let feedbackTierKey: string | null = null;
+                                    let pctEarned: number | null = null;
+                                    if (isWeightedRubric) {
+                                      displayedScore = hasSavedGrade
+                                        ? `${savedScore!.grade} / ${maxPointsForCriterion}`
+                                        : String(maxPointsForCriterion);
+                                      if (hasSavedGrade) {
+                                        feedbackTierKey = String(savedScore!.grade);
+                                        pctEarned = maxPointsForCriterion > 0
+                                          ? (savedScore!.grade / maxPointsForCriterion) * 100
+                                          : null;
+                                      }
+                                    } else {
+                                      const awardedPoints = hasSavedGrade
+                                        ? Number(savedScore!.points_awarded) || 0
+                                        : 0;
+                                      displayedScore = hasSavedGrade
+                                        ? `${formatPointValue(awardedPoints)} / ${formatPointValue(maxPointsForCriterion)}`
+                                        : formatPointValue(maxPointsForCriterion);
+                                      if (hasSavedGrade) {
+                                        const tier = maxPointsForCriterion > 0
+                                          ? Math.max(0, Math.min(5, Math.round((awardedPoints / maxPointsForCriterion) * 5)))
+                                          : 0;
+                                        feedbackTierKey = String(tier);
+                                        pctEarned = maxPointsForCriterion > 0
+                                          ? (awardedPoints / maxPointsForCriterion) * 100
+                                          : null;
+                                      }
+                                    }
+
                                     const autoFeedback = hasSavedGrade
                                       ? (savedScore!.feedback && savedScore!.feedback.trim().length > 0
                                           ? savedScore!.feedback
-                                          : criterion.defaultComments?.[String(savedScore!.grade)] ?? '')
+                                          : (feedbackTierKey != null
+                                              ? criterion.defaultComments?.[feedbackTierKey] ?? ''
+                                              : ''))
                                       : '';
                                     const descriptionText =
                                       (autoFeedback && autoFeedback.trim().length > 0)
                                         ? autoFeedback
                                         : (criterion.description || '—');
+
+                                    // Color the awarded cell: green (>=90%), amber (50–90%), red (<50%).
+                                    let awardedCellColor: string = isDark ? '#4ade80' : 'var(--color-success)';
+                                    if (hasSavedGrade && pctEarned != null) {
+                                      if (pctEarned >= 90) {
+                                        awardedCellColor = isDark ? '#4ade80' : 'var(--color-success)';
+                                      } else if (pctEarned >= 50) {
+                                        awardedCellColor = isDark ? '#fbbf24' : '#b45309';
+                                      } else {
+                                        awardedCellColor = isDark ? '#f87171' : '#b91c1c';
+                                      }
+                                    }
+
                                     return (
                                       <tr key={critIdx} style={{ borderTop: '1px solid var(--color-border)' }}>
                                         <td style={{ padding: '10px 12px', color: 'var(--color-text-dark)', fontWeight: 500 }}>{criterion.name}</td>
-                                        <td style={{ padding: '10px 12px', textAlign: 'center', color: isDark ? '#4ade80' : 'var(--color-success)', fontWeight: 700 }}>{displayedScore}</td>
+                                        <td style={{ padding: '10px 12px', textAlign: 'center', color: awardedCellColor, fontWeight: 700 }}>{displayedScore}</td>
                                         {isWeightedRubric && (
                                           <td style={{ padding: '10px 12px', textAlign: 'center', color: 'var(--color-text-dark)', fontWeight: 600 }}>
                                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1.2 }}>
@@ -1260,7 +1333,8 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                               </div>
                             )}
                           </div>
-                        ))}
+                          );
+                        })}
 
                         {/* Total points summary */}
                         {isWeightedRubric ? (

@@ -7,13 +7,12 @@ import { Suspense, useEffect } from 'react';
 
 function dashboardForRole(role: string): string {
     switch (role) {
-        case 'student':
-            return '/student';
         case 'admin':
             return '/admin';
+        case 'student':
         case 'faculty':
         default:
-            return '/courses';
+            return '/dashboard';
     }
 }
 

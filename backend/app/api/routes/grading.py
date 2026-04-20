@@ -60,9 +60,19 @@ class GradeSubmissionRequest(BaseModel):
 
 
 class CriterionScoreInline(BaseModel):
-    """Per-criterion grade (0-5) awarded by instructor/TA for a weighted rubric."""
+    """
+    Per-criterion grade captured at save time so the student can see exactly
+    how much they earned on each rubric row.
+
+    - Weighted rubrics: `grade` is a 0–5 tier rating.
+    - Unweighted rubrics: `points_awarded` is the awarded point value
+      (respects the criterion's `max_points`, may be fractional). `grade`
+      is optional and, when omitted, is derived as a 0–5 tier from
+      `points_awarded / max_points` for display consistency.
+    """
     criterion_id: int
-    grade: int
+    grade: Optional[int] = None
+    points_awarded: Optional[float] = None
     feedback: Optional[str] = None
 
 
@@ -118,11 +128,30 @@ def _persist_manual_criterion_scores(
         if not criterion:
             continue
 
-        grade = max(0, min(int(item.grade or 0), 5))
+        criterion_max_points = float(criterion.max_points or 0)
         percent_weight = float(criterion.weight or 0)
-        # Award points = (grade / 5) * weight%. Totals are still stored on
-        # submission.score; this table is just a breakdown for display.
-        points_awarded = round((grade / 5.0) * percent_weight, 4) if percent_weight > 0 else 0.0
+
+        if item.points_awarded is not None:
+            # Unweighted / points-based rubric: clamp to [0, max_points].
+            clamped_points = max(0.0, float(item.points_awarded))
+            if criterion_max_points > 0:
+                clamped_points = min(clamped_points, criterion_max_points)
+            points_awarded = round(clamped_points, 4)
+            # Derive a 0–5 tier so reads can uniformly look up auto-feedback
+            # from defaultComments by tier.
+            if criterion_max_points > 0:
+                tier = int(round((clamped_points / criterion_max_points) * 5))
+            else:
+                tier = 0
+            grade = max(0, min(tier, 5))
+        else:
+            # Weighted rubric: `grade` is the authoritative 0–5 rating; derive
+            # the corresponding weighted points for the breakdown.
+            grade = max(0, min(int(item.grade or 0), 5))
+            if percent_weight > 0:
+                points_awarded = round((grade / 5.0) * percent_weight, 4)
+            else:
+                points_awarded = 0.0
 
         db.add(
             SubmissionRubricCriterionScore(

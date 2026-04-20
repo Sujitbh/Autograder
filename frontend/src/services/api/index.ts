@@ -14,4 +14,17 @@ export { testcaseService } from './testcaseService';
 export { rubricService } from './rubricService';
 export { codeExecutionApiService } from './codeExecutionApiService';
 export { taDashboardService } from './taDashboardService';
+export { dashboardService } from './dashboardService';
+export type {
+    DashboardCourseRef,
+    DashboardActivityItem,
+    StudentDashboardFeed,
+    StudentDashboardStats,
+    StudentTodoItem,
+    StudentDashboardCourseCard,
+    FacultyDashboardFeed,
+    FacultyDashboardStats,
+    FacultyTodoItem,
+    FacultyDashboardCourseCard,
+} from './dashboardService';
 export * from './messageService';

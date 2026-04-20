@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronDown, LogOut, User, MessageSquare, BookOpen, Moon, Sun, StickyNote, CalendarDays, ArrowLeftRight } from 'lucide-react';
+import { ChevronRight, ChevronDown, LogOut, User, MessageSquare, BookOpen, Moon, Sun, StickyNote, CalendarDays, ArrowLeftRight, LayoutDashboard } from 'lucide-react';
 import { LiveClock } from './LiveClock';
 import {
   DropdownMenu,
@@ -137,9 +137,18 @@ export function TopNav({
   const getHomeRoute = () => {
     if (currentUser?.role === 'admin') return '/admin';
     if (isInTAView) return '/ta';
-    if (currentUser?.role === 'student') return '/student';
+    if (currentUser?.role === 'student' || currentUser?.role === 'faculty') return '/dashboard';
     return '/courses';
   };
+
+  // Quick-jump pills shown next to the logo for students/faculty so the
+  // dashboard and courses list are always one click away from anywhere
+  // in the app. Admin and TAs already have their own dedicated spaces,
+  // so these pills are not shown there.
+  const showQuickNav =
+    (currentUser?.role === 'student' || currentUser?.role === 'faculty') && !isInTAView;
+  const dashboardActive = pathname === '/dashboard' || pathname?.startsWith('/dashboard/');
+  const coursesActive = pathname === '/courses' || pathname?.startsWith('/courses/');
 
   const getSettingsRoute = () => {
     if (currentUser?.role === 'admin') return '/admin/account';
@@ -160,22 +169,60 @@ export function TopNav({
       }}
     >
       {/* Left Zone: Logo + App Name */}
-      <button
-        className="flex items-center cursor-pointer"
-        onClick={() => router.push(getHomeRoute())}
-        type="button"
-        aria-label="Go to courses"
-        style={{ background: 'none', border: 'none', padding: 0 }}
-      >
-        <img
-          src="/images/axiom-logo.png"
-          alt="Axiom"
-          style={{
-            width: '32px',
-            height: '32px',
-          }}
-        />
-      </button>
+      <div className="flex items-center gap-3">
+        <button
+          className="flex items-center cursor-pointer"
+          onClick={() => router.push(getHomeRoute())}
+          type="button"
+          aria-label="Go to home"
+          style={{ background: 'none', border: 'none', padding: 0 }}
+        >
+          <img
+            src="/images/axiom-logo.png"
+            alt="Axiom"
+            style={{
+              width: '32px',
+              height: '32px',
+            }}
+          />
+        </button>
+        {showQuickNav && (
+          <div className="hidden md:flex items-center gap-1 ml-2">
+            <button
+              type="button"
+              onClick={() => router.push('/dashboard')}
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors"
+              style={{
+                backgroundColor: dashboardActive ? 'rgba(255,255,255,0.2)' : 'transparent',
+                border: `1px solid ${dashboardActive ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.15)'}`,
+                color: navFg,
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+              aria-current={dashboardActive ? 'page' : undefined}
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" />
+              Dashboard
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push(currentUser?.role === 'student' ? '/student' : '/courses')}
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 transition-colors"
+              style={{
+                backgroundColor: coursesActive ? 'rgba(255,255,255,0.2)' : 'transparent',
+                border: `1px solid ${coursesActive ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.15)'}`,
+                color: navFg,
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+              aria-current={coursesActive ? 'page' : undefined}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              Courses
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Center Zone: Breadcrumb Trail (hidden on top-level pages) */}
       {breadcrumbs.length > 0 && (

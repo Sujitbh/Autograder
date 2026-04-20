@@ -9,10 +9,10 @@ import type { UserRole } from '@/types';
 /** Return the dashboard path for a given role. */
 function dashboardForRole(role: UserRole): string {
     switch (role) {
-        case 'student': return '/student';
         case 'admin': return '/admin';
+        case 'student':
         case 'faculty':
-        default: return '/courses';
+        default: return '/dashboard';
     }
 }
 

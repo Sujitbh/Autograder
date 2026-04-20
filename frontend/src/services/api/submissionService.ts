@@ -351,10 +351,16 @@ export const submissionService = {
       score: number;
       max_score?: number;
       feedback?: string;
-      /** Optional per-criterion 0-5 grades for weighted rubrics. */
+      /**
+       * Optional per-criterion breakdown.
+       * - Weighted rubrics: pass `grade` (0–5 tier).
+       * - Unweighted rubrics: pass `points_awarded` (0..criterion.max_points);
+       *   the backend derives the 0–5 tier for default-comment lookup.
+       */
       criterion_scores?: Array<{
         criterion_id: number;
-        grade: number;
+        grade?: number;
+        points_awarded?: number;
         feedback?: string | null;
       }>;
     }

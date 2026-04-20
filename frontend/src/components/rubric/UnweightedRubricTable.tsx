@@ -1,11 +1,26 @@
 'use client';
 
-import React, { useCallback, useMemo } from 'react';
-import { ChevronDown, ChevronUp, GripVertical, Plus, Trash2 } from 'lucide-react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { ChevronDown, ChevronUp, GripVertical, MessageSquare, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import type { RubricCriterion, RubricSection } from './WeightedRubricTable';
+
+// Unweighted rubrics still surface auto-feedback on a 5-tier scale so the
+// student sees a message matching how close they came to full credit
+// (5 = full credit, 0 = none). The tier is derived at read time from
+// `points_awarded / max_points` to keep the authoring UI consistent with
+// weighted rubrics.
+const UNWEIGHTED_TIER_SCALE = [5, 4, 3, 2, 1, 0] as const;
+const UNWEIGHTED_TIER_LABEL: Record<number, string> = {
+    5: 'Full credit',
+    4: 'Nearly there',
+    3: 'Partial',
+    2: 'Limited',
+    1: 'Minimal',
+    0: 'No credit',
+};
 
 interface UnweightedRubricTableProps {
     sections: RubricSection[];
@@ -23,7 +38,10 @@ function emptyCriterion(name = 'New Criterion'): RubricCriterion {
         name,
         description: '',
         maxPoints: 1,
-        weight: 1,
+        // `weight` is required by the shared interface but is not used in
+        // unweighted mode; keep it at 0 so nothing downstream tries to
+        // compute percentages from it.
+        weight: 0,
         gradingMethod: 'manual',
         defaultComments: {},
     };
@@ -33,7 +51,7 @@ function emptySection(name = 'New Section'): RubricSection {
     return {
         name,
         description: '',
-        weight: 1,
+        weight: 0,
         criteria: [emptyCriterion('Criterion 1')],
     };
 }
@@ -265,6 +283,12 @@ export default function UnweightedRubricTable({
                                                     placeholder="Describe what this criterion evaluates..."
                                                     disabled={readOnly}
                                                 />
+                                                {!readOnly && (
+                                                    <DefaultCommentsEditorUnweighted
+                                                        comments={(criterion.defaultComments ?? {}) as Record<string, string>}
+                                                        onChange={(dc) => updateCriterion(si, ci, { defaultComments: dc })}
+                                                    />
+                                                )}
                                             </td>
                                             {!readOnly && (
                                                 <td className="border border-gray-300 px-1 text-center dark:border-gray-600">
@@ -324,6 +348,56 @@ export default function UnweightedRubricTable({
                 <Button type="button" variant="outline" size="sm" onClick={addSection} className="mt-2">
                     <Plus className="mr-1 h-4 w-4" /> Add Section
                 </Button>
+            )}
+        </div>
+    );
+}
+
+// ── Default comments inline editor (unweighted, 0–5 tier) ──────────────────
+
+function DefaultCommentsEditorUnweighted({
+    comments,
+    onChange,
+}: {
+    comments: Record<string, string>;
+    onChange: (comments: Record<string, string>) => void;
+}) {
+    const [open, setOpen] = useState(() =>
+        Object.values(comments || {}).some((v) => (v ?? '').trim().length > 0),
+    );
+
+    return (
+        <div className="mt-2">
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-[#6B0000] hover:underline"
+            >
+                <MessageSquare className="h-3 w-3" />
+                {open ? 'Hide auto feedback' : 'Add auto feedback for this criterion'}
+            </button>
+            {open && (
+                <div className="mt-1 grid gap-1 rounded-md border border-dashed border-gray-300 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800/60">
+                    <p className="text-[10px] text-gray-500">
+                        Shown to the student based on how close their score is to full credit.
+                        5 = full points, 0 = no points.
+                    </p>
+                    {UNWEIGHTED_TIER_SCALE.map((tier) => (
+                        <div key={tier} className="flex items-start gap-1.5">
+                            <span className="w-16 shrink-0 pt-1.5 text-[11px] font-mono text-gray-500">
+                                {tier} · {UNWEIGHTED_TIER_LABEL[tier]}
+                            </span>
+                            <Input
+                                value={comments[String(tier)] ?? ''}
+                                onChange={(e) =>
+                                    onChange({ ...comments, [String(tier)]: e.target.value })
+                                }
+                                placeholder={`Default comment for ${UNWEIGHTED_TIER_LABEL[tier].toLowerCase()}`}
+                                className="h-6 text-[11px] bg-white dark:bg-gray-800"
+                            />
+                        </div>
+                    ))}
+                </div>
             )}
         </div>
     );
