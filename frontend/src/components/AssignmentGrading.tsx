@@ -270,7 +270,7 @@ export function AssignmentGrading() {
             const submittedAt = sub.created_at ?? sub.submittedAt ?? null;
             const score = sub.score ?? sub.grade?.totalScore ?? null;
             const maxScore = sub.max_score ?? sub.grade?.maxScore ?? meta?.totalPoints ?? 100;
-            const status = sub.status === 'graded' || score != null ? 'graded' : 'submitted';
+            const status = sub.status === 'graded' ? 'graded' : 'submitted';
 
             const row = {
                 id: String(sub.id),
@@ -418,7 +418,8 @@ export function AssignmentGrading() {
         setIsGradingAll(true);
         try {
             const result = await submissionService.gradeAllSubmissions(assignmentId);
-            window.alert(`Executed grading for ${result.total_considered ?? result.total_graded} latest submission(s). Graded: ${result.total_graded}. Errors: ${result.total_errors}.`);
+            const suggested = result.total_suggested ?? result.total_graded ?? 0;
+            window.alert(`Generated auto-grade suggestions for ${result.total_considered ?? suggested} latest submission(s). Suggestions: ${suggested}. Errors: ${result.total_errors}.`);
             refetchSubmissions();
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to grade submissions';

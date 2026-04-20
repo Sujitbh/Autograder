@@ -69,12 +69,12 @@ function normalizeAssignmentStatusLabel(statusRaw: string, hasGrade: boolean): s
 
   if (status === 'missing') return 'Missed Deadline';
   if (status === 'not_submitted') return 'Not Submitted';
-  if (status === 'graded' || (hasGrade && status !== 'ungraded')) return 'Graded';
+  if (status === 'graded') return 'Graded';
   if (status === 'ungraded' || status === 'submitted' || status === 'pending' || status === 'grading') {
     return 'Submitted - Needs Grading';
   }
 
-  return hasGrade ? 'Graded' : 'Not Submitted';
+  return hasGrade ? 'Submitted - Needs Grading' : 'Not Submitted';
 }
 
 type SortField = 'name' | 'studentId' | 'total' | string;

@@ -654,7 +654,7 @@ def ta_auto_grade(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """Auto-grade a submission: run tests + rubric evaluation. Requires can_grade."""
+    """Auto-grade a submission: suggestion only (does not finalize grade/status)."""
     import logging, traceback
     logger = logging.getLogger(__name__)
     try:
@@ -676,10 +676,7 @@ def ta_auto_grade(
         ).delete()
         db.flush()
 
-        # Use the grading service to run tests + rubric
-        submission.status = "grading"
-        db.commit()
-
+        # Use the grading service to run tests + rubric (suggestion only)
         results = GradingService.grade_submission(
             db=db,
             submission_id=submission.id,
@@ -688,14 +685,6 @@ def ta_auto_grade(
             grader_id=user.id,
         )
 
-        # Update submission with grading results
-        submission.status = "graded"
-        submission.score = results["total_score"]
-        submission.max_score = results["max_score"]
-        submission.feedback = "\n".join(results["feedback"]) if results["feedback"] else None
-        from datetime import datetime
-        submission.graded_at = datetime.utcnow()
-        db.commit()
         db.refresh(submission)
 
         # Also fetch the stored test results for the response
@@ -722,22 +711,19 @@ def ta_auto_grade(
         return {
             "submission_id": submission.id,
             "status": submission.status,
-            "score": float(submission.score) if submission.score is not None else None,
-            "max_score": float(submission.max_score) if submission.max_score is not None else None,
-            "feedback": submission.feedback,
+            "score": float(results["total_score"]) if results.get("total_score") is not None else None,
+            "max_score": float(results["max_score"]) if results.get("max_score") is not None else None,
+            "feedback": "\n".join(results["feedback"]) if results.get("feedback") else None,
             "percentage": results["percentage"],
             "test_results": results.get("test_results"),
             "rubric_results": results.get("rubric_results"),
             "stored_results": results_data,
-            "message": "Auto-grading complete",
+            "message": "Auto-grade suggestion generated. Instructor must submit final grade.",
         }
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error in ta_auto_grade: {traceback.format_exc()}")
-        submission.status = "error"
-        submission.feedback = str(e)
-        db.commit()
         raise HTTPException(status_code=500, detail=f"Auto-grading failed: {str(e)}")
 
 
@@ -789,7 +775,7 @@ def grade_submission(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    """TA submits a grade for a submission."""
+    """TA saves a grading draft; only instructors can submit final grades."""
     enrollment = _require_ta_for_course(db, user.id, course_id)
     permissions = _get_permissions(db, enrollment.id)
     _require_permission(permissions, "can_grade", "grade submissions")
@@ -807,6 +793,18 @@ def grade_submission(
     feedback = payload.get("feedback", "")
     is_draft = payload.get("is_draft", False)
     rubric_breakdown = payload.get("rubric_breakdown")
+
+    if submission.status == "graded":
+        raise HTTPException(
+            status_code=403,
+            detail="Final grade already submitted by instructor; TA cannot modify finalized grades",
+        )
+
+    if not is_draft:
+        raise HTTPException(
+            status_code=403,
+            detail="Only instructors can submit final grades. Save as draft instead.",
+        )
 
     if score is not None:
         submission.score = score
@@ -846,7 +844,8 @@ def grade_submission(
                 )
             )
 
-    submission.status = "grading" if is_draft else "graded"
+    submission.status = "grading"
+    submission.graded_at = None
 
     db.commit()
     db.refresh(submission)
@@ -857,7 +856,7 @@ def grade_submission(
         "score": float(submission.score) if submission.score is not None else None,
         "max_score": float(submission.max_score) if submission.max_score is not None else None,
         "feedback": submission.feedback,
-        "message": "Draft saved" if is_draft else "Grade submitted",
+        "message": "Draft saved for instructor review",
     }
 
 

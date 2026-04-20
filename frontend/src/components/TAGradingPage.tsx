@@ -29,7 +29,6 @@ import {
     XCircle,
     Clock,
     Send,
-    Save,
     Loader2,
     ChevronDown,
     ChevronRight,
@@ -172,7 +171,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     const autoGradeMutation = useTAAutoGrade(courseIdNum);
 
     // Code execution hook (for ad-hoc run)
-    const { execute, isRunning: isExecutingCode, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
+    const { execute, compile, isRunning: isExecutingCode, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
 
     const [activeFileIndex, setActiveFileIndex] = useState(0);
     const [editorFiles, setEditorFiles] = useState<EditorReviewFile[]>([]);
@@ -280,7 +279,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
             ? sortedSubmissionIds[currentSubmissionIndex + 1].id
             : null;
 
-    const handleGrade = (isDraft: boolean, moveToNext: boolean = false) => {
+    const handleSaveDraft = (moveToNext: boolean = false) => {
         const feedbackToSave = feedback.trim() || 'Reviewed by TA.';
         gradeMutation.mutate(
             {
@@ -289,17 +288,13 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                     score: score ? Number.parseFloat(score) : undefined,
                     max_score: maxScore ? Number.parseFloat(maxScore) : undefined,
                     feedback: feedbackToSave,
-                    is_draft: isDraft,
+                    is_draft: true,
                 },
             },
             {
                 onSuccess: () => {
-                    if (!isDraft) {
-                        if (moveToNext && nextSubmissionId) {
-                            router.push(`/ta/courses/${courseId}/submissions/${nextSubmissionId}/grade`);
-                            return;
-                        }
-                        router.push(`/ta/courses/${courseId}/submissions`);
+                    if (moveToNext && nextSubmissionId) {
+                        router.push(`/ta/courses/${courseId}/submissions/${nextSubmissionId}/grade`);
                     }
                 },
             }
@@ -384,6 +379,8 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         detail.assignment.allowed_languages?.split(',')[0]
         || 'python'
     ).toLowerCase();
+    const supportsCompileCheck = language === 'python' || language === 'java';
+    const compileButtonLabel = language === 'java' ? 'Compile' : 'Check Syntax';
 
     const sectionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 100);
     const criterionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 0);
@@ -438,6 +435,13 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         }
         setShowInlineInput(false);
         await execute(code, language);
+    };
+
+    const handleCompileCode = async () => {
+        if (!supportsCompileCheck) return;
+        setOutputOpen(true);
+        setShowInlineInput(false);
+        await compile(code, language);
     };
 
     const handleOpenInlineInput = () => {
@@ -703,6 +707,24 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                             >
                                 {isExecutingCode ? '⏳ Running...' : '▶ Run Code'}
                             </button>
+                            {supportsCompileCheck && (
+                                <button
+                                    onClick={handleCompileCode}
+                                    disabled={isExecutingCode || runTestsMutation.isPending || autoGradeMutation.isPending}
+                                    style={{
+                                        padding: '5px 12px', borderRadius: 5, fontSize: 12, fontWeight: 700,
+                                        background: 'var(--color-primary)', color: '#fff', letterSpacing: '.3px',
+                                        transition: 'background .15s, box-shadow .2s',
+                                        opacity: isExecutingCode ? 0.7 : 1,
+                                        cursor: isExecutingCode ? 'not-allowed' : 'pointer',
+                                        border: 'none',
+                                    }}
+                                    onMouseEnter={e => { if (!isExecutingCode) { e.currentTarget.style.background = 'var(--color-primary-hover)'; e.currentTarget.style.boxShadow = '0 0 10px rgba(123,13,13,.45)'; } }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.boxShadow = 'none'; }}
+                                >
+                                    {compileButtonLabel}
+                                </button>
+                            )}
 
                             <button
                                 onClick={handleOpenInlineInput}
@@ -1364,7 +1386,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
 
                                                 <div className="flex flex-col gap-3">
                                                     <button
-                                                        onClick={() => handleGrade(false)}
+                                                        onClick={() => handleSaveDraft(false)}
                                                         disabled={gradeMutation.isPending || !score}
                                                         style={{
                                                             width: '100%', padding: '12px', borderRadius: 6,
@@ -1388,12 +1410,12 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                         }}
                                                     >
                                                         {gradeMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                                                        Submit Final Grade
+                                                        Save Draft for Instructor
                                                     </button>
 
                                                     {nextSubmissionId && (
                                                         <button
-                                                            onClick={() => handleGrade(false, true)}
+                                                            onClick={() => handleSaveDraft(true)}
                                                             disabled={gradeMutation.isPending || !score}
                                                             className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
                                                             style={{
@@ -1404,24 +1426,9 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                 fontWeight: 600,
                                                             }}
                                                         >
-                                                            <Send className="w-4 h-4" /> Save &amp; Next
+                                                            <Send className="w-4 h-4" /> Save Draft &amp; Next
                                                         </button>
                                                     )}
-
-                                                    <button
-                                                        onClick={() => handleGrade(true)}
-                                                        disabled={gradeMutation.isPending}
-                                                        className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors hover:opacity-90 disabled:opacity-50"
-                                                        style={{
-                                                            backgroundColor: 'var(--color-primary-bg)',
-                                                            border: '1px solid var(--color-border)',
-                                                            color: 'var(--color-text-dark)',
-                                                            fontSize: '13px',
-                                                            fontWeight: 600,
-                                                        }}
-                                                    >
-                                                        <Save className="w-4 h-4" /> Save Draft
-                                                    </button>
                                                 </div>
 
                                                 {gradeMutation.isSuccess && (
@@ -1430,7 +1437,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                         style={{ backgroundColor: 'var(--color-success-bg)', border: '1px solid #6EE7B7' }}
                                                     >
                                                         <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-success)' }}>
-                                                            Grade recorded successfully
+                                                            Draft saved successfully
                                                         </p>
                                                     </div>
                                                 )}

@@ -131,6 +131,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
             score: number;
             max_score: number;
             feedback?: string;
+            is_draft?: boolean;
             criterion_scores?: Array<{
                 criterion_id: number;
                 grade?: number;
@@ -152,7 +153,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         mutationFn: () => submissionService.runTests(submissionId),
     });
 
-    const { execute, isRunning: isExecutingCode, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
+    const { execute, compile, isRunning: isExecutingCode, result: execResult, error: execError, lastStdinInput } = useCodeExecution();
 
     const [activeFileIndex, setActiveFileIndex] = useState(0);
     const [editorFiles, setEditorFiles] = useState<EditorReviewFile[]>([]);
@@ -563,6 +564,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
             score: normalizedScore,
             max_score: normalizedMax,
             feedback: feedbackToSave,
+            is_draft: isDraft,
             criterion_scores: criterionScores,
         });
 
@@ -612,6 +614,14 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         }
         setShowInlineInput(false);
         await execute(code, lang);
+    };
+    const handleCompileCode = async () => {
+        if (!detail) return;
+        const lang = (detail.assignment.language || 'python').toLowerCase();
+        if (lang !== 'python' && lang !== 'java') return;
+        setOutputOpen(true);
+        setShowInlineInput(false);
+        await compile(code, lang);
     };
     const handleOpenInlineInput = () => {
         setOutputOpen(true);
@@ -725,6 +735,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     }
 
     const language = (detail.assignment.language || 'python').toLowerCase();
+    const supportsCompileCheck = language === 'python' || language === 'java';
+    const compileButtonLabel = language === 'java' ? 'Compile' : 'Check Syntax';
     const activeFile = editorFiles[activeFileIndex];
     const code = activeFile?.content || '';
     const displayTests = (() => {
@@ -1010,6 +1022,14 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                 onMouseLeave={e => { e.currentTarget.style.background = '#16a34a'; }}>
                                 {isExecutingCode ? '⏳ Running...' : '▶ Run Code'}
                             </button>
+                            {supportsCompileCheck && (
+                                <button onClick={handleCompileCode} disabled={isExecutingCode || autoGradeMutation.isPending}
+                                    style={{ padding: '6px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: 'var(--color-primary)', color: '#fff', letterSpacing: '.3px', transition: 'background .15s, box-shadow .2s', opacity: isExecutingCode ? 0.7 : 1, cursor: isExecutingCode ? 'not-allowed' : 'pointer', border: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap', lineHeight: 1.1 }}
+                                    onMouseEnter={e => { if (!isExecutingCode) { e.currentTarget.style.background = 'var(--color-primary-hover)'; e.currentTarget.style.boxShadow = '0 0 10px rgba(123,13,13,.45)'; } }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--color-primary)'; e.currentTarget.style.boxShadow = 'none'; }}>
+                                    {compileButtonLabel}
+                                </button>
+                            )}
                             <button
                                 onClick={handleOpenInlineInput}
                                 disabled={isExecutingCode || autoGradeMutation.isPending}

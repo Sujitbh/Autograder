@@ -80,6 +80,7 @@ class ManualScoreUpdateRequest(BaseModel):
     score: int
     max_score: Optional[int] = None
     feedback: Optional[str] = None
+    is_draft: bool = False
     rubric_breakdown: Optional[list[dict]] = None
     # Per-criterion 0–5 ratings + auto feedback snapshot for weighted rubrics.
     criterion_scores: Optional[list[CriterionScoreInline]] = None
@@ -367,10 +368,6 @@ def grade_submission(
     )
     _enforce_ta_can_grade(db=db, user=user, course_id=assignment.course_id)
 
-    # Update submission status
-    submission.status = "grading"
-    db.commit()
-
     try:
         results = GradingService.grade_submission(
             db=db,
@@ -380,21 +377,53 @@ def grade_submission(
             grader_id=user.id,
         )
 
-        # Update submission with results
-        submission.status = "graded"
-        submission.score = results["total_score"]
-        submission.max_score = results["max_score"]
-        submission.feedback = "\n".join(results["feedback"])
-        from datetime import datetime
-        submission.graded_at = datetime.utcnow()
-        db.commit()
+        # Return suggestion data without finalizing submission status/score.
+        # Final status transitions happen only in manual score submission.
+        stored_results = db.query(SubmissionResult).filter(
+            SubmissionResult.submission_id == submission.id
+        ).all()
+        stored_results_payload = []
+        for tr in stored_results:
+            tc = db.query(TestCase).filter(TestCase.id == tr.testcase_id).first() if tr.testcase_id else None
+            stored_results_payload.append({
+                "id": tr.id,
+                "testcase_id": tr.testcase_id,
+                "testcase_name": tc.name if tc else None,
+                "input_data": tc.input_data if tc else None,
+                "expected_output": tc.expected_output if tc else None,
+                "passed": tr.passed,
+                "output": tr.output,
+                "error_output": tr.error_output,
+                "points_awarded": float(tr.points_awarded) if tr.points_awarded is not None else None,
+                "execution_time_ms": tr.execution_time_ms,
+            })
 
-        return results
+        feedback_lines = results.get("feedback") or []
+        feedback_text = "\n".join(str(line) for line in feedback_lines if line) or None
+
+        if run_tests and apply_rubric:
+            message = "Auto-grade suggestion generated"
+        elif run_tests and not apply_rubric:
+            message = "Test run complete"
+        elif apply_rubric:
+            message = "Rubric suggestion generated"
+        else:
+            message = "Grading analysis complete"
+
+        return {
+            "submission_id": submission.id,
+            "status": submission.status,
+            "score": results.get("total_score"),
+            "max_score": results.get("max_score"),
+            "feedback": feedback_text,
+            "percentage": results.get("percentage", 0),
+            "test_results": results.get("test_results"),
+            "rubric_results": results.get("rubric_results"),
+            "stored_results": stored_results_payload,
+            "message": message,
+        }
 
     except Exception as e:
-        submission.status = "error"
-        submission.feedback = str(e)
-        db.commit()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Grading failed: {str(e)}",
@@ -526,20 +555,21 @@ def grade_all_submissions(
     for sub in submissions:
         try:
             result = GradingService.grade_submission(db, sub.id, grader_id=user.id)
-            sub.status = "graded"
-            sub.score = result["total_score"]
-            sub.max_score = result["max_score"]
-            results.append({"submission_id": sub.id, "status": "graded", "score": result["total_score"]})
+            results.append({
+                "submission_id": sub.id,
+                "status": "suggested",
+                "score": result.get("total_score"),
+                "max_score": result.get("max_score"),
+                "percentage": result.get("percentage"),
+            })
         except Exception as e:
-            sub.status = "error"
             results.append({"submission_id": sub.id, "status": "error", "error": str(e)})
-
-    db.commit()
 
     return {
         "assignment_id": assignment_id,
         "total_considered": len(submissions),
-        "total_graded": len([r for r in results if r["status"] == "graded"]),
+        "total_graded": len([r for r in results if r["status"] == "suggested"]),
+        "total_suggested": len([r for r in results if r["status"] == "suggested"]),
         "total_errors": len([r for r in results if r["status"] == "error"]),
         "results": results,
     }
@@ -559,13 +589,19 @@ def manual_score_submission(
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
 
-    require_course_role(
+    resolved_role = require_course_role(
         db=db,
         user=user,
         course_id=assignment.course_id,
         allowed_roles=["instructor", "ta"],
     )
     _enforce_ta_can_grade(db=db, user=user, course_id=assignment.course_id)
+
+    if resolved_role == "ta" and submission.status == "graded":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only instructors can modify finalized grades",
+        )
 
     if payload.score < 0:
         raise HTTPException(status_code=400, detail="score must be >= 0")
@@ -594,10 +630,22 @@ def manual_score_submission(
         grader_id=user.id,
     )
 
-    submission.status = "graded"
-
     from datetime import datetime
-    submission.graded_at = datetime.utcnow()
+    requested_draft = bool(payload.is_draft)
+    is_draft = requested_draft or resolved_role == "ta"
+
+    if is_draft:
+        submission.status = "grading"
+        submission.graded_at = None
+        message = (
+            "Draft saved. Only instructors can submit final grades."
+            if resolved_role == "ta" and not requested_draft
+            else "Draft saved"
+        )
+    else:
+        submission.status = "graded"
+        submission.graded_at = datetime.utcnow()
+        message = "Grade submitted"
 
     db.add(submission)
     db.commit()
@@ -610,6 +658,7 @@ def manual_score_submission(
         "max_score": submission.max_score,
         "feedback": submission.feedback,
         "graded_at": submission.graded_at,
+        "message": message,
     }
 
 

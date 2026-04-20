@@ -82,7 +82,8 @@ export function ClassPerformancePage({ courseId, assignmentId }: ClassPerformanc
     mutationFn: () => submissionService.gradeAllSubmissions(assignmentId),
     onSuccess: async (result) => {
       await refetch();
-      window.alert(`Executed grading for ${result.total_considered ?? result.total_graded} latest submission(s). Graded: ${result.total_graded}. Errors: ${result.total_errors}.`);
+      const suggested = result.total_suggested ?? result.total_graded ?? 0;
+      window.alert(`Generated auto-grade suggestions for ${result.total_considered ?? suggested} latest submission(s). Suggestions: ${suggested}. Errors: ${result.total_errors}.`);
     },
     onError: (err) => {
       const message = err instanceof Error ? err.message : 'Failed to run bulk execution';

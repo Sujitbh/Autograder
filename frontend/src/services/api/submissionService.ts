@@ -35,6 +35,7 @@ interface BackendGradingResults {
   max_score?: number | null;
   feedback?: string | null;
   graded_at?: string | null;
+  message?: string;
 }
 
 export interface AssignmentZipDownload {
@@ -351,6 +352,7 @@ export const submissionService = {
       score: number;
       max_score?: number;
       feedback?: string;
+      is_draft?: boolean;
       /**
        * Optional per-criterion breakdown.
        * - Weighted rubrics: pass `grade` (0–5 tier).

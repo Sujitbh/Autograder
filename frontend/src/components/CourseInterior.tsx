@@ -171,7 +171,7 @@ export function CourseInterior() {
 
       const latest = Array.from(latestByStudent.values());
       const submittedStudents = latest.length;
-      const gradedStudents = latest.filter((s: any) => s.status === 'graded' || s.grade?.totalScore != null).length;
+      const gradedStudents = latest.filter((s: any) => s.status === 'graded').length;
       const totalStudents = assignment.totalStudents > 0 ? assignment.totalStudents : submittedStudents;
 
       return {
