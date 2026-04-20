@@ -53,6 +53,26 @@ function lookupCourseCode(id: string) {
     try { const s = JSON.parse(localStorage.getItem('autograde_courses') || '[]'); const f = s.find((c: any) => c.id === id); if (f) return f.code; } catch { } return id;
 }
 
+function lookupCourseName(id: string) {
+    try {
+        const s = JSON.parse(localStorage.getItem('autograde_courses') || '[]');
+        const f = s.find((c: any) => c.id === id);
+        if (f?.title) return f.title;
+        if (f?.name) return f.name;
+        if (f?.code) return f.code;
+    } catch { /* ignore */ }
+    return id;
+}
+
+function toSafeZipNamePart(value: string, fallback: string): string {
+    const cleaned = String(value || '')
+        .normalize('NFKD')
+        .replace(/[^\x00-\x7F]/g, '')
+        .replace(/[^A-Za-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    return cleaned || fallback;
+}
+
 interface StudentSubmission {
     id: string;
     studentName: string;
@@ -368,11 +388,19 @@ export function AssignmentGrading() {
         if (!assignmentId) return;
         setIsDownloadingZip(true);
         try {
-            const blob = await submissionService.downloadAssignmentZip(assignmentId);
+            const { blob, filename } = await submissionService.downloadAssignmentZip(assignmentId);
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `assignment_${assignmentId}_submissions.zip`;
+            const fallbackCourse = toSafeZipNamePart(
+                lookupCourseName(courseId!),
+                `course_${courseId ?? 'unknown'}`,
+            );
+            const fallbackAssignment = toSafeZipNamePart(
+                meta?.name ?? '',
+                `assignment_${assignmentId}`,
+            );
+            a.download = filename || `${fallbackCourse}_${fallbackAssignment}.zip`;
             a.click();
             URL.revokeObjectURL(url);
         } catch (err) {

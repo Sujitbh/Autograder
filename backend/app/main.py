@@ -69,6 +69,7 @@ try:
     with engine.connect() as conn:
         # Backward-compatible schema patch for existing databases.
         conn.execute(text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS rubric_mode VARCHAR NOT NULL DEFAULT 'unweighted'"))
+        conn.execute(text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS grading_strategy VARCHAR NOT NULL DEFAULT 'latest'"))
         conn.execute(text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS ai_detection_enabled BOOLEAN NOT NULL DEFAULT true"))
         conn.execute(text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS auto_flag_enabled BOOLEAN NOT NULL DEFAULT true"))
         conn.execute(text("ALTER TABLE assignments ADD COLUMN IF NOT EXISTS auto_flag_threshold FLOAT NOT NULL DEFAULT 0.70"))

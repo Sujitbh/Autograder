@@ -11,7 +11,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { TopNav } from '@/components/TopNav';
 import { PageLayout } from '@/components/PageLayout';
 import { Sidebar } from '@/components/Sidebar';
-import { CreateAssignmentForm, type AssignmentFormData } from '@/components/CreateAssignmentForm';
+import { CreateAssignmentForm, type AssignmentFormData, type AssignmentSubmissionMeta } from '@/components/CreateAssignmentForm';
 import { toast } from 'sonner';
 import { useCreateAssignment, useUpdateAssignment } from '@/hooks/queries';
 import type { CreateAssignmentDto } from '@/types';
@@ -100,11 +100,11 @@ function assignmentToFormPartial(a: Assignment): Partial<AssignmentFormData> {
         publicTests: [],
         privateTests: [],
         rubricMode: a.rubricMode ?? 'unweighted',
+        gradingStrategy: a.gradingStrategy ?? 'latest',
         rubric: rubricSections,
         maxAttempts: a.maxSubmissions ?? 5,
         allowedFileTypes: a.language === 'java' ? '.java' : '.py',
         maxFileSizeMB: 5,
-        gradingStrategy: 'latest',
         allowResubmission: true,
         showResultsToStudents: true,
         enableGitSubmission: false,
@@ -157,6 +157,7 @@ function toDto(data: AssignmentFormData, courseId: string): CreateAssignmentDto 
         dueDate: isoDate,
         maxPoints: data.maxPoints ?? 100,
         maxSubmissions: data.maxAttempts ?? 5,
+        gradingStrategy: data.gradingStrategy ?? 'latest',
         rubricMode: data.rubricMode,
         isGroup: data.isGroup ?? false,
         starterCode: data.starterCode || undefined,
@@ -207,6 +208,15 @@ export function CreateAssignmentPage() {
     const [defaultRubricReady, setDefaultRubricReady] = useState(false);
     const [initialData, setInitialData] = useState<Partial<AssignmentFormData>>({});
     const [initialStep, setInitialStep] = useState(0);
+
+    const uploadDescriptionPdfIfPresent = useCallback(
+        async (assignmentId: string, submitMeta?: AssignmentSubmissionMeta) => {
+            const pdfFile = submitMeta?.descriptionPdfFile;
+            if (!pdfFile) return;
+            await assignmentService.uploadDescriptionPdf(assignmentId, pdfFile);
+        },
+        []
+    );
 
     useEffect(() => {
         if (!cid) return;
@@ -290,7 +300,7 @@ export function CreateAssignmentPage() {
     }, [cid, draftId]);
 
     const handleSaveDraft = useCallback(
-        (data: AssignmentFormData) => {
+        (data: AssignmentFormData, submitMeta?: AssignmentSubmissionMeta) => {
             const dto = { ...toDto(data, cid), status: 'draft' } as CreateAssignmentDto & { status: string };
             if (draftId) {
                 void (async () => {
@@ -322,6 +332,7 @@ export function CreateAssignmentPage() {
                                 })),
                             ]
                         );
+                        await uploadDescriptionPdfIfPresent(draftId, submitMeta);
                         try {
                             localStorage.setItem(`autograde_assignment_draft_edit_${draftId}`, JSON.stringify(data));
                         } catch { /* ignore */ }
@@ -348,7 +359,12 @@ export function CreateAssignmentPage() {
             }
 
             createMutation.mutate(dto, {
-                onSuccess: (created) => {
+                onSuccess: async (created) => {
+                    try {
+                        await uploadDescriptionPdfIfPresent(created.id, submitMeta);
+                    } catch (pdfErr: any) {
+                        toast.error(`Draft saved, but failed to upload description PDF: ${pdfErr?.message ?? 'Unknown error'}`);
+                    }
                     // Persist the latest editable draft snapshot by assignment id.
                     try {
                         localStorage.setItem(`autograde_assignment_draft_edit_${created.id}`, JSON.stringify(data));
@@ -376,26 +392,16 @@ export function CreateAssignmentPage() {
                 },
             });
         },
-        [cid, createMutation, updateMutation, draftId, router]
+        [cid, createMutation, updateMutation, draftId, router, uploadDescriptionPdfIfPresent]
     );
 
     const handlePublish = useCallback(
-        (data: AssignmentFormData) => {
+        (data: AssignmentFormData, submitMeta?: AssignmentSubmissionMeta) => {
             const dto = toDto(data, cid);
             const defaultRubricPayload = rubricToCourseDefaultPayload(data);
             if (draftId) {
                 void (async () => {
                     try {
-                        await updateMutation.mutateAsync({
-                            courseId: cid,
-                            assignmentId: draftId,
-                            dto: {
-                                ...dto,
-                                status: 'published',
-                                isActive: true,
-                            },
-                        });
-
                         await assignmentService.replaceAssignmentRubric(draftId, {
                             rubricMode: data.rubricMode,
                             rubric: (data.rubric ?? []).map((section) => {
@@ -436,6 +442,18 @@ export function CreateAssignmentPage() {
                             ]
                         );
 
+                        await uploadDescriptionPdfIfPresent(draftId, submitMeta);
+
+                        await updateMutation.mutateAsync({
+                            courseId: cid,
+                            assignmentId: draftId,
+                            dto: {
+                                ...dto,
+                                status: 'published',
+                                isActive: true,
+                            },
+                        });
+
                         try {
                             await courseService.putCourseDefaultRubric(cid, defaultRubricPayload);
                         } catch { /* ignore default rubric sync failures */ }
@@ -459,7 +477,12 @@ export function CreateAssignmentPage() {
             }
 
             createMutation.mutate(dto, {
-                onSuccess: async () => {
+                onSuccess: async (created) => {
+                    try {
+                        await uploadDescriptionPdfIfPresent(created.id, submitMeta);
+                    } catch (pdfErr: any) {
+                        toast.error(`Assignment published, but failed to upload description PDF: ${pdfErr?.message ?? 'Unknown error'}`);
+                    }
                     try {
                         await courseService.putCourseDefaultRubric(cid, defaultRubricPayload);
                     } catch { /* ignore default rubric sync failures */ }
@@ -479,7 +502,7 @@ export function CreateAssignmentPage() {
                 },
             });
         },
-        [cid, router, createMutation, draftId, updateMutation]
+        [cid, router, createMutation, draftId, updateMutation, uploadDescriptionPdfIfPresent]
     );
 
     const handleCancel = useCallback(() => {

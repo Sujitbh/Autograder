@@ -1001,13 +1001,16 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                         {isOverdue && ' (Overdue!)'}
                       </div>
                     )}
-                    {(descriptionText || !hasDescriptionPdf) && (
+                    {!hasDescriptionPdf && (
                       <div style={{ fontSize: 13, lineHeight: 1.7, color: 'var(--color-text-mid)', whiteSpace: 'pre-wrap' as const }}>
                         {descriptionText || 'No description provided.'}
                       </div>
                     )}
                     {hasDescriptionPdf && (
                       <div style={{ marginTop: 12 }}>
+                        <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--color-text-mid)', marginBottom: 8 }}>
+                          This assignment description is provided as a PDF.
+                        </p>
                         <Button
                           type="button"
                           variant="outline"

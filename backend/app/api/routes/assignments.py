@@ -147,6 +147,7 @@ def create_assignment(
         max_submissions=payload.max_submissions,
         max_points=payload.max_points,
         rubric_mode=payload.rubric_mode or "unweighted",
+        grading_strategy=payload.grading_strategy or "latest",
         allowed_languages=payload.allowed_languages,
         starter_code=payload.starter_code,
         status=payload.status or "published",

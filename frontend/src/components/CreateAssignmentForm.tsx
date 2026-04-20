@@ -343,6 +343,10 @@ const formSchema = z.object({
 
 export type AssignmentFormData = z.infer<typeof formSchema>;
 
+export interface AssignmentSubmissionMeta {
+    descriptionPdfFile?: File | null;
+}
+
 // ── Step definitions ────────────────────────────────────────────────
 
 const STEPS = [
@@ -361,8 +365,8 @@ const STEPS = [
 
 interface CreateAssignmentFormProps {
     courseId: string;
-    onSaveDraft: (data: AssignmentFormData) => void;
-    onPublish: (data: AssignmentFormData) => void;
+    onSaveDraft: (data: AssignmentFormData, meta?: AssignmentSubmissionMeta) => void;
+    onPublish: (data: AssignmentFormData, meta?: AssignmentSubmissionMeta) => void;
     onCancel: () => void;
     initialData?: Partial<AssignmentFormData>;
     initialStep?: number;
@@ -968,6 +972,7 @@ export function CreateAssignmentForm({
     const descFileInputRef = useRef<HTMLInputElement>(null);
     const [descFileLoading, setDescFileLoading] = useState(false);
     const [descPdfImages, setDescPdfImages] = useState<string[]>([]);
+    const [descriptionPdfFile, setDescriptionPdfFile] = useState<File | null>(null);
 
     const handleDescriptionFileUpload = async (file: File) => {
         setDescFileLoading(true);
@@ -978,7 +983,6 @@ export function CreateAssignmentForm({
                 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
                 const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
                 const pageImages: string[] = [];
-                let text = '';
                 for (let i = 1; i <= pdf.numPages; i++) {
                     const page = await pdf.getPage(i);
                     // Render page to canvas at 2× scale for crisp display
@@ -991,18 +995,15 @@ export function CreateAssignmentForm({
                         await page.render({ canvasContext: ctx, viewport }).promise;
                         pageImages.push(canvas.toDataURL('image/png'));
                     }
-                    // Also extract plain text for backend storage
-                    const content = await page.getTextContent();
-                    text += content.items
-                        .filter((item) => 'str' in item)
-                        .map((item) => (item as { str: string }).str)
-                        .join(' ') + '\n\n';
                 }
                 setDescPdfImages(pageImages);
-                setValue('description', text.trim(), { shouldDirty: true });
+                setDescriptionPdfFile(file);
+                // Keep PDF as the source of truth; avoid dumping extracted text into description.
+                setValue('description', '', { shouldDirty: true });
             } else {
                 const text = await file.text();
                 setDescPdfImages([]);
+                setDescriptionPdfFile(null);
                 setValue('description', text, { shouldDirty: true });
             }
         } catch (err) {
@@ -1479,8 +1480,8 @@ export function CreateAssignmentForm({
                     )}
                     <p className="mt-1 text-xs text-gray-400">
                         {descPdfImages.length > 0
-                            ? `${descPdfImages.length} page${descPdfImages.length !== 1 ? 's' : ''} rendered from PDF — exact fonts and formatting preserved.`
-                            : 'Supports Markdown formatting. Upload a .txt, .md, or .pdf file to auto-fill.'}
+                            ? `PDF attached (${descriptionPdfFile?.name ?? 'description.pdf'}). Students will open this as a PDF instead of inline text.`
+                            : 'Supports Markdown formatting. Upload a .txt or .md file to auto-fill text, or upload a .pdf to attach as a downloadable description.'}
                     </p>
                 </div>
             </div>
@@ -2442,7 +2443,7 @@ export function CreateAssignmentForm({
                     <Button
                         type="button"
                         variant="outline"
-                        onClick={() => onSaveDraft(getValues())}
+                        onClick={() => onSaveDraft(getValues(), { descriptionPdfFile })}
                         className="flex-1 h-11"
                     >
                         <Save className="h-4 w-4 mr-2" /> Save as Draft
@@ -2478,7 +2479,7 @@ export function CreateAssignmentForm({
     return (
         <>
             <form
-                onSubmit={handleSubmit((values) => onPublish(sanitizeRubricForSubmission(values)))}
+                onSubmit={handleSubmit((values) => onPublish(sanitizeRubricForSubmission(values), { descriptionPdfFile }))}
                 className="mx-auto max-w-4xl space-y-6"
             >
                 {renderStepIndicator()}
@@ -2510,7 +2511,7 @@ export function CreateAssignmentForm({
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => onSaveDraft(getSanitizedValues())}
+                                onClick={() => onSaveDraft(getSanitizedValues(), { descriptionPdfFile })}
                             >
                                 <Save className="mr-1 h-4 w-4" /> Save Draft
                             </Button>
@@ -2620,7 +2621,7 @@ export function CreateAssignmentForm({
                                 }
                                 setShowPublishDialog(false);
                                 handleSubmit(
-                                    (values) => onPublish(sanitizeRubricForSubmission(values)),
+                                    (values) => onPublish(sanitizeRubricForSubmission(values), { descriptionPdfFile }),
                                     () => {
                                         focusFirstValidationStep();
                                         toast.error('Please fix validation errors before publishing.');

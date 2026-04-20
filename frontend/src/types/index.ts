@@ -79,6 +79,7 @@ export interface Assignment {
     maxPoints: number;
     maxSubmissions?: number;
     rubricMode?: 'weighted' | 'unweighted';
+    gradingStrategy?: 'latest' | 'best';
     status: AssignmentStatus;
     isActive?: boolean;
     isGroup: boolean;
@@ -252,6 +253,7 @@ export interface CreateAssignmentDto {
     maxPoints: number;
     maxSubmissions?: number;
     rubricMode?: 'weighted' | 'unweighted';
+    gradingStrategy?: 'latest' | 'best';
     isGroup: boolean;
     allowLateSubmissions: boolean;
     aiDetectionEnabled?: boolean;

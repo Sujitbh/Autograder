@@ -37,6 +37,33 @@ interface BackendGradingResults {
   graded_at?: string | null;
 }
 
+export interface AssignmentZipDownload {
+  blob: Blob;
+  filename: string;
+}
+
+function parseFilenameFromContentDisposition(headerValue: string | undefined): string | null {
+  if (!headerValue) return null;
+
+  // RFC 5987 form: filename*=UTF-8''...
+  const utfMatch = headerValue.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (utfMatch?.[1]) {
+    try {
+      return decodeURIComponent(utfMatch[1].replace(/["']/g, ''));
+    } catch {
+      return utfMatch[1].replace(/["']/g, '');
+    }
+  }
+
+  // Legacy quoted/unquoted filename=...
+  const basicMatch = headerValue.match(/filename\s*=\s*("?)([^\";]+)\1/i);
+  if (basicMatch?.[2]) {
+    return basicMatch[2].trim();
+  }
+
+  return null;
+}
+
 function mapSubmission(s: BackendSubmission): Submission {
   const resolvedMax = s.max_score ?? s.display_max_score ?? 100;
   return {
@@ -377,11 +404,18 @@ export const submissionService = {
   },
 
   /** Instructor/TA ZIP download of all submissions for assignment. */
-  async downloadAssignmentZip(assignmentId: string): Promise<Blob> {
-    const { data } = await api.get(`/faculty/assignments/${assignmentId}/download-zip`, {
+  async downloadAssignmentZip(assignmentId: string): Promise<AssignmentZipDownload> {
+    const response = await api.get(`/faculty/assignments/${assignmentId}/download-zip`, {
       responseType: 'blob',
     });
-    return data;
+    const filename =
+      parseFilenameFromContentDisposition(response.headers?.['content-disposition']) ??
+      '';
+
+    return {
+      blob: response.data,
+      filename,
+    };
   },
 
   /** Student history helper; backend already filters by auth user role. */

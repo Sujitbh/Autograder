@@ -20,6 +20,7 @@ interface BackendAssignment {
     max_submissions: number | null;
     max_points: number | null;
     rubric_mode?: 'weighted' | 'unweighted' | null;
+    grading_strategy?: 'latest' | 'best' | null;
     allowed_languages: string | null;
     starter_code: string | null;
     status: string;
@@ -65,6 +66,7 @@ function mapAssignment(a: BackendAssignment): Assignment {
         maxPoints: a.max_points ?? 100,
         maxSubmissions: a.max_submissions ?? undefined,
         rubricMode: (a.rubric_mode as 'weighted' | 'unweighted' | undefined) ?? 'unweighted',
+        gradingStrategy: (a.grading_strategy as 'latest' | 'best' | undefined) ?? 'latest',
         status: (a.status as 'draft' | 'published' | 'closed') ?? (a.is_active ? 'published' : 'draft'),
         isActive: a.is_active,
         isGroup: false,
@@ -153,6 +155,7 @@ export const assignmentService = {
             allowed_languages: dto.language ?? 'python',
             max_points: dto.maxPoints ?? 100,
             rubric_mode: dto.rubricMode ?? 'unweighted',
+            grading_strategy: dto.gradingStrategy ?? 'latest',
             max_submissions: dto.maxSubmissions ?? null,
             status: dto.status ?? 'published',
             ai_detection_enabled: dto.aiDetectionEnabled ?? true,
@@ -229,6 +232,7 @@ export const assignmentService = {
         if (dto.maxPoints != null) payload.max_points = dto.maxPoints;
         if (dto.maxSubmissions != null) payload.max_submissions = dto.maxSubmissions;
         if (dto.rubricMode != null) payload.rubric_mode = dto.rubricMode;
+        if (dto.gradingStrategy != null) payload.grading_strategy = dto.gradingStrategy;
         if (dto.starterCode !== undefined) payload.starter_code = dto.starterCode;
         if (dto.status != null) payload.status = dto.status;
         if (dto.isActive !== undefined) payload.is_active = dto.isActive;

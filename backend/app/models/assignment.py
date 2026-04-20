@@ -20,6 +20,7 @@ class Assignment(Base):
     allowed_languages = Column(String, nullable=True)  # Comma-separated: "python,java,cpp"
     starter_code = Column(Text, nullable=True)  # Faculty-provided starter code template
     rubric_mode = Column(String, nullable=False, default="unweighted")  # weighted | unweighted
+    grading_strategy = Column(String, nullable=False, default="latest")  # latest | best
     status = Column(String, nullable=False, default="published")  # draft | published | closed
     is_active = Column(Boolean, default=True)
     ai_detection_enabled = Column(Boolean, nullable=False, default=True)

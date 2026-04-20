@@ -45,6 +45,7 @@ class AssignmentCreate(BaseModel):
     max_submissions: Optional[int] = None
     max_points: Optional[int] = 100
     rubric_mode: Optional[str] = "unweighted"
+    grading_strategy: Optional[str] = "latest"  # latest | best
     allowed_languages: Optional[str] = None  # Comma-separated: "python,java,cpp"
     starter_code: Optional[str] = None  # Faculty-provided starter code template
     status: Optional[str] = "published"  # draft | published | closed
@@ -67,6 +68,7 @@ class AssignmentUpdate(BaseModel):
     max_submissions: Optional[int] = None
     max_points: Optional[int] = None
     rubric_mode: Optional[str] = None
+    grading_strategy: Optional[str] = None
     allowed_languages: Optional[str] = None
     starter_code: Optional[str] = None
     status: Optional[str] = None
@@ -99,6 +101,7 @@ class AssignmentOut(BaseModel):
     max_submissions: Optional[int] = None
     max_points: Optional[int] = None
     rubric_mode: str = "unweighted"
+    grading_strategy: str = "latest"
     allowed_languages: Optional[str] = None
     starter_code: Optional[str] = None
     status: str = "published"

@@ -115,9 +115,16 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         queryFn: () => submissionService.getSubmissionDetail(submissionId),
     });
 
-    const anonymizedStudentLabel = detail
-        ? `Student #${detail.student?.id ?? submissionId}`
-        : `Student #${submissionId}`;
+    const studentIdentityLabel = detail?.student?.name?.trim()
+        ? detail.student.name
+        : `Student ${detail?.student?.id ?? submissionId}`;
+
+    const studentIdentityMeta = [
+        detail?.student?.email?.trim() || null,
+        detail?.student?.id != null ? `ID: ${detail.student.id}` : null,
+    ]
+        .filter((value): value is string => Boolean(value))
+        .join(' | ');
 
     const gradeMutation = useMutation({
         mutationFn: (payload: { score: number; max_score: number; feedback?: string }) =>
@@ -716,6 +723,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                         visibleStudentRows.map((s: any) => {
                                             const isCurrent = String(s.id) === String(submissionId);
                                             const isGraded = s.status === 'graded';
+                                            const gradingProgressLabel = isGraded ? 'Graded 1/1' : 'Needs grading 0/1';
                                             return (
                                                 <button
                                                     key={s.id}
@@ -751,9 +759,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                             {s.studentName || `Student ${s.studentId ?? ''}`}
                                                         </div>
                                                         <div style={{ fontSize: 10.5, color: 'var(--color-text-light)' }}>
-                                                            {isGraded
-                                                                ? `Graded${s.grade ? ` · ${s.grade.totalScore}/${s.grade.maxScore}` : ''}`
-                                                                : 'Needs grading'}
+                                                            {gradingProgressLabel}
                                                         </div>
                                                     </div>
                                                     <span
@@ -1055,8 +1061,8 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                 <User className="w-5 h-5" style={{ color: 'var(--color-primary)' }} />
                                             </div>
                                             <div>
-                                                <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{anonymizedStudentLabel}</p>
-                                                <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>Identity hidden for blind grading</p>
+                                                <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--color-text-dark)' }}>{studentIdentityLabel}</p>
+                                                <p style={{ fontSize: '13px', color: 'var(--color-text-mid)' }}>{studentIdentityMeta || 'Student details unavailable'}</p>
                                             </div>
                                         </div>
                                         <div className="space-y-3">
