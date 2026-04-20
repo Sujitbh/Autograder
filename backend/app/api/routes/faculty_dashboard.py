@@ -36,17 +36,32 @@ def faculty_dashboard_feed(
     week_ahead = now + timedelta(days=7)
     two_weeks_ago = now - timedelta(days=14)
 
-    # Courses taught directly by this user + TA-enrolled courses.
-    owned_courses = db.query(Course).filter(Course.faculty_id == user.id).all()
-    ta_enrollments = (
-        db.query(Enrollment)
-        .filter(Enrollment.user_id == user.id, Enrollment.role == "ta")
-        .all()
-    )
-    ta_course_ids = [e.course_id for e in ta_enrollments]
-    courses_map = {c.id: c for c in owned_courses}
-    if ta_course_ids:
-        for c in db.query(Course).filter(Course.id.in_(ta_course_ids)).all():
+    # Courses taught by this user. Authoritative source is the Enrollment
+    # table with role "instructor" (and "ta"); Course.faculty_id is kept as a
+    # legacy fallback so courses from older data still surface. Admins see
+    # every course.
+    courses_map: dict[int, Course] = {}
+    if user.role == "admin":
+        for c in db.query(Course).all():
+            courses_map[c.id] = c
+    else:
+        teaching_enrollments = (
+            db.query(Enrollment)
+            .filter(
+                Enrollment.user_id == user.id,
+                Enrollment.role.in_(("instructor", "ta")),
+            )
+            .all()
+        )
+        teaching_course_ids = [e.course_id for e in teaching_enrollments]
+        if teaching_course_ids:
+            for c in (
+                db.query(Course).filter(Course.id.in_(teaching_course_ids)).all()
+            ):
+                courses_map[c.id] = c
+        # Legacy fallback: Course.faculty_id for users that never got an
+        # instructor enrollment row.
+        for c in db.query(Course).filter(Course.faculty_id == user.id).all():
             courses_map.setdefault(c.id, c)
     courses = list(courses_map.values())
     course_ids = list(courses_map.keys())
