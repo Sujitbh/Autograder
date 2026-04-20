@@ -10,7 +10,7 @@ import { EmptyState } from './EmptyState';
 export interface StudentCourseLike {
     id: number;
     name: string;
-    code: string;
+    code: string | null;
     assignments_count: number;
     completed_count: number;
     average_score: number | null;
@@ -19,7 +19,7 @@ export interface StudentCourseLike {
 export interface FacultyCourseLike {
     id: number;
     name: string;
-    code: string;
+    code: string | null;
     student_count: number;
     published_count: number;
     draft_count: number;
@@ -79,11 +79,16 @@ export function CourseTile({
 }) {
     const router = useRouter();
     const color = courseColorVar(course.id);
+    const codeLabel = course.code ?? '—';
+    const destination =
+        role === 'student'
+            ? `/student/courses/${course.id}`
+            : `/courses/${course.id}`;
 
     return (
         <button
             type="button"
-            onClick={() => router.push(`/courses/${course.id}`)}
+            onClick={() => router.push(destination)}
             className={cn(
                 'group relative flex w-full flex-col overflow-hidden rounded-[12px] text-left',
                 'transition-all duration-200',
@@ -94,7 +99,7 @@ export function CourseTile({
                 boxShadow:
                     'inset 0 0 0 1px var(--dash-ring-subtle), var(--dash-shadow-soft)',
             }}
-            aria-label={`Open ${course.code} ${course.name}`}
+            aria-label={`Open ${codeLabel} ${course.name}`}
         >
             {/* 56px color band with soft gradient wash */}
             <div
@@ -116,7 +121,7 @@ export function CourseTile({
                     <span
                         className="font-mono text-[12px] font-semibold uppercase tracking-[0.08em] text-white/95"
                     >
-                        {course.code}
+                        {codeLabel}
                     </span>
                     <ArrowUpRight
                         className="h-4 w-4 text-white/70 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"

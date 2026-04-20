@@ -245,7 +245,7 @@ def faculty_dashboard_feed(
             if course
             else None,
             "at": _iso(m.created_at),
-            "link": "/messages",
+            "link": "/faculty/messages",
         })
 
     activity.sort(key=lambda x: x.get("at") or "", reverse=True)

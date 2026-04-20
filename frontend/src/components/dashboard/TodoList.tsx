@@ -121,7 +121,7 @@ export function StudentTodoList({ todos }: { todos: StudentTodoItem[] }) {
                 onClick={() => {
                     if (t.course) {
                         router.push(
-                            `/courses/${t.course.id}/assignments/${t.assignment_id}/view`,
+                            `/student/courses/${t.course.id}/assignments/${t.assignment_id}`,
                         );
                     }
                 }}
@@ -188,7 +188,7 @@ export function StudentTodoList({ todos }: { todos: StudentTodoItem[] }) {
                                 onClick={() => {
                                     if (t.course) {
                                         router.push(
-                                            `/courses/${t.course.id}/assignments/${t.assignment_id}/view`,
+                                            `/student/courses/${t.course.id}/assignments/${t.assignment_id}`,
                                         );
                                     }
                                 }}

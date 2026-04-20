@@ -5,7 +5,7 @@ import api from './client';
 export interface DashboardCourseRef {
     id: number;
     name: string;
-    code: string;
+    code: string | null;
 }
 
 export interface DashboardActivityItem {
@@ -60,7 +60,7 @@ export type StudentTodoItem =
 export interface StudentDashboardCourseCard {
     id: number;
     name: string;
-    code: string;
+    code: string | null;
     assignments_count: number;
     completed_count: number;
     average_score: number | null;
@@ -111,7 +111,7 @@ export type FacultyTodoItem =
 export interface FacultyDashboardCourseCard {
     id: number;
     name: string;
-    code: string;
+    code: string | null;
     student_count: number;
     published_count: number;
     draft_count: number;

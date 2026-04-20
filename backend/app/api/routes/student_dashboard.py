@@ -281,7 +281,7 @@ def student_dashboard_feed(
                     if course
                     else None,
                     "at": _iso(s.graded_at),
-                    "link": f"/courses/{a.course_id}/assignments/{a.id}/view",
+                    "link": f"/student/courses/{a.course_id}/assignments/{a.id}",
                 })
     # Upcoming assignments (next 14 days)
     for a in assignments:
@@ -300,7 +300,7 @@ def student_dashboard_feed(
                 if course
                 else None,
                 "at": _iso(a.due_date),
-                "link": f"/courses/{a.course_id}/assignments/{a.id}/view",
+                "link": f"/student/courses/{a.course_id}/assignments/{a.id}",
             })
     # Recent messages (announcements)
     recent_msgs = (
@@ -320,7 +320,7 @@ def student_dashboard_feed(
             if course
             else None,
             "at": _iso(m.created_at),
-            "link": "/messages",
+            "link": "/student/messages",
         })
 
     activity.sort(key=lambda x: x.get("at") or "", reverse=True)

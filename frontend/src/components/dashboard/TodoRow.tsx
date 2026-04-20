@@ -36,7 +36,7 @@ export interface TodoRowProps {
     icon: React.ReactNode;
     title: string;
     subtitle?: string | null;
-    course?: { id: number; code: string; name?: string } | null;
+    course?: { id: number; code: string | null; name?: string } | null;
     /** Short trailing badge (due label, count, percentage, etc.) */
     trail?: { label: string; tone?: 'primary' | 'warn' | 'ok' | 'info' | 'danger' | 'neutral' };
     /** Only rendered when onClick is provided (makes the row itself interactive). */

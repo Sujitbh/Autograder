@@ -116,6 +116,10 @@ export function courseColorVar(courseId: number | null | undefined): string {
     return `var(--dash-cat-${idx})`;
 }
 
+function courseCodeLabel(course: { code: string | null } | null | undefined): string {
+    return course?.code ?? '—';
+}
+
 /* ───────────────────────── Activity grouping + compression ───────────────────────── */
 
 export interface ActivityBucket {
@@ -255,8 +259,8 @@ export function pickStudentFocus(feed: StudentDashboardFeed): StudentFocus {
             variant: 'urgent',
             eyebrow: 'Missing work',
             title: missing.title,
-            hint: `Submit now — ${missing.course.code}`,
-            href: `/courses/${missing.course.id}/assignments/${missing.assignment_id}/view`,
+            hint: `Submit now — ${courseCodeLabel(missing.course)}`,
+            href: `/student/courses/${missing.course.id}/assignments/${missing.assignment_id}`,
         };
     }
     const nextUp = feed.todos.find((t): t is Extract<StudentTodoItem, { kind: 'upcoming' }> => t.kind === 'upcoming' && Boolean(t.due_date));
@@ -265,8 +269,8 @@ export function pickStudentFocus(feed: StudentDashboardFeed): StudentFocus {
             variant: 'urgent',
             eyebrow: 'Up next',
             title: nextUp.title,
-            hint: `Due ${formatDayHeader(nextUp.due_date)} · ${nextUp.course.code}`,
-            href: `/courses/${nextUp.course.id}/assignments/${nextUp.assignment_id}/view`,
+            hint: `Due ${formatDayHeader(nextUp.due_date)} · ${courseCodeLabel(nextUp.course)}`,
+            href: `/student/courses/${nextUp.course.id}/assignments/${nextUp.assignment_id}`,
         };
     }
     return {
@@ -292,7 +296,7 @@ export function pickFacultyFocus(feed: FacultyDashboardFeed): FacultyFocus {
             variant: 'urgent',
             eyebrow: 'Grading queue',
             title: `Grade ${grading.count} submission${grading.count === 1 ? '' : 's'}`,
-            hint: `${grading.title} · ${grading.course.code}`,
+            hint: `${grading.title} · ${courseCodeLabel(grading.course)}`,
             href: `/courses/${grading.course.id}/grading`,
         };
     }
@@ -302,7 +306,7 @@ export function pickFacultyFocus(feed: FacultyDashboardFeed): FacultyFocus {
             variant: 'urgent',
             eyebrow: 'Closing soon',
             title: closing.title,
-            hint: `Closes ${formatDayHeader(closing.due_date)} · ${closing.course.code}`,
+            hint: `Closes ${formatDayHeader(closing.due_date)} · ${courseCodeLabel(closing.course)}`,
             href: `/courses/${closing.course.id}/assignments/${closing.assignment_id}`,
         };
     }
@@ -312,7 +316,7 @@ export function pickFacultyFocus(feed: FacultyDashboardFeed): FacultyFocus {
             variant: 'urgent',
             eyebrow: 'Finish publishing',
             title: draft.title,
-            hint: `Draft · ${draft.course.code}`,
+            hint: `Draft · ${courseCodeLabel(draft.course)}`,
             href: `/courses/${draft.course.id}/assignments/${draft.assignment_id}`,
         };
     }

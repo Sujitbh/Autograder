@@ -23,7 +23,7 @@ import type { StudentTodoItem, FacultyTodoItem } from '@/services/api';
 export interface WeekAheadItem {
     key: string;
     title: string;
-    course: { id: number; code: string; name?: string } | null;
+    course: { id: number; code: string | null; name?: string } | null;
     due: string; // ISO
     link: string;
 }
@@ -157,7 +157,7 @@ function Chip({ item, onOpen }: { item: WeekAheadItem; onOpen: (link: string) =>
                 e.stopPropagation();
                 onOpen(item.link);
             }}
-            title={`${item.course?.code ?? ''} · ${item.title}`}
+            title={`${item.course?.code ?? '—'} · ${item.title}`}
             className="group flex w-full items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-left transition-colors hover:bg-[var(--dash-ring-subtle)]"
         >
             <span

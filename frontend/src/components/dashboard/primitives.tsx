@@ -14,11 +14,12 @@ export function CoursePill({
     course,
     className,
 }: {
-    course: { id: number; code: string; name?: string } | null | undefined;
+    course: { id: number; code: string | null; name?: string } | null | undefined;
     className?: string;
 }) {
     if (!course) return null;
     const color = courseColorVar(course.id);
+    const codeLabel = course.code ?? '—';
     return (
         <span
             className={cn(
@@ -26,7 +27,7 @@ export function CoursePill({
                 'font-mono tracking-tight',
                 className,
             )}
-            title={course.name || course.code}
+            title={course.name || codeLabel}
             style={{
                 color,
                 background: `color-mix(in srgb, ${color} 10%, transparent)`,
@@ -38,7 +39,7 @@ export function CoursePill({
                 className="h-[6px] w-[6px] rounded-full"
                 style={{ background: color }}
             />
-            {course.code}
+            {codeLabel}
         </span>
     );
 }
