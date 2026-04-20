@@ -171,6 +171,67 @@
   --chart-3: var(--color-success);
   --chart-4: var(--color-info);
   --chart-5: var(--color-warning);
+
+  /* ============================================
+     Dashboard Design Tokens (v2)
+     Added for the redesigned /dashboard page.
+     Scoped names (--dash-*) so they never collide
+     with the rest of the app's legacy tokens.
+     ============================================ */
+
+  /* Surfaces — three elevation tiers */
+  --dash-surface-1: #FAF7F5;   /* page background, warmer than primary-bg */
+  --dash-surface-2: #FFFFFF;   /* card */
+  --dash-surface-3: #FFFFFF;   /* raised (hero, hover), same hue as card, shadow does the work */
+
+  /* Rings */
+  --dash-ring-subtle: rgba(24, 24, 27, 0.06);
+  --dash-ring-strong: rgba(24, 24, 27, 0.12);
+
+  /* Ink — neutral zinc scale for non-branded text */
+  --dash-ink-1: #111114;
+  --dash-ink-2: #27272A;
+  --dash-ink-3: #52525B;
+  --dash-ink-4: #71717A;
+  --dash-ink-5: #A1A1AA;
+
+  /* Elevation shadows */
+  --dash-shadow-soft:
+    0 1px 2px rgba(16, 16, 20, 0.04),
+    0 1px 1px rgba(16, 16, 20, 0.03);
+  --dash-shadow-raised:
+    0 2px 4px rgba(16, 16, 20, 0.05),
+    0 8px 24px rgba(16, 16, 20, 0.06);
+
+  /* Semantic pairs — ink / tint(6%) / soft(12%) */
+  --dash-ok-ink: #15803D;
+  --dash-ok-tint: color-mix(in srgb, #15803D 6%, transparent);
+  --dash-ok-soft: color-mix(in srgb, #15803D 14%, transparent);
+  --dash-warn-ink: #B45309;
+  --dash-warn-tint: color-mix(in srgb, #B45309 6%, transparent);
+  --dash-warn-soft: color-mix(in srgb, #B45309 14%, transparent);
+  --dash-danger-ink: #B91C1C;
+  --dash-danger-tint: color-mix(in srgb, #B91C1C 6%, transparent);
+  --dash-danger-soft: color-mix(in srgb, #B91C1C 14%, transparent);
+  --dash-info-ink: #1D4ED8;
+  --dash-info-tint: color-mix(in srgb, #1D4ED8 6%, transparent);
+  --dash-info-soft: color-mix(in srgb, #1D4ED8 14%, transparent);
+  --dash-primary-ink: var(--color-primary);
+  --dash-primary-tint: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  --dash-primary-soft: color-mix(in srgb, var(--color-primary) 14%, transparent);
+
+  /* Categorical palette for courses (6 hues) */
+  --dash-cat-1: #6B0000;
+  --dash-cat-2: #0F766E;
+  --dash-cat-3: #1D4ED8;
+  --dash-cat-4: #B45309;
+  --dash-cat-5: #6D28D9;
+  --dash-cat-6: #BE185D;
+
+  /* Motion */
+  --dash-motion-enter: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dash-motion-fast: 140ms;
+  --dash-motion-slow: 320ms;
 }
 
 /* ============================================
@@ -233,6 +294,53 @@
   --input: var(--color-border);
   --input-background: #1E1E1E;
   --ring: var(--color-primary);
+
+  /* Dashboard tokens — dark mode
+     Rebuilt on a neutral zinc scale instead of inverted maroon,
+     with a subtle warm tint so ULM branding still lives in the room. */
+  --dash-surface-1: #0E0E11;   /* page */
+  --dash-surface-2: #17171B;   /* card */
+  --dash-surface-3: #1C1C21;   /* raised */
+
+  --dash-ring-subtle: rgba(255, 255, 255, 0.06);
+  --dash-ring-strong: rgba(255, 255, 255, 0.12);
+
+  --dash-ink-1: #F4F4F5;
+  --dash-ink-2: #E4E4E7;
+  --dash-ink-3: #A1A1AA;
+  --dash-ink-4: #71717A;
+  --dash-ink-5: #52525B;
+
+  --dash-shadow-soft:
+    0 1px 2px rgba(0, 0, 0, 0.5),
+    0 1px 1px rgba(0, 0, 0, 0.3);
+  --dash-shadow-raised:
+    0 4px 12px rgba(0, 0, 0, 0.45),
+    0 16px 40px rgba(0, 0, 0, 0.35);
+
+  /* Dark-mode semantic: brighter ink for contrast, kept-tints low-sat */
+  --dash-ok-ink: #4ADE80;
+  --dash-ok-tint: color-mix(in srgb, #22C55E 14%, transparent);
+  --dash-ok-soft: color-mix(in srgb, #22C55E 24%, transparent);
+  --dash-warn-ink: #FBBF24;
+  --dash-warn-tint: color-mix(in srgb, #F59E0B 14%, transparent);
+  --dash-warn-soft: color-mix(in srgb, #F59E0B 24%, transparent);
+  --dash-danger-ink: #F87171;
+  --dash-danger-tint: color-mix(in srgb, #EF4444 14%, transparent);
+  --dash-danger-soft: color-mix(in srgb, #EF4444 24%, transparent);
+  --dash-info-ink: #60A5FA;
+  --dash-info-tint: color-mix(in srgb, #3B82F6 14%, transparent);
+  --dash-info-soft: color-mix(in srgb, #3B82F6 24%, transparent);
+  --dash-primary-ink: #E08A84;
+  --dash-primary-tint: color-mix(in srgb, #E08A84 14%, transparent);
+  --dash-primary-soft: color-mix(in srgb, #E08A84 24%, transparent);
+
+  --dash-cat-1: #E08A84;
+  --dash-cat-2: #2DD4BF;
+  --dash-cat-3: #60A5FA;
+  --dash-cat-4: #FBBF24;
+  --dash-cat-5: #A78BFA;
+  --dash-cat-6: #F472B6;
 }
 
 @theme inline {
@@ -384,5 +492,76 @@
   50% {
     transform: translate(6px, -22px);
     opacity: 0.25;
+  }
+}
+
+/* ============================================
+   Dashboard motion + layout helpers
+   Scoped to .dash-root so they never leak.
+   ============================================ */
+@keyframes dash-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dash-shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: 200px 0;
+  }
+}
+
+.dash-root {
+  background: var(--dash-surface-1);
+  color: var(--dash-ink-1);
+}
+
+.dash-root .dash-enter {
+  opacity: 0;
+  animation: dash-enter 420ms var(--dash-motion-enter) forwards;
+  animation-delay: var(--dash-stagger, 0ms);
+  will-change: transform, opacity;
+}
+
+.dash-root .dash-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--dash-surface-2) 0%,
+    color-mix(in srgb, var(--dash-surface-2) 88%, var(--dash-ink-5)) 50%,
+    var(--dash-surface-2) 100%
+  );
+  background-size: 400px 100%;
+  animation: dash-shimmer 1.4s linear infinite;
+  border-radius: 8px;
+}
+
+.dash-root .dash-hairline {
+  background: var(--dash-ring-subtle);
+}
+
+/* Focus rings on dashboard surfaces — visible on both backgrounds,
+   not browser-default blue. */
+.dash-root :where(a, button, [role='button']):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-root .dash-enter {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .dash-root .dash-skeleton {
+    animation: none;
   }
 }
