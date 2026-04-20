@@ -7,12 +7,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { authService } from '@/services/api';
 import { useAuth } from '@/utils/AuthContext';
 
-function dashboardForRole(role: string): string {
+function homeForRole(role: string): string {
   switch (role) {
     case 'admin': return '/admin';
-    case 'student':
+    case 'student': return '/student';
     case 'faculty':
-    default: return '/dashboard';
+    default: return '/courses';
   }
 }
 
@@ -150,7 +150,7 @@ function OTPContent() {
       const user = await authService.getCurrentUser();
       login(user as any, result.access_token, false);
       setTimeout(() => {
-        router.push(dashboardForRole(user.role));
+        router.push(homeForRole(user.role));
       }, 500);
     } catch (err: any) {
       const detail = err?.response?.data?.detail ?? err?.message ?? 'Verification failed';

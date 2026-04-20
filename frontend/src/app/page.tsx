@@ -6,14 +6,15 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/utils/AuthContext';
 import ModernTechLanding from '@/components/landing/ModernTechLanding';
 
-function dashboardForRole(role: string): string {
+function homeForRole(role: string): string {
   switch (role) {
     case 'admin':
       return '/admin';
     case 'student':
+      return '/student';
     case 'faculty':
     default:
-      return '/dashboard';
+      return '/courses';
   }
 }
 
@@ -26,7 +27,7 @@ export default function Home() {
       return;
     }
     if (isAuthenticated && role) {
-      router.replace(dashboardForRole(role));
+      router.replace(homeForRole(role));
     }
   }, [isAuthenticated, role, isLoading, router]);
 

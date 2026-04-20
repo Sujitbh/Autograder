@@ -42,7 +42,7 @@ export function facultyWeekItems(todos: FacultyTodoItem[]): WeekAheadItem[] {
             course: t.course,
             due: t.due_date,
             link: t.course
-                ? `/courses/${t.course.id}/assignments/${t.assignment_id}`
+                ? `/courses/${t.course.id}/assignments/${t.assignment_id}/grading`
                 : '/courses',
         });
     }

@@ -137,7 +137,8 @@ export function TopNav({
   const getHomeRoute = () => {
     if (currentUser?.role === 'admin') return '/admin';
     if (isInTAView) return '/ta';
-    if (currentUser?.role === 'student' || currentUser?.role === 'faculty') return '/dashboard';
+    if (currentUser?.role === 'student') return '/student';
+    if (currentUser?.role === 'faculty') return '/courses';
     return '/courses';
   };
 

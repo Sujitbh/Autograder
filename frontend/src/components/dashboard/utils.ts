@@ -307,7 +307,7 @@ export function pickFacultyFocus(feed: FacultyDashboardFeed): FacultyFocus {
             eyebrow: 'Closing soon',
             title: closing.title,
             hint: `Closes ${formatDayHeader(closing.due_date)} · ${courseCodeLabel(closing.course)}`,
-            href: `/courses/${closing.course.id}/assignments/${closing.assignment_id}`,
+            href: `/courses/${closing.course.id}/assignments/${closing.assignment_id}/grading`,
         };
     }
     const draft = feed.todos.find((t): t is Extract<FacultyTodoItem, { kind: 'draft' }> => t.kind === 'draft');
@@ -317,7 +317,7 @@ export function pickFacultyFocus(feed: FacultyDashboardFeed): FacultyFocus {
             eyebrow: 'Finish publishing',
             title: draft.title,
             hint: `Draft · ${courseCodeLabel(draft.course)}`,
-            href: `/courses/${draft.course.id}/assignments/${draft.assignment_id}`,
+            href: `/courses/${draft.course.id}/assignments/${draft.assignment_id}/grading`,
         };
     }
     return {

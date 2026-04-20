@@ -278,7 +278,7 @@ export function FacultyTodoList({ todos }: { todos: FacultyTodoItem[] }) {
                     onClick={() => {
                         if (t.course) {
                             router.push(
-                                `/courses/${t.course.id}/assignments/${t.assignment_id}`,
+                                `/courses/${t.course.id}/assignments/${t.assignment_id}/grading`,
                             );
                         }
                     }}
@@ -300,7 +300,7 @@ export function FacultyTodoList({ todos }: { todos: FacultyTodoItem[] }) {
                 onClick={() => {
                     if (t.course) {
                         router.push(
-                            `/courses/${t.course.id}/assignments/${t.assignment_id}`,
+                            `/courses/${t.course.id}/assignments/${t.assignment_id}/grading`,
                         );
                     }
                 }}

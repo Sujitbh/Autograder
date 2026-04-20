@@ -5,14 +5,15 @@ import { useAuth } from '@/utils/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Suspense, useEffect } from 'react';
 
-function dashboardForRole(role: string): string {
+function homeForRole(role: string): string {
     switch (role) {
         case 'admin':
             return '/admin';
         case 'student':
+            return '/student';
         case 'faculty':
         default:
-            return '/dashboard';
+            return '/courses';
     }
 }
 
@@ -22,7 +23,7 @@ function SignupInner() {
 
     useEffect(() => {
         if (isAuthenticated && currentRole) {
-            router.replace(dashboardForRole(currentRole));
+            router.replace(homeForRole(currentRole));
         }
     }, [isAuthenticated, currentRole, router]);
 

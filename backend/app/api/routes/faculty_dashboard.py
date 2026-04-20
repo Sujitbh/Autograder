@@ -224,7 +224,7 @@ def faculty_dashboard_feed(
                 if course
                 else None,
                 "at": _iso(a.due_date),
-                "link": f"/courses/{a.course_id}/assignments/{a.id}",
+                "link": f"/courses/{a.course_id}/assignments/{a.id}/grading",
             })
 
     # Recent messages (sent or received)

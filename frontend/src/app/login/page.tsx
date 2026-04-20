@@ -6,13 +6,13 @@ import { useRouter } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
 import type { UserRole } from '@/types';
 
-/** Return the dashboard path for a given role. */
-function dashboardForRole(role: UserRole): string {
+/** Return the post-login home path for a given role. */
+function homeForRole(role: UserRole): string {
     switch (role) {
         case 'admin': return '/admin';
-        case 'student':
+        case 'student': return '/student';
         case 'faculty':
-        default: return '/dashboard';
+        default: return '/courses';
     }
 }
 
@@ -21,12 +21,12 @@ function LoginContent() {
     const router = useRouter();
 
     useEffect(() => {
-        if (isAuthenticated && role) router.replace(dashboardForRole(role));
+        if (isAuthenticated && role) router.replace(homeForRole(role));
     }, [isAuthenticated, role, router]);
 
     return <LoginPage onLogin={(userData, token, rememberMe) => {
         login(userData, token, rememberMe);
-        router.push(dashboardForRole(userData.role));
+        router.push(homeForRole(userData.role));
     }} />;
 }
 
