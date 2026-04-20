@@ -33,7 +33,7 @@ import { useStudentDashboardStats } from "@/hooks/queries/useStudentDashboardSta
 interface StudentCourse {
   id: number | string;
   name: string;
-  code: string;
+  code: string | null;
   description?: string;
   assignments_count?: number;
   completed_count?: number;
@@ -57,7 +57,7 @@ function StudentDashboard() {
   const filteredCourses = courses.filter(course => {
     const matchesSearch =
       course.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      course.code.toLowerCase().includes(searchQuery.toLowerCase());
+      (course.code ?? '').toLowerCase().includes(searchQuery.toLowerCase());
     return matchesSearch;
   });
 
@@ -263,7 +263,7 @@ function StudentDashboard() {
                           display: 'inline-block'
                         }}
                       >
-                        {course.code}
+                        {course.code ?? '—'}
                       </span>
                       {completedPct !== null && (
                         <span

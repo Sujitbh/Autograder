@@ -28,7 +28,7 @@ export default function TeachingAssistantDashboard() {
 
   const dashboardCourses: Course[] = taCourses.map((c) => ({
     id: String(c.id),
-    code: c.code,
+    code: c.code ?? '',
     name: c.name,
     semester: '',
     section: '',

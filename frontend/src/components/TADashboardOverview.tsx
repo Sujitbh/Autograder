@@ -114,7 +114,7 @@ export function TADashboardOverview({
             <option value="">All Courses</option>
             {courses.map((course) => (
               <option key={course.id} value={course.id}>
-                {course.code} - {course.name}
+                {course.code || '—'} - {course.name}
               </option>
             ))}
           </select>
@@ -149,7 +149,7 @@ export function TADashboardOverview({
                         className="font-semibold"
                         style={{ color: 'var(--color-text-dark)' }}
                       >
-                        {course.code}
+                        {course.code || '—'}
                       </h3>
                       <p
                         className="text-sm"

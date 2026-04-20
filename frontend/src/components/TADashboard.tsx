@@ -87,7 +87,7 @@ export default function TADashboard() {
                 const q = searchQuery.toLowerCase();
                 return (
                     c.name.toLowerCase().includes(q) ||
-                    c.code.toLowerCase().includes(q) ||
+                    (c.code ?? '').toLowerCase().includes(q) ||
                     (c.instructor_name ?? '').toLowerCase().includes(q)
                 );
             }
@@ -100,7 +100,7 @@ export default function TADashboard() {
         return [...filtered].sort((a, b) => {
             let cmp = 0;
             switch (sortField) {
-                case 'code': cmp = a.code.localeCompare(b.code); break;
+                case 'code': cmp = (a.code ?? '').localeCompare(b.code ?? ''); break;
                 case 'name': cmp = a.name.localeCompare(b.name); break;
                 case 'instructor': cmp = (a.instructor_name ?? '').localeCompare(b.instructor_name ?? ''); break;
                 case 'students': cmp = a.student_count - b.student_count; break;
@@ -323,7 +323,7 @@ export default function TADashboard() {
                                                     letterSpacing: '0.3px',
                                                 }}
                                             >
-                                                {course.code}
+                                                {course.code ?? '—'}
                                             </span>
                                         </td>
 

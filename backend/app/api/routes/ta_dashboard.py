@@ -14,6 +14,7 @@ from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
 from app.models.submission_result import SubmissionResult
 from app.models.submission_rubric_score import SubmissionRubricScore
+from app.models.rubric import Rubric
 from app.models.enrollment import Enrollment
 from app.models.testcase import TestCase
 from app.models.rubric_section import RubricSection

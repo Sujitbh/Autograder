@@ -22,7 +22,7 @@ export interface TAPermissions {
 export interface TACourse {
     id: number;
     name: string;
-    code: string;
+    code: string | null;
     description: string | null;
     is_active: boolean;
     instructor_name: string | null;
