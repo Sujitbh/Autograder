@@ -126,6 +126,13 @@ def list_assignments(
     if user and user.role == "student":
         q = q.filter(Assignment.is_active == True)
 
+    # Default ordering: earliest due date first; undated assignments last.
+    q = q.order_by(
+        Assignment.due_date.is_(None),
+        Assignment.due_date.asc(),
+        Assignment.id.asc(),
+    )
+
     return q.all()
 
 

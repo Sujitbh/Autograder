@@ -235,7 +235,11 @@ def get_course_assignments(
     if search:
         q = q.filter(Assignment.title.ilike(f"%{search}%"))
 
-    assignments = q.order_by(desc(Assignment.due_date)).all()
+    assignments = q.order_by(
+        Assignment.due_date.is_(None),
+        Assignment.due_date.asc(),
+        Assignment.id.asc(),
+    ).all()
     result = []
 
     for a in assignments:

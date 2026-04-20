@@ -97,6 +97,12 @@ function isOverdue(a: Assignment): boolean {
   return new Date(a.dueDate) < NOW && status === 'open' && getNeedsGrade(a) > 0;
 }
 
+function dueDateSortValue(dueDate: string): number {
+  if (!dueDate) return Number.POSITIVE_INFINITY;
+  const timestamp = new Date(dueDate).getTime();
+  return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
+}
+
 const STATUS_ORDER: Record<string, number> = { open: 0, graded: 1, draft: 2, closed: 3 };
 
 function lookupCourse(courseId: string): { code: string; title: string } {
@@ -116,7 +122,7 @@ export function CourseInterior() {
   const [_showGradingModal, _setShowGradingModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('dueDate');
-  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
   const [deleteTarget, setDeleteTarget] = useState<Assignment | null>(null);
   const [duplicateTarget, setDuplicateTarget] = useState<Assignment | null>(null);
 
@@ -257,7 +263,7 @@ export function CourseInterior() {
       switch (sortField) {
         case 'name': cmp = a.name.localeCompare(b.name); break;
         case 'language': cmp = a.language.localeCompare(b.language); break;
-        case 'dueDate': cmp = (a.dueDate ? new Date(a.dueDate).getTime() : 0) - (b.dueDate ? new Date(b.dueDate).getTime() : 0); break;
+        case 'dueDate': cmp = dueDateSortValue(a.dueDate) - dueDateSortValue(b.dueDate); break;
         case 'submitted': cmp = getSubmittedPct(a) - getSubmittedPct(b); break;
         case 'needsGrade': cmp = getNeedsGrade(a) - getNeedsGrade(b); break;
         case 'status': cmp = (STATUS_ORDER[getStatus(a)] ?? 9) - (STATUS_ORDER[getStatus(b)] ?? 9); break;

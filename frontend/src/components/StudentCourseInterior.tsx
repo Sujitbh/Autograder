@@ -34,6 +34,12 @@ const STATUS_ORDER: Record<StudentStatus, number> = {
   graded: 3,
 };
 
+function dueDateSortValue(dueDate: string): number {
+  if (!dueDate) return Number.POSITIVE_INFINITY;
+  const timestamp = new Date(dueDate).getTime();
+  return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
+}
+
 function getStudentStatus(
   submissionStatus: string | null,
 ): StudentStatus {
@@ -154,7 +160,7 @@ export function StudentCourseInterior({ courseId }: StudentCourseInteriorProps) 
           cmp = a.name.localeCompare(b.name);
           break;
         case 'dueDate':
-          cmp = (a.dueDate ? new Date(a.dueDate).getTime() : 0) - (b.dueDate ? new Date(b.dueDate).getTime() : 0);
+          cmp = dueDateSortValue(a.dueDate) - dueDateSortValue(b.dueDate);
           break;
         case 'status':
           cmp = (STATUS_ORDER[getStudentStatus(aSub?.status ?? null)] ?? 9) -

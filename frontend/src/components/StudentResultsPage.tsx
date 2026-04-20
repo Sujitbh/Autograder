@@ -23,6 +23,12 @@ interface StudentResultItem {
 type SortField = 'assignment' | 'course' | 'status' | 'score' | 'due_date';
 type SortOrder = 'asc' | 'desc';
 
+function dueDateSortValue(dueDate: string | null): number {
+  if (!dueDate) return Number.POSITIVE_INFINITY;
+  const timestamp = new Date(dueDate).getTime();
+  return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
+}
+
 export function StudentResultsPage() {
   const router = useRouter();
   const [rows, setRows] = useState<StudentResultItem[]>([]);
@@ -103,8 +109,8 @@ export function StudentResultsPage() {
           comparison = scoreA - scoreB;
           break;
         case 'due_date':
-          const dateA = a.due_date ? new Date(a.due_date).getTime() : 0;
-          const dateB = b.due_date ? new Date(b.due_date).getTime() : 0;
+          const dateA = dueDateSortValue(a.due_date);
+          const dateB = dueDateSortValue(b.due_date);
           comparison = dateA - dateB;
           break;
       }
