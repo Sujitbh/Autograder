@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import keyword
+import logging
 import re
 import string
 import threading
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Sequence
@@ -43,6 +45,7 @@ class LanguageRules:
 
 _MODEL_LOCK = threading.Lock()
 _MODEL_CACHE: Dict[str, Dict[str, Any]] = {}
+LOGGER = logging.getLogger(__name__)
 
 _PYTHON_RULES = LanguageRules(
     keywords=set(keyword.kwlist),
@@ -88,43 +91,144 @@ _JAVA_RULES = LanguageRules(
 )
 
 
+def _model_root_candidates() -> list[Path]:
+    configured = Path(settings.AI_DETECTOR_MODEL_ROOT)
+    # Support both:
+    # - repo layouts where ai_detector/ is sibling of Autograder/
+    # - repo layouts where ai_detector/ lives inside the app root
+    app_file = Path(__file__).resolve()
+    service_dir = app_file.parent
+    app_dir = service_dir.parent
+    backend_dir = app_dir.parent
+    project_root = backend_dir.parent
+    workspace_root = project_root.parent
+
+    candidates = [
+        configured,
+        project_root / "ai_detector" / "models",
+        workspace_root / "ai_detector" / "models",
+        backend_dir / "data" / "models",
+    ]
+
+    deduped: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(candidate)
+    return deduped
+
+
 def _models_root() -> Path:
+    for candidate in _model_root_candidates():
+        if candidate.exists():
+            return candidate
+    # Fall back to configured path for diagnostics if none exists.
     return Path(settings.AI_DETECTOR_MODEL_ROOT)
 
 
 def _bundle_path(language: str) -> Path:
-    return _models_root() / language / "model_bundle.joblib"
+    roots = _model_root_candidates()
+    for root in roots:
+        candidate = root / language / "model_bundle.joblib"
+        if candidate.exists():
+            return candidate
+    return roots[0] / language / "model_bundle.joblib"
 
 
 def _load_bundle(language: str) -> Dict[str, Any] | None:
+    bundle, _ = _load_bundle_with_error(language)
+    return bundle
+
+
+def _load_bundle_with_error(language: str) -> tuple[Dict[str, Any] | None, dict[str, Any]]:
     import joblib
 
     if language not in ("python", "java"):
-        return None
+        return None, {
+            "reason": "unsupported_language",
+            "language": language,
+        }
 
     bundle_path = _bundle_path(language)
     mtime = bundle_path.stat().st_mtime if bundle_path.exists() else None
 
     cached = _MODEL_CACHE.get(language)
-    if cached and cached.get("mtime") == mtime:
-        return cached.get("bundle")
+    if (
+        cached
+        and cached.get("mtime") == mtime
+        and cached.get("path") == str(bundle_path)
+    ):
+        bundle = cached.get("bundle")
+        error = cached.get("error") or {}
+        return bundle, dict(error)
 
     with _MODEL_LOCK:
         cached = _MODEL_CACHE.get(language)
-        if cached and cached.get("mtime") == mtime:
-            return cached.get("bundle")
+        if (
+            cached
+            and cached.get("mtime") == mtime
+            and cached.get("path") == str(bundle_path)
+        ):
+            bundle = cached.get("bundle")
+            error = cached.get("error") or {}
+            return bundle, dict(error)
 
         bundle = None
+        error: dict[str, Any]
         if bundle_path.exists():
             try:
                 loaded = joblib.load(bundle_path)
                 if isinstance(loaded, dict) and "model" in loaded:
                     bundle = loaded
+                    error = {}
+                else:
+                    error = {
+                        "reason": "invalid_bundle_format",
+                        "detail": f"Expected dict with key 'model', got {type(loaded).__name__}",
+                        "bundle_path": str(bundle_path),
+                    }
+                    LOGGER.error(
+                        "AI detector bundle format invalid for %s at %s. Loaded type=%s",
+                        language,
+                        bundle_path,
+                        type(loaded).__name__,
+                    )
             except Exception:
-                bundle = None
+                tb = traceback.format_exc()
+                error = {
+                    "reason": "bundle_load_exception",
+                    "detail": "Exception while loading model bundle with joblib",
+                    "exception": traceback.format_exc(limit=1).strip(),
+                    "traceback": tb,
+                    "bundle_path": str(bundle_path),
+                }
+                LOGGER.exception("Failed loading AI detector bundle for %s from %s", language, bundle_path)
+        else:
+            available_roots = [str(root) for root in _model_root_candidates()]
+            error = {
+                "reason": "bundle_file_not_found",
+                "detail": f"Model bundle not found at {bundle_path}",
+                "bundle_path": str(bundle_path),
+                "model_root_candidates": available_roots,
+                "configured_model_root": str(settings.AI_DETECTOR_MODEL_ROOT),
+            }
+            LOGGER.warning(
+                "AI detector bundle not found for %s. expected=%s candidates=%s",
+                language,
+                bundle_path,
+                available_roots,
+            )
 
-        _MODEL_CACHE[language] = {"mtime": mtime, "bundle": bundle}
-        return bundle
+        _MODEL_CACHE[language] = {
+            "mtime": mtime,
+            "bundle": bundle,
+            "error": error,
+            "path": str(bundle_path),
+        }
+        return bundle, dict(error)
 
 
 def _detect_language(code: str, filename: str | None = None) -> str | None:
@@ -296,27 +400,64 @@ def _band_for_confidence(confidence: float) -> str:
     return "low"
 
 
-def predict_ai_likelihood(code: str, filename: str | None = None, threshold: float | None = None) -> dict | None:
-    """Return model-based AI likelihood details if a trained artifact exists; otherwise None."""
+def _predict_ai_likelihood_internal(
+    code: str,
+    filename: str | None = None,
+    threshold: float | None = None,
+) -> tuple[dict | None, dict[str, Any]]:
+    diagnostics: dict[str, Any] = {
+        "filename": filename,
+        "language_detected": None,
+        "bundle_loaded": False,
+        "bundle_path": None,
+        "bundle_keys": None,
+        "feature_vector_length": None,
+        "feature_columns_length": None,
+        "model_type": None,
+        "scaler_type": None,
+        "reason": None,
+    }
+
     if not code:
-        return None
+        diagnostics["reason"] = "empty_code"
+        return None, diagnostics
 
     language = _detect_language(code=code, filename=filename)
+    diagnostics["language_detected"] = language
     if language not in ("python", "java"):
-        return None
+        diagnostics["reason"] = "unsupported_or_undetected_language"
+        return None, diagnostics
 
-    bundle = _load_bundle(language)
+    bundle_path = _bundle_path(language)
+    diagnostics["bundle_path"] = str(bundle_path)
+
+    bundle, load_error = _load_bundle_with_error(language)
+    if load_error:
+        diagnostics.update(load_error)
     if not bundle:
-        return None
+        diagnostics["reason"] = diagnostics.get("reason") or "bundle_unavailable"
+        return None, diagnostics
+
+    diagnostics["bundle_loaded"] = True
+    diagnostics["bundle_keys"] = sorted(list(bundle.keys()))
 
     model = bundle.get("model")
     scaler = bundle.get("scaler")
     feature_columns = bundle.get("feature_columns") or []
 
-    if model is None or not feature_columns:
-        return None
+    diagnostics["model_type"] = type(model).__name__ if model is not None else None
+    diagnostics["scaler_type"] = type(scaler).__name__ if scaler is not None else None
+    diagnostics["feature_columns_length"] = len(feature_columns)
+
+    if model is None:
+        diagnostics["reason"] = "bundle_model_missing"
+        return None, diagnostics
+    if not feature_columns:
+        diagnostics["reason"] = "bundle_feature_columns_missing"
+        return None, diagnostics
 
     feature_row = _extract_numeric_features(code=code, language=language)
+    diagnostics["feature_vector_length"] = len(feature_row)
     model_input = pd.DataFrame(
         [[feature_row.get(column, 0.0) for column in feature_columns]],
         columns=feature_columns,
@@ -326,12 +467,15 @@ def predict_ai_likelihood(code: str, filename: str | None = None, threshold: flo
         transformed = scaler.transform(model_input) if scaler is not None else model_input
 
         if not hasattr(model, "predict_proba"):
-            return None
+            diagnostics["reason"] = "model_missing_predict_proba"
+            return None, diagnostics
 
         probabilities = model.predict_proba(transformed)
         positive_index = _positive_class_index(model)
         if positive_index is None:
-            return None
+            diagnostics["reason"] = "model_positive_class_not_resolved"
+            diagnostics["classes"] = [str(value) for value in getattr(model, "classes_", [])]
+            return None, diagnostics
 
         confidence = float(probabilities[0][positive_index])
         threshold_used = _resolve_threshold(threshold)
@@ -339,7 +483,7 @@ def predict_ai_likelihood(code: str, filename: str | None = None, threshold: flo
 
         winner_name = str(bundle.get("winner_model_name") or "classifier")
 
-        return {
+        result = {
             "ai_confidence": round(confidence, 6),
             "ai_flagged": bool(flagged),
             "threshold_used": round(threshold_used, 6),
@@ -353,5 +497,43 @@ def predict_ai_likelihood(code: str, filename: str | None = None, threshold: flo
             ],
             "disclaimer": "AI detection is advisory only; use instructor judgement and corroborating evidence.",
         }
+        diagnostics["reason"] = "ok"
+        return result, diagnostics
     except Exception:
-        return None
+        diagnostics["reason"] = "predict_exception"
+        diagnostics["detail"] = "Exception during scaler.transform or model.predict_proba"
+        diagnostics["exception"] = traceback.format_exc(limit=1).strip()
+        diagnostics["traceback"] = traceback.format_exc()
+        LOGGER.exception(
+            "AI detector inference failed. language=%s filename=%s bundle_path=%s model=%s scaler=%s feature_columns=%s feature_vector=%s",
+            language,
+            filename,
+            diagnostics.get("bundle_path"),
+            diagnostics.get("model_type"),
+            diagnostics.get("scaler_type"),
+            diagnostics.get("feature_columns_length"),
+            diagnostics.get("feature_vector_length"),
+        )
+        return None, diagnostics
+
+
+def predict_ai_likelihood_with_diagnostics(
+    code: str,
+    filename: str | None = None,
+    threshold: float | None = None,
+) -> tuple[dict | None, dict[str, Any]]:
+    return _predict_ai_likelihood_internal(
+        code=code,
+        filename=filename,
+        threshold=threshold,
+    )
+
+
+def predict_ai_likelihood(code: str, filename: str | None = None, threshold: float | None = None) -> dict | None:
+    """Return model-based AI likelihood details if a trained artifact exists; otherwise None."""
+    result, _ = _predict_ai_likelihood_internal(
+        code=code,
+        filename=filename,
+        threshold=threshold,
+    )
+    return result

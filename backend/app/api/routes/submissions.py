@@ -1,6 +1,7 @@
 import os
 import re
 import difflib
+import logging
 from collections import Counter
 from pathlib import Path
 from typing import List, Any
@@ -20,10 +21,11 @@ from app.models.submission_rubric_score import SubmissionRubricScore
 from app.models.testcase import TestCase
 from app.models.user import User
 from app.schemas.submission import SubmissionCreate, SubmissionOut, SubmissionWithStudent
-from app.services.ai_detector_service import predict_ai_likelihood
+from app.services.ai_detector_service import predict_ai_likelihood, predict_ai_likelihood_with_diagnostics
 from app.settings import settings
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
+LOGGER = logging.getLogger(__name__)
 
 
 SOURCE_EXTENSIONS = {".py", ".java", ".cpp", ".c", ".js", ".ts", ".go", ".rs", ".kt", ".swift"}
@@ -410,9 +412,18 @@ def _estimate_ai_likelihood(
         empty_result["scoring_source"] = "heuristic"
         empty_result["fallback_reason"] = "empty_source_code"
         empty_result["detected_language"] = detected_language
+        empty_result["model_debug"] = {
+            "reason": "empty_source_code",
+            "filename": filename,
+            "bundle_loaded": False,
+        }
         return empty_result
 
-    model_result = predict_ai_likelihood(code, filename=filename, threshold=threshold)
+    model_result, model_debug = predict_ai_likelihood_with_diagnostics(
+        code,
+        filename=filename,
+        threshold=threshold,
+    )
     if model_result is not None:
         model_result = dict(model_result)
         if force_unflag:
@@ -420,11 +431,22 @@ def _estimate_ai_likelihood(
         model_result["scoring_source"] = "model"
         model_result["fallback_reason"] = None
         model_result["detected_language"] = model_result.get("model_language") or detected_language
+        model_result["model_debug"] = model_debug
         return model_result
 
     heuristic = _heuristic_ai_likelihood(code)
     score_percent = float(heuristic.get("score", 0.0))
     threshold_used = _resolve_ai_threshold(threshold)
+    failure_reason = str(model_debug.get("reason") or "model_unavailable_or_prediction_failed")
+    failure_detail = model_debug.get("detail")
+    fallback_reason = failure_reason if not failure_detail else f"{failure_reason}: {failure_detail}"
+    LOGGER.warning(
+        "AI model fallback to heuristic for file=%s reason=%s model_debug=%s",
+        filename,
+        fallback_reason,
+        model_debug,
+    )
+
     return {
         "ai_confidence": round(score_percent / 100.0, 6),
         "ai_flagged": ((score_percent / 100.0) >= threshold_used) and (not force_unflag),
@@ -432,11 +454,12 @@ def _estimate_ai_likelihood(
         "model_language": None,
         "detected_language": detected_language,
         "scoring_source": "heuristic",
-        "fallback_reason": "model_unavailable_or_prediction_failed",
+        "fallback_reason": fallback_reason,
         "score": heuristic["score"],
         "band": heuristic["band"],
         "signals": heuristic["signals"],
         "disclaimer": heuristic["disclaimer"],
+        "model_debug": model_debug,
     }
 
 
@@ -542,6 +565,7 @@ def _score_submission_ai_from_files(
         detected_language = estimated.get("detected_language") or assignment_language or _language_from_filename(filename)
         scoring_source = str(estimated.get("scoring_source") or "heuristic")
         fallback_reason = estimated.get("fallback_reason")
+        model_debug = estimated.get("model_debug")
         if fallback_reason:
             fallback_reasons.append(str(fallback_reason))
         if scoring_source != "model":
@@ -559,6 +583,7 @@ def _score_submission_ai_from_files(
             "score": round(confidence * 100.0, 1),
             "band": _confidence_band(confidence),
             "signals": list(estimated.get("signals") or []),
+            "model_debug": model_debug,
         }
         file_results.append(file_result)
 
