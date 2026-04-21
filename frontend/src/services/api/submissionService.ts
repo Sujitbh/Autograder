@@ -38,6 +38,68 @@ interface BackendGradingResults {
   message?: string;
 }
 
+export interface IntegrityAIFileResult {
+  filename: string;
+  detected_language?: string | null;
+  scoring_source?: 'model' | 'heuristic' | 'mixed' | 'none' | string;
+  fallback_reason?: string | null;
+  ai_confidence: number;
+  threshold_used: number;
+  threshold_exceeded?: boolean;
+  file_flagged?: boolean;
+  score?: number;
+  band?: 'low' | 'medium' | 'high';
+  signals?: string[];
+}
+
+export interface IntegrityAIDetection {
+  ai_confidence?: number;
+  ai_flagged?: boolean;
+  threshold_used?: number;
+  model_language?: string | null;
+  score: number;
+  band: 'low' | 'medium' | 'high';
+  signals: string[];
+  disclaimer: string;
+  scoring_source?: 'model' | 'heuristic' | 'mixed' | 'none' | string;
+  fallback_reason?: string | null;
+  assignment_language_filter?: string | null;
+  aggregation_method?: string;
+  evaluated_file_count?: number;
+  threshold_exceeded?: boolean;
+  file_results?: IntegrityAIFileResult[];
+  flagged_sections?: Array<{
+    filename?: string | null;
+    start_line: number;
+    end_line: number;
+    score: number;
+    threshold: number;
+    snippet: string;
+  }>;
+}
+
+export interface SubmissionIntegrityReport {
+  plagiarism: {
+    checked_against: number;
+    top_matches: Array<{
+      submission_id: number;
+      student_id: number;
+      student_name: string;
+      student_email: string | null;
+      status: string;
+      submitted_at: string | null;
+      filename: string | null;
+      similarity_percent: number;
+      risk: 'low' | 'medium' | 'high';
+    }>;
+    note: string;
+    peers_with_latest_submission?: number;
+    peers_skipped_no_file_rows?: number;
+    peers_skipped_unreadable_on_disk?: number;
+  };
+  ai_detection: IntegrityAIDetection;
+}
+
 export interface AssignmentZipDownload {
   blob: Blob;
   filename: string;
@@ -202,44 +264,7 @@ export const submissionService = {
       points_earned: number;
       error: string | null;
     }>;
-    integrity?: {
-      plagiarism: {
-        checked_against: number;
-        top_matches: Array<{
-          submission_id: number;
-          student_id: number;
-          student_name: string;
-          student_email: string | null;
-          status: string;
-          submitted_at: string | null;
-          filename: string | null;
-          similarity_percent: number;
-          risk: 'low' | 'medium' | 'high';
-        }>;
-        note: string;
-        peers_with_latest_submission?: number;
-        peers_skipped_no_file_rows?: number;
-        peers_skipped_unreadable_on_disk?: number;
-      };
-      ai_detection: {
-        ai_confidence?: number;
-        ai_flagged?: boolean;
-        threshold_used?: number;
-        model_language?: string | null;
-        score: number;
-        band: 'low' | 'medium' | 'high';
-        signals: string[];
-        disclaimer: string;
-        flagged_sections?: Array<{
-          filename?: string | null;
-          start_line: number;
-          end_line: number;
-          score: number;
-          threshold: number;
-          snippet: string;
-        }>;
-      };
-    } | null;
+    integrity?: SubmissionIntegrityReport | null;
   }> {
     const { data } = await withRetry(() =>
       api.get(`/submissions/${submissionId}/detail`, {
@@ -253,30 +278,8 @@ export const submissionService = {
 
   /** Full classmate similarity scan (all matches; instructor/TA). */
   async getPlagiarismScan(submissionId: string): Promise<{
-    plagiarism: {
-      checked_against: number;
-      top_matches: Array<{
-        submission_id: number;
-        student_id: number;
-        student_name: string;
-        student_email: string | null;
-        status: string;
-        submitted_at: string | null;
-        filename: string | null;
-        similarity_percent: number;
-        risk: 'low' | 'medium' | 'high';
-      }>;
-      note: string;
-      peers_with_latest_submission?: number;
-      peers_skipped_no_file_rows?: number;
-      peers_skipped_unreadable_on_disk?: number;
-    };
-    ai_detection: {
-      score: number;
-      band: 'low' | 'medium' | 'high';
-      signals: string[];
-      disclaimer: string;
-    };
+    plagiarism: SubmissionIntegrityReport['plagiarism'];
+    ai_detection: IntegrityAIDetection;
   }> {
     const { data } = await withRetry(() => api.get(`/submissions/${submissionId}/plagiarism-scan`));
     return data;

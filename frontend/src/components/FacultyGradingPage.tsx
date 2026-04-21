@@ -86,6 +86,15 @@ function getBandLabel(scoreBand: 'low' | 'medium' | 'high') {
     return scoreBand.charAt(0).toUpperCase() + scoreBand.slice(1);
 }
 
+function getScoringSourceLabel(source?: string | null) {
+    if (!source) return 'Unknown';
+    if (source === 'model') return 'Model';
+    if (source === 'heuristic') return 'Heuristic';
+    if (source === 'mixed') return 'Mixed';
+    if (source === 'none') return 'Not scored';
+    return source;
+}
+
 function getPlagiarismZeroMatchesExplanation(plagiarism: {
     checked_against: number;
     peers_with_latest_submission?: number;
@@ -1577,12 +1586,74 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                             {integrityForPanel.ai_detection.score}% {getBandLabel(integrityForPanel.ai_detection.band)}
                                                         </span>
                                                     </div>
+                                                    <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 8 }}>
+                                                        <span
+                                                            style={{
+                                                                ...(integrityForPanel.ai_detection.threshold_exceeded ?? integrityForPanel.ai_detection.ai_flagged
+                                                                    ? getRiskTagStyle('high')
+                                                                    : getRiskTagStyle('low')),
+                                                                fontSize: '10px',
+                                                                fontWeight: 700,
+                                                                padding: '2px 8px',
+                                                                borderRadius: 999,
+                                                            }}
+                                                        >
+                                                            {(integrityForPanel.ai_detection.threshold_exceeded ?? integrityForPanel.ai_detection.ai_flagged) ? 'Flagged' : 'Not flagged'}
+                                                        </span>
+                                                        <span style={{ fontSize: '10px', color: 'var(--color-text-mid)' }}>
+                                                            Scoring source: {getScoringSourceLabel(integrityForPanel.ai_detection.scoring_source)}
+                                                        </span>
+                                                        <span style={{ fontSize: '10px', color: 'var(--color-text-mid)' }}>
+                                                            Files scored: {integrityForPanel.ai_detection.evaluated_file_count ?? integrityForPanel.ai_detection.file_results?.length ?? 0}
+                                                        </span>
+                                                    </div>
                                                     {integrityForPanel.ai_detection.signals.length > 0 && (
                                                         <ul style={{ marginTop: 6, paddingLeft: 16, fontSize: '11px', color: 'var(--color-text-mid)' }}>
                                                             {integrityForPanel.ai_detection.signals.slice(0, 3).map((sig, i) => (
                                                                 <li key={`${sig}-${i}`}>{sig}</li>
                                                             ))}
                                                         </ul>
+                                                    )}
+                                                    {integrityForPanel.ai_detection.file_results && integrityForPanel.ai_detection.file_results.length > 0 && (
+                                                        <div style={{ marginTop: 8 }}>
+                                                            <p style={{ fontSize: '11px', color: 'var(--color-text-dark)', fontWeight: 600, marginBottom: 6 }}>
+                                                                Per-file AI breakdown
+                                                            </p>
+                                                            <div className="space-y-1.5">
+                                                                {integrityForPanel.ai_detection.file_results.map((fileResult, index) => (
+                                                                    <div
+                                                                        key={`${fileResult.filename}-${index}`}
+                                                                        className="rounded px-2 py-1.5"
+                                                                        style={{ border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)' }}
+                                                                    >
+                                                                        <div className="flex items-center justify-between gap-2">
+                                                                            <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                                                                                {fileResult.filename}
+                                                                            </span>
+                                                                            <span
+                                                                                style={{
+                                                                                    ...(fileResult.threshold_exceeded ? getRiskTagStyle('high') : getRiskTagStyle('low')),
+                                                                                    fontSize: '10px',
+                                                                                    fontWeight: 700,
+                                                                                    padding: '2px 8px',
+                                                                                    borderRadius: 999,
+                                                                                }}
+                                                                            >
+                                                                                {fileResult.score?.toFixed(1) ?? (fileResult.ai_confidence * 100).toFixed(1)}%
+                                                                            </span>
+                                                                        </div>
+                                                                        <p style={{ fontSize: '10px', color: 'var(--color-text-mid)' }}>
+                                                                            {fileResult.detected_language ?? 'unknown'} | {getScoringSourceLabel(fileResult.scoring_source)} | {fileResult.threshold_exceeded ? 'crossed threshold' : 'below threshold'}
+                                                                        </p>
+                                                                        {fileResult.fallback_reason && (
+                                                                            <p style={{ fontSize: '10px', color: 'var(--color-text-light)' }}>
+                                                                                Fallback: {fileResult.fallback_reason}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
                                                     )}
                                                     <p style={{ marginTop: 6, fontSize: '10px', color: 'var(--color-text-light)' }}>
                                                         {integrityForPanel.ai_detection.disclaimer}

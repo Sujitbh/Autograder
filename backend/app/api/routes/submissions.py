@@ -27,6 +27,20 @@ router = APIRouter(prefix="/submissions", tags=["submissions"])
 
 
 SOURCE_EXTENSIONS = {".py", ".java", ".cpp", ".c", ".js", ".ts", ".go", ".rs", ".kt", ".swift"}
+AI_SCORABLE_EXTENSIONS_BY_LANGUAGE = {
+    "python": {".py"},
+    "java": {".java"},
+}
+EXTENSION_TO_AI_LANGUAGE = {
+    ".py": "python",
+    ".java": "java",
+}
+ASSIGNMENT_LANGUAGE_ALIASES = {
+    "python": "python",
+    "py": "python",
+    "python3": "python",
+    "java": "java",
+}
 
 
 def _resolve_submission_disk_path(stored: str | None) -> str | None:
@@ -73,6 +87,109 @@ def _extract_primary_source_file(files: list[SubmissionFile]) -> tuple[str | Non
     # Prefer source-like extensions, then longest file.
     candidates.sort(key=lambda item: ((Path(item[0]).suffix.lower() not in SOURCE_EXTENSIONS), -len(item[1])))
     return candidates[0]
+
+
+def _normalize_assignment_language_token(token: str | None) -> str | None:
+    if token is None:
+        return None
+    normalized = token.strip().lower()
+    if not normalized:
+        return None
+    return ASSIGNMENT_LANGUAGE_ALIASES.get(normalized)
+
+
+def _language_from_filename(filename: str | None) -> str | None:
+    if not filename:
+        return None
+    return EXTENSION_TO_AI_LANGUAGE.get(Path(filename).suffix.lower())
+
+
+def _resolve_assignment_ai_language(assignment: Assignment | None) -> tuple[str | None, str | None]:
+    if assignment is None:
+        return None, "assignment_missing"
+
+    raw = getattr(assignment, "allowed_languages", None)
+    if raw is None or not str(raw).strip():
+        return None, "assignment_allowed_languages_missing"
+
+    tokens = [token.strip() for token in str(raw).split(",") if token.strip()]
+    if not tokens:
+        return None, "assignment_allowed_languages_missing"
+
+    primary_token = tokens[0]
+    primary_language = _normalize_assignment_language_token(primary_token)
+    if primary_language in AI_SCORABLE_EXTENSIONS_BY_LANGUAGE:
+        return primary_language, None
+
+    for token in tokens[1:]:
+        normalized = _normalize_assignment_language_token(token)
+        if normalized in AI_SCORABLE_EXTENSIONS_BY_LANGUAGE:
+            return normalized, f"primary_assignment_language_unsupported:{primary_token.lower()}"
+
+    return None, f"assignment_language_unsupported:{primary_token.lower()}"
+
+
+def _read_submission_source_files(files: list[SubmissionFile]) -> list[dict[str, str]]:
+    source_files: list[dict[str, str]] = []
+    for f in files:
+        filename = f.filename or ""
+        actual_path = _resolve_submission_disk_path(f.path)
+        if not actual_path:
+            continue
+        try:
+            with open(actual_path, "r", encoding="utf-8", errors="replace") as fh:
+                code = fh.read()
+        except Exception:
+            continue
+
+        if not code.strip():
+            continue
+
+        source_files.append(
+            {
+                "filename": filename,
+                "code": code,
+                "extension": Path(filename).suffix.lower(),
+            }
+        )
+    return source_files
+
+
+def _select_relevant_ai_source_files(
+    source_files: list[dict[str, str]],
+    assignment_language: str | None,
+    assignment_language_reason: str | None,
+) -> tuple[list[dict[str, str]], str | None]:
+    if assignment_language in AI_SCORABLE_EXTENSIONS_BY_LANGUAGE:
+        wanted_extensions = AI_SCORABLE_EXTENSIONS_BY_LANGUAGE[assignment_language]
+        relevant = [item for item in source_files if item["extension"] in wanted_extensions]
+        if relevant:
+            return relevant, assignment_language_reason
+        expected = ",".join(sorted(wanted_extensions))
+        return [], f"no_relevant_files_for_assignment_language:{assignment_language}:{expected}"
+
+    python_files = [item for item in source_files if item["extension"] == ".py"]
+    java_files = [item for item in source_files if item["extension"] == ".java"]
+
+    if python_files and not java_files:
+        reason = assignment_language_reason or "assignment_language_unknown"
+        return python_files, f"{reason};fallback_used:python_only_submission_files"
+    if java_files and not python_files:
+        reason = assignment_language_reason or "assignment_language_unknown"
+        return java_files, f"{reason};fallback_used:java_only_submission_files"
+    if python_files and java_files:
+        reason = assignment_language_reason or "assignment_language_unknown"
+        return [], f"{reason};mixed_supported_file_types_without_assignment_language"
+
+    return [], assignment_language_reason or "no_supported_python_or_java_submission_files"
+
+
+def _confidence_band(confidence: float) -> str:
+    if confidence >= 0.65:
+        return "high"
+    if confidence >= 0.40:
+        return "medium"
+    return "low"
 
 
 def _strip_comments(code: str) -> str:
@@ -223,13 +340,7 @@ def _build_ai_result_from_confidence(
     confidence = max(0.0, min(1.0, float(confidence)))
     threshold = _resolve_ai_threshold(threshold)
     flagged = (confidence >= threshold) and (not force_unflag)
-
-    if confidence >= 0.65:
-        band = "high"
-    elif confidence >= 0.40:
-        band = "medium"
-    else:
-        band = "low"
+    band = _confidence_band(confidence)
 
     signals = list(extra_signals or [])
     if not signals:
@@ -286,20 +397,31 @@ def _estimate_ai_likelihood(
     *,
     force_unflag: bool = False,
 ) -> dict:
+    detected_language = _language_from_filename(filename)
+
     if not code or not code.strip():
-        return _build_ai_result_from_confidence(
+        empty_result = _build_ai_result_from_confidence(
             confidence=0.0,
             threshold=_resolve_ai_threshold(threshold),
             model_language=None,
             extra_signals=["No source code available for model scoring"],
             force_unflag=force_unflag,
         )
+        empty_result["scoring_source"] = "heuristic"
+        empty_result["fallback_reason"] = "empty_source_code"
+        empty_result["detected_language"] = detected_language
+        return empty_result
 
     model_result = predict_ai_likelihood(code, filename=filename, threshold=threshold)
     if model_result is not None:
+        model_result = dict(model_result)
         if force_unflag:
             model_result["ai_flagged"] = False
+        model_result["scoring_source"] = "model"
+        model_result["fallback_reason"] = None
+        model_result["detected_language"] = model_result.get("model_language") or detected_language
         return model_result
+
     heuristic = _heuristic_ai_likelihood(code)
     score_percent = float(heuristic.get("score", 0.0))
     threshold_used = _resolve_ai_threshold(threshold)
@@ -308,6 +430,9 @@ def _estimate_ai_likelihood(
         "ai_flagged": ((score_percent / 100.0) >= threshold_used) and (not force_unflag),
         "threshold_used": round(threshold_used, 6),
         "model_language": None,
+        "detected_language": detected_language,
+        "scoring_source": "heuristic",
+        "fallback_reason": "model_unavailable_or_prediction_failed",
         "score": heuristic["score"],
         "band": heuristic["band"],
         "signals": heuristic["signals"],
@@ -347,6 +472,148 @@ def _sync_submission_ai_fields(submission: Submission, ai_result: dict | None) -
         changed = True
 
     return changed
+
+
+def _score_submission_ai_from_files(
+    files: list[SubmissionFile],
+    assignment: Assignment | None,
+    threshold: float,
+    *,
+    force_unflag: bool = False,
+    include_flagged_sections: bool = False,
+) -> dict:
+    threshold_to_use = _resolve_ai_threshold(threshold)
+    assignment_language, assignment_language_reason = _resolve_assignment_ai_language(assignment)
+    source_files = _read_submission_source_files(files)
+    relevant_files, selection_reason = _select_relevant_ai_source_files(
+        source_files,
+        assignment_language=assignment_language,
+        assignment_language_reason=assignment_language_reason,
+    )
+
+    if not relevant_files:
+        signals: list[str] = []
+        if assignment_language:
+            ext_list = ",".join(sorted(AI_SCORABLE_EXTENSIONS_BY_LANGUAGE[assignment_language]))
+            signals.append(f"No readable {ext_list} files found for assignment language {assignment_language}.")
+        else:
+            signals.append("Could not determine assignment language for AI scoring.")
+        result = _build_ai_result_from_confidence(
+            confidence=0.0,
+            threshold=threshold_to_use,
+            model_language=None,
+            extra_signals=signals,
+            force_unflag=force_unflag,
+        )
+        result.update(
+            {
+                "scoring_source": "none",
+                "fallback_reason": selection_reason or "no_relevant_source_files",
+                "assignment_language_filter": assignment_language,
+                "aggregation_method": "max_ai_confidence",
+                "evaluated_file_count": 0,
+                "threshold_exceeded": False,
+                "file_results": [],
+                "flagged_sections": [],
+            }
+        )
+        return result
+
+    file_results: list[dict[str, Any]] = []
+    flagged_sections: list[dict[str, Any]] = []
+    fallback_reasons: list[str] = []
+    heuristic_count = 0
+
+    for item in relevant_files:
+        filename = item["filename"]
+        code = item["code"]
+        estimated = _estimate_ai_likelihood(
+            code,
+            filename=filename,
+            threshold=threshold_to_use,
+            force_unflag=force_unflag,
+        )
+
+        confidence = max(0.0, min(1.0, float(estimated.get("ai_confidence", 0.0))))
+        item_threshold = _resolve_ai_threshold(estimated.get("threshold_used", threshold_to_use))
+        threshold_exceeded = confidence >= item_threshold
+        file_flagged = threshold_exceeded and (not force_unflag)
+
+        detected_language = estimated.get("detected_language") or assignment_language or _language_from_filename(filename)
+        scoring_source = str(estimated.get("scoring_source") or "heuristic")
+        fallback_reason = estimated.get("fallback_reason")
+        if fallback_reason:
+            fallback_reasons.append(str(fallback_reason))
+        if scoring_source != "model":
+            heuristic_count += 1
+
+        file_result = {
+            "filename": filename,
+            "detected_language": detected_language,
+            "scoring_source": scoring_source,
+            "fallback_reason": fallback_reason,
+            "ai_confidence": round(confidence, 6),
+            "threshold_used": round(item_threshold, 6),
+            "threshold_exceeded": bool(threshold_exceeded),
+            "file_flagged": bool(file_flagged),
+            "score": round(confidence * 100.0, 1),
+            "band": _confidence_band(confidence),
+            "signals": list(estimated.get("signals") or []),
+        }
+        file_results.append(file_result)
+
+        if include_flagged_sections and file_flagged:
+            flagged_sections.extend(
+                _flagged_code_sections(
+                    code,
+                    filename=filename,
+                    threshold=item_threshold,
+                )
+            )
+
+    max_confidence = max(float(item["ai_confidence"]) for item in file_results)
+    threshold_exceeded_any = any(bool(item["threshold_exceeded"]) for item in file_results)
+    flagged_any = any(bool(item["file_flagged"]) for item in file_results)
+    sources = {str(item.get("scoring_source") or "heuristic") for item in file_results}
+
+    if len(sources) == 1:
+        scoring_source = next(iter(sources))
+    else:
+        scoring_source = "mixed"
+
+    summary_signals = [
+        f"Evaluated {len(file_results)} file(s) and aggregated with max AI confidence.",
+    ]
+    if assignment_language:
+        summary_signals.append(f"Assignment language filter: {assignment_language}.")
+    if heuristic_count > 0:
+        summary_signals.append(f"Heuristic fallback used for {heuristic_count} file(s).")
+
+    if selection_reason:
+        fallback_reasons.append(selection_reason)
+
+    deduped_reasons = sorted({reason for reason in fallback_reasons if reason})
+    aggregate = _build_ai_result_from_confidence(
+        confidence=max_confidence,
+        threshold=threshold_to_use,
+        model_language=assignment_language,
+        extra_signals=summary_signals,
+        force_unflag=force_unflag,
+    )
+    aggregate.update(
+        {
+            "ai_flagged": bool(flagged_any),
+            "scoring_source": scoring_source,
+            "fallback_reason": "; ".join(deduped_reasons) if deduped_reasons else None,
+            "assignment_language_filter": assignment_language,
+            "aggregation_method": "max_ai_confidence",
+            "evaluated_file_count": len(file_results),
+            "threshold_exceeded": bool(threshold_exceeded_any),
+            "file_results": file_results,
+            "flagged_sections": flagged_sections if include_flagged_sections else [],
+        }
+    )
+    return aggregate
 
 
 def _chunk_windows(line_count: int, window_size: int = 24, step: int = 10) -> list[tuple[int, int]]:
@@ -457,36 +724,16 @@ def _build_integrity_report(
 
     files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == submission.id).all()
     current_filename, current_code = _extract_primary_source_file(files)
-    stored_ai = _stored_ai_likelihood(
-        submission,
+    ai_detection = _score_submission_ai_from_files(
+        files,
+        assignment=assignment,
         threshold=threshold_to_use,
         force_unflag=force_unflag,
+        include_flagged_sections=ai_detection_enabled and auto_flag_enabled,
     )
 
-    if ai_detection_enabled:
-        ai_detection = stored_ai or _estimate_ai_likelihood(
-            current_code or "",
-            filename=current_filename,
-            threshold=threshold_to_use,
-            force_unflag=force_unflag,
-        )
-        ai_detection["flagged_sections"] = (
-            _flagged_code_sections(
-                current_code,
-                filename=current_filename,
-                threshold=float(ai_detection.get("threshold_used", threshold_to_use)),
-            )
-            if current_code and ai_detection.get("ai_flagged")
-            else []
-        )
-    else:
-        ai_detection = _build_ai_result_from_confidence(
-            confidence=float(submission.ai_confidence or 0.0),
-            threshold=threshold_to_use,
-            model_language=submission.ai_model_language,
-            extra_signals=["AI detection is disabled for this assignment."],
-            force_unflag=True,
-        )
+    if not ai_detection_enabled:
+        ai_detection["signals"] = ["AI detection is disabled for this assignment."] + list(ai_detection.get("signals") or [])
         ai_detection["flagged_sections"] = []
 
     if not current_code:
@@ -610,6 +857,22 @@ def get_submission(
             course_id=assignment.course_id,
             allowed_roles=["instructor", "ta"],
         )
+
+    threshold_to_use = _effective_ai_threshold(assignment, None)
+    force_unflag = (not _is_ai_detection_enabled(assignment)) or (not _is_auto_flag_enabled(assignment))
+    submission_files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == s.id).all()
+    ai_snapshot = _score_submission_ai_from_files(
+        submission_files,
+        assignment=assignment,
+        threshold=threshold_to_use,
+        force_unflag=force_unflag,
+        include_flagged_sections=False,
+    )
+    if _sync_submission_ai_fields(s, ai_snapshot):
+        db.add(s)
+        db.commit()
+        db.refresh(s)
+
     return s
 
 
@@ -711,22 +974,22 @@ def get_submission_detail(
             ai_threshold=threshold_to_use,
         )
 
-    stored_ai = _stored_ai_likelihood(
-        s,
-        threshold=threshold_to_use,
-        force_unflag=force_unflag,
+    ai_snapshot = (
+        integrity_report["ai_detection"]
+        if integrity_report
+        else _score_submission_ai_from_files(
+            files,
+            assignment=assignment,
+            threshold=threshold_to_use,
+            force_unflag=force_unflag,
+            include_flagged_sections=False,
+        )
     )
-    ai_snapshot = integrity_report["ai_detection"] if integrity_report else stored_ai
+
     if _sync_submission_ai_fields(s, ai_snapshot):
         db.add(s)
         db.commit()
         db.refresh(s)
-        # Keep response aligned to persisted values.
-        stored_ai = _stored_ai_likelihood(
-            s,
-            threshold=threshold_to_use,
-            force_unflag=force_unflag,
-        )
 
     return {
         "id": s.id,
@@ -794,10 +1057,10 @@ def get_submission_detail(
             Submission.student_id == s.student_id,
             Submission.id <= s.id,
         ).count(),
-        "ai_confidence": stored_ai["ai_confidence"] if stored_ai else None,
-        "ai_flagged": stored_ai["ai_flagged"] if stored_ai else None,
-        "threshold_used": stored_ai["threshold_used"] if stored_ai else None,
-        "model_language": stored_ai["model_language"] if stored_ai else None,
+        "ai_confidence": ai_snapshot["ai_confidence"] if ai_snapshot else None,
+        "ai_flagged": ai_snapshot["ai_flagged"] if ai_snapshot else None,
+        "threshold_used": ai_snapshot["threshold_used"] if ai_snapshot else None,
+        "model_language": ai_snapshot["model_language"] if ai_snapshot else None,
         "integrity": integrity_report,
     }
 
@@ -964,12 +1227,25 @@ def get_submissions_by_assignment(
     threshold_to_use = _effective_ai_threshold(assignment, None)
     force_unflag = (not _is_ai_detection_enabled(assignment)) or (not _is_auto_flag_enabled(assignment))
     any_ai_updates = False
+    submission_ids = [sub.id for sub in submissions]
+    files_by_submission_id: dict[int, list[SubmissionFile]] = {}
+
+    if submission_ids:
+        all_submission_files = (
+            db.query(SubmissionFile)
+            .filter(SubmissionFile.submission_id.in_(submission_ids))
+            .all()
+        )
+        for file_record in all_submission_files:
+            files_by_submission_id.setdefault(file_record.submission_id, []).append(file_record)
 
     for sub in submissions:
-        recalculated_ai = _stored_ai_likelihood(
-            sub,
+        recalculated_ai = _score_submission_ai_from_files(
+            files_by_submission_id.get(sub.id, []),
+            assignment=assignment,
             threshold=threshold_to_use,
             force_unflag=force_unflag,
+            include_flagged_sections=False,
         )
         if _sync_submission_ai_fields(sub, recalculated_ai):
             db.add(sub)
@@ -984,7 +1260,7 @@ def get_submissions_by_assignment(
     result = []
     for sub in submissions:
         student = db.query(User).filter(User.id == sub.student_id).first()
-        files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == sub.id).all()
+        files = files_by_submission_id.get(sub.id, [])
         
         result.append({
             "id": sub.id,
@@ -1139,28 +1415,20 @@ async def upload_submission_files(
     ai_result = None
     try:
         submission_files = db.query(SubmissionFile).filter(SubmissionFile.submission_id == submission.id).all()
-        primary_filename, primary_code = _extract_primary_source_file(submission_files)
-        if primary_code:
-            if _is_ai_detection_enabled(assignment):
-                ai_result = _estimate_ai_likelihood(
-                    primary_code,
-                    filename=primary_filename,
-                    threshold=threshold_to_use,
-                    force_unflag=force_unflag,
-                )
-            else:
-                ai_result = _build_ai_result_from_confidence(
-                    confidence=0.0,
-                    threshold=threshold_to_use,
-                    model_language=None,
-                    extra_signals=["AI detection is disabled for this assignment."],
-                    force_unflag=True,
-                )
+        ai_result = _score_submission_ai_from_files(
+            submission_files,
+            assignment=assignment,
+            threshold=threshold_to_use,
+            force_unflag=force_unflag,
+            include_flagged_sections=False,
+        )
+        if not _is_ai_detection_enabled(assignment):
+            ai_result["signals"] = ["AI detection is disabled for this assignment."] + list(ai_result.get("signals") or [])
 
-            if _sync_submission_ai_fields(submission, ai_result):
-                db.add(submission)
-                db.commit()
-                db.refresh(submission)
+        if _sync_submission_ai_fields(submission, ai_result):
+            db.add(submission)
+            db.commit()
+            db.refresh(submission)
     except Exception as exc:
         logger.warning("AI detection failed for submission %s: %s", submission.id, exc)
 
@@ -1174,4 +1442,7 @@ async def upload_submission_files(
         "ai_flagged": submission.ai_flagged,
         "threshold_used": submission.ai_threshold_used,
         "model_language": submission.ai_model_language,
+        "ai_scoring_source": ai_result.get("scoring_source") if ai_result else None,
+        "ai_fallback_reason": ai_result.get("fallback_reason") if ai_result else None,
+        "ai_file_results": ai_result.get("file_results") if ai_result else [],
     }
