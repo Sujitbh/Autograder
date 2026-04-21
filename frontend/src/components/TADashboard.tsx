@@ -441,9 +441,35 @@ export default function TADashboard() {
 
                                         {/* Course Name */}
                                         <td className="px-5 py-4">
-                                            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
+                                            <span
+                                                className="ta-course-name group-hover:underline"
+                                                style={{
+                                                    fontSize: '15px',
+                                                    fontWeight: 600,
+                                                    color: 'var(--color-primary)',
+                                                    letterSpacing: '-0.01em',
+                                                    textUnderlineOffset: '3px',
+                                                    textDecorationThickness: '1.5px',
+                                                }}
+                                            >
                                                 {course.name}
                                             </span>
+                                            {course.description && (
+                                                <span
+                                                    className="block"
+                                                    style={{
+                                                        fontSize: '12px',
+                                                        color: 'var(--color-text-light)',
+                                                        marginTop: '2px',
+                                                        maxWidth: '360px',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap',
+                                                    }}
+                                                >
+                                                    {course.description}
+                                                </span>
+                                            )}
                                         </td>
 
                                         {/* Instructor */}

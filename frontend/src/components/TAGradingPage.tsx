@@ -229,12 +229,33 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         };
     } | null>(null);
 
+    // Per-criterion grading state. Keys are criterion ids; values are strings
+    // so the inputs remain controlled while the TA is typing (empty vs "0").
+    const [criterionScores, setCriterionScores] = useState<Record<number, string>>({});
+    // Tracks whether the TA has manually edited the Score / Max Points fields.
+    // While false we keep those fields in sync with the per-criterion totals.
+    const [scoreOverridden, setScoreOverridden] = useState(false);
+    const [maxScoreOverridden, setMaxScoreOverridden] = useState(false);
+
     // Populate form when detail loads
     useEffect(() => {
         if (detail) {
             setScore(detail.score?.toString() || '');
             setMaxScore(detail.max_score?.toString() || '');
             setFeedback(detail.feedback || '');
+            // Treat persisted score/max as manual overrides so our rubric
+            // auto-compute doesn't clobber values the instructor already saved.
+            setScoreOverridden(detail.score != null);
+            setMaxScoreOverridden(detail.max_score != null);
+            // Seed per-criterion scores from any previously saved draft so a TA
+            // coming back to a partially-graded submission sees their work.
+            const seeded: Record<number, string> = {};
+            for (const rs of (detail.rubric_scores ?? [])) {
+                if (rs?.rubric_id != null && rs.score_awarded != null) {
+                    seeded[rs.rubric_id] = String(rs.score_awarded);
+                }
+            }
+            setCriterionScores(seeded);
         }
     }, [detail]);
 
@@ -290,6 +311,26 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
 
     const handleSaveDraft = (moveToNext: boolean = false) => {
         const feedbackToSave = feedback.trim() || 'Reviewed by TA.';
+
+        // Serialize per-criterion scores for the backend. We only send rows
+        // that the TA actually touched so empty criteria don't reset to zero.
+        const rubricBreakdown: Array<{ rubric_id: number; score_awarded: number }> = [];
+        for (const section of rubricSections) {
+            for (const criterion of (section.criteria || [])) {
+                const cid = Number(criterion.id);
+                if (!Number.isFinite(cid) || cid <= 0) continue;
+                const raw = criterionScores[cid];
+                if (raw === undefined || raw === '') continue;
+                const parsed = Number(raw);
+                if (!Number.isFinite(parsed)) continue;
+                const critMax = isWeightedRubric ? 5 : (criterion.max_points || 0);
+                const clamped = critMax > 0
+                    ? Math.max(0, Math.min(parsed, critMax))
+                    : Math.max(0, parsed);
+                rubricBreakdown.push({ rubric_id: cid, score_awarded: clamped });
+            }
+        }
+
         gradeMutation.mutate(
             {
                 submissionId: submissionIdNum,
@@ -298,6 +339,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                     max_score: maxScore ? Number.parseFloat(maxScore) : undefined,
                     feedback: feedbackToSave,
                     is_draft: true,
+                    rubric_breakdown: rubricBreakdown.length > 0 ? rubricBreakdown : undefined,
                 },
             },
             {
@@ -322,6 +364,21 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                 if (data.score != null) setScore(data.score.toString());
                 if (data.max_score != null) setMaxScore(data.max_score.toString());
                 if (data.feedback) setFeedback(data.feedback);
+                // Seed per-criterion inputs from the auto-graded evaluations
+                // so the TA can tweak individual rows instead of retyping them.
+                const evals = data.rubric_results?.evaluations ?? [];
+                if (evals.length > 0) {
+                    setCriterionScores((prev) => {
+                        const next = { ...prev };
+                        for (const ev of evals) {
+                            const cid = (ev as any).criterion_id ?? (ev as any).rubric_id;
+                            if (cid != null && ev.earned_points != null) {
+                                next[cid] = String(ev.earned_points);
+                            }
+                        }
+                        return next;
+                    });
+                }
                 // Also update test results display
                 if (data.stored_results) {
                     setRunTestsResult({
@@ -351,6 +408,163 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         { label: 'Submissions', href: `/ta/courses/${courseId}/submissions` },
         { label: `Grading #${submissionId}` },
     ];
+
+    // NOTE: Rubric-derived values and their memoized lookups must live above the
+    // isLoading / error early-returns below. Otherwise the useMemo hooks below
+    // would be skipped on the first (loading) render and appear on the next
+    // render, which violates the Rules of Hooks and triggers a console error.
+    const sectionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 100);
+    const criterionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 0);
+
+    const rubricSections = normalizeTARubricSections(detail?.rubrics ?? []);
+    const rubrics = rubricSections.flatMap((section) =>
+        section.criteria.map((criterion) => ({
+            ...criterion,
+            section_name: section.name,
+            section_weight: section.weight,
+        }))
+    );
+    const inferredWeightedRubric = rubricSections.some(
+        (section) =>
+            Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 ||
+            section.criteria.some((criterion) => Math.abs((criterionWeightPercent(criterion.weight) || 0) - 100) > 0.0001)
+    );
+    const isWeightedRubric = detail?.assignment?.rubric_mode === 'weighted' || inferredWeightedRubric;
+    const resolvedWeightedCriteria = useMemo(() => {
+        if (!isWeightedRubric) return [];
+        return buildResolvedWeightedCriteria(rubricSections as any[]);
+    }, [isWeightedRubric, rubricSections]);
+    const weightedByKey = useMemo(
+        () => new Map(resolvedWeightedCriteria.map((row) => [row.key, row.effectiveWeightPercent])),
+        [resolvedWeightedCriteria],
+    );
+
+    // Running totals from the per-criterion inputs. For weighted rubrics each
+    // criterion maxes out at 5 (the shared tier scale) and the weighted total
+    // gets scaled back up to assignment.max_points, matching the backend.
+    const rubricTotals = useMemo(() => {
+        let earned = 0;
+        let max = 0;
+        for (const section of rubricSections) {
+            for (const criterion of (section.criteria || [])) {
+                const critMax = isWeightedRubric ? 5 : (criterion.max_points || 0);
+                max += critMax;
+                const raw = criterionScores[Number(criterion.id)];
+                const parsed = raw === undefined || raw === '' ? NaN : Number(raw);
+                if (Number.isFinite(parsed)) {
+                    earned += Math.max(0, Math.min(parsed, critMax));
+                }
+            }
+        }
+        const hasAnyInput = Object.values(criterionScores).some((v) => v !== '' && v !== undefined);
+        return { earned, max, hasAnyInput };
+    }, [rubricSections, isWeightedRubric, criterionScores]);
+
+    // Assignment-level earned / max derived from the rubric totals. For weighted
+    // rubrics we scale by assignment.max_points so the student-facing grade
+    // reflects the weighted composition, not raw tier points.
+    const derivedAssignmentGrade = useMemo(() => {
+        const assignmentMax = Number(detail?.assignment?.max_points ?? 0);
+        if (!rubricTotals.hasAnyInput) return null;
+        if (rubricTotals.max <= 0) return null;
+        if (isWeightedRubric && assignmentMax > 0) {
+            const pct = rubricTotals.earned / rubricTotals.max;
+            return { earned: Number((pct * assignmentMax).toFixed(2)), max: assignmentMax };
+        }
+        return { earned: rubricTotals.earned, max: rubricTotals.max };
+    }, [rubricTotals, isWeightedRubric, detail?.assignment?.max_points]);
+
+    // Keep Score / Max Points in sync with the rubric total unless the TA has
+    // explicitly overridden them. Placed after derivedAssignmentGrade is
+    // defined so the effect's dep array doesn't hit a TDZ during render.
+    useEffect(() => {
+        if (!derivedAssignmentGrade) return;
+        if (!scoreOverridden) {
+            const next = String(derivedAssignmentGrade.earned);
+            setScore((prev) => (prev === next ? prev : next));
+        }
+        if (!maxScoreOverridden) {
+            const next = String(derivedAssignmentGrade.max);
+            setMaxScore((prev) => (prev === next ? prev : next));
+        }
+    }, [derivedAssignmentGrade, scoreOverridden, maxScoreOverridden]);
+
+    // Derived values needed by the useCallback hooks below. Kept above the
+    // early-returns so the hook order stays stable across renders.
+    const language = (
+        detail?.assignment?.allowed_languages?.split(',')[0]
+        || 'python'
+    ).toLowerCase();
+    const supportsCompileCheck = language === 'python' || language === 'java';
+    const compileButtonLabel = language === 'java' ? 'Compile' : 'Check Syntax';
+
+    const saveEditorFilesNow = useCallback((): EditorReviewFile[] => {
+        const currentFiles = editorFilesRef.current;
+        if (currentFiles.length === 0) return [];
+
+        const savedSnapshot = currentFiles.map((file) => ({ ...file, savedContent: file.content }));
+        editorFilesRef.current = savedSnapshot;
+        setEditorFiles(savedSnapshot);
+        return savedSnapshot;
+    }, []);
+
+    const buildExecutionScope = useCallback((filesSnapshot?: EditorReviewFile[]) => {
+        const scopedFiles = filesSnapshot ?? editorFilesRef.current;
+        const defaultFileName = `solution${LANGUAGE_EXTENSION_MAP[language] ?? '.txt'}`;
+        const entryFile = scopedFiles[activeFileIndex]?.name ?? defaultFileName;
+        return {
+            assignmentId: detail?.assignment?.id,
+            entryFilename: entryFile,
+            files: scopedFiles.map((file) => ({ name: file.name, content: file.content })),
+        };
+    }, [activeFileIndex, detail?.assignment?.id, language]);
+
+    const resolveExecutionCode = useCallback((filesSnapshot: EditorReviewFile[], entryFilename?: string) => {
+        if (filesSnapshot.length === 0) {
+            return editorFilesRef.current[activeFileIndex]?.content ?? '';
+        }
+        const entryFile = entryFilename
+            ? filesSnapshot.find((file) => file.name === entryFilename)
+            : undefined;
+        return entryFile?.content ?? filesSnapshot[activeFileIndex]?.content ?? '';
+    }, [activeFileIndex]);
+
+    const handleUploadSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files) return;
+        const files = Array.from(e.target.files);
+        files.forEach((file) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const content = (ev.target?.result as string) ?? '';
+                setEditorFiles((prev) => {
+                    const existing = prev.findIndex((entry) => entry.name === file.name);
+                    if (existing >= 0) {
+                        const next = [...prev];
+                        next[existing] = {
+                            ...next[existing],
+                            content,
+                            savedContent: content,
+                        };
+                        setActiveFileIndex(existing);
+                        return next;
+                    }
+                    const next = [
+                        ...prev,
+                        {
+                            id: `upload-${Date.now()}-${prev.length}`,
+                            name: file.name,
+                            content,
+                            savedContent: content,
+                        },
+                    ];
+                    setActiveFileIndex(next.length - 1);
+                    return next;
+                });
+            };
+            reader.readAsText(file);
+        });
+        e.target.value = '';
+    }, []);
 
     if (isLoading) {
         return (
@@ -384,39 +598,6 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         );
     }
 
-    const language = (
-        detail.assignment.allowed_languages?.split(',')[0]
-        || 'python'
-    ).toLowerCase();
-    const supportsCompileCheck = language === 'python' || language === 'java';
-    const compileButtonLabel = language === 'java' ? 'Compile' : 'Check Syntax';
-
-    const sectionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 100);
-    const criterionWeightPercent = (weight?: number | null) => toWeightPercent(weight, 0);
-
-    const rubricSections = normalizeTARubricSections(detail.rubrics ?? []);
-    const rubrics = rubricSections.flatMap((section) =>
-        section.criteria.map((criterion) => ({
-            ...criterion,
-            section_name: section.name,
-            section_weight: section.weight,
-        }))
-    );
-    const inferredWeightedRubric = rubricSections.some(
-        (section) =>
-            Math.abs(sectionWeightPercent(section.weight) - 100) > 0.0001 ||
-            section.criteria.some((criterion) => Math.abs((criterionWeightPercent(criterion.weight) || 0) - 100) > 0.0001)
-    );
-    const isWeightedRubric = detail.assignment?.rubric_mode === 'weighted' || inferredWeightedRubric;
-    const resolvedWeightedCriteria = useMemo(() => {
-        if (!isWeightedRubric) return [];
-        return buildResolvedWeightedCriteria(rubricSections as any[]);
-    }, [isWeightedRubric, rubricSections]);
-    const weightedByKey = useMemo(
-        () => new Map(resolvedWeightedCriteria.map((row) => [row.key, row.effectiveWeightPercent])),
-        [resolvedWeightedCriteria],
-    );
-
     const getCriterionEffectiveWeight = (section: any, criterion: any, sectionIdx: number, critIdx: number) => {
         const key = toCriterionKey(section, criterion, sectionIdx, critIdx);
         return weightedByKey.get(key) ?? 0;
@@ -431,37 +612,6 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
     };
     const activeFile = editorFiles[activeFileIndex];
     const code = activeFile?.content || '';
-
-    const saveEditorFilesNow = useCallback((): EditorReviewFile[] => {
-        const currentFiles = editorFilesRef.current;
-        if (currentFiles.length === 0) return [];
-
-        const savedSnapshot = currentFiles.map((file) => ({ ...file, savedContent: file.content }));
-        editorFilesRef.current = savedSnapshot;
-        setEditorFiles(savedSnapshot);
-        return savedSnapshot;
-    }, []);
-
-    const buildExecutionScope = useCallback((filesSnapshot?: EditorReviewFile[]) => {
-        const scopedFiles = filesSnapshot ?? editorFilesRef.current;
-        const defaultFileName = `solution${LANGUAGE_EXTENSION_MAP[language] ?? '.txt'}`;
-        const entryFile = scopedFiles[activeFileIndex]?.name ?? defaultFileName;
-        return {
-            assignmentId: detail?.assignment?.id,
-            entryFilename: entryFile,
-            files: scopedFiles.map((file) => ({ name: file.name, content: file.content })),
-        };
-    }, [activeFileIndex, detail?.assignment?.id, language]);
-
-    const resolveExecutionCode = useCallback((filesSnapshot: EditorReviewFile[], entryFilename?: string) => {
-        if (filesSnapshot.length === 0) {
-            return editorFilesRef.current[activeFileIndex]?.content ?? '';
-        }
-        const entryFile = entryFilename
-            ? filesSnapshot.find((file) => file.name === entryFilename)
-            : undefined;
-        return entryFile?.content ?? filesSnapshot[activeFileIndex]?.content ?? '';
-    }, [activeFileIndex]);
 
     const handleRunCode = async () => {
         setOutputOpen(true);
@@ -535,43 +685,6 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         ]);
         setActiveFileIndex(editorFiles.length);
     };
-
-    const handleUploadSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        if (!e.target.files) return;
-        const files = Array.from(e.target.files);
-        files.forEach((file) => {
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const content = (ev.target?.result as string) ?? '';
-                setEditorFiles((prev) => {
-                    const existing = prev.findIndex((entry) => entry.name === file.name);
-                    if (existing >= 0) {
-                        const next = [...prev];
-                        next[existing] = {
-                            ...next[existing],
-                            content,
-                            savedContent: content,
-                        };
-                        setActiveFileIndex(existing);
-                        return next;
-                    }
-                    const next = [
-                        ...prev,
-                        {
-                            id: `upload-${Date.now()}-${prev.length}`,
-                            name: file.name,
-                            content,
-                            savedContent: content,
-                        },
-                    ];
-                    setActiveFileIndex(next.length - 1);
-                    return next;
-                });
-            };
-            reader.readAsText(file);
-        });
-        e.target.value = '';
-    }, []);
 
     return (
         <PageLayout>
@@ -1260,7 +1373,7 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                             <div className="mb-6">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <h3 style={{ fontSize: '13px', textTransform: 'uppercase', letterSpacing: '.5px', fontWeight: 600, color: 'var(--color-text-mid)' }}>
-                                                        Rubric Reference
+                                                        Rubric
                                                     </h3>
                                                     <span
                                                         style={{
@@ -1277,6 +1390,43 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                     >
                                                         {isWeightedRubric ? 'Weighted' : 'Unweighted'}
                                                     </span>
+                                                </div>
+
+                                                {/* Running total strip */}
+                                                <div
+                                                    className="mb-3 flex items-center justify-between rounded-md px-3 py-2"
+                                                    style={{
+                                                        backgroundColor: 'var(--color-surface)',
+                                                        border: '1px solid var(--color-border)',
+                                                    }}
+                                                >
+                                                    <div style={{ fontSize: 11, color: 'var(--color-text-mid)' }}>
+                                                        Rubric total
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-dark)' }}>
+                                                            {rubricTotals.hasAnyInput ? rubricTotals.earned : '—'}
+                                                            <span style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-mid)' }}>
+                                                                {' '} / {rubricTotals.max} pts
+                                                            </span>
+                                                        </span>
+                                                        {isWeightedRubric && derivedAssignmentGrade && (
+                                                            <span
+                                                                style={{
+                                                                    fontSize: 11,
+                                                                    fontWeight: 600,
+                                                                    color: 'var(--color-primary)',
+                                                                    backgroundColor: 'rgba(107,0,0,.08)',
+                                                                    border: '1px solid rgba(107,0,0,.20)',
+                                                                    borderRadius: 999,
+                                                                    padding: '2px 8px',
+                                                                }}
+                                                                title="Weighted score scaled to the assignment's total points"
+                                                            >
+                                                                → {derivedAssignmentGrade.earned} / {derivedAssignmentGrade.max}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <div className="space-y-4">
                                                     {rubricSections.map((section, sectionIdx) => (
@@ -1297,17 +1447,21 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                         const autoEval = autoGradeResult?.rubric_results?.evaluations?.find(
                                                                             (e) => (e.criterion_id ?? e.rubric_id) === criterion.id
                                                                         );
-                                                                        const earned = autoEval ? autoEval.earned_points : null;
                                                                         const max = autoEval?.max_points ?? (isWeightedRubric ? 5 : (criterion.max_points || 0));
                                                                         const effectiveWeight = getCriterionEffectiveWeight(section, criterion, sectionIdx, critIdx);
+                                                                        const criterionIdNum = Number(criterion.id);
+                                                                        const rawScore = criterionScores[criterionIdNum] ?? '';
+                                                                        const earnedNum = rawScore === '' ? null : Number(rawScore);
+                                                                        const hasScore = earnedNum !== null && Number.isFinite(earnedNum);
+                                                                        const isFull = hasScore && max > 0 && earnedNum === max;
 
                                                                         return (
                                                                             <div
                                                                                 key={criterion.id}
-                                                                                className="flex items-center justify-between px-3 py-2 rounded-lg"
+                                                                                className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg"
                                                                                 style={{ backgroundColor: 'var(--color-primary-bg)', border: '1px solid var(--color-border)' }}
                                                                             >
-                                                                                <div className="flex-1 pr-2">
+                                                                                <div className="flex-1 pr-2 min-w-0">
                                                                                     <p style={{ fontSize: '12px', fontWeight: 500, color: 'var(--color-text-dark)' }}>
                                                                                         {criterion.name}
                                                                                     </p>
@@ -1325,18 +1479,41 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                                         </p>
                                                                                     )}
                                                                                 </div>
-                                                                                <span
-                                                                                    className="px-2 py-0.5 rounded-md shrink-0"
+                                                                                <div
+                                                                                    className="flex items-center gap-1 shrink-0 rounded-md px-2 py-1"
                                                                                     style={{
-                                                                                        fontSize: '11px',
-                                                                                        fontWeight: 600,
-                                                                                        color: earned !== null ? (earned === max ? 'var(--color-success)' : 'var(--color-warning)') : 'var(--color-text-mid)',
                                                                                         backgroundColor: 'var(--color-surface)',
-                                                                                        border: '1px solid var(--color-border)',
+                                                                                        border: `1px solid ${hasScore ? (isFull ? 'rgba(45,106,45,.35)' : 'rgba(107,0,0,.35)') : 'var(--color-border)'}`,
                                                                                     }}
                                                                                 >
-                                                                                    {earned !== null ? `${earned} / ` : ''}{max} pts
-                                                                                </span>
+                                                                                    <input
+                                                                                        type="number"
+                                                                                        min={0}
+                                                                                        max={max || undefined}
+                                                                                        step={isWeightedRubric ? 1 : 0.5}
+                                                                                        value={rawScore}
+                                                                                        onChange={(e) => {
+                                                                                            const v = e.target.value;
+                                                                                            setCriterionScores((prev) => ({
+                                                                                                ...prev,
+                                                                                                [criterionIdNum]: v,
+                                                                                            }));
+                                                                                        }}
+                                                                                        aria-label={`Score for ${criterion.name}`}
+                                                                                        className="w-12 text-right bg-transparent focus:outline-none"
+                                                                                        style={{
+                                                                                            fontSize: '12px',
+                                                                                            fontWeight: 600,
+                                                                                            color: hasScore ? (isFull ? 'var(--color-success)' : 'var(--color-primary)') : 'var(--color-text-dark)',
+                                                                                            // Hide native spinner for a cleaner look
+                                                                                            MozAppearance: 'textfield',
+                                                                                        }}
+                                                                                        placeholder="—"
+                                                                                    />
+                                                                                    <span style={{ fontSize: '11px', color: 'var(--color-text-mid)' }}>
+                                                                                        / {max} pts
+                                                                                    </span>
+                                                                                </div>
                                                                             </div>
                                                                         );
                                                                     })
@@ -1380,7 +1557,10 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                             id="grade-score"
                                                             type="number"
                                                             value={score}
-                                                            onChange={(e) => setScore(e.target.value)}
+                                                            onChange={(e) => {
+                                                                setScore(e.target.value);
+                                                                setScoreOverridden(true);
+                                                            }}
                                                             className="w-full px-3 py-2 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none transition-shadow"
                                                             style={{
                                                                 backgroundColor: 'var(--color-surface)',
@@ -1389,6 +1569,26 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                 color: 'var(--color-text-dark)',
                                                             }}
                                                         />
+                                                        {rubricTotals.hasAnyInput && (
+                                                            <div className="flex items-center justify-between" style={{ marginTop: 4 }}>
+                                                                <span style={{ fontSize: 10, color: 'var(--color-text-light)' }}>
+                                                                    {scoreOverridden ? 'Manually overridden' : 'Auto-synced from rubric'}
+                                                                </span>
+                                                                {scoreOverridden && (
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            setScoreOverridden(false);
+                                                                            if (derivedAssignmentGrade) setScore(String(derivedAssignmentGrade.earned));
+                                                                        }}
+                                                                        style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-primary)' }}
+                                                                        className="hover:underline"
+                                                                    >
+                                                                        Sync to rubric
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                     <div>
                                                         <label
@@ -1401,7 +1601,10 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                             id="grade-max-score"
                                                             type="number"
                                                             value={maxScore}
-                                                            onChange={(e) => setMaxScore(e.target.value)}
+                                                            onChange={(e) => {
+                                                                setMaxScore(e.target.value);
+                                                                setMaxScoreOverridden(true);
+                                                            }}
                                                             className="w-full px-3 py-2 rounded-lg focus:ring-2 focus:ring-primary focus:outline-none transition-shadow"
                                                             style={{
                                                                 backgroundColor: 'var(--color-surface)',
