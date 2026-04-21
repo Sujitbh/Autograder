@@ -78,6 +78,49 @@ export interface IntegrityAIDetection {
   }>;
 }
 
+export interface FlaggedCodeBlockResult {
+  block_id: string;
+  block_type: string;
+  start_line?: number | null;
+  end_line?: number | null;
+  ai_confidence: number;
+  score: number;
+  threshold_used: number;
+  threshold_exceeded: boolean;
+  scoring_source?: 'model' | 'heuristic' | 'mixed' | 'none' | string;
+  detected_language?: string | null;
+  fallback_reason?: string | null;
+  code: string;
+}
+
+export interface FlaggedCodeFileResult {
+  filename: string;
+  file_ai_confidence: number;
+  file_threshold_used: number;
+  threshold_exceeded: boolean;
+  file_flagged?: boolean;
+  scoring_source?: 'model' | 'heuristic' | 'mixed' | 'none' | string;
+  detected_language?: string | null;
+  fallback_reason?: string | null;
+  extraction_note?: string | null;
+  block_count: number;
+  blocks: FlaggedCodeBlockResult[];
+}
+
+export interface FlaggedCodeAnalysisResponse {
+  submission_id: number;
+  assignment_id: number;
+  language?: string | null;
+  threshold_used?: number;
+  scoring_source?: 'model' | 'heuristic' | 'mixed' | 'none' | string;
+  selection_mode?: string;
+  evaluated_file_count?: number;
+  analyzed_file_count?: number;
+  relevant_file_selection_reason?: string | null;
+  files: FlaggedCodeFileResult[];
+  disclaimer: string;
+}
+
 export interface SubmissionIntegrityReport {
   plagiarism: {
     checked_against: number;
@@ -282,6 +325,23 @@ export const submissionService = {
     ai_detection: IntegrityAIDetection;
   }> {
     const { data } = await withRetry(() => api.get(`/submissions/${submissionId}/plagiarism-scan`));
+    return data;
+  },
+
+  /** On-demand block-level AI scoring view for flagged/top-confidence files. */
+  async getFlaggedCode(
+    submissionId: string,
+    options?: { aiThreshold?: number; maxFiles?: number }
+  ): Promise<FlaggedCodeAnalysisResponse> {
+    const params: Record<string, number> = {};
+    if (options?.aiThreshold != null) params.ai_threshold = options.aiThreshold;
+    if (options?.maxFiles != null) params.max_files = options.maxFiles;
+
+    const { data } = await withRetry(() =>
+      api.get<FlaggedCodeAnalysisResponse>(`/submissions/${submissionId}/flagged-code`, {
+        params: Object.keys(params).length > 0 ? params : undefined,
+      })
+    );
     return data;
   },
 
