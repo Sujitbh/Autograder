@@ -364,7 +364,7 @@ function DefaultCommentsEditorUnweighted({
 }) {
     const [open, setOpen] = useState(false);
 
-    const configuredCount = UNWEIGHTED_TIER_SCALE.reduce(
+    const configuredCount = UNWEIGHTED_TIER_SCALE.reduce<number>(
         (sum, tier) => sum + ((comments?.[String(tier)] ?? '').trim().length > 0 ? 1 : 0),
         0,
     );
