@@ -449,11 +449,12 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         setInfoTab('grading');
         try {
             const result = await autoGradeMutation.mutateAsync();
-            setAutoGradeResult(result);
+            let nextAutoResult: any = { ...result };
 
             // Prefer criterion-level rubric suggestions so the grading tab
             // inputs reflect the autograder recommendation row-by-row.
             let appliedCriterionSuggestions = false;
+            let nextRubricScores: number[] | null = null;
             const evaluations = Array.isArray(result?.rubric_results?.evaluations)
                 ? result.rubric_results.evaluations
                 : [];
@@ -487,21 +488,48 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
                 if (mappedScores.some((value) => value !== null)) {
                     appliedCriterionSuggestions = true;
-                    setRubricScores((prev) =>
-                        mappedScores.map((value, idx) => {
-                            if (value != null) return value;
-                            const fallback = Number(prev[idx]);
-                            return Number.isFinite(fallback) ? fallback : 0;
-                        }),
-                    );
+                    nextRubricScores = mappedScores.map((value, idx) => {
+                        if (value != null) return value;
+                        const fallback = Number(rubricScores[idx]);
+                        return Number.isFinite(fallback) ? fallback : 0;
+                    });
+                    setRubricScores(nextRubricScores);
                 }
             }
 
             // Backward-compatible fallback for older responses that only return
             // an overall score without criterion evaluations.
             if (!appliedCriterionSuggestions && result.score != null && rubrics.length > 0) {
-                setRubricScores(distributeScoreAcrossRubrics(result.score, rubrics));
+                nextRubricScores = distributeScoreAcrossRubrics(result.score, rubrics);
+                setRubricScores(nextRubricScores);
             }
+
+            // Keep the top auto-score banner aligned with the rubric totals
+            // shown in the grading form so they never drift apart.
+            if (nextRubricScores && rubrics.length > 0) {
+                const computedMax = isWeightedRubric
+                    ? Math.max(0, Number(weightedMaxTotal) || 0)
+                    : rubrics.reduce((sum: number, criterion: any) => sum + (getCriterionScaleMax(criterion) || 0), 0);
+
+                const computedScore = isWeightedRubric
+                    ? calculateWeightedTotalPoints(
+                        rubrics.map((criterion: any, idx: number) => ({
+                            rating: Math.max(0, Math.min(Number(nextRubricScores?.[idx]) || 0, getCriterionScaleMax(criterion))),
+                            effectiveWeightPercent: Number(criterion.effective_weight_percent) || 0,
+                        })),
+                    )
+                    : nextRubricScores.reduce((sum, value) => sum + (Number(value) || 0), 0);
+
+                const computedPercentage = computedMax > 0 ? (computedScore / computedMax) * 100 : 0;
+                nextAutoResult = {
+                    ...nextAutoResult,
+                    score: Math.round(computedScore * 100) / 100,
+                    max_score: Math.round(computedMax * 100) / 100,
+                    percentage: Math.round(computedPercentage * 100) / 100,
+                };
+            }
+
+            setAutoGradeResult(nextAutoResult);
             if (result.feedback) setFeedback(result.feedback);
             // Update live test results
             if (result.stored_results) {
@@ -518,7 +546,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                 })));
             }
         } catch (e) { /* handled by mutation state */ }
-    }, [rubrics, autoGradeMutation, distributeScoreAcrossRubrics, getCriterionScaleMax, isWeightedRubric]);
+    }, [rubrics, autoGradeMutation, distributeScoreAcrossRubrics, getCriterionScaleMax, isWeightedRubric, rubricScores, weightedMaxTotal]);
 
     const sortedAssignmentSubmissions = useMemo(
         () => [...assignmentSubmissions].sort(
