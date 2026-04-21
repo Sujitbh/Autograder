@@ -450,8 +450,56 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         try {
             const result = await autoGradeMutation.mutateAsync();
             setAutoGradeResult(result);
-            // Populate score fields
-            if (result.score != null && rubrics.length > 0) {
+
+            // Prefer criterion-level rubric suggestions so the grading tab
+            // inputs reflect the autograder recommendation row-by-row.
+            let appliedCriterionSuggestions = false;
+            const evaluations = Array.isArray(result?.rubric_results?.evaluations)
+                ? result.rubric_results.evaluations
+                : [];
+            if (rubrics.length > 0 && evaluations.length > 0) {
+                const evaluationByCriterionId = new Map<number, any>();
+                evaluations.forEach((evaluation: any) => {
+                    const criterionId = Number(evaluation?.criterion_id ?? evaluation?.rubric_id);
+                    if (Number.isFinite(criterionId) && criterionId > 0 && !evaluationByCriterionId.has(criterionId)) {
+                        evaluationByCriterionId.set(criterionId, evaluation);
+                    }
+                });
+
+                const mappedScores = rubrics.map((criterion: any) => {
+                    const criterionId = Number(criterion?.id);
+                    const evaluation = evaluationByCriterionId.get(criterionId);
+                    if (!evaluation) return null;
+
+                    const maxForInput = getCriterionScaleMax(criterion);
+                    if (isWeightedRubric) {
+                        const raw = Number(evaluation?.grade ?? evaluation?.earned_points);
+                        if (!Number.isFinite(raw)) return null;
+                        const clamped = Math.max(0, Math.min(Math.round(raw), maxForInput));
+                        return clamped;
+                    }
+
+                    const raw = Number(evaluation?.earned_points ?? evaluation?.points_awarded);
+                    if (!Number.isFinite(raw)) return null;
+                    const clamped = Math.max(0, Math.min(raw, maxForInput));
+                    return clamped;
+                });
+
+                if (mappedScores.some((value) => value !== null)) {
+                    appliedCriterionSuggestions = true;
+                    setRubricScores((prev) =>
+                        mappedScores.map((value, idx) => {
+                            if (value != null) return value;
+                            const fallback = Number(prev[idx]);
+                            return Number.isFinite(fallback) ? fallback : 0;
+                        }),
+                    );
+                }
+            }
+
+            // Backward-compatible fallback for older responses that only return
+            // an overall score without criterion evaluations.
+            if (!appliedCriterionSuggestions && result.score != null && rubrics.length > 0) {
                 setRubricScores(distributeScoreAcrossRubrics(result.score, rubrics));
             }
             if (result.feedback) setFeedback(result.feedback);
@@ -470,7 +518,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                 })));
             }
         } catch (e) { /* handled by mutation state */ }
-    }, [rubrics, autoGradeMutation, distributeScoreAcrossRubrics]);
+    }, [rubrics, autoGradeMutation, distributeScoreAcrossRubrics, getCriterionScaleMax, isWeightedRubric]);
 
     const sortedAssignmentSubmissions = useMemo(
         () => [...assignmentSubmissions].sort(

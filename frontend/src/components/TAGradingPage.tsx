@@ -219,7 +219,11 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         rubric_results?: {
             evaluations?: Array<{
                 rubric_id: number;
+                criterion_id?: number;
                 earned_points: number;
+                max_points?: number;
+                grade?: number;
+                points_awarded?: number;
                 feedback?: string;
             }>;
         };
@@ -1291,10 +1295,10 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
                                                                 {(section.criteria || []).length > 0 ? (
                                                                     (section.criteria || []).map((criterion, critIdx) => {
                                                                         const autoEval = autoGradeResult?.rubric_results?.evaluations?.find(
-                                                                            (e) => e.rubric_id === criterion.id
+                                                                            (e) => (e.criterion_id ?? e.rubric_id) === criterion.id
                                                                         );
                                                                         const earned = autoEval ? autoEval.earned_points : null;
-                                                                        const max = criterion.max_points || 0;
+                                                                        const max = autoEval?.max_points ?? (isWeightedRubric ? 5 : (criterion.max_points || 0));
                                                                         const effectiveWeight = getCriterionEffectiveWeight(section, criterion, sectionIdx, critIdx);
 
                                                                         return (

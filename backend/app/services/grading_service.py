@@ -10,22 +10,28 @@ This service provides:
 
 from typing import Optional, List
 from datetime import datetime
+import json
 import os
 import re
+from types import SimpleNamespace
 from pathlib import Path
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
+from app.models.assignment import Assignment
 from app.models.submission import Submission
 from app.models.submission_file import SubmissionFile
 from app.models.submission_result import SubmissionResult
 from app.models.testcase import TestCase
 from app.models.rubric import Rubric
+from app.models.rubric_section import RubricSection
 from app.services.execution_service import ExecutionService
 
 
 class GradingService:
     """Service for grading student submissions."""
+
+    _WEIGHT_EPSILON = 0.0001
 
     @staticmethod
     def _resolve_submission_file_path(raw_path: str) -> str:
@@ -146,6 +152,305 @@ class GradingService:
         )
 
         return workspace_files, language, entry_code, entry_filename
+
+    @staticmethod
+    def _to_weight_percent(weight: Optional[float], fallback: float = 0.0) -> float:
+        """Normalize stored weight value to a percentage-style number."""
+        if weight is None:
+            return fallback
+        try:
+            value = float(weight)
+        except (TypeError, ValueError):
+            return fallback
+        if value < 0:
+            return 0.0
+        # Legacy DB stores criterion weight as a fraction of section.
+        return value * 100.0 if value <= 1.5 else value
+
+    @staticmethod
+    def _resolve_section_criterion_weights(
+        section_weight_percent: float,
+        criterion_weights_percent: list[Optional[float]],
+    ) -> list[float]:
+        """
+        Resolve criterion effective global weights for a section.
+
+        Mirrors frontend logic so weighted auto-grade totals line up with the
+        grading UI. Handles both:
+        - global criterion weights (sum ~= section weight)
+        - relative criterion weights (sum ~= 100 inside a section)
+        """
+        count = len(criterion_weights_percent)
+        if count == 0:
+            return []
+
+        section_weight = max(0.0, float(section_weight_percent or 0.0))
+        present = [
+            0.0 if w is None else max(0.0, float(w))
+            for w in criterion_weights_percent
+        ]
+        total_present = sum(present)
+
+        if total_present <= GradingService._WEIGHT_EPSILON:
+            each = (section_weight / count) if section_weight > GradingService._WEIGHT_EPSILON else 0.0
+            return [each for _ in range(count)]
+
+        global_total = total_present
+        relative_total = (total_present * section_weight) / 100.0
+        global_diff = abs(global_total - section_weight)
+        relative_diff = abs(relative_total - section_weight)
+        use_global_weights = global_diff <= relative_diff
+
+        if use_global_weights:
+            return present
+
+        return [(w * section_weight) / 100.0 for w in present]
+
+    @staticmethod
+    def _derive_test_ratio(test_results: Optional[dict]) -> Optional[float]:
+        """Return test performance as a [0,1] ratio when available."""
+        if not test_results:
+            return None
+
+        total_points = float(test_results.get("total_points") or 0)
+        earned_points = float(test_results.get("earned_points") or 0)
+        if total_points > 0:
+            return max(0.0, min(earned_points / total_points, 1.0))
+
+        total_cases = int(test_results.get("total_testcases") or 0)
+        passed_cases = int(test_results.get("passed_testcases") or 0)
+        if total_cases > 0:
+            return max(0.0, min(passed_cases / total_cases, 1.0))
+
+        return None
+
+    @staticmethod
+    def _is_test_focused_criterion(
+        name: Optional[str],
+        description: Optional[str],
+        grading_method: Optional[str],
+    ) -> bool:
+        method = (grading_method or "").strip().lower()
+        if method in {"auto", "hybrid"}:
+            return True
+
+        text = f"{name or ''} {description or ''}".lower()
+        keywords = (
+            "test",
+            "correctness",
+            "output",
+            "functionality",
+            "pass",
+            "edge case",
+            "expected",
+        )
+        return any(key in text for key in keywords)
+
+    @staticmethod
+    def _default_comment_for_grade(
+        default_comments_raw: Optional[str],
+        grade: int,
+    ) -> Optional[str]:
+        """Return rubric default comment for a computed 0-5 grade tier."""
+        if not default_comments_raw:
+            return None
+        try:
+            payload = json.loads(default_comments_raw)
+        except Exception:
+            return None
+        if not isinstance(payload, dict):
+            return None
+        value = payload.get(str(grade))
+        if value is None:
+            value = payload.get(grade)
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    @staticmethod
+    def _blend_rubric_and_test_ratio(
+        rubric_ratio: float,
+        test_ratio: Optional[float],
+        *,
+        grading_method: Optional[str],
+        is_test_focused: bool,
+    ) -> float:
+        """
+        Blend rubric heuristic with test performance.
+
+        This guarantees auto-grade suggestions include both rubric intent and
+        observed testcase behavior whenever tests are available.
+        """
+        base = max(0.0, min(float(rubric_ratio), 1.0))
+        if test_ratio is None:
+            return base
+
+        test = max(0.0, min(float(test_ratio), 1.0))
+        method = (grading_method or "").strip().lower()
+
+        if is_test_focused or method == "auto":
+            score = (0.9 * test) + (0.1 * base)
+        elif method == "hybrid":
+            score = (0.6 * test) + (0.4 * base)
+        else:
+            # Manual rows still get a light test signal so suggestions remain
+            # grounded in execution outcomes.
+            score = (0.2 * test) + (0.8 * base)
+
+        return max(0.0, min(score, 1.0))
+
+    @staticmethod
+    def _evaluate_sectioned_rubric(
+        assignment: Optional[Assignment],
+        rubric_sections: list[RubricSection],
+        code: str,
+        test_results: Optional[dict] = None,
+    ) -> dict:
+        """
+        Evaluate modern section/criterion rubric format.
+
+        Supports both weighted and unweighted rubric modes and emits criterion-
+        level evaluations that the grading UI can prefill directly.
+        """
+        weighted_mode = (getattr(assignment, "rubric_mode", None) or "unweighted") == "weighted"
+        test_ratio = GradingService._derive_test_ratio(test_results)
+
+        evaluations: list[dict] = []
+        total_points = 0.0
+        earned_points = 0.0
+
+        for section in rubric_sections:
+            section_criteria = sorted(
+                section.criteria or [],
+                key=lambda c: ((c.order or 0), c.id),
+            )
+            if not section_criteria:
+                continue
+
+            if weighted_mode:
+                section_weight_percent = GradingService._to_weight_percent(section.weight, 100.0)
+                criterion_weight_percents = [
+                    GradingService._to_weight_percent(c.weight, 0.0) if c.weight is not None else None
+                    for c in section_criteria
+                ]
+                effective_weight_percents = GradingService._resolve_section_criterion_weights(
+                    section_weight_percent,
+                    criterion_weight_percents,
+                )
+            else:
+                effective_weight_percents = [0.0 for _ in section_criteria]
+
+            for idx, criterion in enumerate(section_criteria):
+                criterion_name = criterion.name or "Criterion"
+                criterion_description = criterion.description or ""
+                grading_method = criterion.grading_method or "manual"
+                is_test_focused = GradingService._is_test_focused_criterion(
+                    criterion_name,
+                    criterion_description,
+                    grading_method,
+                )
+
+                proxy_rubric = SimpleNamespace(
+                    name=criterion_name,
+                    description=criterion_description,
+                )
+                rubric_ratio, heuristic_feedback = GradingService._simple_rubric_check(
+                    code,
+                    proxy_rubric,
+                )
+                blended_ratio = GradingService._blend_rubric_and_test_ratio(
+                    rubric_ratio,
+                    test_ratio,
+                    grading_method=grading_method,
+                    is_test_focused=is_test_focused,
+                )
+
+                if weighted_mode:
+                    effective_weight = max(
+                        0.0,
+                        float(effective_weight_percents[idx] if idx < len(effective_weight_percents) else 0.0),
+                    )
+                    grade_tier = int(round(blended_ratio * 5))
+                    grade_tier = max(0, min(grade_tier, 5))
+                    display_earned = float(grade_tier)
+                    display_max = 5.0
+                    points_awarded = (grade_tier / 5.0) * effective_weight if effective_weight > 0 else 0.0
+                    total_points += effective_weight
+                    earned_points += points_awarded
+                    weight_percent = effective_weight
+                else:
+                    criterion_max = float(criterion.max_points or 0)
+                    if criterion_max <= 0:
+                        criterion_max = 5.0
+                    points_awarded = criterion_max * blended_ratio
+                    grade_tier = int(round((points_awarded / criterion_max) * 5)) if criterion_max > 0 else 0
+                    grade_tier = max(0, min(grade_tier, 5))
+                    display_earned = points_awarded
+                    display_max = criterion_max
+                    total_points += criterion_max
+                    earned_points += points_awarded
+                    weight_percent = None
+
+                feedback_parts: list[str] = []
+                default_comment = GradingService._default_comment_for_grade(
+                    criterion.default_comments,
+                    grade_tier,
+                )
+                if default_comment:
+                    feedback_parts.append(default_comment)
+                if heuristic_feedback:
+                    feedback_parts.append(heuristic_feedback)
+                if test_ratio is not None and (is_test_focused or (grading_method or "").lower() in {"auto", "hybrid"}):
+                    feedback_parts.append(
+                        f"Test performance: {int(round(test_ratio * 100))}% of test points earned."
+                    )
+
+                # Keep feedback concise and stable.
+                seen_feedback = set()
+                deduped_feedback_parts = []
+                for part in feedback_parts:
+                    normalized = part.strip()
+                    if not normalized or normalized in seen_feedback:
+                        continue
+                    seen_feedback.add(normalized)
+                    deduped_feedback_parts.append(normalized)
+                feedback_text = "; ".join(deduped_feedback_parts) if deduped_feedback_parts else "Evaluated"
+
+                evaluations.append(
+                    {
+                        # Legacy key kept for frontend compatibility.
+                        "rubric_id": criterion.id,
+                        "rubric_name": criterion_name,
+                        "criterion_id": criterion.id,
+                        "criterion_name": criterion_name,
+                        "section_id": section.id,
+                        "section_name": section.name,
+                        "grading_method": grading_method,
+                        "max_points": round(display_max, 4),
+                        # For weighted mode this is the 0-5 rubric tier.
+                        "earned_points": round(display_earned, 4),
+                        # Contribution to overall suggested score.
+                        "points_awarded": round(points_awarded, 4),
+                        "grade": grade_tier,
+                        "weight_percent": round(weight_percent, 4) if weight_percent is not None else None,
+                        "feedback": feedback_text,
+                    }
+                )
+
+        total_points = round(total_points, 4)
+        earned_points = round(earned_points, 4)
+        score_includes_tests = bool(test_ratio is not None and len(evaluations) > 0)
+
+        return {
+            "total_rubrics": len(evaluations),
+            "total_points": total_points,
+            "earned_points": earned_points,
+            "evaluations": evaluations,
+            # `grade_submission()` uses this flag to avoid double-counting tests.
+            "has_test_rubric": score_includes_tests,
+            "rubric_mode": "weighted" if weighted_mode else "unweighted",
+        }
 
     @staticmethod
     def grade_submission(
@@ -349,6 +654,25 @@ class GradingService:
         """
         Evaluate submission against rubric criteria.
         """
+        assignment = db.query(Assignment).filter(
+            Assignment.id == submission.assignment_id
+        ).first()
+
+        rubric_sections = (
+            db.query(RubricSection)
+            .filter(RubricSection.assignment_id == submission.assignment_id)
+            .order_by(RubricSection.order.asc(), RubricSection.id.asc())
+            .all()
+        )
+
+        if rubric_sections:
+            return GradingService._evaluate_sectioned_rubric(
+                assignment=assignment,
+                rubric_sections=rubric_sections,
+                code=code,
+                test_results=test_results,
+            )
+
         rubrics = db.query(Rubric).filter(
             Rubric.assignment_id == submission.assignment_id
         ).all()
