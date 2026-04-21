@@ -11,7 +11,13 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { TopNav } from '@/components/TopNav';
 import { PageLayout } from '@/components/PageLayout';
 import { Sidebar } from '@/components/Sidebar';
-import { CreateAssignmentForm, type AssignmentFormData, type AssignmentSubmissionMeta } from '@/components/CreateAssignmentForm';
+import {
+    CreateAssignmentForm,
+    type AssignmentFormData,
+    type AssignmentSubmissionMeta,
+    clampAssignmentWizardStep,
+    getNewAssignmentWizardStorageKey,
+} from '@/components/CreateAssignmentForm';
 import { toast } from 'sonner';
 import { useCreateAssignment, useUpdateAssignment } from '@/hooks/queries';
 import type { CreateAssignmentDto } from '@/types';
@@ -22,6 +28,29 @@ import { testcaseService } from '@/services/api/testcaseService';
 import { courseDefaultApiToFormPartial, formRubricToCoursePutApi } from '@/lib/courseDefaultRubric';
 import { Loader2 } from 'lucide-react';
 import type { Assignment } from '@/types';
+
+function readNewAssignmentWizardSnapshot(courseId: string): { data: Partial<AssignmentFormData>; step: number } | null {
+    try {
+        const raw = localStorage.getItem(getNewAssignmentWizardStorageKey(courseId));
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as { v?: number; data?: Partial<AssignmentFormData>; step?: number };
+        if (!parsed?.data || typeof parsed.data !== 'object') return null;
+        return {
+            data: parsed.data,
+            step: clampAssignmentWizardStep(typeof parsed.step === 'number' ? parsed.step : 0),
+        };
+    } catch {
+        return null;
+    }
+}
+
+function clearNewAssignmentWizardSnapshot(courseId: string): void {
+    try {
+        localStorage.removeItem(getNewAssignmentWizardStorageKey(courseId));
+    } catch {
+        /* ignore */
+    }
+}
 
 function lookupCourseCode(id: string) {
     try {
@@ -109,7 +138,7 @@ function assignmentToFormPartial(a: Assignment): Partial<AssignmentFormData> {
         showResultsToStudents: true,
         enableGitSubmission: false,
         autoFlagEnabled: true,
-        autoFlagThreshold: 70,
+        autoFlagThreshold: 90,
         crossSectionComparison: false,
     };
 }
@@ -279,14 +308,27 @@ export function CreateAssignmentPage() {
                 .getCourseDefaultRubric(cid)
                 .then((d) => {
                     if (!cancelled) {
-                        setInitialData(courseDefaultApiToFormPartial(d));
-                        setInitialStep(0);
+                        const base = courseDefaultApiToFormPartial(d);
+                        const snap = readNewAssignmentWizardSnapshot(cid);
+                        if (snap) {
+                            setInitialData({ ...base, ...snap.data });
+                            setInitialStep(snap.step);
+                        } else {
+                            setInitialData(base);
+                            setInitialStep(0);
+                        }
                     }
                 })
                 .catch(() => {
                     if (!cancelled) {
-                        setInitialData({});
-                        setInitialStep(0);
+                        const snap = readNewAssignmentWizardSnapshot(cid);
+                        if (snap) {
+                            setInitialData(snap.data);
+                            setInitialStep(snap.step);
+                        } else {
+                            setInitialData({});
+                            setInitialStep(0);
+                        }
                     }
                 })
                 .finally(() => {
@@ -373,6 +415,7 @@ export function CreateAssignmentPage() {
                     try {
                         localStorage.removeItem(`autograde_assignment_draft_${cid}`);
                     } catch { /* ignore */ }
+                    clearNewAssignmentWizardSnapshot(cid);
                     toast.success('Assignment saved as draft!');
                     router.push(`/courses/${cid}`);
                 },
@@ -490,6 +533,7 @@ export function CreateAssignmentPage() {
                     try {
                         localStorage.removeItem(`autograde_assignment_draft_${cid}`);
                     } catch { /* ignore */ }
+                    clearNewAssignmentWizardSnapshot(cid);
                     toast.success('Assignment published!');
                     router.push(`/courses/${cid}`);
                 },
@@ -506,8 +550,11 @@ export function CreateAssignmentPage() {
     );
 
     const handleCancel = useCallback(() => {
+        if (!draftId) {
+            clearNewAssignmentWizardSnapshot(cid);
+        }
         router.push(`/courses/${cid}`);
-    }, [cid, router]);
+    }, [cid, draftId, router]);
 
     if (!defaultRubricReady) {
         return (
@@ -545,6 +592,7 @@ export function CreateAssignmentPage() {
                         courseId={cid}
                         initialData={initialData}
                         initialStep={initialStep}
+                        persistWizardProgress={!draftId}
                         onSaveDraft={handleSaveDraft}
                         onPublish={handlePublish}
                         onCancel={handleCancel}

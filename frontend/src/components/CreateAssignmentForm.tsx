@@ -360,6 +360,17 @@ const STEPS = [
     { label: 'Review', icon: Eye },
 ] as const;
 
+/** Used when persisting / restoring the "new assignment" wizard across refresh. */
+export const CREATE_ASSIGNMENT_WIZARD_STEP_COUNT = STEPS.length;
+
+export function getNewAssignmentWizardStorageKey(courseId: string): string {
+    return `autograde_new_assignment_wizard_v1_${courseId}`;
+}
+
+export function clampAssignmentWizardStep(raw: number): number {
+    return Math.max(0, Math.min(raw, STEPS.length - 1));
+}
+
 // ── Props ───────────────────────────────────────────────────────────
 
 interface CreateAssignmentFormProps {
@@ -369,6 +380,8 @@ interface CreateAssignmentFormProps {
     onCancel: () => void;
     initialData?: Partial<AssignmentFormData>;
     initialStep?: number;
+    /** When true, form values + step index are written to localStorage so refresh does not lose work. */
+    persistWizardProgress?: boolean;
 }
 
 interface RubricSectionEditorProps {
@@ -402,6 +415,7 @@ export function CreateAssignmentForm({
     onCancel,
     initialData,
     initialStep = 0,
+    persistWizardProgress = false,
 }: CreateAssignmentFormProps) {
     const [currentStep, setCurrentStep] = useState(() => Math.max(0, Math.min(STEPS.length - 1, initialStep)));
     const [showSaveRubricDialog, setShowSaveRubricDialog] = useState(false);
@@ -451,7 +465,7 @@ export function CreateAssignmentForm({
             enableGitSubmission: false,
             // Integrity review
             autoFlagEnabled: true,
-            autoFlagThreshold: 70,
+            autoFlagThreshold: 90,
             crossSectionComparison: false,
             ...initialData,
             rubricWeightKind: initialData?.rubricWeightKind ?? 'percent',
@@ -474,6 +488,28 @@ export function CreateAssignmentForm({
         defaultValues,
         mode: 'onChange',
     });
+
+    const formValues = useWatch({ control });
+
+    useEffect(() => {
+        if (!persistWizardProgress) return;
+        const key = getNewAssignmentWizardStorageKey(courseId);
+        const handle = window.setTimeout(() => {
+            try {
+                localStorage.setItem(
+                    key,
+                    JSON.stringify({
+                        v: 1,
+                        step: currentStep,
+                        data: getValues(),
+                    }),
+                );
+            } catch {
+                /* ignore quota / private mode */
+            }
+        }, 450);
+        return () => window.clearTimeout(handle);
+    }, [formValues, currentStep, persistWizardProgress, courseId, getValues]);
 
     const sanitizeRubricForSubmission = useCallback((values: AssignmentFormData): AssignmentFormData => {
         return {

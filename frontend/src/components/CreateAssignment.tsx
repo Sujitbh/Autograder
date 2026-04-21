@@ -266,7 +266,7 @@ export function CreateAssignment() {
 
     /* ── Step 6: AI Settings ── */
     const [manualReviewThreshold, setManualReviewThreshold] = useState(true);
-    const [flagThresholdPercent, setFlagThresholdPercent] = useState(70);
+    const [flagThresholdPercent, setFlagThresholdPercent] = useState(90);
 
     /* ════════════════════════════════════════════════════════
        Validation
