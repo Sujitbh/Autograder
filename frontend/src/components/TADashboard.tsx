@@ -5,13 +5,16 @@ import { useRouter } from 'next/navigation';
 import { TALayout } from './TALayout';
 import { useTAOverview } from '@/hooks/queries/useTADashboard';
 import { Input } from './ui/input';
+import { KpiCard } from './dashboard/KpiCard';
 import {
     Search,
     BookOpen,
     ChevronUp,
     ChevronDown,
+    ChevronRight,
     Loader2,
     FilterX,
+    ClipboardList,
 } from 'lucide-react';
 
 type SortField = 'code' | 'name' | 'instructor' | 'students' | 'assignments' | 'pending' | 'status';
@@ -43,11 +46,33 @@ function getStatusBadge(isActive: boolean) {
 
 function getPendingBadge(count: number) {
     if (count === 0) {
-        return <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--color-text-light)' }}>0</span>;
+        return (
+            <span
+                style={{
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: 'var(--color-text-light)',
+                    fontStyle: 'italic',
+                }}
+            >
+                All clear
+            </span>
+        );
     }
     return (
-        <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-warning)' }}>
-            {count}
+        <span
+            className="inline-flex items-center"
+            style={{
+                fontSize: '12px',
+                fontWeight: 700,
+                color: 'var(--color-warning)',
+                backgroundColor: 'var(--color-warning-bg, rgba(217,119,6,0.12))',
+                padding: '3px 10px',
+                borderRadius: '999px',
+                letterSpacing: '0.2px',
+            }}
+        >
+            {count} to review
         </span>
     );
 }
@@ -128,18 +153,69 @@ export default function TADashboard() {
             : <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--color-primary)' }} />;
     };
 
+    const topPendingCourse = useMemo(() => {
+        return [...courses]
+            .filter((c) => c.is_active && c.pending_grading > 0)
+            .sort((a, b) => b.pending_grading - a.pending_grading)[0];
+    }, [courses]);
+
     return (
         <TALayout activeItem="overview">
             {/* Page Header */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
+            <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                        <span
+                            className="inline-flex items-center rounded-full px-2.5 py-0.5"
+                            style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                letterSpacing: '0.4px',
+                                textTransform: 'uppercase',
+                                backgroundColor: 'var(--color-primary-light)',
+                                color: 'var(--color-primary)',
+                            }}
+                        >
+                            Teaching Assistant
+                        </span>
+                    </div>
                     <h1 style={{ fontSize: '28px', fontWeight: 700, lineHeight: '36px', color: 'var(--color-text-dark)' }}>
                         TA Dashboard
                     </h1>
-                    <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '8px' }}>
-                        {courses.length} assigned course{courses.length !== 1 ? 's' : ''} · Manage your teaching assistant responsibilities
+                    <p style={{ fontSize: '14px', color: 'var(--color-text-mid)', marginTop: '4px' }}>
+                        Review grading queues, track progress, and open the courses you support.
                     </p>
                 </div>
+
+                {topPendingCourse && (
+                    <button
+                        onClick={() => router.push(`/ta/courses/${topPendingCourse.id}/grading`)}
+                        className="inline-flex items-center gap-2 rounded-full transition-colors"
+                        style={{
+                            backgroundColor: 'var(--color-primary)',
+                            color: '#fff',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            padding: '9px 18px',
+                            boxShadow: 'var(--shadow-card)',
+                        }}
+                    >
+                        <ClipboardList className="w-4 h-4" />
+                        Open grading queue
+                        <span
+                            className="rounded-full"
+                            style={{
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                backgroundColor: 'rgba(255,255,255,0.2)',
+                                padding: '1px 7px',
+                                lineHeight: '16px',
+                            }}
+                        >
+                            {overview?.pending_grading ?? 0}
+                        </span>
+                    </button>
+                )}
             </div>
 
             {/* Loading state */}
@@ -166,56 +242,92 @@ export default function TADashboard() {
             )}
 
             {overview && !isLoading && (<>
-                {/* Search Bar */}
-                <div className="mb-4">
-                    <div className="relative max-w-md">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-light)]" />
-                        <Input
-                            placeholder="Search by course name, code, or instructor..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 border-[var(--color-border)]"
-                        />
-                    </div>
+                {/* KPI strip */}
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 mb-6" aria-label="TA key metrics">
+                    <KpiCard
+                        label="Assigned courses"
+                        value={overview.assigned_courses}
+                        tone="primary"
+                    />
+                    <KpiCard
+                        label="Students supported"
+                        value={overview.total_students}
+                        tone="info"
+                    />
+                    <KpiCard
+                        label="Graded this week"
+                        value={overview.graded_this_week}
+                        tone="ok"
+                        footer={overview.graded_this_week > 0 ? 'Nice pace' : undefined}
+                    />
+                    <KpiCard
+                        label="Pending review"
+                        value={overview.pending_grading}
+                        tone={overview.pending_grading > 0 ? 'warn' : 'neutral'}
+                    />
                 </div>
 
-                {/* Filter Tabs */}
-                <div className="flex gap-1 mb-6 border-b-2" style={{ borderColor: 'var(--color-border)' }}>
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className="px-4 py-3 transition-colors relative flex items-center gap-2"
-                            style={{
-                                color: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-text-mid)',
-                                fontSize: '14px',
-                                fontWeight: activeTab === tab.id ? 600 : 400,
-                            }}
+                {/* Toolbar: search + tabs */}
+                <div
+                    className="rounded-xl mb-6"
+                    style={{
+                        backgroundColor: 'var(--color-surface)',
+                        border: '1px solid var(--color-border)',
+                        padding: '12px 16px',
+                    }}
+                >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="relative flex-1 min-w-[240px] max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-text-light)]" />
+                            <Input
+                                placeholder="Search courses, codes, or instructors"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-10 border-[var(--color-border)]"
+                            />
+                        </div>
+
+                        <div
+                            className="inline-flex rounded-full p-1"
+                            style={{ backgroundColor: 'var(--color-primary-bg)' }}
+                            role="tablist"
+                            aria-label="Course status filter"
                         >
-                            {tab.label}
-                            {tab.count > 0 && (
-                                <span
-                                    style={{
-                                        fontSize: '11px',
-                                        fontWeight: 600,
-                                        backgroundColor: activeTab === tab.id ? 'var(--color-primary)' : 'var(--color-border)',
-                                        color: activeTab === tab.id ? '#fff' : 'var(--color-text-mid)',
-                                        padding: '1px 7px',
-                                        borderRadius: '10px',
-                                        lineHeight: '16px',
-                                    }}
-                                >
-                                    {tab.count}
-                                </span>
-                            )}
-                            {activeTab === tab.id && (
-                                <div
-                                    className="absolute bottom-0 left-0 right-0"
-                                    style={{ height: '2px', backgroundColor: 'var(--color-primary)' }}
-                                />
-                            )}
-                        </button>
-                    ))}
+                            {tabs.map((tab) => {
+                                const active = activeTab === tab.id;
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        role="tab"
+                                        aria-selected={active}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className="inline-flex items-center gap-2 rounded-full transition-colors"
+                                        style={{
+                                            padding: '6px 14px',
+                                            fontSize: '13px',
+                                            fontWeight: active ? 600 : 500,
+                                            color: active ? 'var(--color-primary)' : 'var(--color-text-mid)',
+                                            backgroundColor: active ? 'var(--color-surface)' : 'transparent',
+                                            boxShadow: active ? 'var(--shadow-card)' : 'none',
+                                        }}
+                                    >
+                                        {tab.label}
+                                        <span
+                                            style={{
+                                                fontSize: '11px',
+                                                fontWeight: 700,
+                                                minWidth: '18px',
+                                                textAlign: 'center',
+                                                color: active ? 'var(--color-primary)' : 'var(--color-text-light)',
+                                            }}
+                                        >
+                                            {tab.count}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
                 </div>
 
                 {/* Courses Table */}
@@ -286,16 +398,16 @@ export default function TADashboard() {
                                             Status <SortIcon field="status" />
                                         </button>
                                     </th>
+                                    <th className="px-4 py-4 w-10" aria-hidden="true" />
                                 </tr>
                             </thead>
                             <tbody>
-                                {sorted.map((course) => (
+                                {sorted.map((course, idx) => (
                                     <tr
                                         key={course.id}
-                                        className="border-b transition-colors"
+                                        className="group transition-colors"
                                         style={{
-                                            borderColor: 'var(--color-border)',
-                                            borderLeft: course.pending_grading > 0 ? '4px solid var(--color-warning)' : '4px solid transparent',
+                                            borderBottom: idx === sorted.length - 1 ? 'none' : '1px solid var(--color-border)',
                                             cursor: 'pointer',
                                         }}
                                         tabIndex={0}
@@ -308,7 +420,7 @@ export default function TADashboard() {
                                                 router.push(`/ta/courses/${course.id}`);
                                             }
                                         }}
-                                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-primary-bg)')}
+                                        onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--color-surface-elevated)')}
                                         onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '')}
                                     >
                                         {/* Course Code */}
@@ -329,7 +441,7 @@ export default function TADashboard() {
 
                                         {/* Course Name */}
                                         <td className="px-5 py-4">
-                                            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-primary)' }}>
+                                            <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--color-text-dark)' }}>
                                                 {course.name}
                                             </span>
                                         </td>
@@ -363,6 +475,14 @@ export default function TADashboard() {
                                         {/* Status */}
                                         <td className="px-5 py-4">
                                             {getStatusBadge(course.is_active)}
+                                        </td>
+
+                                        {/* Open affordance */}
+                                        <td className="px-4 py-4 text-right">
+                                            <ChevronRight
+                                                className="w-4 h-4 inline-block opacity-40 group-hover:opacity-80 transition-opacity"
+                                                style={{ color: 'var(--color-text-mid)' }}
+                                            />
                                         </td>
                                     </tr>
                                 ))}
