@@ -227,9 +227,9 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
     const integrityForPanel = plagiarismScanOverride ?? detail?.integrity ?? null;
     const hasPerFileAiResults = (integrityForPanel?.ai_detection.file_results?.length ?? 0) > 0;
-    const hasFlaggedAiContent = Boolean(
-        integrityForPanel?.ai_detection.threshold_exceeded ?? integrityForPanel?.ai_detection.ai_flagged
-    );
+    const isAutoFlagged = Boolean(integrityForPanel?.ai_detection.ai_flagged);
+    const hasThresholdCrossing = Boolean(integrityForPanel?.ai_detection.threshold_exceeded);
+    const hasFlaggedAiContent = isAutoFlagged || hasThresholdCrossing;
     const canOpenFlaggedCode = Boolean(integrityForPanel && (hasFlaggedAiContent || hasPerFileAiResults));
 
     const flaggedCodeQuery = useQuery({
@@ -1603,17 +1603,20 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                     <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 8 }}>
                                                         <span
                                                             style={{
-                                                                ...(integrityForPanel.ai_detection.threshold_exceeded ?? integrityForPanel.ai_detection.ai_flagged
-                                                                    ? getRiskTagStyle('high')
-                                                                    : getRiskTagStyle('low')),
+                                                                ...(isAutoFlagged ? getRiskTagStyle('high') : getRiskTagStyle('low')),
                                                                 fontSize: '10px',
                                                                 fontWeight: 700,
                                                                 padding: '2px 8px',
                                                                 borderRadius: 999,
                                                             }}
                                                         >
-                                                            {(integrityForPanel.ai_detection.threshold_exceeded ?? integrityForPanel.ai_detection.ai_flagged) ? 'Flagged' : 'Not flagged'}
+                                                            {isAutoFlagged ? 'Auto-flagged' : 'Not auto-flagged'}
                                                         </span>
+                                                        {hasThresholdCrossing && (
+                                                            <span style={{ fontSize: '10px', color: 'var(--color-text-mid)' }}>
+                                                                Threshold crossing detected in at least one file
+                                                            </span>
+                                                        )}
                                                         <span style={{ fontSize: '10px', color: 'var(--color-text-mid)' }}>
                                                             Scoring source: {getScoringSourceLabel(integrityForPanel.ai_detection.scoring_source)}
                                                         </span>
@@ -1621,6 +1624,22 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                             Files scored: {integrityForPanel.ai_detection.evaluated_file_count ?? integrityForPanel.ai_detection.file_results?.length ?? 0}
                                                         </span>
                                                     </div>
+                                                    {integrityForPanel.ai_detection.auto_flag_decision_reason && (
+                                                        <p
+                                                            style={{
+                                                                marginTop: 6,
+                                                                fontSize: '10px',
+                                                                color: 'var(--color-text-mid)',
+                                                                lineHeight: 1.5,
+                                                                padding: '6px 8px',
+                                                                borderRadius: 6,
+                                                                border: '1px solid var(--color-border)',
+                                                                background: 'var(--color-surface)',
+                                                            }}
+                                                        >
+                                                            Auto-flag decision: {integrityForPanel.ai_detection.auto_flag_decision_reason}
+                                                        </p>
+                                                    )}
                                                     {integrityForPanel.ai_detection.signals.length > 0 && (
                                                         <ul style={{ marginTop: 6, paddingLeft: 16, fontSize: '11px', color: 'var(--color-text-mid)' }}>
                                                             {integrityForPanel.ai_detection.signals.slice(0, 3).map((sig, i) => (
@@ -1659,6 +1678,16 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                         <p style={{ fontSize: '10px', color: 'var(--color-text-mid)' }}>
                                                                             {fileResult.detected_language ?? 'unknown'} | {getScoringSourceLabel(fileResult.scoring_source)} | {fileResult.threshold_exceeded ? 'crossed threshold' : 'below threshold'}
                                                                         </p>
+                                                                        {fileResult.confidence_adjusted && typeof fileResult.raw_score === 'number' && (
+                                                                            <p style={{ fontSize: '10px', color: 'var(--color-text-light)' }}>
+                                                                                Softened from raw {fileResult.raw_score.toFixed(1)}% for conservative review handling.
+                                                                            </p>
+                                                                        )}
+                                                                        {fileResult.signals && fileResult.signals.length > 0 && (
+                                                                            <p style={{ fontSize: '10px', color: 'var(--color-text-light)', marginTop: 2 }}>
+                                                                                Signals: {fileResult.signals.slice(0, 2).join(' • ')}
+                                                                            </p>
+                                                                        )}
                                                                         {fileResult.fallback_reason && (
                                                                             <p style={{ fontSize: '10px', color: 'var(--color-text-light)' }}>
                                                                                 Fallback: {fileResult.fallback_reason}
@@ -1688,7 +1717,7 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                 {showFlaggedCodePanel ? 'Hide flagged code' : 'Open flagged code'}
                                                             </button>
                                                             <span style={{ fontSize: 10, color: 'var(--color-text-light)' }}>
-                                                                Block-level analysis runs only when opened.
+                                                                Block-level and full-file review details load only when opened.
                                                             </span>
                                                         </div>
                                                     )}
@@ -1739,6 +1768,22 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                     <p style={{ fontSize: 10, color: 'var(--color-text-light)', lineHeight: 1.5, marginBottom: 8 }}>
                                                                         {flaggedCodeQuery.data.disclaimer}
                                                                     </p>
+                                                                    {flaggedCodeQuery.data.auto_flag_decision_reason && (
+                                                                        <p
+                                                                            style={{
+                                                                                fontSize: 10,
+                                                                                color: 'var(--color-text-mid)',
+                                                                                lineHeight: 1.5,
+                                                                                marginBottom: 8,
+                                                                                padding: '6px 8px',
+                                                                                borderRadius: 6,
+                                                                                border: '1px solid var(--color-border)',
+                                                                                background: 'var(--color-surface-elevated)',
+                                                                            }}
+                                                                        >
+                                                                            Auto-flag policy decision: {flaggedCodeQuery.data.auto_flag_decision_reason}
+                                                                        </p>
+                                                                    )}
                                                                     {flaggedCodeQuery.data.files.length === 0 ? (
                                                                         <p style={{ fontSize: 11, color: 'var(--color-text-mid)' }}>
                                                                             No block-level regions were available to display for this submission.
@@ -1774,6 +1819,16 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                                     <p style={{ fontSize: 10, color: 'var(--color-text-mid)', marginTop: 2 }}>
                                                                                         {flaggedFile.detected_language ?? 'unknown'} | {getScoringSourceLabel(flaggedFile.scoring_source)} | {flaggedFile.block_count} block(s)
                                                                                     </p>
+                                                                                    {flaggedFile.confidence_adjusted && typeof flaggedFile.raw_file_ai_confidence === 'number' && (
+                                                                                        <p style={{ fontSize: 10, color: 'var(--color-text-light)', marginTop: 2 }}>
+                                                                                            Softened from raw {(flaggedFile.raw_file_ai_confidence * 100).toFixed(1)}%.
+                                                                                        </p>
+                                                                                    )}
+                                                                                    {flaggedFile.signals && flaggedFile.signals.length > 0 && (
+                                                                                        <p style={{ fontSize: 10, color: 'var(--color-text-light)', marginTop: 2 }}>
+                                                                                            Signals: {flaggedFile.signals.slice(0, 3).join(' • ')}
+                                                                                        </p>
+                                                                                    )}
                                                                                     {flaggedFile.extraction_note && (
                                                                                         <p style={{ fontSize: 10, color: 'var(--color-text-light)', marginTop: 2 }}>
                                                                                             Extraction: {flaggedFile.extraction_note}
@@ -1824,6 +1879,11 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                                                             Fallback: {block.fallback_reason}
                                                                                                         </p>
                                                                                                     )}
+                                                                                                    {block.signals && block.signals.length > 0 && (
+                                                                                                        <p style={{ fontSize: 10, color: 'var(--color-text-light)', marginTop: 2 }}>
+                                                                                                            Signals: {block.signals.slice(0, 2).join(' • ')}
+                                                                                                        </p>
+                                                                                                    )}
                                                                                                     <pre
                                                                                                         style={{
                                                                                                             marginTop: 6,
@@ -1845,6 +1905,38 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                                                 </div>
                                                                                             ))}
                                                                                         </div>
+                                                                                    )}
+                                                                                    {flaggedFile.full_file_code && (
+                                                                                        <details style={{ marginTop: 8 }}>
+                                                                                            <summary
+                                                                                                style={{
+                                                                                                    fontSize: 10,
+                                                                                                    color: 'var(--color-text-mid)',
+                                                                                                    cursor: 'pointer',
+                                                                                                    fontWeight: 700,
+                                                                                                }}
+                                                                                            >
+                                                                                                View full file
+                                                                                            </summary>
+                                                                                            <pre
+                                                                                                style={{
+                                                                                                    marginTop: 6,
+                                                                                                    marginBottom: 0,
+                                                                                                    padding: 8,
+                                                                                                    borderRadius: 6,
+                                                                                                    border: '1px solid var(--color-border)',
+                                                                                                    background: '#0F172A',
+                                                                                                    color: '#E2E8F0',
+                                                                                                    fontSize: 11,
+                                                                                                    lineHeight: 1.45,
+                                                                                                    overflowX: 'auto',
+                                                                                                    maxHeight: 300,
+                                                                                                    overflowY: 'auto',
+                                                                                                }}
+                                                                                            >
+                                                                                                <code>{flaggedFile.full_file_code}</code>
+                                                                                            </pre>
+                                                                                        </details>
                                                                                     )}
                                                                                 </div>
                                                                             ))}

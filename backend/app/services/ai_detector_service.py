@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import keyword
 import logging
+import math
 import re
 import string
 import threading
@@ -46,6 +47,14 @@ class LanguageRules:
 _MODEL_LOCK = threading.Lock()
 _MODEL_CACHE: Dict[str, Dict[str, Any]] = {}
 LOGGER = logging.getLogger(__name__)
+
+_CONFIDENCE_EPSILON = 1e-6
+_BASE_CONFIDENCE_TEMPERATURE = 1.35
+_SMALL_FILE_EXTRA_TEMPERATURE = 0.25
+_TINY_FILE_EXTRA_TEMPERATURE = 0.35
+_LOW_COMPLEXITY_EXTRA_TEMPERATURE = 0.35
+_DRIVER_STYLE_EXTRA_TEMPERATURE = 0.45
+_MAX_CONFIDENCE_TEMPERATURE = 2.75
 
 _PYTHON_RULES = LanguageRules(
     keywords=set(keyword.kwlist),
@@ -400,6 +409,141 @@ def _band_for_confidence(confidence: float) -> str:
     return "low"
 
 
+def _soften_confidence(confidence: float, temperature: float) -> float:
+    bounded = max(_CONFIDENCE_EPSILON, min(1.0 - _CONFIDENCE_EPSILON, float(confidence)))
+    adjusted_temperature = max(1.0, float(temperature))
+    if adjusted_temperature == 1.0:
+        return bounded
+
+    logit = math.log(bounded / (1.0 - bounded))
+    softened_logit = logit / adjusted_temperature
+    softened = 1.0 / (1.0 + math.exp(-softened_logit))
+    return max(0.0, min(1.0, float(softened)))
+
+
+def _build_file_profile(code: str, language: str, feature_row: Dict[str, float]) -> Dict[str, Any]:
+    non_empty_line_count = int(round(float(feature_row.get("non_empty_line_count", 0.0))))
+    line_count = int(round(float(feature_row.get("line_count", 0.0))))
+    function_or_method_count = int(round(float(feature_row.get("function_or_method_count", 0.0))))
+    loop_count = int(round(float(feature_row.get("loop_count", 0.0))))
+    conditional_count = int(round(float(feature_row.get("conditional_count", 0.0))))
+    exception_count = int(round(float(feature_row.get("exception_count", 0.0))))
+    assignment_count = int(round(float(feature_row.get("assignment_count", 0.0))))
+    return_count = int(round(float(feature_row.get("return_count", 0.0))))
+    import_count = int(round(float(feature_row.get("import_count", 0.0))))
+    class_count = int(round(float(feature_row.get("class_count", 0.0))))
+    comment_line_count = int(round(float(feature_row.get("comment_line_count", 0.0))))
+
+    branch_count = loop_count + conditional_count + exception_count
+    structural_operation_count = branch_count + assignment_count + return_count
+    structural_density = (
+        float(structural_operation_count) / float(max(non_empty_line_count, 1))
+    )
+
+    has_java_main_method = bool(
+        language == "java" and re.search(r"\bpublic\s+static\s+void\s+main\s*\(", code)
+    )
+
+    is_tiny_file = non_empty_line_count <= 24
+    is_small_file = non_empty_line_count <= 60
+    is_low_structural_complexity = (
+        (function_or_method_count <= 3 and structural_operation_count <= 9)
+        or structural_density <= 0.20
+    )
+    is_driver_like = bool(
+        language == "java"
+        and has_java_main_method
+        and class_count <= 1
+        and function_or_method_count <= 3
+        and non_empty_line_count <= 120
+    )
+    is_substantial = bool(
+        non_empty_line_count >= 80
+        or (function_or_method_count >= 5 and structural_operation_count >= 12)
+        or branch_count >= 8
+    )
+
+    return {
+        "line_count": line_count,
+        "non_empty_line_count": non_empty_line_count,
+        "comment_line_count": comment_line_count,
+        "function_or_method_count": function_or_method_count,
+        "class_count": class_count,
+        "import_count": import_count,
+        "loop_count": loop_count,
+        "conditional_count": conditional_count,
+        "exception_count": exception_count,
+        "assignment_count": assignment_count,
+        "return_count": return_count,
+        "branch_count": branch_count,
+        "structural_operation_count": structural_operation_count,
+        "structural_density": round(structural_density, 6),
+        "has_java_main_method": has_java_main_method,
+        "is_tiny_file": is_tiny_file,
+        "is_small_file": is_small_file,
+        "is_low_structural_complexity": is_low_structural_complexity,
+        "is_driver_like": is_driver_like,
+        "is_substantial": is_substantial,
+    }
+
+
+def _confidence_adjustment(raw_confidence: float, profile: Dict[str, Any]) -> tuple[float, Dict[str, Any]]:
+    temperature = _BASE_CONFIDENCE_TEMPERATURE
+    reasons: list[str] = []
+
+    if bool(profile.get("is_small_file")):
+        temperature += _SMALL_FILE_EXTRA_TEMPERATURE
+        reasons.append("small_file")
+    if bool(profile.get("is_tiny_file")):
+        temperature += _TINY_FILE_EXTRA_TEMPERATURE
+        reasons.append("tiny_file")
+    if bool(profile.get("is_low_structural_complexity")):
+        temperature += _LOW_COMPLEXITY_EXTRA_TEMPERATURE
+        reasons.append("low_structural_complexity")
+    if bool(profile.get("is_driver_like")):
+        temperature += _DRIVER_STYLE_EXTRA_TEMPERATURE
+        reasons.append("driver_style_structure")
+
+    temperature = min(_MAX_CONFIDENCE_TEMPERATURE, temperature)
+    apply_softening = float(raw_confidence) >= 0.5
+    adjusted_confidence = (
+        _soften_confidence(raw_confidence, temperature)
+        if apply_softening
+        else max(0.0, min(1.0, float(raw_confidence)))
+    )
+    adjustment = {
+        "method": "temperature_scaling",
+        "is_calibrated": False,
+        "applied": apply_softening,
+        "temperature": round(temperature, 6),
+        "raw_confidence": round(float(raw_confidence), 6),
+        "adjusted_confidence": round(float(adjusted_confidence), 6),
+        "reasons": reasons if apply_softening else [],
+        "note": (
+            "Conservative confidence softening applied because this detector is not statistically calibrated "
+            "for high-stakes accusation decisions."
+            if apply_softening
+            else "Conservative confidence softening is only applied to high-confidence outputs."
+        ),
+    }
+    return adjusted_confidence, adjustment
+
+
+def _profile_signals(profile: Dict[str, Any]) -> list[str]:
+    signals: list[str] = []
+    if bool(profile.get("is_driver_like")):
+        signals.append("Driver/entrypoint-style structure detected")
+    if bool(profile.get("is_low_structural_complexity")):
+        signals.append("Low structural complexity file")
+    if bool(profile.get("is_tiny_file")):
+        signals.append("Tiny source file (few non-empty lines)")
+    elif bool(profile.get("is_small_file")):
+        signals.append("Small source file")
+    if not bool(profile.get("is_substantial")):
+        signals.append("File is lightweight evidence by size/complexity")
+    return signals
+
+
 def _predict_ai_likelihood_internal(
     code: str,
     filename: str | None = None,
@@ -458,6 +602,8 @@ def _predict_ai_likelihood_internal(
 
     feature_row = _extract_numeric_features(code=code, language=language)
     diagnostics["feature_vector_length"] = len(feature_row)
+    file_profile = _build_file_profile(code=code, language=language, feature_row=feature_row)
+    diagnostics["file_profile"] = dict(file_profile)
     model_input = pd.DataFrame(
         [[feature_row.get(column, 0.0) for column in feature_columns]],
         columns=feature_columns,
@@ -477,24 +623,44 @@ def _predict_ai_likelihood_internal(
             diagnostics["classes"] = [str(value) for value in getattr(model, "classes_", [])]
             return None, diagnostics
 
-        confidence = float(probabilities[0][positive_index])
+        raw_confidence = float(probabilities[0][positive_index])
+        confidence, confidence_adjustment = _confidence_adjustment(
+            raw_confidence=raw_confidence,
+            profile=file_profile,
+        )
         threshold_used = _resolve_threshold(threshold)
         flagged = confidence >= threshold_used
 
         winner_name = str(bundle.get("winner_model_name") or "classifier")
+        signals = [
+            f"Model confidence from {winner_name}",
+            f"Language-specific model: {language}",
+        ]
+        signals.extend(_profile_signals(file_profile))
+        if confidence_adjustment.get("applied"):
+            if confidence_adjustment.get("reasons"):
+                signals.append(
+                    "Confidence was softened conservatively for lightweight/boilerplate-like structure."
+                )
+            else:
+                signals.append("Confidence was softened conservatively before thresholding.")
+        signals.append("Detector uses structural features only; advisory signal, not proof.")
+        deduped_signals = list(dict.fromkeys(signals))
 
         result = {
             "ai_confidence": round(confidence, 6),
+            "raw_ai_confidence": round(raw_confidence, 6),
+            "confidence_adjusted": abs(confidence - raw_confidence) > 1e-9,
+            "confidence_adjustment": confidence_adjustment,
             "ai_flagged": bool(flagged),
             "threshold_used": round(threshold_used, 6),
             "model_language": language,
+            "file_profile": file_profile,
             # Compatibility fields already consumed by existing frontend integrity UI
             "score": round(confidence * 100.0, 1),
+            "raw_score": round(raw_confidence * 100.0, 1),
             "band": _band_for_confidence(confidence),
-            "signals": [
-                f"Model confidence from {winner_name}",
-                f"Language-specific model: {language}",
-            ],
+            "signals": deduped_signals,
             "disclaimer": "AI detection is advisory only; use instructor judgement and corroborating evidence.",
         }
         diagnostics["reason"] = "ok"

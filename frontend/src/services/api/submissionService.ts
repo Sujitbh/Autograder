@@ -44,16 +44,53 @@ export interface IntegrityAIFileResult {
   scoring_source?: 'model' | 'heuristic' | 'mixed' | 'none' | string;
   fallback_reason?: string | null;
   ai_confidence: number;
+  raw_ai_confidence?: number;
+  confidence_adjusted?: boolean;
+  confidence_adjustment?: {
+    method?: string;
+    is_calibrated?: boolean;
+    applied?: boolean;
+    temperature?: number;
+    raw_confidence?: number;
+    adjusted_confidence?: number;
+    reasons?: string[];
+    note?: string;
+  } | null;
   threshold_used: number;
   threshold_exceeded?: boolean;
   file_flagged?: boolean;
   score?: number;
+  raw_score?: number;
   band?: 'low' | 'medium' | 'high';
   signals?: string[];
+  file_profile?: {
+    line_count?: number;
+    non_empty_line_count?: number;
+    comment_line_count?: number;
+    function_or_method_count?: number;
+    class_count?: number;
+    import_count?: number;
+    loop_count?: number;
+    conditional_count?: number;
+    exception_count?: number;
+    assignment_count?: number;
+    return_count?: number;
+    branch_count?: number;
+    structural_operation_count?: number;
+    structural_density?: number;
+    has_java_main_method?: boolean;
+    is_tiny_file?: boolean;
+    is_small_file?: boolean;
+    is_low_structural_complexity?: boolean;
+    is_driver_like?: boolean;
+    is_substantial?: boolean;
+  } | null;
 }
 
 export interface IntegrityAIDetection {
   ai_confidence?: number;
+  raw_ai_confidence?: number;
+  confidence_adjusted?: boolean;
   ai_flagged?: boolean;
   threshold_used?: number;
   model_language?: string | null;
@@ -67,6 +104,17 @@ export interface IntegrityAIDetection {
   aggregation_method?: string;
   evaluated_file_count?: number;
   threshold_exceeded?: boolean;
+  auto_flag_policy?: {
+    policy_name?: string;
+    threshold_crossing_file_count?: number;
+    substantial_threshold_crossing_file_count?: number;
+    lightweight_threshold_crossing_file_count?: number;
+    auto_flagged?: boolean;
+    decision_reason?: string;
+    evidence?: string[];
+  } | null;
+  auto_flag_decision_reason?: string | null;
+  auto_flag_evidence?: string[];
   file_results?: IntegrityAIFileResult[];
   flagged_sections?: Array<{
     filename?: string | null;
@@ -84,27 +132,39 @@ export interface FlaggedCodeBlockResult {
   start_line?: number | null;
   end_line?: number | null;
   ai_confidence: number;
+  raw_ai_confidence?: number;
+  confidence_adjusted?: boolean;
+  confidence_adjustment?: IntegrityAIFileResult['confidence_adjustment'];
   score: number;
+  raw_score?: number;
   threshold_used: number;
   threshold_exceeded: boolean;
   scoring_source?: 'model' | 'heuristic' | 'mixed' | 'none' | string;
   detected_language?: string | null;
   fallback_reason?: string | null;
+  signals?: string[];
+  file_profile?: IntegrityAIFileResult['file_profile'];
   code: string;
 }
 
 export interface FlaggedCodeFileResult {
   filename: string;
   file_ai_confidence: number;
+  raw_file_ai_confidence?: number;
+  confidence_adjusted?: boolean;
+  confidence_adjustment?: IntegrityAIFileResult['confidence_adjustment'];
   file_threshold_used: number;
   threshold_exceeded: boolean;
   file_flagged?: boolean;
   scoring_source?: 'model' | 'heuristic' | 'mixed' | 'none' | string;
   detected_language?: string | null;
   fallback_reason?: string | null;
+  signals?: string[];
+  file_profile?: IntegrityAIFileResult['file_profile'];
   extraction_note?: string | null;
   block_count: number;
   blocks: FlaggedCodeBlockResult[];
+  full_file_code?: string | null;
 }
 
 export interface FlaggedCodeAnalysisResponse {
@@ -117,6 +177,9 @@ export interface FlaggedCodeAnalysisResponse {
   evaluated_file_count?: number;
   analyzed_file_count?: number;
   relevant_file_selection_reason?: string | null;
+  auto_flag_policy?: IntegrityAIDetection['auto_flag_policy'];
+  auto_flag_decision_reason?: string | null;
+  auto_flag_evidence?: string[];
   files: FlaggedCodeFileResult[];
   disclaimer: string;
 }

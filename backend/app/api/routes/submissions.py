@@ -48,6 +48,7 @@ ASSIGNMENT_LANGUAGE_ALIASES = {
 BLOCK_FALLBACK_CHUNK_SIZE = 36
 FLAGGED_CODE_MAX_FILES_DEFAULT = 5
 FLAGGED_CODE_MAX_FILES_LIMIT = 20
+AI_FLAG_POLICY_NAME = "conservative_multi_evidence_v1"
 
 JAVA_CLASS_SIGNATURE_PATTERN = re.compile(
     r"""(?mx)
@@ -222,6 +223,107 @@ def _confidence_band(confidence: float) -> str:
     if confidence >= 0.40:
         return "medium"
     return "low"
+
+
+def _coerce_file_profile(profile: Any) -> dict[str, Any]:
+    if not isinstance(profile, dict):
+        return {}
+    normalized: dict[str, Any] = {}
+    for key, value in profile.items():
+        normalized[str(key)] = value
+    return normalized
+
+
+def _file_reason_signals(file_profile: dict[str, Any], confidence_adjustment: dict[str, Any] | None) -> list[str]:
+    signals: list[str] = []
+    if bool(file_profile.get("is_driver_like")):
+        signals.append("Driver/entrypoint-style structure")
+    if bool(file_profile.get("is_low_structural_complexity")):
+        signals.append("Low structural complexity")
+    if bool(file_profile.get("is_tiny_file")):
+        signals.append("Very small source file")
+    elif bool(file_profile.get("is_small_file")):
+        signals.append("Small source file")
+    if not bool(file_profile.get("is_substantial", True)):
+        signals.append("Lightweight evidence file")
+
+    reasons = []
+    if isinstance(confidence_adjustment, dict):
+        reasons = [str(item) for item in (confidence_adjustment.get("reasons") or []) if str(item)]
+    if reasons:
+        signals.append(
+            "Confidence softened conservatively ({})".format(", ".join(reasons))
+        )
+    return list(dict.fromkeys(signals))
+
+
+def _auto_flag_decision(
+    file_results: list[dict[str, Any]],
+    *,
+    threshold: float,
+    force_unflag: bool,
+) -> dict[str, Any]:
+    threshold_to_use = _resolve_ai_threshold(threshold)
+
+    threshold_crossing = [item for item in file_results if bool(item.get("threshold_exceeded"))]
+    substantial_crossing = [
+        item
+        for item in threshold_crossing
+        if bool((item.get("file_profile") or {}).get("is_substantial"))
+    ]
+    lightweight_crossing = [
+        item
+        for item in threshold_crossing
+        if not bool((item.get("file_profile") or {}).get("is_substantial"))
+    ]
+    extreme_non_driver = [
+        item
+        for item in threshold_crossing
+        if float(item.get("ai_confidence", 0.0)) >= max(0.95, threshold_to_use + 0.20)
+        and not bool((item.get("file_profile") or {}).get("is_driver_like"))
+        and not bool((item.get("file_profile") or {}).get("is_tiny_file"))
+    ]
+
+    evidence: list[str] = []
+    if force_unflag:
+        decision_reason = "Auto-flagging disabled by assignment policy."
+        flagged = False
+    elif not threshold_crossing:
+        decision_reason = "No file crossed the configured threshold."
+        flagged = False
+    elif len(threshold_crossing) >= 2:
+        decision_reason = "Multiple files crossed the configured threshold."
+        flagged = True
+        evidence.append(f"{len(threshold_crossing)} files crossed threshold")
+    elif substantial_crossing:
+        decision_reason = "A substantial file crossed the configured threshold."
+        flagged = True
+        evidence.append(f"substantial file: {substantial_crossing[0].get('filename')}")
+    elif extreme_non_driver:
+        decision_reason = "Very high confidence found in a non-driver file."
+        flagged = True
+        evidence.append(f"extreme non-driver file: {extreme_non_driver[0].get('filename')}")
+    else:
+        only_file = threshold_crossing[0].get("filename") if len(threshold_crossing) == 1 else None
+        decision_reason = (
+            "Threshold exceeded only by a lightweight/driver-like file; held for human review but not auto-flagged."
+        )
+        flagged = False
+        if only_file:
+            evidence.append(f"lightweight crossing file: {only_file}")
+
+    if lightweight_crossing and not flagged:
+        evidence.append(f"lightweight threshold crossings: {len(lightweight_crossing)}")
+
+    return {
+        "policy_name": AI_FLAG_POLICY_NAME,
+        "threshold_crossing_file_count": len(threshold_crossing),
+        "substantial_threshold_crossing_file_count": len(substantial_crossing),
+        "lightweight_threshold_crossing_file_count": len(lightweight_crossing),
+        "auto_flagged": bool(flagged) and (not force_unflag),
+        "decision_reason": decision_reason,
+        "evidence": evidence,
+    }
 
 
 def _strip_comments(code: str) -> str:
@@ -563,9 +665,20 @@ def _score_submission_ai_from_files(
                 "scoring_source": "none",
                 "fallback_reason": selection_reason or "no_relevant_source_files",
                 "assignment_language_filter": assignment_language,
-                "aggregation_method": "max_ai_confidence",
+                "aggregation_method": "max_ai_confidence_with_conservative_flag_policy",
                 "evaluated_file_count": 0,
                 "threshold_exceeded": False,
+                "auto_flag_policy": {
+                    "policy_name": AI_FLAG_POLICY_NAME,
+                    "threshold_crossing_file_count": 0,
+                    "substantial_threshold_crossing_file_count": 0,
+                    "lightweight_threshold_crossing_file_count": 0,
+                    "auto_flagged": False,
+                    "decision_reason": "No relevant files available for AI scoring.",
+                    "evidence": [],
+                },
+                "auto_flag_decision_reason": "No relevant files available for AI scoring.",
+                "auto_flag_evidence": [],
                 "file_results": [],
                 "flagged_sections": [],
             }
@@ -588,6 +701,7 @@ def _score_submission_ai_from_files(
         )
 
         confidence = max(0.0, min(1.0, float(estimated.get("ai_confidence", 0.0))))
+        raw_confidence = max(0.0, min(1.0, float(estimated.get("raw_ai_confidence", confidence))))
         item_threshold = _resolve_ai_threshold(estimated.get("threshold_used", threshold_to_use))
         threshold_exceeded = confidence >= item_threshold
         file_flagged = threshold_exceeded and (not force_unflag)
@@ -596,10 +710,16 @@ def _score_submission_ai_from_files(
         scoring_source = str(estimated.get("scoring_source") or "heuristic")
         fallback_reason = estimated.get("fallback_reason")
         model_debug = estimated.get("model_debug")
+        file_profile = _coerce_file_profile(estimated.get("file_profile"))
+        confidence_adjustment = estimated.get("confidence_adjustment")
         if fallback_reason:
             fallback_reasons.append(str(fallback_reason))
         if scoring_source != "model":
             heuristic_count += 1
+
+        merged_signals = list(estimated.get("signals") or [])
+        merged_signals.extend(_file_reason_signals(file_profile, confidence_adjustment))
+        merged_signals = list(dict.fromkeys(merged_signals))
 
         file_result = {
             "filename": filename,
@@ -607,12 +727,17 @@ def _score_submission_ai_from_files(
             "scoring_source": scoring_source,
             "fallback_reason": fallback_reason,
             "ai_confidence": round(confidence, 6),
+            "raw_ai_confidence": round(raw_confidence, 6),
+            "confidence_adjusted": abs(confidence - raw_confidence) > 1e-9,
+            "confidence_adjustment": confidence_adjustment,
             "threshold_used": round(item_threshold, 6),
             "threshold_exceeded": bool(threshold_exceeded),
             "file_flagged": bool(file_flagged),
             "score": round(confidence * 100.0, 1),
+            "raw_score": round(raw_confidence * 100.0, 1),
             "band": _confidence_band(confidence),
-            "signals": list(estimated.get("signals") or []),
+            "signals": merged_signals,
+            "file_profile": file_profile,
             "model_debug": model_debug,
         }
         file_results.append(file_result)
@@ -627,8 +752,14 @@ def _score_submission_ai_from_files(
             )
 
     max_confidence = max(float(item["ai_confidence"]) for item in file_results)
+    max_raw_confidence = max(float(item.get("raw_ai_confidence", item["ai_confidence"])) for item in file_results)
     threshold_exceeded_any = any(bool(item["threshold_exceeded"]) for item in file_results)
-    flagged_any = any(bool(item["file_flagged"]) for item in file_results)
+    auto_flag_policy = _auto_flag_decision(
+        file_results,
+        threshold=threshold_to_use,
+        force_unflag=force_unflag,
+    )
+    flagged_any = bool(auto_flag_policy.get("auto_flagged"))
     sources = {str(item.get("scoring_source") or "heuristic") for item in file_results}
 
     if len(sources) == 1:
@@ -643,6 +774,13 @@ def _score_submission_ai_from_files(
         summary_signals.append(f"Assignment language filter: {assignment_language}.")
     if heuristic_count > 0:
         summary_signals.append(f"Heuristic fallback used for {heuristic_count} file(s).")
+    summary_signals.append(
+        f"Auto-flag policy: {auto_flag_policy.get('policy_name')} ({auto_flag_policy.get('decision_reason')})"
+    )
+    if threshold_exceeded_any and not flagged_any:
+        summary_signals.append(
+            "Threshold was exceeded, but auto-flag was withheld because evidence came from lightweight/driver-like files."
+        )
 
     if selection_reason:
         fallback_reasons.append(selection_reason)
@@ -658,12 +796,17 @@ def _score_submission_ai_from_files(
     aggregate.update(
         {
             "ai_flagged": bool(flagged_any),
+            "raw_ai_confidence": round(max_raw_confidence, 6),
+            "confidence_adjusted": abs(max_confidence - max_raw_confidence) > 1e-9,
             "scoring_source": scoring_source,
             "fallback_reason": "; ".join(deduped_reasons) if deduped_reasons else None,
             "assignment_language_filter": assignment_language,
-            "aggregation_method": "max_ai_confidence",
+            "aggregation_method": "max_ai_confidence_with_conservative_flag_policy",
             "evaluated_file_count": len(file_results),
             "threshold_exceeded": bool(threshold_exceeded_any),
+            "auto_flag_policy": auto_flag_policy,
+            "auto_flag_decision_reason": auto_flag_policy.get("decision_reason"),
+            "auto_flag_evidence": auto_flag_policy.get("evidence") or [],
             "file_results": file_results,
             "flagged_sections": flagged_sections if include_flagged_sections else [],
         }
@@ -1245,9 +1388,15 @@ def _score_code_blocks(
             force_unflag=False,
         )
         confidence = max(0.0, min(1.0, float(estimated.get("ai_confidence", 0.0))))
+        raw_confidence = max(0.0, min(1.0, float(estimated.get("raw_ai_confidence", confidence))))
         threshold_used = _resolve_ai_threshold(estimated.get("threshold_used", threshold))
         threshold_exceeded = confidence >= threshold_used
         score_percent = float(estimated.get("score", round(confidence * 100.0, 1)))
+        confidence_adjustment = estimated.get("confidence_adjustment")
+        file_profile = _coerce_file_profile(estimated.get("file_profile"))
+        block_signals = list(estimated.get("signals") or [])
+        block_signals.extend(_file_reason_signals(file_profile, confidence_adjustment))
+        block_signals = list(dict.fromkeys(block_signals))
 
         scored_blocks.append(
             {
@@ -1256,12 +1405,18 @@ def _score_code_blocks(
                 "start_line": int(block.get("start_line") or 0) or None,
                 "end_line": int(block.get("end_line") or 0) or None,
                 "ai_confidence": round(confidence, 6),
+                "raw_ai_confidence": round(raw_confidence, 6),
+                "confidence_adjusted": abs(confidence - raw_confidence) > 1e-9,
+                "confidence_adjustment": confidence_adjustment,
                 "score": round(score_percent, 1),
+                "raw_score": round(raw_confidence * 100.0, 1),
                 "threshold_used": round(threshold_used, 6),
                 "threshold_exceeded": bool(threshold_exceeded),
                 "scoring_source": str(estimated.get("scoring_source") or "heuristic"),
                 "detected_language": estimated.get("detected_language") or detected_language,
                 "fallback_reason": estimated.get("fallback_reason"),
+                "signals": block_signals,
+                "file_profile": file_profile,
                 "code": snippet,
             }
         )
@@ -1344,9 +1499,16 @@ def _build_flagged_code_report(
         file_code = code_by_filename.get(filename, "")
 
         file_confidence = max(0.0, min(1.0, float(file_result.get("ai_confidence", 0.0))))
+        file_raw_confidence = max(
+            0.0,
+            min(1.0, float(file_result.get("raw_ai_confidence", file_confidence))),
+        )
         file_threshold_used = _resolve_ai_threshold(file_result.get("threshold_used", threshold_to_use))
         file_threshold_exceeded = bool(file_result.get("threshold_exceeded")) or (file_confidence >= file_threshold_used)
         detected_language = file_result.get("detected_language") or assignment_language or _language_from_filename(filename)
+        file_signals = list(file_result.get("signals") or [])
+        file_profile = _coerce_file_profile(file_result.get("file_profile"))
+        confidence_adjustment = file_result.get("confidence_adjustment")
 
         if file_code.strip():
             scored_blocks, extraction_note, block_language = _score_code_blocks(
@@ -1364,15 +1526,21 @@ def _build_flagged_code_report(
             {
                 "filename": filename,
                 "file_ai_confidence": round(file_confidence, 6),
+                "raw_file_ai_confidence": round(file_raw_confidence, 6),
+                "confidence_adjusted": abs(file_confidence - file_raw_confidence) > 1e-9,
+                "confidence_adjustment": confidence_adjustment,
                 "file_threshold_used": round(file_threshold_used, 6),
                 "threshold_exceeded": bool(file_threshold_exceeded),
                 "file_flagged": bool(file_result.get("file_flagged")) or bool(file_threshold_exceeded),
                 "scoring_source": file_result.get("scoring_source"),
                 "detected_language": block_language,
                 "fallback_reason": file_result.get("fallback_reason"),
+                "signals": file_signals,
+                "file_profile": file_profile,
                 "extraction_note": extraction_note,
                 "block_count": len(scored_blocks),
                 "blocks": scored_blocks,
+                "full_file_code": file_code if file_code.strip() else None,
             }
         )
 
@@ -1386,10 +1554,14 @@ def _build_flagged_code_report(
         "evaluated_file_count": ai_snapshot.get("evaluated_file_count", len(file_results)),
         "analyzed_file_count": len(analyzed_files),
         "relevant_file_selection_reason": relevant_file_reason,
+        "auto_flag_policy": ai_snapshot.get("auto_flag_policy"),
+        "auto_flag_decision_reason": ai_snapshot.get("auto_flag_decision_reason"),
+        "auto_flag_evidence": ai_snapshot.get("auto_flag_evidence") or [],
         "files": analyzed_files,
         "disclaimer": (
             "Block-level scores are approximate review aids. The detector is primarily trained for file-level "
-            "prediction, so these blocks are not exact attribution or definitive proof."
+            "prediction, so these blocks are not exact attribution or definitive proof. Model output is advisory "
+            "and must be corroborated with human review."
         ),
     }
     return report, ai_snapshot
