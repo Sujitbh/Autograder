@@ -186,10 +186,12 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
         ReturnType<typeof submissionService.getPlagiarismScan>
     > | null>(null);
     const [compareOtherSubmissionId, setCompareOtherSubmissionId] = useState<number | null>(null);
+    const [showFlaggedCodePanel, setShowFlaggedCodePanel] = useState(false);
 
     useEffect(() => {
         setPlagiarismScanOverride(null);
         setCompareOtherSubmissionId(null);
+        setShowFlaggedCodePanel(false);
     }, [submissionId]);
 
     useEffect(() => {
@@ -224,6 +226,18 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     });
 
     const integrityForPanel = plagiarismScanOverride ?? detail?.integrity ?? null;
+    const hasPerFileAiResults = (integrityForPanel?.ai_detection.file_results?.length ?? 0) > 0;
+    const hasFlaggedAiContent = Boolean(
+        integrityForPanel?.ai_detection.threshold_exceeded ?? integrityForPanel?.ai_detection.ai_flagged
+    );
+    const canOpenFlaggedCode = Boolean(integrityForPanel && (hasFlaggedAiContent || hasPerFileAiResults));
+
+    const flaggedCodeQuery = useQuery({
+        queryKey: ['submission-flagged-code', submissionId],
+        queryFn: () => submissionService.getFlaggedCode(submissionId),
+        enabled: showFlaggedCodePanel && canOpenFlaggedCode,
+        staleTime: 60_000,
+    });
 
     const { data: assignmentSubmissions = [] } = useQuery({
         queryKey: ['faculty-assignment-submissions', detail?.assignment?.id],
@@ -1653,6 +1667,191 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
                                                                     </div>
                                                                 ))}
                                                             </div>
+                                                        </div>
+                                                    )}
+                                                    {canOpenFlaggedCode && (
+                                                        <div className="flex flex-wrap items-center gap-2" style={{ marginTop: 8 }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowFlaggedCodePanel((prev) => !prev)}
+                                                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded transition-all"
+                                                                style={{
+                                                                    backgroundColor: 'var(--color-surface)',
+                                                                    color: 'var(--color-text-dark)',
+                                                                    border: '1px solid var(--color-border)',
+                                                                    fontSize: 11,
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer',
+                                                                }}
+                                                            >
+                                                                <FileText className="w-3.5 h-3.5" />
+                                                                {showFlaggedCodePanel ? 'Hide flagged code' : 'Open flagged code'}
+                                                            </button>
+                                                            <span style={{ fontSize: 10, color: 'var(--color-text-light)' }}>
+                                                                Block-level analysis runs only when opened.
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {showFlaggedCodePanel && (
+                                                        <div
+                                                            style={{
+                                                                marginTop: 8,
+                                                                border: '1px solid var(--color-border)',
+                                                                borderRadius: 8,
+                                                                background: 'var(--color-surface)',
+                                                                padding: 8,
+                                                            }}
+                                                        >
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-dark)' }}>
+                                                                    Suspicious blocks (highest AI confidence first)
+                                                                </p>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => flaggedCodeQuery.refetch()}
+                                                                    disabled={flaggedCodeQuery.isFetching}
+                                                                    style={{
+                                                                        fontSize: 10,
+                                                                        fontWeight: 700,
+                                                                        color: 'var(--color-primary)',
+                                                                        background: 'transparent',
+                                                                        border: 'none',
+                                                                        cursor: 'pointer',
+                                                                        opacity: flaggedCodeQuery.isFetching ? 0.6 : 1,
+                                                                    }}
+                                                                >
+                                                                    Refresh
+                                                                </button>
+                                                            </div>
+                                                            {flaggedCodeQuery.isLoading && (
+                                                                <div className="flex items-center gap-2" style={{ marginTop: 6 }}>
+                                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--color-primary)' }} />
+                                                                    <span style={{ fontSize: 10, color: 'var(--color-text-mid)' }}>Analyzing code blocks...</span>
+                                                                </div>
+                                                            )}
+                                                            {flaggedCodeQuery.error && (
+                                                                <p style={{ marginTop: 6, fontSize: 10, color: '#B91C1C' }}>
+                                                                    Could not load flagged code details: {(flaggedCodeQuery.error as Error).message}
+                                                                </p>
+                                                            )}
+                                                            {flaggedCodeQuery.data && !flaggedCodeQuery.isLoading && (
+                                                                <div style={{ marginTop: 6 }}>
+                                                                    <p style={{ fontSize: 10, color: 'var(--color-text-light)', lineHeight: 1.5, marginBottom: 8 }}>
+                                                                        {flaggedCodeQuery.data.disclaimer}
+                                                                    </p>
+                                                                    {flaggedCodeQuery.data.files.length === 0 ? (
+                                                                        <p style={{ fontSize: 11, color: 'var(--color-text-mid)' }}>
+                                                                            No block-level regions were available to display for this submission.
+                                                                        </p>
+                                                                    ) : (
+                                                                        <div className="space-y-2">
+                                                                            {flaggedCodeQuery.data.files.map((flaggedFile, fileIndex) => (
+                                                                                <div
+                                                                                    key={`${flaggedFile.filename}-${fileIndex}`}
+                                                                                    style={{
+                                                                                        border: '1px solid var(--color-border)',
+                                                                                        borderRadius: 8,
+                                                                                        padding: 8,
+                                                                                        background: 'var(--color-surface-elevated)',
+                                                                                    }}
+                                                                                >
+                                                                                    <div className="flex items-center justify-between gap-2">
+                                                                                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-dark)' }}>
+                                                                                            {flaggedFile.filename}
+                                                                                        </span>
+                                                                                        <span
+                                                                                            style={{
+                                                                                                ...(flaggedFile.threshold_exceeded ? getRiskTagStyle('high') : getRiskTagStyle('low')),
+                                                                                                fontSize: '10px',
+                                                                                                fontWeight: 700,
+                                                                                                padding: '2px 8px',
+                                                                                                borderRadius: 999,
+                                                                                            }}
+                                                                                        >
+                                                                                            {(flaggedFile.file_ai_confidence * 100).toFixed(1)}%
+                                                                                        </span>
+                                                                                    </div>
+                                                                                    <p style={{ fontSize: 10, color: 'var(--color-text-mid)', marginTop: 2 }}>
+                                                                                        {flaggedFile.detected_language ?? 'unknown'} | {getScoringSourceLabel(flaggedFile.scoring_source)} | {flaggedFile.block_count} block(s)
+                                                                                    </p>
+                                                                                    {flaggedFile.extraction_note && (
+                                                                                        <p style={{ fontSize: 10, color: 'var(--color-text-light)', marginTop: 2 }}>
+                                                                                            Extraction: {flaggedFile.extraction_note}
+                                                                                        </p>
+                                                                                    )}
+                                                                                    {flaggedFile.blocks.length === 0 ? (
+                                                                                        <p style={{ fontSize: 10, color: 'var(--color-text-light)', marginTop: 6 }}>
+                                                                                            No scorable blocks found for this file.
+                                                                                        </p>
+                                                                                    ) : (
+                                                                                        <div className="space-y-2" style={{ marginTop: 6 }}>
+                                                                                            {flaggedFile.blocks.map((block, blockIndex) => (
+                                                                                                <div
+                                                                                                    key={`${flaggedFile.filename}-${block.block_id}-${blockIndex}`}
+                                                                                                    style={{
+                                                                                                        border: block.threshold_exceeded ? '1px solid #FCA5A5' : '1px solid var(--color-border)',
+                                                                                                        borderRadius: 8,
+                                                                                                        padding: 8,
+                                                                                                        background: block.threshold_exceeded ? '#FFF5F5' : 'var(--color-surface)',
+                                                                                                    }}
+                                                                                                >
+                                                                                                    <div className="flex items-center justify-between gap-2">
+                                                                                                        <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-text-dark)' }}>
+                                                                                                            {block.block_id}
+                                                                                                        </span>
+                                                                                                        <span
+                                                                                                            style={{
+                                                                                                                ...(block.threshold_exceeded ? getRiskTagStyle('high') : getRiskTagStyle('low')),
+                                                                                                                fontSize: '10px',
+                                                                                                                fontWeight: 700,
+                                                                                                                padding: '2px 8px',
+                                                                                                                borderRadius: 999,
+                                                                                                            }}
+                                                                                                        >
+                                                                                                            {block.score.toFixed(1)}%
+                                                                                                        </span>
+                                                                                                    </div>
+                                                                                                    <p style={{ fontSize: 10, color: 'var(--color-text-mid)', marginTop: 2 }}>
+                                                                                                        {block.block_type}
+                                                                                                        {block.start_line && block.end_line ? ` | lines ${block.start_line}-${block.end_line}` : ''}
+                                                                                                        {' | '}
+                                                                                                        {getScoringSourceLabel(block.scoring_source)}
+                                                                                                        {' | '}
+                                                                                                        {block.threshold_exceeded ? 'crossed threshold' : 'below threshold'}
+                                                                                                    </p>
+                                                                                                    {block.fallback_reason && (
+                                                                                                        <p style={{ fontSize: 10, color: 'var(--color-text-light)', marginTop: 2 }}>
+                                                                                                            Fallback: {block.fallback_reason}
+                                                                                                        </p>
+                                                                                                    )}
+                                                                                                    <pre
+                                                                                                        style={{
+                                                                                                            marginTop: 6,
+                                                                                                            marginBottom: 0,
+                                                                                                            padding: 8,
+                                                                                                            borderRadius: 6,
+                                                                                                            border: '1px solid var(--color-border)',
+                                                                                                            background: '#0F172A',
+                                                                                                            color: '#E2E8F0',
+                                                                                                            fontSize: 11,
+                                                                                                            lineHeight: 1.45,
+                                                                                                            overflowX: 'auto',
+                                                                                                            maxHeight: 260,
+                                                                                                            overflowY: 'auto',
+                                                                                                        }}
+                                                                                                    >
+                                                                                                        <code>{block.code}</code>
+                                                                                                    </pre>
+                                                                                                </div>
+                                                                                            ))}
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                     <p style={{ marginTop: 6, fontSize: '10px', color: 'var(--color-text-light)' }}>
