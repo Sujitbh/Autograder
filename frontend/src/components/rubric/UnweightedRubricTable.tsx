@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, GripVertical, MessageSquare, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, ChevronUp, GripVertical, MessageSquare, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -362,25 +362,39 @@ function DefaultCommentsEditorUnweighted({
     comments: Record<string, string>;
     onChange: (comments: Record<string, string>) => void;
 }) {
-    const [open, setOpen] = useState(() =>
-        Object.values(comments || {}).some((v) => (v ?? '').trim().length > 0),
+    const [open, setOpen] = useState(false);
+
+    const configuredCount = UNWEIGHTED_TIER_SCALE.reduce(
+        (sum, tier) => sum + ((comments?.[String(tier)] ?? '').trim().length > 0 ? 1 : 0),
+        0,
     );
+    const hasComments = configuredCount > 0;
 
     return (
         <div className="mt-2">
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-[#6B0000] hover:underline"
+                aria-expanded={open}
+                className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-2 py-1 text-[11px] font-medium text-gray-600 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100"
             >
+                {open ? (
+                    <ChevronDown className="h-3 w-3" />
+                ) : (
+                    <ChevronRight className="h-3 w-3" />
+                )}
                 <MessageSquare className="h-3 w-3" />
-                {open ? 'Hide auto feedback' : 'Add auto feedback for this criterion'}
+                <span>Auto feedback</span>
+                {hasComments && (
+                    <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                        {configuredCount}/{UNWEIGHTED_TIER_SCALE.length}
+                    </span>
+                )}
             </button>
             {open && (
-                <div className="mt-1 grid gap-1 rounded-md border border-dashed border-gray-300 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800/60">
+                <div className="mt-1.5 grid gap-1 rounded-md border border-dashed border-gray-300 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800/60">
                     <p className="text-[10px] text-gray-500">
-                        Shown to the student based on how close their score is to full credit.
-                        5 = full points, 0 = no points.
+                        Optional. Shown to the student based on how close their score is to full credit (5 = full points, 0 = no points).
                     </p>
                     {UNWEIGHTED_TIER_SCALE.map((tier) => (
                         <div key={tier} className="flex items-start gap-1.5">
