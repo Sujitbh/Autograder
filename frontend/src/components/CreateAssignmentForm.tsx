@@ -489,27 +489,39 @@ export function CreateAssignmentForm({
         mode: 'onChange',
     });
 
-    const formValues = useWatch({ control });
+    const getValuesRef = useRef(getValues);
+    getValuesRef.current = getValues;
 
     useEffect(() => {
         if (!persistWizardProgress) return;
         const key = getNewAssignmentWizardStorageKey(courseId);
-        const handle = window.setTimeout(() => {
-            try {
-                localStorage.setItem(
-                    key,
-                    JSON.stringify({
-                        v: 1,
-                        step: currentStep,
-                        data: getValues(),
-                    }),
-                );
-            } catch {
-                /* ignore quota / private mode */
-            }
-        }, 450);
-        return () => window.clearTimeout(handle);
-    }, [formValues, currentStep, persistWizardProgress, courseId, getValues]);
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        const scheduleSave = () => {
+            if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+            timeoutId = window.setTimeout(() => {
+                try {
+                    localStorage.setItem(
+                        key,
+                        JSON.stringify({
+                            v: 1,
+                            step: currentStep,
+                            data: getValuesRef.current(),
+                        }),
+                    );
+                } catch {
+                    /* ignore quota / private mode */
+                }
+            }, 450);
+        };
+        scheduleSave();
+        const subscription = watch(() => {
+            scheduleSave();
+        });
+        return () => {
+            subscription.unsubscribe();
+            if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+        };
+    }, [watch, persistWizardProgress, courseId, currentStep]);
 
     const sanitizeRubricForSubmission = useCallback((values: AssignmentFormData): AssignmentFormData => {
         return {

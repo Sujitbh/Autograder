@@ -319,7 +319,7 @@ export const submissionService = {
   /** Get full submission detail including file contents and test results. */
   async getSubmissionDetail(
     submissionId: string,
-    options?: { aiThreshold?: number }
+    options?: { aiThreshold?: number; signal?: AbortSignal }
   ): Promise<{
     id: number;
     status: string;
@@ -372,13 +372,12 @@ export const submissionService = {
     }>;
     integrity?: SubmissionIntegrityReport | null;
   }> {
-    const { data } = await withRetry(() =>
-      api.get(`/submissions/${submissionId}/detail`, {
-        params: options?.aiThreshold != null
-          ? { ai_threshold: options.aiThreshold }
-          : undefined,
-      })
-    );
+    const { data } = await api.get(`/submissions/${submissionId}/detail`, {
+      params: options?.aiThreshold != null
+        ? { ai_threshold: options.aiThreshold }
+        : undefined,
+      signal: options?.signal,
+    });
     return data;
   },
 
@@ -456,7 +455,13 @@ export const submissionService = {
   },
 
   /** List submissions for an assignment. */
-  async getSubmissions(assignmentId: string): Promise<Submission[]> {
+  async getSubmissions(assignmentId: string, signal?: AbortSignal): Promise<Submission[]> {
+    if (signal) {
+      const { data } = await api.get<BackendSubmission[]>(`/submissions/assignments/${assignmentId}`, {
+        signal,
+      });
+      return data.map(mapSubmission);
+    }
     const { data } = await withRetry(() =>
       api.get<BackendSubmission[]>(`/submissions/assignments/${assignmentId}`)
     );

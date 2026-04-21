@@ -42,10 +42,13 @@ function normalizeCriterion(
     criterionIndex: number
 ): RubricCriterion {
     const name = toStringValue(value.name, `Criterion ${criterionIndex + 1}`);
+    const rawId = (value as { id?: unknown }).id;
     const id =
-        typeof value.id === 'string' && value.id.trim().length > 0
-            ? value.id
-            : buildStableId(`criterion-s${sectionIndex + 1}`, criterionIndex, name);
+        typeof rawId === 'number' && Number.isFinite(rawId)
+            ? String(rawId)
+            : typeof rawId === 'string' && rawId.trim().length > 0
+              ? rawId.trim()
+              : buildStableId(`criterion-s${sectionIndex + 1}`, criterionIndex, name);
     const gradingMethod =
         value.gradingMethod === 'auto' || value.gradingMethod === 'hybrid' || value.gradingMethod === 'manual'
             ? value.gradingMethod
@@ -70,10 +73,13 @@ function normalizeSection(
     sectionIndex: number
 ): RubricSection {
     const name = toStringValue(value.name, `${DEFAULT_SECTION_NAME} ${sectionIndex + 1}`);
+    const rawSectionId = (value as { id?: unknown }).id;
     const id =
-        typeof value.id === 'string' && value.id.trim().length > 0
-            ? value.id
-            : buildStableId('section', sectionIndex, name);
+        typeof rawSectionId === 'number' && Number.isFinite(rawSectionId)
+            ? String(rawSectionId)
+            : typeof rawSectionId === 'string' && rawSectionId.trim().length > 0
+              ? rawSectionId.trim()
+              : buildStableId('section', sectionIndex, name);
     const rawCriteria = Array.isArray(value.criteria) ? value.criteria : [];
 
     return {

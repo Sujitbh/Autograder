@@ -78,6 +78,33 @@ const FILE_ICONS: Record<string, string> = {
   java: '☕', cpp: '⚙️', c: '⚙️', js: '🟨', ts: '🔷',
   html: '🌐', css: '🎨', json: '{}', md: '📝', txt: '📄',
 };
+function lookupDefaultCommentForTier(
+  defaultComments: Record<string, string> | null | undefined,
+  tierKey: string,
+): string {
+  if (!defaultComments || !tierKey) return '';
+  const direct = defaultComments[tierKey];
+  if (direct && direct.trim()) return direct.trim();
+  const n = Number(tierKey);
+  if (Number.isFinite(n)) {
+    const alt = defaultComments[String(n)];
+    if (alt && alt.trim()) return alt.trim();
+  }
+  return '';
+}
+
+function buildCriterionFeedbackFallback(
+  isWeighted: boolean,
+  saved: { grade: number; points_awarded: number },
+  maxPts: number,
+): string {
+  if (isWeighted) {
+    return `Your rating on this criterion is ${saved.grade} out of ${maxPts}.`;
+  }
+  const pts = Number(saved.points_awarded) || 0;
+  return `You earned ${formatPointValue(pts)} out of ${formatPointValue(maxPts)} points on this criterion.`;
+}
+
 function getFileIcon(name: string) {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   if (ext === 'py') return (
@@ -281,21 +308,31 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
   }, [assignmentId]);
 
   const course = courses?.find((c) => c.id === courseId);
-  const latestSubmission = submissions && submissions.length > 0 ? submissions[0] : null;
+  const submissionsSorted = useMemo(() => {
+    if (!submissions?.length) return [];
+    return [...submissions].sort((a, b) => {
+      const tb = new Date(b.submittedAt || 0).getTime();
+      const ta = new Date(a.submittedAt || 0).getTime();
+      if (tb !== ta) return tb - ta;
+      return Number(b.id) - Number(a.id);
+    });
+  }, [submissions]);
+  const latestSubmission = submissionsSorted[0] ?? null;
 
   // Pull per-criterion grades (0-5) that the instructor/TA saved during grading
   // so the student can see what they got on each rubric row and the matching
   // automated feedback (default comments) from the weighted rubric.
   const latestSubmissionIdNum = latestSubmission ? Number(latestSubmission.id) : null;
   const hasGradeForLatest = !!latestSubmission?.grade;
+  const shouldLoadCriterionScores =
+    latestSubmissionIdNum != null &&
+    Number.isFinite(latestSubmissionIdNum) &&
+    latestSubmissionIdNum > 0 &&
+    (hasGradeForLatest || latestSubmission?.status === 'graded');
   const { data: criterionScoreRows } = useQuery({
     queryKey: ['submission-criterion-scores', latestSubmissionIdNum],
     queryFn: () => submissionService.getSubmissionCriterionScores(latestSubmissionIdNum!),
-    enabled:
-      latestSubmissionIdNum != null &&
-      Number.isFinite(latestSubmissionIdNum) &&
-      latestSubmissionIdNum > 0 &&
-      hasGradeForLatest,
+    enabled: shouldLoadCriterionScores,
   });
   const criterionScoreByCriterionId = useMemo(() => {
     const m = new Map<string, { grade: number; points_awarded: number; feedback: string | null }>();
@@ -1307,12 +1344,22 @@ export function StudentAssignmentDetail({ courseId, assignmentId }: StudentAssig
                                       }
                                     }
 
+                                    const instructorComment =
+                                      savedScore?.feedback && savedScore.feedback.trim().length > 0
+                                        ? savedScore.feedback.trim()
+                                        : '';
+                                    const tierAutoComment =
+                                      hasSavedGrade && feedbackTierKey != null
+                                        ? lookupDefaultCommentForTier(criterion.defaultComments, feedbackTierKey)
+                                        : '';
                                     const autoFeedback = hasSavedGrade
-                                      ? (savedScore!.feedback && savedScore!.feedback.trim().length > 0
-                                          ? savedScore!.feedback
-                                          : (feedbackTierKey != null
-                                              ? criterion.defaultComments?.[feedbackTierKey] ?? ''
-                                              : ''))
+                                      ? instructorComment ||
+                                        tierAutoComment ||
+                                        buildCriterionFeedbackFallback(
+                                          isWeightedRubric,
+                                          savedScore!,
+                                          maxPointsForCriterion,
+                                        )
                                       : '';
                                     const descriptionText =
                                       (autoFeedback && autoFeedback.trim().length > 0)

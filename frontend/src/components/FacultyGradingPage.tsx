@@ -122,8 +122,13 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
 
     const { data: detail, isLoading, error } = useQuery({
         queryKey: ['faculty-submission-detail', submissionId],
-        queryFn: () => submissionService.getSubmissionDetail(submissionId),
+        queryFn: ({ signal }) => submissionService.getSubmissionDetail(submissionId, { signal }),
     });
+
+    /** Ignore stale detail if it does not match the URL (avoids out-of-order fetches mixing rosters). */
+    const detailMatchesSubmission = Boolean(detail && String(detail.id) === String(submissionId));
+    const rosterAssignmentId =
+        detailMatchesSubmission && detail?.assignment?.id != null ? detail.assignment.id : null;
 
     const studentIdentityLabel = detail?.student?.name?.trim()
         ? detail.student.name
@@ -236,15 +241,20 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     const canOpenFlaggedCode = Boolean(integrityForPanel && (hasFlaggedAiContent || hasPerFileAiResults));
 
     const { data: assignmentSubmissions = [] } = useQuery({
-        queryKey: ['faculty-assignment-submissions', detail?.assignment?.id],
-        queryFn: () => submissionService.getSubmissions(String(detail!.assignment.id)),
-        enabled: !!detail?.assignment?.id,
+        queryKey: ['faculty-assignment-submissions', rosterAssignmentId],
+        queryFn: ({ signal }) => submissionService.getSubmissions(String(rosterAssignmentId!), signal),
+        enabled: typeof rosterAssignmentId === 'number' && rosterAssignmentId > 0,
     });
 
+    const assignmentSubmissionsForRoster = useMemo(() => {
+        if (rosterAssignmentId == null) return [];
+        return assignmentSubmissions.filter((s) => String(s.assignmentId) === String(rosterAssignmentId));
+    }, [assignmentSubmissions, rosterAssignmentId]);
+
     const { data: assignmentTestcases = [] } = useQuery({
-        queryKey: ['faculty-assignment-testcases', detail?.assignment?.id],
-        queryFn: () => submissionService.getAssignmentTestcases(String(detail!.assignment.id)),
-        enabled: !!detail?.assignment?.id,
+        queryKey: ['faculty-assignment-testcases', rosterAssignmentId],
+        queryFn: () => submissionService.getAssignmentTestcases(String(rosterAssignmentId!)),
+        enabled: typeof rosterAssignmentId === 'number' && rosterAssignmentId > 0,
     });
 
     // Helper: flatten rubric sections into flat array of criteria for scoring
@@ -568,10 +578,10 @@ export default function FacultyGradingPage({ courseId, submissionId }: Readonly<
     }, [rubrics, autoGradeMutation, distributeScoreAcrossRubrics, getCriterionScaleMax, isWeightedRubric, rubricScores, weightedMaxTotal]);
 
     const sortedAssignmentSubmissions = useMemo(
-        () => [...assignmentSubmissions].sort(
+        () => [...assignmentSubmissionsForRoster].sort(
             (a, b) => new Date(b.submittedAt ?? 0).getTime() - new Date(a.submittedAt ?? 0).getTime()
         ),
-        [assignmentSubmissions]
+        [assignmentSubmissionsForRoster]
     );
 
     const studentLatestSubmissions = useMemo(() => {
