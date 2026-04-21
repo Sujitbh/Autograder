@@ -11,7 +11,6 @@ from app.models.user import User
 from app.models.course import Course
 from app.models.assignment import Assignment
 from app.models.submission import Submission
-from app.models.submission_file import SubmissionFile
 from app.models.submission_result import SubmissionResult
 from app.models.submission_rubric_score import SubmissionRubricScore
 from app.models.rubric import Rubric
@@ -19,7 +18,6 @@ from app.models.enrollment import Enrollment
 from app.models.testcase import TestCase
 from app.models.rubric_section import RubricSection
 from app.models.ta_permission import TAPermission
-from app.services.execution_service import ExecutionService
 from app.services.grading_service import GradingService
 
 router = APIRouter(prefix="/ta-dashboard", tags=["ta-dashboard"])
@@ -534,7 +532,7 @@ def ta_run_tests(
     user: User = Depends(get_current_user),
 ):
     """Run all test cases against a submission. Requires can_run_tests."""
-    import logging, traceback, os
+    import logging, traceback
     logger = logging.getLogger(__name__)
     try:
         enrollment = _require_ta_for_course(db, user.id, course_id)
@@ -557,55 +555,21 @@ def ta_run_tests(
         if not testcases:
             raise HTTPException(status_code=400, detail="No test cases configured for this assignment")
 
-        # Read main submission file
-        files = db.query(SubmissionFile).filter(
-            SubmissionFile.submission_id == submission.id
-        ).all()
-        if not files:
-            raise HTTPException(status_code=400, detail="No files in submission")
-
-        main_file = files[0]
-        actual_path = main_file.path
-        if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
-            from app.settings import settings
-            from pathlib import Path
-            actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
-
-        if not actual_path or not os.path.exists(actual_path):
-            raise HTTPException(status_code=400, detail="Submission file not found on disk")
-
-        with open(actual_path, "r", errors="replace") as fh:
-            code = fh.read()
-
-        language = ExecutionService.detect_language(main_file.filename) or "python"
-
-        # Clear old results for this submission
-        db.query(SubmissionResult).filter(
-            SubmissionResult.submission_id == submission.id
-        ).delete()
-        db.flush()
-
-        # Run all test cases
-        execution_results = ExecutionService.run_all_testcases(
-            code=code,
-            language=language,
-            testcases=testcases,
+        grading_results = GradingService.grade_submission(
+            db=db,
+            submission_id=submission.id,
+            run_tests=True,
+            apply_rubric=False,
+            grader_id=user.id,
         )
-
-        # Store results in database
-        for result in execution_results["results"]:
-            db_result = SubmissionResult(
-                submission_id=submission.id,
-                testcase_id=result["testcase_id"],
-                passed=result["passed"],
-                output=result["actual_output"],
-                error_output=result.get("stderr", ""),
-                points_awarded=result["points_earned"],
-                execution_time_ms=result.get("execution_time_ms"),
-            )
-            db.add(db_result)
-
-        db.commit()
+        execution_results = grading_results.get("test_results") or {
+            "total_testcases": 0,
+            "passed_testcases": 0,
+            "total_points": 0,
+            "earned_points": 0,
+            "score_percentage": 0,
+            "results": [],
+        }
 
         # Return results including test case details
         stored_results = db.query(SubmissionResult).filter(

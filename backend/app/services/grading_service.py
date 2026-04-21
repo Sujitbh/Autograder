@@ -11,6 +11,8 @@ This service provides:
 from typing import Optional, List
 from datetime import datetime
 import os
+import re
+from pathlib import Path
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 
@@ -24,6 +26,126 @@ from app.services.execution_service import ExecutionService
 
 class GradingService:
     """Service for grading student submissions."""
+
+    @staticmethod
+    def _resolve_submission_file_path(raw_path: str) -> str:
+        """Resolve stored submission path to an absolute on-disk path when needed."""
+        actual_path = raw_path
+        if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
+            from app.settings import settings
+            actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
+        return actual_path
+
+    @staticmethod
+    def _select_java_entry_filename(workspace_files: list[dict[str, str]]) -> Optional[str]:
+        """
+        Pick the Java entry file for multi-file submissions.
+        Prefer files that contain a main method, and strongly prefer when the
+        public class name matches the filename stem.
+        """
+        java_files = [
+            f for f in workspace_files
+            if ExecutionService.detect_language(str(f.get("name", ""))) == "java"
+        ]
+        if not java_files:
+            return None
+
+        main_pattern = re.compile(r"\bpublic\s+static\s+void\s+main\s*\(")
+        public_class_pattern = re.compile(r"\bpublic\s+class\s+([A-Za-z_]\w*)")
+        candidates: list[tuple[int, str]] = []
+
+        for file_obj in java_files:
+            filename = str(file_obj.get("name", ""))
+            content = str(file_obj.get("content", ""))
+            if not main_pattern.search(content):
+                continue
+
+            file_stem = Path(filename).stem
+            public_class_match = public_class_pattern.search(content)
+            public_class_name = public_class_match.group(1) if public_class_match else None
+
+            score = 1
+            if public_class_name and public_class_name == file_stem:
+                score = 3
+            elif public_class_name:
+                score = 2
+
+            candidates.append((score, filename))
+
+        if candidates:
+            candidates.sort(key=lambda item: (-item[0], item[1]))
+            return candidates[0][1]
+
+        return str(java_files[0].get("name", "")) or None
+
+    @staticmethod
+    def _load_submission_workspace(
+        files: list[SubmissionFile],
+    ) -> tuple[list[dict[str, str]], str, str, Optional[str]]:
+        """
+        Load all submission files into an execution workspace and select entry file.
+
+        Returns:
+            (workspace_files, language, entry_code, entry_filename)
+        """
+        workspace_files: list[dict[str, str]] = []
+        load_errors: list[str] = []
+        for file_row in sorted(files, key=lambda f: f.id or 0):
+            actual_path = GradingService._resolve_submission_file_path(file_row.path)
+            if not actual_path or not os.path.exists(actual_path):
+                load_errors.append(
+                    f"Missing file: '{actual_path or file_row.path}'"
+                )
+                continue
+
+            try:
+                with open(actual_path, "r", errors="replace") as fh:
+                    content = fh.read()
+            except Exception as e:
+                load_errors.append(f"Error reading {actual_path}: {str(e)}")
+                continue
+
+            filename = (file_row.filename or "").strip() or Path(actual_path).name
+            workspace_files.append({
+                "name": filename,
+                "content": content,
+            })
+
+        if not workspace_files:
+            detail = "; ".join(load_errors) if load_errors else "No files in submission"
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=detail,
+            )
+
+        # Detect language from available files.
+        language = "python"
+        for file_obj in workspace_files:
+            detected = ExecutionService.detect_language(str(file_obj.get("name", "")))
+            if detected:
+                language = detected
+                break
+
+        # Select entry file.
+        entry_filename: Optional[str] = None
+        if language == "java":
+            entry_filename = GradingService._select_java_entry_filename(workspace_files)
+
+        if entry_filename is None:
+            for file_obj in workspace_files:
+                if ExecutionService.detect_language(str(file_obj.get("name", ""))) == language:
+                    entry_filename = str(file_obj.get("name", ""))
+                    break
+
+        if entry_filename is None:
+            entry_filename = str(workspace_files[0].get("name", ""))
+
+        entry_code = next(
+            (str(file_obj.get("content", "")) for file_obj in workspace_files if str(file_obj.get("name", "")) == entry_filename),
+            str(workspace_files[0].get("content", "")),
+        )
+
+        return workspace_files, language, entry_code, entry_filename
 
     @staticmethod
     def grade_submission(
@@ -77,39 +199,18 @@ class GradingService:
             "feedback": [],
         }
 
-        # Read main code file
-        main_file = files[0]  # TODO: Better logic to identify main file
-        actual_path = main_file.path
-        if actual_path and not os.path.isabs(actual_path) and actual_path.startswith("data/"):
-            from app.settings import settings
-            from pathlib import Path
-            actual_path = str(Path(settings.DATA_ROOT) / actual_path[5:])
-
-        if not actual_path or not __import__("os").path.exists(actual_path):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error reading submission file: [Errno 2] No such file or directory: '{actual_path or main_file.path}'",
-            )
-
-        try:
-            with open(actual_path, "r", errors="replace") as f:
-                code = f.read()
-        except Exception as e:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error reading submission file {actual_path}: {str(e)}",
-            )
-
-        # Detect language
-        language = ExecutionService.detect_language(main_file.filename)
-        if not language:
-            language = "python"  # Default fallback
+        workspace_files, language, code, entry_filename = GradingService._load_submission_workspace(files)
 
         test_results = None
         # Run test cases
         if run_tests:
             test_results = GradingService._run_tests(
-                db, submission, code, language
+                db,
+                submission,
+                code,
+                language,
+                files=workspace_files,
+                entry_filename=entry_filename,
             )
             results["test_results"] = test_results
             # We only add test_results["earned_points"] to total_score ONLY IF 
@@ -186,6 +287,9 @@ class GradingService:
         submission: Submission,
         code: str,
         language: str,
+        *,
+        files: Optional[list[dict[str, str]]] = None,
+        entry_filename: Optional[str] = None,
     ) -> dict:
         """Run test cases against submission code."""
         # Get test cases for assignment
@@ -207,6 +311,8 @@ class GradingService:
             code=code,
             language=language,
             testcases=testcases,
+            files=files,
+            entry_filename=entry_filename,
         )
 
         # Replace any prior test results for this submission so repeated grading
@@ -223,7 +329,9 @@ class GradingService:
                 testcase_id=result["testcase_id"],
                 passed=result["passed"],
                 output=result["actual_output"],
+                error_output=result.get("stderr", ""),
                 points_awarded=result["points_earned"],
+                execution_time_ms=result.get("execution_time_ms"),
             )
             db.add(db_result)
 

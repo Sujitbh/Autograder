@@ -582,6 +582,8 @@ class ExecutionService:
         language: str,
         input_data: str,
         expected_output: str,
+        entry_filename: Optional[str] = None,
+        files: Optional[list[dict[str, str]]] = None,
     ) -> dict:
         """
         Run code against a single test case.
@@ -593,6 +595,8 @@ class ExecutionService:
             code=code,
             language=language,
             stdin_input=input_data,
+            entry_filename=entry_filename,
+            files=files,
         )
 
         actual = result.stdout
@@ -671,6 +675,8 @@ class ExecutionService:
         code: str,
         language: str,
         testcases: list,
+        entry_filename: Optional[str] = None,
+        files: Optional[list[dict[str, str]]] = None,
     ) -> dict:
         """
         Run code against all test cases.
@@ -707,6 +713,8 @@ class ExecutionService:
                 language=language,
                 input_data=input_data or "",
                 expected_output=expected_output or "",
+                entry_filename=entry_filename,
+                files=files,
             )
 
             result["testcase_id"] = tc_id
