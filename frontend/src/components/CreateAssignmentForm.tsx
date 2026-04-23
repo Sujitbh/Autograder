@@ -495,7 +495,7 @@ export function CreateAssignmentForm({
     useEffect(() => {
         if (!persistWizardProgress) return;
         const key = getNewAssignmentWizardStorageKey(courseId);
-        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        let timeoutId: number | undefined;
         const scheduleSave = () => {
             if (timeoutId !== undefined) window.clearTimeout(timeoutId);
             timeoutId = window.setTimeout(() => {

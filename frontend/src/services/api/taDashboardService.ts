@@ -265,6 +265,22 @@ export const taDashboardService = {
         feedback: string | null;
         percentage: number;
         message: string;
+        /** Present when backend runs rubric evaluation (see `GradingService.grade_submission`). */
+        rubric_results?: {
+            evaluations?: Array<{
+                rubric_id?: number;
+                criterion_id?: number;
+                earned_points?: number | null;
+                max_points?: number;
+                grade?: number;
+                points_awarded?: number;
+                feedback?: string;
+            }>;
+            earned_points?: number;
+            total_points?: number;
+            has_test_rubric?: boolean;
+        } | null;
+        test_results?: unknown;
         stored_results: Array<{
             id: number;
             testcase_id: number | null;

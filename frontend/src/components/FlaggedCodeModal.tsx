@@ -107,7 +107,7 @@ export function FlaggedCodeModal({
     const submissionKey = String(submissionId);
     const { data, isLoading, error } = useQuery({
         queryKey: ['submission-flagged-code', submissionKey],
-        queryFn: () => submissionService.getFlaggedCode(Number(submissionKey)),
+        queryFn: () => submissionService.getFlaggedCode(submissionKey),
         enabled: open && !!submissionKey,
         staleTime: 60_000,
     });

@@ -218,15 +218,18 @@ export default function TAGradingPage({ courseId, submissionId }: Readonly<TAGra
         message: string;
         rubric_results?: {
             evaluations?: Array<{
-                rubric_id: number;
+                rubric_id?: number;
                 criterion_id?: number;
-                earned_points: number;
+                earned_points?: number | null;
                 max_points?: number;
                 grade?: number;
                 points_awarded?: number;
                 feedback?: string;
             }>;
-        };
+            earned_points?: number;
+            total_points?: number;
+            has_test_rubric?: boolean;
+        } | null;
     } | null>(null);
 
     // Per-criterion grading state. Keys are criterion ids; values are strings
